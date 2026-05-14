@@ -1,0 +1,6 @@
+MasterSheetPath=D:\Kshipa\PlantHMI\hmi\VAPR067_Master Sheet_V08 2 1.xlsx
+ProjectRoot=D:\Kshipa\PlantHMI\hmi\MyPlantHMI
+DeviceCount=56
+AlarmCount=460
+MappedAlarms=166
+UnmappedAlarms=294

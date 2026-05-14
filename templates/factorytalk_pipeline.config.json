@@ -1,0 +1,51 @@
+{
+  "sheets": {
+    "device": {
+      "name": "Device",
+      "startRow": 2,
+      "columns": {
+        "EquipmentName": 4,
+        "EquipmentCode": 5,
+        "DeviceType": 6,
+        "PlcTag": 7
+      }
+    },
+    "alarm": {
+      "name": "Alarms",
+      "headerSearchMaxRow": 30,
+      "headerToken": "ErrorCode",
+      "maxBlankRowsBeforeStop": 8,
+      "columns": {
+        "SrNo": 2,
+        "ErrorCode": 3,
+        "Device": 6,
+        "AlarmDescription": 7,
+        "AlarmMessage": 8
+      }
+    }
+  },
+  "defaults": {
+    "shortcut": "Offline",
+    "alarmSeverity": "500",
+    "ackRequired": "true",
+    "alarmTriggerTemplate": "{PlcTag}.Alarm.{ErrorCode}",
+    "defaultTemplate": "generic_equipment",
+    "defaultGlobalObject": "Motor"
+  },
+  "deviceTypeToTemplate": {
+    "C3-SERVO": "servo_drive",
+    "C5-SERVO": "servo_drive",
+    "CMMT-ST": "servo_drive",
+    "PF525": "vfd_drive",
+    "DOL": "dol_motor",
+    "ABB": "robot"
+  },
+  "deviceTypeToGlobalObject": {
+    "C3-SERVO": "Motor",
+    "C5-SERVO": "Motor",
+    "CMMT-ST": "Motor",
+    "PF525": "Motor",
+    "DOL": "Motor",
+    "ABB": "Motor"
+  }
+}

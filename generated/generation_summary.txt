@@ -1,6 +1,11 @@
 MasterSheetPath=D:\Kshipa\PlantHMI\hmi\VAPR067_Master Sheet_V08 2 1.xlsx
 ProjectRoot=D:\Kshipa\PlantHMI\hmi\MyPlantHMI
-DeviceCount=56
+ProjectApplicationName=MyPlantHMI
+ProjectMedFile=D:\Kshipa\PlantHMI\hmi\MyPlantHMI\MyPlantHMI.med
+DeviceCount=62
+DevicesMissingPlcTag=6
 AlarmCount=460
-MappedAlarms=166
-UnmappedAlarms=294
+MappedAlarms=168
+AmbiguousAlarms=0
+UnmappedAlarms=292
+DuplicateDeviceKeys=2

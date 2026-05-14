@@ -20,12 +20,23 @@ Input CSV:
 
 - `templates/equipment_list.csv`
 - Columns: `Equipment`, `Template`, `Shortcut`
+- Optional columns: `HmiBasePath`, `PlcBasePath`
 - Supported `Template` values: `pallet_dispenser`, `stopper`
 
 Run from workspace root:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/generate_hmi_tags.ps1 -EquipmentFile templates/equipment_list.csv -OutputFile generated/hmi_tags.csv
+```
+
+If HMI and PLC paths differ, you can override the templates:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/generate_hmi_tags.ps1 `
+	-EquipmentFile templates/equipment_list.csv `
+	-OutputFile generated/hmi_tags.csv `
+	-HmiTagTemplate "{HmiBasePath}.{Suffix}" `
+	-PlcReferenceTemplate "[{Shortcut}]Program:MainProgram.{PlcTagPath}"
 ```
 
 Output:

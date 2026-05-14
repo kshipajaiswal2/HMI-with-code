@@ -1,4 +1,11 @@
 {
+  "project": {
+    "requiredDirectories": [
+      "Gfx",
+      "Global Objects",
+      "TAG"
+    ]
+  },
   "sheets": {
     "device": {
       "name": "Device",
@@ -28,9 +35,11 @@
     "shortcut": "Offline",
     "alarmSeverity": "500",
     "ackRequired": "true",
+    "devicePlcReferenceTemplate": "[{Shortcut}]{PlcTag}",
     "alarmTriggerTemplate": "{PlcTag}.Alarm.{ErrorCode}",
     "defaultTemplate": "generic_equipment",
-    "defaultGlobalObject": "Motor"
+    "defaultGlobalObject": "Motor",
+    "screenNameTemplate": "EQP_{EquipmentCode}"
   },
   "deviceTypeToTemplate": {
     "C3-SERVO": "servo_drive",

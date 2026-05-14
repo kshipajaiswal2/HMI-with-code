@@ -18,9 +18,12 @@ This setup lets you replace the master sheet and restored project folder for oth
 
 The config controls:
 
+- FactoryTalk project structure validation
 - Worksheet names
 - Column indexes
 - Default shortcut/severity
+- Device PLC reference template
+- Screen naming template
 - Device type to template/global object mapping
 
 ## Run
@@ -41,7 +44,25 @@ From workspace root:
 - `generated/alarms_seed.csv`
 - `generated/screen_spec.csv`
 - `generated/global_object_params.csv`
+- `generated/device_key_issues.csv`
 - `generated/generation_summary.txt`
+
+## Validation and Reporting
+
+The script now validates that the supplied `ProjectRoot` looks like a real FactoryTalk source project.
+
+By default it checks for:
+
+- a `.med` file in the root
+- `Gfx`
+- `Global Objects`
+- `TAG`
+
+It also reports:
+
+- devices with missing PLC tags
+- ambiguous device-key matches
+- duplicate normalized device keys in `generated/device_key_issues.csv`
 
 ## How To Reuse For Another Project
 
@@ -49,6 +70,25 @@ From workspace root:
 2. Restore the new project from `.apa` and place the folder in `hmi/`.
 3. Update `templates/factorytalk_pipeline.config.json` if the worksheet names or columns changed.
 4. Re-run the same script with new `-MasterSheetPath` and `-ProjectRoot` values.
+
+## HMI Tag Generator Reuse
+
+The simple tag generator also supports reusable naming.
+
+Run:
+
+```powershell
+.\scripts\generate_hmi_tags.ps1 `
+  -EquipmentFile templates/equipment_list.csv `
+  -OutputFile generated/hmi_tags.csv `
+  -HmiTagTemplate "{HmiBasePath}.{Suffix}" `
+  -PlcReferenceTemplate "[{Shortcut}]Program:MainProgram.{PlcTagPath}"
+```
+
+Optional CSV columns:
+
+- `HmiBasePath`
+- `PlcBasePath`
 
 ## Notes
 

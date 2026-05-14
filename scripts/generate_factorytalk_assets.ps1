@@ -46,6 +46,21 @@ function Normalize-Key {
     return [regex]::Replace($compact, '\d+', { param($m) ([int]$m.Value).ToString() })
 }
 
+function Expand-Template {
+    param(
+        [string]$Template,
+        [hashtable]$Tokens
+    )
+
+    $expanded = $Template
+    foreach ($key in $Tokens.Keys) {
+        $replacement = if ($null -eq $Tokens[$key]) { "" } else { [string]$Tokens[$key] }
+        $expanded = $expanded.Replace("{$key}", $replacement)
+    }
+
+    return $expanded
+}
+
 function Get-Worksheet {
     param(
         $Workbook,
@@ -72,6 +87,38 @@ function Get-ExcelWorkbook {
     return @($excel, $workbook)
 }
 
+function Get-ProjectMetadata {
+    param(
+        [string]$ProjectRoot,
+        [string[]]$RequiredDirectories
+    )
+
+    $medFiles = @(Get-ChildItem -LiteralPath $ProjectRoot -Filter *.med -File -ErrorAction Stop)
+    if (-not $medFiles -or $medFiles.Count -eq 0) {
+        throw "No .med project file found in project root: $ProjectRoot"
+    }
+
+    $missingDirectories = New-Object System.Collections.Generic.List[string]
+    foreach ($directory in $RequiredDirectories) {
+        $fullPath = Join-Path -Path $ProjectRoot -ChildPath $directory
+        if (-not (Test-Path -LiteralPath $fullPath -PathType Container)) {
+            $missingDirectories.Add($directory)
+        }
+    }
+
+    if ($missingDirectories.Count -gt 0) {
+        throw "Project root is missing required FactoryTalk directories: $($missingDirectories -join ', ')"
+    }
+
+    return [PSCustomObject]@{
+        ProjectRoot         = $ProjectRoot
+        ApplicationName     = [System.IO.Path]::GetFileNameWithoutExtension($medFiles[0].Name)
+        MedFilePath         = $medFiles[0].FullName
+        MedFileCount        = $medFiles.Count
+        RequiredDirectories = ($RequiredDirectories -join ';')
+    }
+}
+
 function Close-ExcelWorkbook {
     param(
         $Excel,
@@ -92,12 +139,119 @@ function Close-ExcelWorkbook {
     [GC]::WaitForPendingFinalizers()
 }
 
+function Add-LookupValue {
+    param(
+        [hashtable]$Lookup,
+        [string]$Key,
+        $Value
+    )
+
+    if (-not $Key) {
+        return
+    }
+
+    if (-not $Lookup.ContainsKey($Key)) {
+        $Lookup[$Key] = New-Object System.Collections.Generic.List[object]
+    }
+
+    $Lookup[$Key].Add($Value)
+}
+
+function Get-LookupIssues {
+    param(
+        [hashtable]$Lookup,
+        [string]$KeyType
+    )
+
+    $issues = New-Object System.Collections.Generic.List[object]
+    foreach ($entry in $Lookup.GetEnumerator()) {
+        if ($entry.Value.Count -le 1) {
+            continue
+        }
+
+        $issues.Add([PSCustomObject]@{
+                KeyType          = $KeyType
+                NormalizedKey    = $entry.Key
+                MatchCount       = $entry.Value.Count
+                EquipmentCodes   = ($entry.Value | ForEach-Object { $_.EquipmentCode } | Sort-Object -Unique) -join '; '
+                EquipmentNames   = ($entry.Value | ForEach-Object { $_.EquipmentName } | Sort-Object -Unique) -join '; '
+                PlcTags          = ($entry.Value | ForEach-Object { $_.PlcTag } | Where-Object { $_ } | Sort-Object -Unique) -join '; '
+            })
+    }
+
+    return $issues
+}
+
+function Resolve-DeviceMatch {
+    param(
+        [string]$DeviceText,
+        [hashtable]$DeviceByNameKey,
+        [hashtable]$DeviceByCodeKey
+    )
+
+    $deviceKey = Normalize-Key -Value $DeviceText
+    if (-not $deviceKey) {
+        return [PSCustomObject]@{
+            Status          = "Unmapped"
+            MatchSource     = "None"
+            Device          = $null
+            CandidateCodes  = ""
+        }
+    }
+
+    if ($DeviceByNameKey.ContainsKey($deviceKey)) {
+        $nameMatches = $DeviceByNameKey[$deviceKey]
+        if ($nameMatches.Count -eq 1) {
+            return [PSCustomObject]@{
+                Status         = "MatchedByName"
+                MatchSource    = "Name"
+                Device         = $nameMatches[0]
+                CandidateCodes = ($nameMatches | ForEach-Object { $_.EquipmentCode } | Sort-Object -Unique) -join '; '
+            }
+        }
+
+        return [PSCustomObject]@{
+            Status         = "Ambiguous"
+            MatchSource    = "Name"
+            Device         = $null
+            CandidateCodes = ($nameMatches | ForEach-Object { $_.EquipmentCode } | Sort-Object -Unique) -join '; '
+        }
+    }
+
+    if ($DeviceByCodeKey.ContainsKey($deviceKey)) {
+        $codeMatches = $DeviceByCodeKey[$deviceKey]
+        if ($codeMatches.Count -eq 1) {
+            return [PSCustomObject]@{
+                Status         = "MatchedByCode"
+                MatchSource    = "Code"
+                Device         = $codeMatches[0]
+                CandidateCodes = ($codeMatches | ForEach-Object { $_.EquipmentCode } | Sort-Object -Unique) -join '; '
+            }
+        }
+
+        return [PSCustomObject]@{
+            Status         = "Ambiguous"
+            MatchSource    = "Code"
+            Device         = $null
+            CandidateCodes = ($codeMatches | ForEach-Object { $_.EquipmentCode } | Sort-Object -Unique) -join '; '
+        }
+    }
+
+    return [PSCustomObject]@{
+        Status          = "Unmapped"
+        MatchSource     = "None"
+        Device          = $null
+        CandidateCodes  = ""
+    }
+}
+
 function Read-DeviceRows {
     param(
         $Worksheet,
         $Columns,
         [int]$StartRow,
-        [string]$Shortcut
+        [string]$Shortcut,
+        [string]$DevicePlcReferenceTemplate
     )
 
     $rows = New-Object System.Collections.Generic.List[object]
@@ -117,8 +271,15 @@ function Read-DeviceRows {
             $equipmentCode = $plcTag
         }
 
-        if ([string]::IsNullOrWhiteSpace($plcTag)) {
-            continue
+        $plcReference = ""
+        if (-not [string]::IsNullOrWhiteSpace($plcTag)) {
+            $plcReference = Expand-Template -Template $DevicePlcReferenceTemplate -Tokens @{
+                Shortcut      = $Shortcut
+                PlcTag        = $plcTag
+                EquipmentCode = $equipmentCode
+                EquipmentName = $equipmentName
+                DeviceType    = $deviceType
+            }
         }
 
         $rows.Add([PSCustomObject]@{
@@ -128,7 +289,8 @@ function Read-DeviceRows {
                 DeviceType    = $deviceType
                 PlcTag        = $plcTag
                 Shortcut      = $Shortcut
-                PlcReference  = "[$Shortcut]$plcTag"
+                PlcReference  = $plcReference
+                PlcTagStatus  = if ([string]::IsNullOrWhiteSpace($plcTag)) { "MissingPlcTag" } else { "Ready" }
             })
     }
 
@@ -193,22 +355,20 @@ function Read-AlarmRows {
             continue
         }
 
-        $deviceObj = $null
-        $deviceKey = Normalize-Key -Value $device
-        if ($deviceKey -and $DeviceByNameKey.Contains($deviceKey)) {
-            $deviceObj = $DeviceByNameKey[$deviceKey]
-        }
-        elseif ($deviceKey -and $DeviceByCodeKey.Contains($deviceKey)) {
-            $deviceObj = $DeviceByCodeKey[$deviceKey]
-        }
+        $match = Resolve-DeviceMatch -DeviceText $device -DeviceByNameKey $DeviceByNameKey -DeviceByCodeKey $DeviceByCodeKey
+        $deviceObj = $match.Device
 
         $plcTag = ""
         $shortcut = ""
         $plcReference = ""
+        $mappingStatus = $match.Status
         if ($deviceObj) {
             $plcTag = $deviceObj.PlcTag
             $shortcut = $deviceObj.Shortcut
             $plcReference = $deviceObj.PlcReference
+            if ([string]::IsNullOrWhiteSpace($plcTag)) {
+                $mappingStatus = "MatchedNoPlcTag"
+            }
         }
 
         $triggerTag = ""
@@ -232,7 +392,9 @@ function Read-AlarmRows {
                 Shortcut          = $shortcut
                 PlcReference      = $plcReference
                 TriggerTag        = $triggerTag
-                MappingStatus     = if ($plcTag) { "Mapped" } else { "Unmapped" }
+                MappingStatus     = $mappingStatus
+                MatchSource       = $match.MatchSource
+                CandidateCodes    = $match.CandidateCodes
             })
     }
 
@@ -245,7 +407,8 @@ function Build-ScreenSpecRows {
         [System.Collections.IDictionary]$TemplateByDeviceType,
         [string]$DefaultTemplate,
         [System.Collections.IDictionary]$GlobalObjectByDeviceType,
-        [string]$DefaultGlobalObject
+        [string]$DefaultGlobalObject,
+        [string]$ScreenNameTemplate
     )
 
     $rows = New-Object System.Collections.Generic.List[object]
@@ -263,7 +426,12 @@ function Build-ScreenSpecRows {
             $globalObject = $GlobalObjectByDeviceType[$typeKey]
         }
 
-        $screenName = "EQP_{0}" -f ($row.EquipmentCode -replace '\s+', '_')
+        $screenName = Expand-Template -Template $ScreenNameTemplate -Tokens @{
+            EquipmentCode = ($row.EquipmentCode -replace '[^A-Za-z0-9_]', '_')
+            EquipmentName = ($row.EquipmentName -replace '[^A-Za-z0-9_]', '_')
+            DeviceType    = ($row.DeviceType -replace '[^A-Za-z0-9_]', '_')
+            PlcTag        = ($row.PlcTag -replace '[^A-Za-z0-9_]', '_')
+        }
         $rows.Add([PSCustomObject]@{
                 ScreenName       = $screenName
                 EquipmentCode    = $row.EquipmentCode
@@ -274,6 +442,7 @@ function Build-ScreenSpecRows {
                 Param_Equipment  = $row.EquipmentCode
                 Param_PlcTag     = $row.PlcTag
                 Param_Description = $row.EquipmentName
+            ScreenStatus     = if ([string]::IsNullOrWhiteSpace($row.PlcTag)) { "NeedsPlcTag" } else { "Ready" }
             })
     }
 
@@ -303,9 +472,26 @@ if (-not (Test-Path -LiteralPath $outputAbsolute)) {
 
 $config = Get-Content -LiteralPath $configAbsolute -Raw | ConvertFrom-Json
 
+$requiredDirectories = @("Gfx", "Global Objects", "TAG")
+if ($config.PSObject.Properties.Name -contains "project" -and $config.project -and $config.project.requiredDirectories) {
+    $requiredDirectories = @($config.project.requiredDirectories)
+}
+
+$devicePlcReferenceTemplate = "[{Shortcut}]{PlcTag}"
+if ($config.defaults.PSObject.Properties.Name -contains "devicePlcReferenceTemplate" -and $config.defaults.devicePlcReferenceTemplate) {
+    $devicePlcReferenceTemplate = [string]$config.defaults.devicePlcReferenceTemplate
+}
+
+$screenNameTemplate = "EQP_{EquipmentCode}"
+if ($config.defaults.PSObject.Properties.Name -contains "screenNameTemplate" -and $config.defaults.screenNameTemplate) {
+    $screenNameTemplate = [string]$config.defaults.screenNameTemplate
+}
+
 $excel = $null
 $workbook = $null
 try {
+    $projectMetadata = Get-ProjectMetadata -ProjectRoot $projectRootAbsolute -RequiredDirectories $requiredDirectories
+
     $opened = Get-ExcelWorkbook -WorkbookPath $masterSheetAbsolute
     $excel = $opened[0]
     $workbook = $opened[1]
@@ -313,19 +499,23 @@ try {
     $deviceSheet = Get-Worksheet -Workbook $workbook -Name $config.sheets.device.name
     $alarmSheet = Get-Worksheet -Workbook $workbook -Name $config.sheets.alarm.name
 
-    $deviceRows = Read-DeviceRows -Worksheet $deviceSheet -Columns $config.sheets.device.columns -StartRow ([int]$config.sheets.device.startRow) -Shortcut ([string]$config.defaults.shortcut)
+    $deviceRows = Read-DeviceRows -Worksheet $deviceSheet -Columns $config.sheets.device.columns -StartRow ([int]$config.sheets.device.startRow) -Shortcut ([string]$config.defaults.shortcut) -DevicePlcReferenceTemplate $devicePlcReferenceTemplate
 
     $deviceByName = @{}
     $deviceByCode = @{}
     foreach ($d in $deviceRows) {
         $nameKey = Normalize-Key -Value $d.EquipmentName
         $codeKey = Normalize-Key -Value $d.EquipmentCode
-        if ($nameKey -and -not $deviceByName.Contains($nameKey)) {
-            $deviceByName[$nameKey] = $d
-        }
-        if ($codeKey -and -not $deviceByCode.Contains($codeKey)) {
-            $deviceByCode[$codeKey] = $d
-        }
+        Add-LookupValue -Lookup $deviceByName -Key $nameKey -Value $d
+        Add-LookupValue -Lookup $deviceByCode -Key $codeKey -Value $d
+    }
+
+    $lookupIssues = New-Object System.Collections.Generic.List[object]
+    foreach ($issue in (Get-LookupIssues -Lookup $deviceByName -KeyType "EquipmentName")) {
+        $lookupIssues.Add($issue)
+    }
+    foreach ($issue in (Get-LookupIssues -Lookup $deviceByCode -KeyType "EquipmentCode")) {
+        $lookupIssues.Add($issue)
     }
 
     $alarmHeaderRow = Find-AlarmHeaderRow -Worksheet $alarmSheet -SearchStartRow 1 -SearchEndRow ([int]$config.sheets.alarm.headerSearchMaxRow) -ErrorCodeColumn ([int]$config.sheets.alarm.columns.ErrorCode) -HeaderToken ([string]$config.sheets.alarm.headerToken)
@@ -341,13 +531,13 @@ try {
         $globalObjectMap[$p.Name.ToUpperInvariant()] = [string]$p.Value
     }
 
-    $screenSpecRows = Build-ScreenSpecRows -DeviceRows $deviceRows -TemplateByDeviceType $templateMap -DefaultTemplate ([string]$config.defaults.defaultTemplate) -GlobalObjectByDeviceType $globalObjectMap -DefaultGlobalObject ([string]$config.defaults.defaultGlobalObject
-    )
+    $screenSpecRows = Build-ScreenSpecRows -DeviceRows $deviceRows -TemplateByDeviceType $templateMap -DefaultTemplate ([string]$config.defaults.defaultTemplate) -GlobalObjectByDeviceType $globalObjectMap -DefaultGlobalObject ([string]$config.defaults.defaultGlobalObject) -ScreenNameTemplate $screenNameTemplate
 
     $deviceOut = Join-Path $outputAbsolute "device_map.csv"
     $alarmOut = Join-Path $outputAbsolute "alarms_seed.csv"
     $screenOut = Join-Path $outputAbsolute "screen_spec.csv"
     $parameterOut = Join-Path $outputAbsolute "global_object_params.csv"
+    $lookupIssueOut = Join-Path $outputAbsolute "device_key_issues.csv"
 
     $deviceRows | Export-Csv -LiteralPath $deviceOut -NoTypeInformation
     $alarmRows | Export-Csv -LiteralPath $alarmOut -NoTypeInformation
@@ -356,15 +546,21 @@ try {
     $screenSpecRows |
         Select-Object ScreenName, GlobalObjectName, Param_Equipment, Param_PlcTag, Param_Description |
         Export-Csv -LiteralPath $parameterOut -NoTypeInformation
+    $lookupIssues | Export-Csv -LiteralPath $lookupIssueOut -NoTypeInformation
 
     $summaryOut = Join-Path $outputAbsolute "generation_summary.txt"
     @(
         "MasterSheetPath=$masterSheetAbsolute"
         "ProjectRoot=$projectRootAbsolute"
+        "ProjectApplicationName=$($projectMetadata.ApplicationName)"
+        "ProjectMedFile=$($projectMetadata.MedFilePath)"
         "DeviceCount=$($deviceRows.Count)"
+        "DevicesMissingPlcTag=$(@($deviceRows | Where-Object { $_.PlcTagStatus -eq 'MissingPlcTag' }).Count)"
         "AlarmCount=$($alarmRows.Count)"
-        "MappedAlarms=$((($alarmRows | Where-Object { $_.MappingStatus -eq 'Mapped' }).Count))"
-        "UnmappedAlarms=$((($alarmRows | Where-Object { $_.MappingStatus -eq 'Unmapped' }).Count))"
+        "MappedAlarms=$(@($alarmRows | Where-Object { $_.MappingStatus -like 'Matched*' -or $_.MappingStatus -eq 'Mapped' }).Count)"
+        "AmbiguousAlarms=$(@($alarmRows | Where-Object { $_.MappingStatus -eq 'Ambiguous' }).Count)"
+        "UnmappedAlarms=$(@($alarmRows | Where-Object { $_.MappingStatus -eq 'Unmapped' }).Count)"
+        "DuplicateDeviceKeys=$($lookupIssues.Count)"
     ) | Set-Content -LiteralPath $summaryOut
 
     Write-Host "Generated files:"
@@ -372,6 +568,7 @@ try {
     Write-Host " - $alarmOut"
     Write-Host " - $screenOut"
     Write-Host " - $parameterOut"
+    Write-Host " - $lookupIssueOut"
     Write-Host " - $summaryOut"
 }
 finally {

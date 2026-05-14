@@ -9,8 +9,11 @@ The setup supports an offline workflow (no live PLC needed) and is reusable for 
 Core outcomes already implemented:
 
 - HMI tag generation from equipment templates.
+- Configurable HMI tag and PLC reference templates for reuse across projects.
 - Device-to-alarm parsing from master sheet.
+- FactoryTalk project root validation against real source structure.
 - Alarm seed export with mapped/unmapped status.
+- Duplicate device-key reporting to avoid silent wrong mappings.
 - Screen specification export for repeated screen creation.
 - Global object parameter export for standardized faceplates.
 - Reusable JSON config for sheet names, columns, defaults, and type mappings.
@@ -61,6 +64,7 @@ So the practical automation model is:
 - generated/alarms_seed.csv
 - generated/screen_spec.csv
 - generated/global_object_params.csv
+- generated/device_key_issues.csv
 - generated/generation_summary.txt
 
 ## 4) Current Project Inputs Used
@@ -87,6 +91,12 @@ From this it builds:
 
 - PlcReference in format: [Shortcut]PlcTag
 - Device map for later alarm/screen mapping
+- PlcTagStatus so devices with no PLC tag still remain visible in outputs
+
+The script now also validates the supplied FactoryTalk project folder by checking for:
+
+- a `.med` application file
+- required directories such as `Gfx`, `Global Objects`, and `TAG`
 
 ### 5.2 Alarm Parsing
 
@@ -96,6 +106,7 @@ The script reads the Alarms worksheet and:
 - Parses alarm rows until configured blank-row stop condition.
 - Builds alarm records with severity/ack defaults.
 - Attempts device mapping by normalized keys.
+- Avoids silent auto-mapping when normalized keys are duplicated.
 
 Normalization includes:
 
@@ -105,14 +116,25 @@ Normalization includes:
 
 Outputs include MappingStatus as Mapped or Unmapped.
 
+Additional statuses now used:
+
+- MatchedByName
+- MatchedByCode
+- MatchedNoPlcTag
+- Ambiguous
+- Unmapped
+
+Duplicate/ambiguous key collisions are exported to `generated/device_key_issues.csv`.
+
 ### 5.3 Screen Spec Generation
 
-For each mapped device row, the script creates a screen entry:
+For each device row, the script creates a screen entry:
 
 - ScreenName (EQP_<EquipmentCode>)
 - TemplateName (from DeviceType mapping)
 - GlobalObjectName (from DeviceType mapping)
 - Parameters for equipment, PLC tag, description
+- ScreenStatus (`Ready` or `NeedsPlcTag`)
 
 This is intended to accelerate repeated screen build using templates/global objects.
 
@@ -125,6 +147,21 @@ Run from workspace root.
 ```powershell
 .\scripts\generate_hmi_tags.ps1 -EquipmentFile templates/equipment_list.csv -OutputFile generated/hmi_tags.csv
 ```
+
+Optional reuse parameters:
+
+```powershell
+.\scripts\generate_hmi_tags.ps1 `
+  -EquipmentFile templates/equipment_list.csv `
+  -OutputFile generated/hmi_tags.csv `
+  -HmiTagTemplate "{HmiBasePath}.{Suffix}" `
+  -PlcReferenceTemplate "[{Shortcut}]Program:MainProgram.{PlcTagPath}"
+```
+
+Optional CSV columns for `templates/equipment_list.csv`:
+
+- `HmiBasePath`
+- `PlcBasePath`
 
 ### 6.2 Full Reusable Pipeline
 
@@ -140,10 +177,13 @@ Run from workspace root.
 
 Latest generation summary:
 
-- DeviceCount: 56
+- DeviceCount: 62
+- DevicesMissingPlcTag: 6
 - AlarmCount: 460
-- MappedAlarms: 166
-- UnmappedAlarms: 294
+- MappedAlarms: 168
+- AmbiguousAlarms: 0
+- UnmappedAlarms: 292
+- DuplicateDeviceKeys: 2
 
 See generated/generation_summary.txt for latest values after each run.
 
@@ -153,7 +193,7 @@ See generated/generation_summary.txt for latest values after each run.
 2. Restore new FactoryTalk project from `.apa` and place restored folder in hmi/.
 3. Update templates/factorytalk_pipeline.config.json only if sheet name or column locations changed.
 4. Run the same pipeline command with new `-MasterSheetPath` and `-ProjectRoot`.
-5. Review generated/generation_summary.txt and generated/alarms_seed.csv for mapping quality.
+5. Review `generated/generation_summary.txt`, `generated/alarms_seed.csv`, and `generated/device_key_issues.csv` for mapping quality.
 
 ## 9) What Still Requires FactoryTalk View Studio
 
@@ -175,7 +215,7 @@ The generated files provide structured input/specification to reduce manual work
 ## 11) Troubleshooting
 
 - If Excel COM cannot open workbook, verify Excel is installed and sheet is closed.
-- If alarm mappings are low, adjust sheet column mapping and naming normalization assumptions.
+- If alarm mappings are low, adjust sheet column mapping and naming normalization assumptions, then review `generated/device_key_issues.csv`.
 - If project copy had locked files, prefer working from `.apa` restore instead of live folder copy.
 
 ## 12) Versioning Advice

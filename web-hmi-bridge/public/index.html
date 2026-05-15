@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FactoryTalk Web Bridge</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div class="hero-title">
+          <h1>FactoryTalk Web Bridge</h1>
+          <p>File exchange + live bridge status + HMI page preview before publish.</p>
+        </div>
+        <div class="status-card" id="bridgeStatus">
+          <span class="dot"></span>
+          <span>Checking bridge...</span>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>File Exchange</h2>
+          <p>Upload files for FactoryTalk import/export and keep a live file count.</p>
+          <form id="uploadForm">
+            <label>Target folder</label>
+            <select id="target">
+              <option value="outbound">Outbound (website -> FactoryTalk)</option>
+              <option value="inbound">Inbound (FactoryTalk -> website)</option>
+            </select>
+            <label>Select file</label>
+            <input type="file" id="fileInput" required />
+            <button type="submit">Upload File</button>
+          </form>
+
+          <div class="file-lists">
+            <div>
+              <h3>Inbound</h3>
+              <ul id="inboundList"></ul>
+            </div>
+            <div>
+              <h3>Outbound</h3>
+              <ul id="outboundList"></ul>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>HMI Page Builder</h2>
+          <p>Describe what page you want, preview it, then save spec for handoff.</p>
+
+          <label>Page name</label>
+          <input id="pageName" type="text" value="Overview" />
+
+          <label>What should this page include?</label>
+          <textarea id="pagePrompt" rows="4" placeholder="Example: I want 3 buttons: Run, Stop, Error as toggle buttons and status text below."></textarea>
+
+          <div class="toggle-row">
+            <label><input type="checkbox" id="btnRun" checked /> Run</label>
+            <label><input type="checkbox" id="btnStop" checked /> Stop</label>
+            <label><input type="checkbox" id="btnError" checked /> Error</label>
+            <label><input type="checkbox" id="toggleMode" checked /> Toggle style</label>
+          </div>
+
+          <div class="actions">
+            <button id="previewBtn" type="button">Preview Page</button>
+            <button id="saveSpecBtn" type="button" class="secondary">Save Spec</button>
+          </div>
+
+          <h3>Preview</h3>
+          <div id="previewPane" class="preview-pane"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

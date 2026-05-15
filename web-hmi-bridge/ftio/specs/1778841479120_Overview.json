@@ -1,0 +1,19 @@
+{
+  "pageName": "Overview",
+  "prompt": "",
+  "controls": [
+    {
+      "name": "Run",
+      "style": "toggle"
+    },
+    {
+      "name": "Stop",
+      "style": "toggle"
+    },
+    {
+      "name": "Error",
+      "style": "toggle"
+    }
+  ],
+  "createdAt": "2026-05-15T10:37:59.120Z"
+}

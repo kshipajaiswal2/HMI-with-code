@@ -1,0 +1,19 @@
+{
+  "pageName": "Overview",
+  "prompt": "Run Stop Error toggle buttons",
+  "controls": [
+    {
+      "style": "toggle",
+      "name": "Run"
+    },
+    {
+      "style": "toggle",
+      "name": "Stop"
+    },
+    {
+      "style": "toggle",
+      "name": "Error"
+    }
+  ],
+  "createdAt": "2026-05-15T09:28:08.184Z"
+}

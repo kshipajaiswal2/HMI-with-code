@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
-const multer = require('multer');
 const chokidar = require('chokidar');
 const { Server } = require('socket.io');
 
@@ -13,12 +12,10 @@ const io = new Server(server);
 const PORT = process.env.PORT || 5050;
 const ROOT = __dirname;
 const FTIO_DIR = path.join(ROOT, 'ftio');
-const INBOUND_DIR = path.join(FTIO_DIR, 'inbound');
-const OUTBOUND_DIR = path.join(FTIO_DIR, 'outbound');
+const EXPORTS_DIR = path.join(FTIO_DIR, 'inbound');
 const SPECS_DIR = path.join(FTIO_DIR, 'specs');
-const MAX_UPLOAD_MB = 20;
 
-for (const dir of [FTIO_DIR, INBOUND_DIR, OUTBOUND_DIR, SPECS_DIR]) {
+for (const dir of [FTIO_DIR, EXPORTS_DIR, SPECS_DIR]) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -26,22 +23,6 @@ for (const dir of [FTIO_DIR, INBOUND_DIR, OUTBOUND_DIR, SPECS_DIR]) {
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(ROOT, 'public')));
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const target = req.body.target === 'inbound' ? INBOUND_DIR : OUTBOUND_DIR;
-    cb(null, target);
-  },
-  filename: (req, file, cb) => {
-    const safeName = `${Date.now()}_${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    cb(null, safeName);
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024 }
-});
 
 function fileRow(bucketDir, name) {
   const full = path.join(bucketDir, name);
@@ -53,21 +34,10 @@ function fileRow(bucketDir, name) {
   };
 }
 
-function getBucketFiles(bucket) {
-  const map = {
-    inbound: INBOUND_DIR,
-    outbound: OUTBOUND_DIR,
-    specs: SPECS_DIR
-  };
-
-  const bucketDir = map[bucket];
-  if (!bucketDir) {
-    throw new Error('Invalid bucket');
-  }
-
-  const files = fs.readdirSync(bucketDir)
-    .filter((name) => fs.statSync(path.join(bucketDir, name)).isFile())
-    .map((name) => fileRow(bucketDir, name))
+function getFiles(dirPath) {
+  const files = fs.readdirSync(dirPath)
+    .filter((name) => fs.statSync(path.join(dirPath, name)).isFile())
+    .map((name) => fileRow(dirPath, name))
     .sort((a, b) => b.lastModified.localeCompare(a.lastModified));
 
   return files;
@@ -76,9 +46,8 @@ function getBucketFiles(bucket) {
 function bridgeSnapshot() {
   return {
     connected: true,
-    inboundCount: getBucketFiles('inbound').length,
-    outboundCount: getBucketFiles('outbound').length,
-    specsCount: getBucketFiles('specs').length,
+    exportsCount: getFiles(EXPORTS_DIR).length,
+    screensCount: getFiles(SPECS_DIR).length,
     updatedAt: new Date().toISOString()
   };
 }
@@ -91,27 +60,13 @@ app.get('/api/bridge/status', (_req, res) => {
   res.json(bridgeSnapshot());
 });
 
-app.get('/api/files/:bucket', (req, res) => {
-  try {
-    const files = getBucketFiles(req.params.bucket);
-    res.json({ bucket: req.params.bucket, files });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+app.get('/api/exports', (_req, res) => {
+  const files = getFiles(EXPORTS_DIR);
+  res.json({ files });
 });
 
-app.get('/api/files/download/:bucket/:name', (req, res) => {
-  const map = {
-    inbound: INBOUND_DIR,
-    outbound: OUTBOUND_DIR,
-    specs: SPECS_DIR
-  };
-  const bucketDir = map[req.params.bucket];
-  if (!bucketDir) {
-    return res.status(400).json({ error: 'Invalid bucket' });
-  }
-
-  const filePath = path.join(bucketDir, req.params.name);
+app.get('/api/exports/download/:name', (req, res) => {
+  const filePath = path.join(EXPORTS_DIR, req.params.name);
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'File not found' });
   }
@@ -119,31 +74,24 @@ app.get('/api/files/download/:bucket/:name', (req, res) => {
   return res.download(filePath);
 });
 
-app.post('/api/files/upload', upload.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Missing file' });
-  }
-
-  const target = req.body.target === 'inbound' ? 'inbound' : 'outbound';
-  return res.json({
-    ok: true,
-    target,
-    filename: req.file.filename,
-    sizeBytes: req.file.size
-  });
-});
-
-app.post('/api/specs', (req, res) => {
-  const { pageName, prompt, controls } = req.body || {};
+app.post('/api/screens', (req, res) => {
+  const { pageName, width, height } = req.body || {};
   if (!pageName || !String(pageName).trim()) {
     return res.status(400).json({ error: 'pageName is required' });
+  }
+
+  const parsedWidth = Number(width);
+  const parsedHeight = Number(height);
+  if (!Number.isFinite(parsedWidth) || !Number.isFinite(parsedHeight) || parsedWidth <= 0 || parsedHeight <= 0) {
+    return res.status(400).json({ error: 'Valid width and height are required' });
   }
 
   const safePageName = String(pageName).trim().replace(/[^a-zA-Z0-9._-]/g, '_');
   const payload = {
     pageName: safePageName,
-    prompt: String(prompt || ''),
-    controls: Array.isArray(controls) ? controls : [],
+    width: parsedWidth,
+    height: parsedHeight,
+    controls: ['Run', 'Stop', 'Error'],
     createdAt: new Date().toISOString()
   };
 
@@ -153,10 +101,10 @@ app.post('/api/specs', (req, res) => {
   return res.json({ ok: true, saved: path.basename(outPath) });
 });
 
-app.get('/api/specs/latest', (_req, res) => {
-  const files = getBucketFiles('specs');
+app.get('/api/screens/latest', (_req, res) => {
+  const files = getFiles(SPECS_DIR);
   if (!files.length) {
-    return res.status(404).json({ error: 'No specs yet' });
+    return res.status(404).json({ error: 'No screens yet' });
   }
 
   const latest = files[0].name;
@@ -173,7 +121,7 @@ function notifyBridge() {
   io.emit('bridge-status', bridgeSnapshot());
 }
 
-const watcher = chokidar.watch([INBOUND_DIR, OUTBOUND_DIR, SPECS_DIR], {
+const watcher = chokidar.watch([EXPORTS_DIR, SPECS_DIR], {
   ignoreInitial: true,
   awaitWriteFinish: {
     stabilityThreshold: 150,
@@ -189,5 +137,5 @@ setInterval(notifyBridge, 5000);
 
 server.listen(PORT, () => {
   console.log(`web-hmi-bridge running on http://localhost:${PORT}`);
-  console.log('Use ftio/inbound and ftio/outbound as shared folders with FactoryTalk tools.');
+  console.log('Use ftio/inbound for FactoryTalk exported files and ftio/specs for created screen specs.');
 });

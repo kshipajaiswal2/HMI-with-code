@@ -118,31 +118,16 @@ button.secondary {
   background: #d6e3ff;
 }
 
-.toggle-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.toggle-row label {
-  margin: 0;
-  border: 1px solid var(--border);
-  padding: 6px 8px;
-  background: #fff;
-}
-
 .actions {
   margin-top: 12px;
   display: flex;
   gap: 10px;
 }
 
-.file-lists {
+.size-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 10px;
 }
 
 ul {
@@ -159,6 +144,10 @@ li {
   border-bottom: 1px solid #d3dde0;
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.8rem;
+}
+
+.single-list {
+  margin-top: 10px;
 }
 
 .preview-pane {
@@ -178,9 +167,20 @@ li {
   text-align: center;
 }
 
-.preview-controls {
-  margin-top: 18px;
+.preview-frame {
+  margin-top: 12px;
+  width: min(100%, 560px);
+  border: 2px solid #000;
+  background: #f3f3f3;
   display: flex;
+  align-items: flex-start;
+  padding: 12px;
+}
+
+.preview-controls {
+  margin-top: 0;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -197,17 +197,12 @@ li {
 .hmi-btn.stop { background: var(--stop); }
 .hmi-btn.error { background: var(--error); }
 
-.hmi-btn.toggle {
-  box-shadow: inset 0 -3px #00000030;
-}
-
-.preview-note {
-  margin-top: 16px;
-  font-size: 0.9rem;
-}
-
 @media (max-width: 900px) {
   .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .size-grid {
     grid-template-columns: 1fr;
   }
 

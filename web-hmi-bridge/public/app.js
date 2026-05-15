@@ -1,20 +1,14 @@
 const socket = io();
 
 const bridgeStatus = document.getElementById('bridgeStatus');
-const inboundList = document.getElementById('inboundList');
-const outboundList = document.getElementById('outboundList');
-const uploadForm = document.getElementById('uploadForm');
-const target = document.getElementById('target');
-const fileInput = document.getElementById('fileInput');
+const exportsList = document.getElementById('exportsList');
+const refreshBtn = document.getElementById('refreshBtn');
 
 const pageName = document.getElementById('pageName');
-const pagePrompt = document.getElementById('pagePrompt');
-const btnRun = document.getElementById('btnRun');
-const btnStop = document.getElementById('btnStop');
-const btnError = document.getElementById('btnError');
-const toggleMode = document.getElementById('toggleMode');
+const screenWidth = document.getElementById('screenWidth');
+const screenHeight = document.getElementById('screenHeight');
 const previewBtn = document.getElementById('previewBtn');
-const saveSpecBtn = document.getElementById('saveSpecBtn');
+const saveScreenBtn = document.getElementById('saveScreenBtn');
 const previewPane = document.getElementById('previewPane');
 
 function kb(sizeBytes) {
@@ -25,28 +19,20 @@ function setBridgeCard(status) {
   const dot = bridgeStatus.querySelector('.dot');
   dot.style.background = status.connected ? '#27ae60' : '#e74c3c';
   bridgeStatus.querySelector('span:last-child').textContent =
-    `Bridge live | inbound ${status.inboundCount} | outbound ${status.outboundCount} | specs ${status.specsCount}`;
+    `Bridge live | exports ${status.exportsCount} | screens ${status.screensCount}`;
 }
 
-async function fetchBucket(bucket) {
-  const res = await fetch(`/api/files/${bucket}`);
-  if (!res.ok) {
-    throw new Error(`Failed to load ${bucket}`);
-  }
-  return res.json();
-}
-
-function renderFiles(el, files, bucket) {
-  el.innerHTML = '';
+function renderExports(files) {
+  exportsList.innerHTML = '';
   if (!files.length) {
-    el.innerHTML = '<li>No files</li>';
+    exportsList.innerHTML = '<li>No exported files found in ftio/inbound yet.</li>';
     return;
   }
 
   for (const file of files) {
     const li = document.createElement('li');
     const link = document.createElement('a');
-    link.href = `/api/files/download/${bucket}/${encodeURIComponent(file.name)}`;
+    link.href = `/api/exports/download/${encodeURIComponent(file.name)}`;
     link.textContent = file.name;
     link.target = '_blank';
 
@@ -55,93 +41,73 @@ function renderFiles(el, files, bucket) {
 
     li.appendChild(link);
     li.appendChild(meta);
-    el.appendChild(li);
+    exportsList.appendChild(li);
   }
 }
 
-async function refreshLists() {
-  const [inbound, outbound] = await Promise.all([
-    fetchBucket('inbound'),
-    fetchBucket('outbound')
-  ]);
-  renderFiles(inboundList, inbound.files, 'inbound');
-  renderFiles(outboundList, outbound.files, 'outbound');
-}
-
-uploadForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  if (!fileInput.files.length) {
-    alert('Select a file first.');
-    return;
-  }
-
-  const fd = new FormData();
-  fd.append('target', target.value);
-  fd.append('file', fileInput.files[0]);
-
-  const res = await fetch('/api/files/upload', { method: 'POST', body: fd });
-  const data = await res.json();
+async function refreshExports() {
+  const res = await fetch('/api/exports');
   if (!res.ok) {
-    alert(data.error || 'Upload failed');
-    return;
+    throw new Error('Failed to load exports');
   }
-
-  fileInput.value = '';
-  await refreshLists();
-});
-
-function buildControls() {
-  const controls = [];
-  if (btnRun.checked) controls.push({ key: 'Run', className: 'run' });
-  if (btnStop.checked) controls.push({ key: 'Stop', className: 'stop' });
-  if (btnError.checked) controls.push({ key: 'Error', className: 'error' });
-  return controls;
+  const data = await res.json();
+  renderExports(data.files);
 }
 
 function renderPreview() {
-  const title = pageName.value.trim() || 'Untitled Page';
-  const prompt = pagePrompt.value.trim();
-  const controls = buildControls();
+  const name = pageName.value.trim() || 'Untitled Screen';
+  const width = Number(screenWidth.value) || 1;
+  const height = Number(screenHeight.value) || 1;
 
   previewPane.innerHTML = '';
 
   const header = document.createElement('div');
   header.className = 'preview-header';
-  header.textContent = title;
+  header.textContent = `${name} (${width} x ${height})`;
   previewPane.appendChild(header);
+
+  const frame = document.createElement('div');
+  frame.className = 'preview-frame';
+  frame.style.aspectRatio = `${width} / ${height}`;
 
   const row = document.createElement('div');
   row.className = 'preview-controls';
 
-  for (const ctl of controls) {
-    const btn = document.createElement('div');
-    btn.className = `hmi-btn ${ctl.className}${toggleMode.checked ? ' toggle' : ''}`;
-    btn.textContent = ctl.key;
-    row.appendChild(btn);
-  }
+  const run = document.createElement('div');
+  run.className = 'hmi-btn run';
+  run.textContent = 'Run';
 
-  previewPane.appendChild(row);
+  const stop = document.createElement('div');
+  stop.className = 'hmi-btn stop';
+  stop.textContent = 'Stop';
 
-  const note = document.createElement('div');
-  note.className = 'preview-note';
-  note.textContent = prompt || 'No prompt entered yet.';
-  previewPane.appendChild(note);
+  const error = document.createElement('div');
+  error.className = 'hmi-btn error';
+  error.textContent = 'Error';
+
+  row.appendChild(run);
+  row.appendChild(stop);
+  row.appendChild(error);
+  frame.appendChild(row);
+  previewPane.appendChild(frame);
 }
 
 previewBtn.addEventListener('click', renderPreview);
+refreshBtn.addEventListener('click', () => {
+  refreshExports().catch((err) => {
+    console.error(err);
+    alert('Could not refresh exported files list');
+  });
+});
 
-saveSpecBtn.addEventListener('click', async () => {
+saveScreenBtn.addEventListener('click', async () => {
   const payload = {
     pageName: pageName.value,
-    prompt: pagePrompt.value,
-    controls: buildControls().map((c) => ({
-      name: c.key,
-      style: toggleMode.checked ? 'toggle' : 'momentary'
-    }))
+    width: Number(screenWidth.value),
+    height: Number(screenHeight.value)
   };
 
-  const res = await fetch('/api/specs', {
+  const res = await fetch('/api/screens', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -149,24 +115,24 @@ saveSpecBtn.addEventListener('click', async () => {
 
   const data = await res.json();
   if (!res.ok) {
-    alert(data.error || 'Failed to save spec');
+    alert(data.error || 'Failed to save screen');
     return;
   }
 
-  alert(`Spec saved as ${data.saved}`);
-  await refreshLists();
+  alert(`Screen spec saved as ${data.saved}`);
+  await refreshExports();
 });
 
 socket.on('bridge-status', (status) => {
   setBridgeCard(status);
-  refreshLists().catch(() => {});
+  refreshExports().catch(() => {});
 });
 
 async function init() {
   const res = await fetch('/api/bridge/status');
   const status = await res.json();
   setBridgeCard(status);
-  await refreshLists();
+  await refreshExports();
   renderPreview();
 }
 

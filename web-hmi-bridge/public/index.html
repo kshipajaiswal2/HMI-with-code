@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FactoryTalk Web Bridge</title>
+    <title>FactoryTalk Screen Starter</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -13,8 +13,8 @@
     <main class="shell">
       <section class="hero">
         <div class="hero-title">
-          <h1>FactoryTalk Web Bridge</h1>
-          <p>File exchange + live bridge status + HMI page preview before publish.</p>
+          <h1>FactoryTalk Screen Starter</h1>
+          <p>Show FactoryTalk exported files and create new screen specs by name and size.</p>
         </div>
         <div class="status-card" id="bridgeStatus">
           <span class="dot"></span>
@@ -24,51 +24,33 @@
 
       <section class="grid">
         <article class="card">
-          <h2>File Exchange</h2>
-          <p>Upload files for FactoryTalk import/export and keep a live file count.</p>
-          <form id="uploadForm">
-            <label>Target folder</label>
-            <select id="target">
-              <option value="outbound">Outbound (website -> FactoryTalk)</option>
-              <option value="inbound">Inbound (FactoryTalk -> website)</option>
-            </select>
-            <label>Select file</label>
-            <input type="file" id="fileInput" required />
-            <button type="submit">Upload File</button>
-          </form>
-
-          <div class="file-lists">
-            <div>
-              <h3>Inbound</h3>
-              <ul id="inboundList"></ul>
-            </div>
-            <div>
-              <h3>Outbound</h3>
-              <ul id="outboundList"></ul>
-            </div>
-          </div>
+          <h2>FactoryTalk Exports</h2>
+          <p>This list auto-refreshes from ftio/inbound (files exported by FactoryTalk).</p>
+          <button id="refreshBtn" type="button">Refresh List</button>
+          <ul id="exportsList" class="single-list"></ul>
         </article>
 
         <article class="card">
-          <h2>HMI Page Builder</h2>
-          <p>Describe what page you want, preview it, then save spec for handoff.</p>
+          <h2>Create New Screen</h2>
+          <p>Set screen name and size. Run/Stop/Error controls are shown in preview and saved in spec.</p>
 
-          <label>Page name</label>
+          <label for="pageName">Screen name</label>
           <input id="pageName" type="text" value="Overview" />
 
-          <label>What should this page include?</label>
-          <textarea id="pagePrompt" rows="4" placeholder="Example: I want 3 buttons: Run, Stop, Error as toggle buttons and status text below."></textarea>
-
-          <div class="toggle-row">
-            <label><input type="checkbox" id="btnRun" checked /> Run</label>
-            <label><input type="checkbox" id="btnStop" checked /> Stop</label>
-            <label><input type="checkbox" id="btnError" checked /> Error</label>
-            <label><input type="checkbox" id="toggleMode" checked /> Toggle style</label>
+          <div class="size-grid">
+            <div>
+              <label for="screenWidth">Width</label>
+              <input id="screenWidth" type="number" min="1" value="1280" />
+            </div>
+            <div>
+              <label for="screenHeight">Height</label>
+              <input id="screenHeight" type="number" min="1" value="720" />
+            </div>
           </div>
 
           <div class="actions">
-            <button id="previewBtn" type="button">Preview Page</button>
-            <button id="saveSpecBtn" type="button" class="secondary">Save Spec</button>
+            <button id="previewBtn" type="button">Preview</button>
+            <button id="saveScreenBtn" type="button" class="secondary">Save Screen Spec</button>
           </div>
 
           <h3>Preview</h3>

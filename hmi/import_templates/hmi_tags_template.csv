@@ -1,0 +1,2 @@
+TagName,PLCReference,DataType,Access,Description
+SAMPLE_TAG,[PLC01]Sample.Tag,DINT,Read/Write,Sample row

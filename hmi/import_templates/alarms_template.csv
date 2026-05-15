@@ -1,0 +1,2 @@
+AlarmName,ErrorCode,Message,Severity,AckRequired,Trigger,Device
+ALM_E000,E000,Sample alarm,500,true,Sample.Tag.Alarm.E000,System

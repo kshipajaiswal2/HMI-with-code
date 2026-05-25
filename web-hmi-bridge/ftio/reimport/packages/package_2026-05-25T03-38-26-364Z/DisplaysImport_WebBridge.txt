@@ -1,0 +1,7 @@
+FactoryTalk Web Bridge package generated successfully.
+
+Display files: 2
+MAIN.xml
+Testscreen.xml
+
+Batch file: BatchImport_WebBridge.xml

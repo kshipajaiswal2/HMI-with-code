@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FactoryTalk Screen Starter</title>
+    <title>FactoryTalk Display XML Bridge</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -13,8 +13,8 @@
     <main class="shell">
       <section class="hero">
         <div class="hero-title">
-          <h1>FactoryTalk Screen Starter</h1>
-          <p>Show FactoryTalk exported files and create new screen specs by name and size.</p>
+          <h1>FactoryTalk Display XML Bridge</h1>
+          <p>Load exported display XML, preview and edit, then build an import package.</p>
         </div>
         <div class="status-card" id="bridgeStatus">
           <span class="dot"></span>
@@ -23,38 +23,120 @@
       </section>
 
       <section class="grid">
-        <article class="card">
-          <h2>FactoryTalk Exports</h2>
-          <p>This list auto-refreshes from ftio/inbound (files exported by FactoryTalk).</p>
+        <article class="card exports-card">
+          <h2>Exported Displays</h2>
+          <p>This list reads exported XML from your FactoryTalk export folder.</p>
           <button id="refreshBtn" type="button">Refresh List</button>
-          <ul id="exportsList" class="single-list"></ul>
+          <ul id="displaysList" class="single-list"></ul>
         </article>
 
-        <article class="card">
-          <h2>Create New Screen</h2>
-          <p>Set screen name and size. Run/Stop/Error controls are shown in preview and saved in spec.</p>
+        <article class="card editor-card">
+          <h2>Display Visual Editor</h2>
+          <p>Open one display and see its visual layout from XML. Edit size, then save and package for import.</p>
 
-          <label for="pageName">Screen name</label>
-          <input id="pageName" type="text" value="Overview" />
+          <div class="editor-layout">
+            <div class="editor-controls">
+              <label for="displayName">Selected display</label>
+              <input id="displayName" type="text" readonly value="None" />
 
-          <div class="size-grid">
-            <div>
-              <label for="screenWidth">Width</label>
-              <input id="screenWidth" type="number" min="1" value="1280" />
+              <div class="size-grid">
+                <div>
+                  <label for="screenWidth">Width</label>
+                  <input id="screenWidth" type="number" min="1" value="1280" />
+                </div>
+                <div>
+                  <label for="screenHeight">Height</label>
+                  <input id="screenHeight" type="number" min="1" value="720" />
+                </div>
+              </div>
+
+              <div class="actions">
+                <button id="previewBtn" type="button">Preview</button>
+                <button id="applySizeBtn" type="button" class="secondary">Apply Size To XML</button>
+                <button id="saveXmlBtn" type="button" class="secondary">Save Edited XML</button>
+                <button id="buildPackageBtn" type="button">Build Import Package</button>
+              </div>
+
+              <section class="object-panel">
+                <h3>Selected Object Properties</h3>
+                <p>Click any object in preview, edit fields, then apply.</p>
+
+                <div class="prop-grid">
+                  <div>
+                    <label for="objType">Type</label>
+                    <input id="objType" type="text" readonly value="None" />
+                  </div>
+                  <div>
+                    <label for="objName">Name</label>
+                    <input id="objName" type="text" value="" />
+                  </div>
+                  <div>
+                    <label for="objCaption">Caption</label>
+                    <input id="objCaption" type="text" value="" />
+                  </div>
+                  <div>
+                    <label for="objLeft">Left</label>
+                    <input id="objLeft" type="number" min="0" value="0" />
+                  </div>
+                  <div>
+                    <label for="objTop">Top</label>
+                    <input id="objTop" type="number" min="0" value="0" />
+                  </div>
+                  <div>
+                    <label for="objWidth">Width</label>
+                    <input id="objWidth" type="number" min="1" value="1" />
+                  </div>
+                  <div>
+                    <label for="objHeight">Height</label>
+                    <input id="objHeight" type="number" min="1" value="1" />
+                  </div>
+                  <div class="prop-wide">
+                    <label for="objBackColor">Back Color</label>
+                    <div class="color-field">
+                      <input id="objBackColor" type="text" value="" placeholder="#002952 or silver" />
+                      <input id="objBackColorPicker" type="color" value="#002952" />
+                      <span id="objBackColorSwatch" class="color-swatch" title="Back Color Preview"></span>
+                    </div>
+                  </div>
+                  <div class="prop-wide">
+                    <label for="objBorderColor">Border Color</label>
+                    <div class="color-field">
+                      <input id="objBorderColor" type="text" value="" placeholder="#002952" />
+                      <input id="objBorderColorPicker" type="color" value="#002952" />
+                      <span id="objBorderColorSwatch" class="color-swatch" title="Border Color Preview"></span>
+                    </div>
+                  </div>
+                  <div class="prop-wide">
+                    <label for="objTextColor">Text Color</label>
+                    <div class="color-field">
+                      <input id="objTextColor" type="text" value="" placeholder="white" />
+                      <input id="objTextColorPicker" type="color" value="#ffffff" />
+                      <span id="objTextColorSwatch" class="color-swatch" title="Text Color Preview"></span>
+                    </div>
+                  </div>
+                  <div>
+                    <label for="objFontSize">Font Size</label>
+                    <input id="objFontSize" type="number" min="1" value="10" />
+                  </div>
+                </div>
+
+                <button id="applyObjectBtn" type="button" class="secondary">Apply Object Changes</button>
+              </section>
+
+              <details class="advanced-box">
+                <summary>Advanced: Show XML code</summary>
+                <label for="xmlEditor">Display XML</label>
+                <textarea id="xmlEditor" rows="10" placeholder="Select a display to load XML..."></textarea>
+              </details>
+
+              <div id="packageResult" class="package-result"></div>
             </div>
-            <div>
-              <label for="screenHeight">Height</label>
-              <input id="screenHeight" type="number" min="1" value="720" />
+
+            <div class="editor-preview">
+              <h3>Preview</h3>
+              <div id="previewPane" class="preview-pane"></div>
             </div>
           </div>
-
-          <div class="actions">
-            <button id="previewBtn" type="button">Preview</button>
-            <button id="saveScreenBtn" type="button" class="secondary">Save Screen Spec</button>
-          </div>
-
-          <h3>Preview</h3>
-          <div id="previewPane" class="preview-pane"></div>
         </article>
       </section>
     </main>

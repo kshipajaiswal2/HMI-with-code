@@ -106,6 +106,21 @@ function applyCaptionStyles(box, node, captionNode) {
   box.style.alignItems = vertical === 'top' ? 'flex-start' : vertical === 'bottom' ? 'flex-end' : 'center';
 }
 
+function applyBorderStyles(box, node) {
+  const borderStyleRaw = String(node.getAttribute('borderStyle') || '').toLowerCase();
+  const borderWidth = Number(node.getAttribute('borderWidth'));
+  const borderColor = node.getAttribute('borderColor');
+
+  if (!borderStyleRaw || borderStyleRaw === 'none') {
+    box.style.border = 'none';
+    return;
+  }
+
+  box.style.borderStyle = borderStyleRaw === 'line' ? 'solid' : borderStyleRaw;
+  box.style.borderWidth = Number.isFinite(borderWidth) && borderWidth > 0 ? `${borderWidth}px` : '1px';
+  box.style.borderColor = borderColor || '#1a1a1a';
+}
+
 function kb(sizeBytes) {
   return `${(sizeBytes / 1024).toFixed(1)} KB`;
 }
@@ -236,10 +251,7 @@ function renderPreview() {
         box.style.background = bg;
       }
 
-      const border = el.getAttribute('borderColor');
-      if (border) {
-        box.style.borderColor = border;
-      }
+      applyBorderStyles(box, el);
 
       const captionNode = Array.from(el.children).find((child) => child.tagName === 'caption');
       const caption = captionNode?.getAttribute('caption') || el.getAttribute('name') || el.tagName;

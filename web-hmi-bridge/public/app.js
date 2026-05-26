@@ -927,10 +927,16 @@ function addButtonObject() {
   const templateButton = Array.from(root.querySelectorAll('*'))
     .find((node) => {
       const tag = String(node.tagName || '').toLowerCase();
-      return tag === 'pushbutton' || tag === 'button' || tag === 'multistatepushbutton';
+      return tag === 'momentarybutton'
+        || tag === 'gotobutton'
+        || tag === 'pushbutton'
+        || tag === 'button'
+        || tag === 'multistatepushbutton';
     });
 
-  const button = templateButton ? templateButton.cloneNode(true) : doc.createElement('pushButton');
+  const button = templateButton ? templateButton.cloneNode(true) : doc.createElement('momentaryButton');
+  const buttonTag = String(button.tagName || '').toLowerCase();
+  const isMomentaryButton = buttonTag === 'momentarybutton';
   const buttonName = uniqueObjectName(doc, 'Button');
   const buttonLabel = buttonName.replace('_', ' ');
 
@@ -945,20 +951,87 @@ function addButtonObject() {
   button.setAttribute('width', String(objWidth));
   button.setAttribute('height', String(objHeight));
 
-  if (!button.hasAttribute('backColor')) {
+  if (!templateButton) {
+    button.setAttribute('visible', 'true');
+    button.setAttribute('isReferenceObject', 'false');
+    button.setAttribute('audio', 'true');
+    button.setAttribute('backStyle', 'solid');
+    button.setAttribute('borderUsesBackColor', 'true');
+    button.setAttribute('buttonAction', 'normallyOpen');
+    button.setAttribute('description', '');
+    button.setAttribute('holdTime', '250');
+    button.setAttribute('highlightColor', 'lime');
+    button.setAttribute('horizontalMargin', '0');
+    button.setAttribute('verticalMargin', '0');
+    button.setAttribute('shape', 'rectangle');
+    button.setAttribute('touch', 'true');
+    button.setAttribute('currentStateId', '0');
+    button.setAttribute('captionOnBorder', 'false');
+
+    const states = doc.createElement('states');
+    const normalState = doc.createElement('state');
+    normalState.setAttribute('stateId', '0');
+    normalState.setAttribute('backColor', '#d9d9d9');
+    normalState.setAttribute('borderColor', '#5f5f5f');
+    normalState.setAttribute('patternColor', 'white');
+    normalState.setAttribute('patternStyle', 'none');
+    normalState.setAttribute('blink', 'false');
+    normalState.setAttribute('endColor', 'white');
+    normalState.setAttribute('gradientStop', '50');
+    normalState.setAttribute('gradientDirection', 'gradientDirectionHorizontal');
+    normalState.setAttribute('gradientShadingStyle', 'gradientHorizontalFromRight');
+
+    const pressedState = doc.createElement('state');
+    pressedState.setAttribute('stateId', '1');
+    pressedState.setAttribute('backColor', '#b8efb8');
+    pressedState.setAttribute('borderColor', '#5f5f5f');
+    pressedState.setAttribute('patternColor', 'white');
+    pressedState.setAttribute('patternStyle', 'none');
+    pressedState.setAttribute('blink', 'false');
+    pressedState.setAttribute('endColor', 'white');
+    pressedState.setAttribute('gradientStop', '50');
+    pressedState.setAttribute('gradientDirection', 'gradientDirectionHorizontal');
+    pressedState.setAttribute('gradientShadingStyle', 'gradientHorizontalFromRight');
+
+    states.appendChild(normalState);
+    states.appendChild(pressedState);
+    button.appendChild(states);
+  }
+
+  if (!isMomentaryButton && !button.hasAttribute('backColor')) {
     button.setAttribute('backColor', '#d9d9d9');
   }
   if (!button.hasAttribute('borderStyle')) {
     button.setAttribute('borderStyle', 'line');
   }
-  if (!button.hasAttribute('borderColor')) {
+  if (!isMomentaryButton && !button.hasAttribute('borderColor')) {
     button.setAttribute('borderColor', '#5f5f5f');
   }
   if (!button.hasAttribute('borderWidth')) {
     button.setAttribute('borderWidth', '1');
   }
 
-  const captionNode = Array.from(button.children).find((child) => child.tagName === 'caption') || doc.createElement('caption');
+  if (isMomentaryButton) {
+    button.removeAttribute('backColor');
+    button.removeAttribute('borderColor');
+    Array.from(button.children)
+      .filter((child) => child.tagName === 'caption' || child.tagName === 'imageSettings')
+      .forEach((child) => child.remove());
+  }
+
+  let captionNode = Array.from(button.children).find((child) => child.tagName === 'caption');
+  if (!captionNode) {
+    const stateNode = Array.from(button.querySelectorAll(':scope > states > state')).find((state) => state.getAttribute('stateId') === '0')
+      || Array.from(button.querySelectorAll(':scope > states > state'))[0];
+    captionNode = stateNode
+      ? Array.from(stateNode.children).find((child) => child.tagName === 'caption') || doc.createElement('caption')
+      : doc.createElement('caption');
+
+    if (stateNode && !Array.from(stateNode.children).includes(captionNode)) {
+      stateNode.appendChild(captionNode);
+    }
+  }
+
   captionNode.setAttribute('caption', buttonLabel);
   if (!captionNode.getAttribute('color')) {
     captionNode.setAttribute('color', '#1f1f1f');
@@ -966,7 +1039,35 @@ function addButtonObject() {
   if (!captionNode.getAttribute('fontSize')) {
     captionNode.setAttribute('fontSize', '10');
   }
-  if (!Array.from(button.children).includes(captionNode)) {
+  if (!captionNode.getAttribute('fontFamily')) {
+    captionNode.setAttribute('fontFamily', 'Arial');
+  }
+  if (!captionNode.getAttribute('bold')) {
+    captionNode.setAttribute('bold', 'true');
+  }
+  if (!captionNode.getAttribute('italic')) {
+    captionNode.setAttribute('italic', 'false');
+  }
+  if (!captionNode.getAttribute('underline')) {
+    captionNode.setAttribute('underline', 'false');
+  }
+  if (!captionNode.getAttribute('strikethrough')) {
+    captionNode.setAttribute('strikethrough', 'false');
+  }
+  if (!captionNode.getAttribute('backStyle')) {
+    captionNode.setAttribute('backStyle', 'transparent');
+  }
+  if (!captionNode.getAttribute('alignment')) {
+    captionNode.setAttribute('alignment', 'middleCenter');
+  }
+  if (!captionNode.getAttribute('wordWrap')) {
+    captionNode.setAttribute('wordWrap', 'false');
+  }
+  if (!captionNode.getAttribute('blink')) {
+    captionNode.setAttribute('blink', 'false');
+  }
+
+  if (!isMomentaryButton && !Array.from(button.children).includes(captionNode) && captionNode.parentNode === button) {
     button.appendChild(captionNode);
   }
 

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FactoryTalk Display XML Bridge</title>
+    <title>Display XML Bridge</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -13,8 +13,7 @@
     <main class="shell">
       <section class="hero">
         <div class="hero-title">
-          <h1>FactoryTalk Display XML Bridge</h1>
-          <p>Load exported display XML, preview and edit, then build an import package.</p>
+          <h1>Display XML Bridge</h1>
         </div>
         <div class="status-card" id="bridgeStatus">
           <span class="dot"></span>
@@ -22,17 +21,28 @@
         </div>
       </section>
 
-      <section class="grid">
+      <section class="grid" id="mainGrid">
         <article class="card exports-card">
-          <h2>Exported Displays</h2>
-          <p>This list reads exported XML from your FactoryTalk export folder.</p>
-          <button id="refreshBtn" type="button">Refresh List</button>
+          <div class="displays-header">
+            <h2>Displays</h2>
+            <button id="toggleSidebarBtn" type="button" class="sidebar-edge-toggle" aria-label="Hide displays sidebar" title="Hide displays sidebar" aria-pressed="false">
+              <span class="edge-icon-bar"></span>
+              <span class="edge-icon-bar"></span>
+              <span class="edge-icon-bar"></span>
+            </button>
+          </div>
+          <input id="uploadInput" type="file" accept=".xml,text/xml,application/xml" multiple />
+          <div class="display-tools">
+            <button id="addDisplayBtn" type="button" class="icon-btn" title="Create new page from Template.xml">+</button>
+            <button id="uploadDisplayBtn" type="button" class="secondary toolbar-upload-btn">Upload XML</button>
+            <button id="removeDisplayBtn" type="button" class="icon-btn secondary" title="Remove selected screen">-</button>
+            <button id="refreshBtn" type="button" class="secondary">Saved List</button>
+          </div>
           <ul id="displaysList" class="single-list"></ul>
         </article>
 
         <article class="card editor-card">
           <h2>Display Visual Editor</h2>
-          <p>Open one display and see its visual layout from XML. Edit size, then save and package for import.</p>
 
           <div class="editor-layout">
             <div class="editor-controls">
@@ -42,23 +52,24 @@
               <div class="size-grid">
                 <div>
                   <label for="screenWidth">Width</label>
-                  <input id="screenWidth" type="number" min="1" value="1280" />
+                  <input id="screenWidth" type="number" min="1" value="1024" />
                 </div>
                 <div>
                   <label for="screenHeight">Height</label>
-                  <input id="screenHeight" type="number" min="1" value="720" />
+                  <input id="screenHeight" type="number" min="1" value="768" />
                 </div>
               </div>
 
               <div class="actions">
                 <button id="previewBtn" type="button">Preview</button>
-                <button id="applySizeBtn" type="button" class="secondary">Apply Size To XML</button>
-                <button id="saveXmlBtn" type="button" class="secondary">Save Edited XML</button>
-                <button id="buildPackageBtn" type="button">Build Import Package</button>
+                <button id="addObjectBtn" type="button" class="secondary">Add Button</button>
+                <button id="applySizeBtn" type="button" class="secondary">Apply Size to HMI</button>
+                <button id="buildPackageBtn" type="button">Get Page Import</button>
+                <button id="buildAllPackageBtn" type="button" class="secondary">Get All Import</button>
               </div>
 
-              <section class="object-panel">
-                <h3>Selected Object Properties</h3>
+              <details class="object-panel" id="objectPanelDetails">
+                <summary>Selected Object Properties</summary>
                 <p>Click any object in preview, edit fields, then apply.</p>
 
                 <div class="prop-grid">
@@ -114,14 +125,15 @@
                       <span id="objTextColorSwatch" class="color-swatch" title="Text Color Preview"></span>
                     </div>
                   </div>
-                  <div>
-                    <label for="objFontSize">Font Size</label>
-                    <input id="objFontSize" type="number" min="1" value="10" />
+                  <div class="prop-wide font-apply-row">
+                    <div class="font-size-field">
+                      <label for="objFontSize">Font Size</label>
+                      <input id="objFontSize" type="number" min="1" value="10" />
+                    </div>
+                    <button id="applyObjectBtn" type="button" class="secondary">Apply</button>
                   </div>
                 </div>
-
-                <button id="applyObjectBtn" type="button" class="secondary">Apply Object Changes</button>
-              </section>
+              </details>
 
               <details class="advanced-box">
                 <summary>Advanced: Show XML code</summary>

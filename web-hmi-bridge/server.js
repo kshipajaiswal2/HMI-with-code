@@ -14,6 +14,7 @@ const PORT = process.env.PORT || 5050;
 const ROOT = __dirname;
 const FTIO_DIR = path.join(ROOT, 'ftio');
 const FACTORYTALK_EXPORT_DIR = process.env.FT_EXPORT_DIR || path.join(ROOT, '..', 'Export import');
+const IMAGE_LIBRARY_DIR = process.env.FT_IMAGE_DIR || path.join(ROOT, '..', 'hmi', 'MyPlantHMI', 'Images');
 const REIMPORT_DIR = path.join(FTIO_DIR, 'reimport');
 const PACKAGE_DIR = path.join(REIMPORT_DIR, 'packages');
 
@@ -38,10 +39,29 @@ function fileRow(dirPath, name) {
 
 function getFiles(dirPath, predicate) {
   const files = fs.readdirSync(dirPath)
-    .filter((name) => fs.statSync(path.join(dirPath, name)).isFile())
+    .filter((name) => {
+      try {
+        return fs.statSync(path.join(dirPath, name)).isFile();
+      } catch (err) {
+        if (err && err.code === 'ENOENT') {
+          return false;
+        }
+        throw err;
+      }
+    })
     .filter((name) => !predicate || predicate(name))
-    .map((name) => fileRow(dirPath, name))
-    .sort((a, b) => b.lastModified.localeCompare(a.lastModified));
+    .map((name) => {
+      try {
+        return fileRow(dirPath, name);
+      } catch (err) {
+        if (err && err.code === 'ENOENT') {
+          return null;
+        }
+        throw err;
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.lastModified.localeCompare(b.lastModified));
 
   return files;
 }
@@ -73,6 +93,89 @@ function writeUtf16LeWithBom(filePath, text) {
   fs.writeFileSync(filePath, Buffer.concat([bom, body]));
 }
 
+function findImagePath(name) {
+  const safeName = path.basename(String(name || '')).trim();
+  if (!safeName || !fs.existsSync(IMAGE_LIBRARY_DIR)) {
+    return null;
+  }
+
+  const directoryFiles = fs.readdirSync(IMAGE_LIBRARY_DIR)
+    .filter((file) => fs.statSync(path.join(IMAGE_LIBRARY_DIR, file)).isFile());
+  const byLower = new Map(directoryFiles.map((file) => [file.toLowerCase(), file]));
+
+  const ext = path.extname(safeName);
+  const candidates = ext
+    ? [safeName]
+    : [
+        `${safeName}.bmp`,
+        `${safeName}.png`,
+        `${safeName}.jpg`,
+        `${safeName}.jpeg`,
+        `${safeName}.gif`,
+        `${safeName}.svg`,
+        `${safeName}.ico`,
+        `${safeName}.webp`
+      ];
+
+  for (const candidate of candidates) {
+    const matched = byLower.get(candidate.toLowerCase());
+    if (matched) {
+      return path.join(IMAGE_LIBRARY_DIR, matched);
+    }
+  }
+
+  const safeBase = path.basename(safeName, path.extname(safeName));
+  const aliases = new Map([
+    ['manual2', 'manual1'],
+    ['machinesequence2', 'machinesequence1']
+  ]);
+  const aliasBase = aliases.get(safeBase.toLowerCase());
+  if (aliasBase) {
+    const aliasCandidates = [
+      `${aliasBase}.bmp`,
+      `${aliasBase}.png`,
+      `${aliasBase}.jpg`,
+      `${aliasBase}.jpeg`,
+      `${aliasBase}.gif`,
+      `${aliasBase}.svg`,
+      `${aliasBase}.ico`,
+      `${aliasBase}.webp`
+    ];
+
+    for (const candidate of aliasCandidates) {
+      const matched = byLower.get(candidate.toLowerCase());
+      if (matched) {
+        return path.join(IMAGE_LIBRARY_DIR, matched);
+      }
+    }
+  }
+
+  // Generic fallback: if a numeric variant is missing (icon2/icon3), try icon1.
+  const numericVariant = safeBase.match(/^(.*?)(\d+)$/);
+  if (numericVariant && numericVariant[1]) {
+    const baseStem = numericVariant[1];
+    const variantCandidates = [
+      `${baseStem}1.bmp`,
+      `${baseStem}1.png`,
+      `${baseStem}1.jpg`,
+      `${baseStem}1.jpeg`,
+      `${baseStem}1.gif`,
+      `${baseStem}1.svg`,
+      `${baseStem}1.ico`,
+      `${baseStem}1.webp`
+    ];
+
+    for (const candidate of variantCandidates) {
+      const matched = byLower.get(candidate.toLowerCase());
+      if (matched) {
+        return path.join(IMAGE_LIBRARY_DIR, matched);
+      }
+    }
+  }
+
+  return null;
+}
+
 function parseDisplayMeta(xml) {
   const widthMatch = xml.match(/\bwidth\s*=\s*"(\d+)"/i);
   const heightMatch = xml.match(/\bheight\s*=\s*"(\d+)"/i);
@@ -81,6 +184,18 @@ function parseDisplayMeta(xml) {
     width: widthMatch ? Number(widthMatch[1]) : null,
     height: heightMatch ? Number(heightMatch[1]) : null
   };
+}
+
+function classifyXmlKind(name, xml) {
+  if (/_addons\.xml$/i.test(String(name || ''))) {
+    return 'global-object';
+  }
+
+  if (/<\s*displaySettings\b/i.test(String(xml || ''))) {
+    return 'display';
+  }
+
+  return 'global-object';
 }
 
 function getDisplayFiles() {
@@ -101,7 +216,7 @@ function getDisplayFiles() {
     map.set(file.name.toLowerCase(), file);
   }
 
-  const merged = [...map.values()].sort((a, b) => b.lastModified.localeCompare(a.lastModified));
+  const merged = [...map.values()].sort((a, b) => a.lastModified.localeCompare(b.lastModified));
   return merged;
 }
 
@@ -165,6 +280,7 @@ app.get('/api/displays', (_req, res) => {
 
     return {
       ...file,
+      kind: classifyXmlKind(file.name, xml),
       width: meta.width,
       height: meta.height
     };
@@ -184,10 +300,20 @@ app.get('/api/displays/:name', (req, res) => {
   return res.json({
     name: resolved.name,
     source: resolved.source,
+    kind: classifyXmlKind(resolved.name, xml),
     xml,
     width: meta.width,
     height: meta.height
   });
+});
+
+app.get('/api/images/:name', (req, res) => {
+  const imagePath = findImagePath(req.params.name);
+  if (!imagePath) {
+    return res.status(404).json({ error: 'Image not found' });
+  }
+
+  return res.sendFile(imagePath);
 });
 
 app.post('/api/displays/:name/save', (req, res) => {
@@ -214,10 +340,44 @@ app.post('/api/displays/:name/save', (req, res) => {
   });
 });
 
+app.delete('/api/displays/:name', (req, res) => {
+  const safeName = safeDisplayFileName(req.params.name);
+  if (!isDisplayXml(safeName)) {
+    return res.status(400).json({ error: 'Only display XML files are supported' });
+  }
+
+  const source = String(req.query?.source || '').toLowerCase();
+  const editedPath = path.join(REIMPORT_DIR, safeName);
+  const exportPath = path.join(FACTORYTALK_EXPORT_DIR, safeName);
+
+  const deleteCandidates = source === 'factorytalk-export'
+    ? [exportPath]
+    : source === 'edited' || source === 'uploaded'
+      ? [editedPath]
+      : [editedPath, exportPath];
+
+  const removed = [];
+  for (const filePath of deleteCandidates) {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      removed.push(filePath);
+    }
+  }
+
+  if (!removed.length) {
+    return res.status(404).json({ error: 'XML file not found' });
+  }
+
+  return res.json({ ok: true, removed: safeName, paths: removed });
+});
+
 app.post('/api/displays/package', (req, res) => {
   const requested = Array.isArray(req.body?.files) ? req.body.files : [];
-  const defaults = getDisplayFiles().map((f) => f.name);
-  const selected = (requested.length ? requested : defaults)
+  if (!requested.length) {
+    return res.status(400).json({ error: 'No files selected for package' });
+  }
+
+  const selected = requested
     .map((name) => safeDisplayFileName(name))
     .filter((name) => isDisplayXml(name));
 
@@ -258,6 +418,42 @@ app.post('/api/displays/package', (req, res) => {
   const batchCompatPath = path.join(packagePath, batchCompatName);
   writeUtf16LeWithBom(batchPath, batchXml);
   writeUtf16LeWithBom(batchCompatPath, batchXml);
+
+  const notesName = 'DisplaysImport_WebBridge.txt';
+  const notesCompatName = 'DisplaysImport.txt';
+  const deleteListName = 'DeleteTargets.txt';
+  const notesLines = [
+    'FactoryTalk Web Bridge package generated successfully.',
+    '',
+    `Display files: ${copied.length}`,
+    ...copied,
+    '',
+    `Batch file: ${batchName}`,
+    '',
+    'Import steps (important):',
+    '1. Close all target displays before import.',
+    '2. In FactoryTalk Batch Import, choose BatchImport.xml from this extracted folder.',
+    '3. Set conflict handling to REPLACE/OVERWRITE existing displays (do not merge/update).',
+    '4. If REPLACE is not available in your dialog, delete the target displays first, then import.',
+    '5. If status says "element does not exist in the Display and cannot be updated", your import is in update/merge mode.',
+    '   Switch to REPLACE, or delete targets first using DeleteTargets.txt, then re-import.',
+    '',
+    'If you import in merge mode, messages like "element already exists and will be ignored" are expected.'
+  ];
+  const notesText = `${notesLines.join('\r\n')}\r\n`;
+  const notesPath = path.join(packagePath, notesName);
+  const notesCompatPath = path.join(packagePath, notesCompatName);
+  fs.writeFileSync(notesPath, notesText, 'utf8');
+  fs.writeFileSync(notesCompatPath, notesText, 'utf8');
+
+  const displayNames = copied.map((name) => name.replace(/\.xml$/i, ''));
+  const deleteText = [
+    'Delete these displays first if FactoryTalk import is merging instead of replacing:',
+    ...displayNames.map((name) => `- ${name}`),
+    '',
+    'After deleting, run Batch Import with BatchImport.xml from this folder.'
+  ].join('\r\n') + '\r\n';
+  fs.writeFileSync(path.join(packagePath, deleteListName), deleteText, 'utf8');
 
   return res.json({
     ok: true,

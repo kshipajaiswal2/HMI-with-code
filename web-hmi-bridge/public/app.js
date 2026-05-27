@@ -2,11 +2,19 @@ const socket = io();
 
 const bridgeStatus = document.getElementById('bridgeStatus');
 const displaysList = document.getElementById('displaysList');
+const sidebarTitle = document.querySelector('.displays-header h2');
+const exportsCard = document.querySelector('.exports-card');
 const uploadInput = document.getElementById('uploadInput');
+const defaultUploadInput = document.getElementById('defaultUploadInput');
 const addDisplayBtn = document.getElementById('addDisplayBtn');
+const addFolderBtn = document.getElementById('addFolderBtn');
+const removeFolderBtn = document.getElementById('removeFolderBtn');
 const uploadDisplayBtn = document.getElementById('uploadDisplayBtn');
 const removeDisplayBtn = document.getElementById('removeDisplayBtn');
 const refreshBtn = document.getElementById('refreshBtn');
+const showDisplaysBtn = document.getElementById('showDisplaysBtn');
+const showDefaultsBtn = document.getElementById('showDefaultsBtn');
+const seedDefaultsBtn = document.getElementById('seedDefaultsBtn');
 const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
 const mainGrid = document.getElementById('mainGrid');
 
@@ -47,8 +55,15 @@ let selectedFiles = [];
 let selectedObjectIndex = null;
 let usingUploadedList = false;
 let currentDisplayRows = [];
+let currentDefaultRows = [];
+let selectedDefaultTemplate = '';
+let selectedFolderName = '';
+let selectedFolderIsCustom = false;
 let hiddenDisplayNames = new Set();
 let draggedDisplayKey = '';
+let folderNames = [];
+let folderAssignments = {};
+let folderCollapsedNames = new Set();
 let previewImageNonce = Date.now();
 let historyPast = [];
 let historyFuture = [];
@@ -61,7 +76,12 @@ const TEMPLATE_DISPLAY_NAME = 'Template.xml';
 const DEFAULT_PREVIEW_WIDTH = 1024;
 const DEFAULT_PREVIEW_HEIGHT = 768;
 const SIDEBAR_STORAGE_KEY = 'displayXmlBridge.sidebarCollapsed';
+const SIDEBAR_MODE_STORAGE_KEY = 'displayXmlBridge.sidebarMode';
+const SIDEBAR_MODE_DISPLAYS = 'displays';
+const SIDEBAR_MODE_DEFAULTS = 'defaults';
+const UNGROUPED_FOLDER_NAME = 'Ungrouped';
 const HISTORY_LIMIT = 120;
+let sidebarMode = SIDEBAR_MODE_DISPLAYS;
 
 function displayKey(name) {
   return String(name || '').toLowerCase();
@@ -84,9 +104,157 @@ function baseFileName(name) {
   return String(name || '').replace(/\.xml$/i, '');
 }
 
+function isNumberedDisplayName(name) {
+  return /^\d{3}_/.test(baseFileName(name));
+}
+
 function isEditableSource(file) {
   const source = String(file?.source || '').toLowerCase();
   return source === 'edited' || source === 'uploaded';
+}
+
+function isDefaultMode() {
+  return sidebarMode === SIDEBAR_MODE_DEFAULTS;
+}
+
+function normalizeFolderName(name) {
+  return String(name || '')
+    .replace(/[\\/:*?"<>|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildAutoDisplayFolderMap(displayFiles) {
+  const autoBuckets = new Map();
+  for (const file of displayFiles) {
+    const base = String(file.name || '').replace(/\.xml$/i, '');
+    const match = base.match(/^(\d{3})/);
+    if (!match) {
+      continue;
+    }
+
+    const bucket = Math.floor(Number(match[1]) / 100) * 100;
+    if (!autoBuckets.has(bucket)) {
+      autoBuckets.set(bucket, []);
+    }
+    autoBuckets.get(bucket).push(file.name);
+  }
+
+  const autoFolderMap = new Map();
+  for (const [bucket, names] of autoBuckets.entries()) {
+    const prefix = String(bucket).padStart(3, '0');
+    const exact = names.find((name) => String(name).toLowerCase().startsWith(`${prefix}_`));
+    autoFolderMap.set(bucket, String(exact || names[0]).replace(/\.xml$/i, ''));
+  }
+
+  return autoFolderMap;
+}
+
+function resolveDisplayFolderName(fileName, autoFolderMap) {
+  const key = displayKey(fileName);
+  const assigned = normalizeFolderName(folderAssignments[key] || '');
+  if (assigned) {
+    return assigned;
+  }
+
+  const base = String(fileName || '').replace(/\.xml$/i, '');
+  const match = base.match(/^(\d{3})/);
+  if (!match) {
+    return UNGROUPED_FOLDER_NAME;
+  }
+
+  const bucket = Math.floor(Number(match[1]) / 100) * 100;
+  return autoFolderMap.get(bucket) || UNGROUPED_FOLDER_NAME;
+}
+
+async function loadDisplayFolders() {
+  const res = await fetch('/api/display-folders');
+  if (!res.ok) {
+    throw new Error('Failed to load display folders');
+  }
+
+  const data = await res.json();
+  const nextFolders = Array.isArray(data.folders)
+    ? data.folders.map((name) => normalizeFolderName(name)).filter(Boolean)
+    : [];
+  const rawAssignments = data.assignments && typeof data.assignments === 'object'
+    ? data.assignments
+    : {};
+  const nextAssignments = {};
+  for (const [name, folder] of Object.entries(rawAssignments)) {
+    const fileKey = displayKey(name);
+    const folderName = normalizeFolderName(folder);
+    if (fileKey && folderName) {
+      nextAssignments[fileKey] = folderName;
+    }
+  }
+
+  folderNames = [...new Set(nextFolders)];
+  folderAssignments = nextAssignments;
+}
+
+async function saveDisplayFolders() {
+  const res = await fetch('/api/display-folders/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ folders: folderNames, assignments: folderAssignments })
+  });
+
+  const data = await readApiJson(res);
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to save display folders');
+  }
+}
+
+function setSidebarMode(mode) {
+  sidebarMode = mode === SIDEBAR_MODE_DEFAULTS ? SIDEBAR_MODE_DEFAULTS : SIDEBAR_MODE_DISPLAYS;
+  localStorage.setItem(SIDEBAR_MODE_STORAGE_KEY, sidebarMode);
+
+  if (exportsCard) {
+    exportsCard.classList.toggle('default-mode', isDefaultMode());
+  }
+
+  if (showDisplaysBtn) {
+    showDisplaysBtn.classList.toggle('active', !isDefaultMode());
+  }
+  if (showDefaultsBtn) {
+    showDefaultsBtn.classList.toggle('active', isDefaultMode());
+  }
+
+  if (sidebarTitle) {
+    sidebarTitle.textContent = isDefaultMode() ? 'Default Templates' : 'Displays';
+  }
+
+  if (addDisplayBtn) {
+    addDisplayBtn.classList.toggle('hidden', isDefaultMode());
+  }
+
+  if (addFolderBtn) {
+    addFolderBtn.classList.toggle('hidden', isDefaultMode());
+  }
+
+  if (removeFolderBtn) {
+    removeFolderBtn.classList.toggle('hidden', isDefaultMode());
+    removeFolderBtn.disabled = true;
+  }
+
+  if (seedDefaultsBtn) {
+    seedDefaultsBtn.classList.toggle('hidden', !isDefaultMode());
+  }
+
+  if (uploadDisplayBtn) {
+    uploadDisplayBtn.classList.toggle('hidden', isDefaultMode());
+    uploadDisplayBtn.textContent = 'Upload XML';
+  }
+
+  if (refreshBtn) {
+    refreshBtn.textContent = isDefaultMode() ? 'Refresh' : 'Saved List';
+  }
+
+  if (removeDisplayBtn) {
+    removeDisplayBtn.title = isDefaultMode() ? 'Remove selected default template' : 'Remove selected screen';
+  }
+
 }
 
 function updatePackageSelection(files = currentDisplayRows) {
@@ -189,12 +357,12 @@ function fitCanvasToFrame(frame, canvas, width, height) {
   const availableWidth = Math.max(1, frame.clientWidth - horizontalPadding);
   const availableHeight = Math.max(1, frame.clientHeight - verticalPadding);
 
-  // Keep the full display visible and let it naturally fill available preview space.
-  const scale = Math.min(availableWidth / width, availableHeight / height);
+  // Keep the display fully visible, but avoid upscaling above 1:1 for closer FT parity.
+  const scale = Math.min(1, availableWidth / width, availableHeight / height);
   const finalScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
 
-  canvas.style.width = `${Math.floor(width * finalScale)}px`;
-  canvas.style.height = `${Math.floor(height * finalScale)}px`;
+  canvas.style.width = `${width * finalScale}px`;
+  canvas.style.height = `${height * finalScale}px`;
 }
 
 function getCanvasScale(canvas, width, height) {
@@ -418,6 +586,15 @@ function getNodeImageName(node) {
   return fromSettings || '';
 }
 
+function getNodeImageRenderOptions(node) {
+  const imageSettings = Array.from(node.children).find((child) => child.tagName === 'imageSettings');
+  const alignmentRaw = imageSettings?.getAttribute('alignment') || 'middleCenter';
+  const scaledRaw = String(imageSettings?.getAttribute('scaled') || '').toLowerCase();
+  const scaled = scaledRaw ? scaledRaw === 'true' : true;
+  const { horizontal, vertical } = parseCaptionAlignment(alignmentRaw);
+  return { horizontal, vertical, scaled };
+}
+
 function createImageFallback(imageName) {
   const raw = String(imageName || '').trim();
   if (!raw) {
@@ -486,14 +663,26 @@ function iconSvg(icon) {
   }
 }
 
+function normalizePreviewCaption(rawCaption, wrapEnabled) {
+  let caption = String(rawCaption || '');
+  if (!wrapEnabled && /\r?\n[ \t]{4,}/.test(caption)) {
+    // Some sequence captions contain hard line-break continuations from export.
+    // Flatten those when wordWrap is disabled so table rows stay single-line.
+    caption = caption.replace(/\s*[\r\n]+[ \t]{2,}/g, ' ');
+  }
+
+  return caption;
+}
+
 function previewTextForNode(node, captionNode) {
   const tag = String(node.tagName || '').toLowerCase();
-  const captionFromChild = String(captionNode?.getAttribute('caption') || '').trim();
+  const wrapEnabled = String(captionNode?.getAttribute('wordWrap') || node.getAttribute('wordWrap') || '').toLowerCase() === 'true';
+  const captionFromChild = normalizePreviewCaption(captionNode?.getAttribute('caption') || '', wrapEnabled).trim();
   if (captionFromChild) {
     return captionFromChild;
   }
 
-  const captionFromNode = String(node.getAttribute('caption') || '').trim();
+  const captionFromNode = normalizePreviewCaption(node.getAttribute('caption') || '', wrapEnabled).trim();
   if (captionFromNode) {
     return captionFromNode;
   }
@@ -515,7 +704,13 @@ function previewTextForNode(node, captionNode) {
 
   if (tag === 'stringdisplay') {
     const expr = String(node.querySelector('connection[name="Value"]')?.getAttribute('expression') || '').toLowerCase();
-    if (expr.includes('system\\user') || expr.includes('system/user')) {
+    if (
+      expr.includes('system\\user')
+      || expr.includes('system/user')
+      || expr.includes('currentusername')
+      || expr.includes('current_user')
+      || expr.includes('username')
+    ) {
       return 'ssssssss';
     }
     return 'STRING';
@@ -1092,7 +1287,25 @@ function addButtonObject() {
 
 function setEditorDisplay(name, xml) {
   selectedDisplay = name;
+  selectedDefaultTemplate = '';
   displayName.value = name;
+  xmlEditor.value = xml;
+  resetHistory(xml);
+  selectedObjectIndex = null;
+  clearObjectPanel();
+
+  const size = readSizeFromXml(xml);
+  if (size.width) screenWidth.value = size.width;
+  if (size.height) screenHeight.value = size.height;
+
+  updatePackageSelection(currentDisplayRows);
+  renderPreview();
+}
+
+function setEditorTemplate(name, xml) {
+  selectedDisplay = '';
+  selectedDefaultTemplate = name;
+  displayName.value = `[Template] ${name}`;
   xmlEditor.value = xml;
   resetHistory(xml);
   selectedObjectIndex = null;
@@ -1193,6 +1406,62 @@ async function deleteDisplayXml(name, source) {
   return data;
 }
 
+async function saveDefaultTemplateXml(name, xml) {
+  const res = await fetch(`/api/default-pages/${encodeURIComponent(name)}/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ xml })
+  });
+
+  const data = await readApiJson(res);
+  if (!res.ok) {
+    throw new Error(data.error || `Failed to save default template ${name}`);
+  }
+
+  return data;
+}
+
+async function loadDefaultTemplateXml(name) {
+  const res = await fetch(`/api/default-pages/${encodeURIComponent(name)}`);
+  const data = await readApiJson(res);
+  if (!res.ok) {
+    throw new Error(data.error || `Failed to load default template ${name}`);
+  }
+
+  return data;
+}
+
+async function deleteDefaultTemplateXml(name) {
+  const res = await fetch(`/api/default-pages/${encodeURIComponent(name)}`, {
+    method: 'DELETE'
+  });
+
+  const data = await readApiJson(res);
+  if (res.status === 404) {
+    return { ok: true, removed: name, alreadyMissing: true };
+  }
+  if (!res.ok) {
+    throw new Error(data.error || `Failed to remove default template ${name}`);
+  }
+
+  return data;
+}
+
+async function seedDefaultTemplates(files) {
+  const res = await fetch('/api/default-pages/seed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files: Array.isArray(files) ? files : [] })
+  });
+
+  const data = await readApiJson(res);
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to copy default templates to project');
+  }
+
+  return data;
+}
+
 function updateCurrentDisplayRow(name, xml) {
   const meta = readSizeFromXml(xml);
   currentDisplayRows = currentDisplayRows.map((file) => file.name === name
@@ -1280,6 +1549,9 @@ function setBridgeCard(status) {
 
 function clearSelectedDisplay() {
   selectedDisplay = '';
+  selectedDefaultTemplate = '';
+  selectedFolderName = '';
+  selectedFolderIsCustom = false;
   selectedObjectIndex = null;
   displayName.value = 'None';
   xmlEditor.value = '';
@@ -1302,6 +1574,14 @@ async function removeDisplayByName(name) {
   }
 
   await deleteDisplayXml(file.name, file.source);
+  if (folderAssignments[key]) {
+    delete folderAssignments[key];
+    try {
+      await saveDisplayFolders();
+    } catch (_err) {
+      // Ignore folder save failure during delete flow.
+    }
+  }
 
   if (displayKey(selectedDisplay) === key) {
     clearSelectedDisplay();
@@ -1309,6 +1589,28 @@ async function removeDisplayByName(name) {
 
   const nextFiles = currentDisplayRows.filter((rowFile) => displayKey(rowFile.name) !== key);
   renderDisplays(nextFiles);
+}
+
+async function removeDefaultTemplateByName(name) {
+  const key = displayKey(name);
+  const file = currentDefaultRows.find((rowFile) => displayKey(rowFile.name) === key);
+  if (!file) {
+    return;
+  }
+
+  const confirmed = confirm(`Remove default template ${file.name}?`);
+  if (!confirmed) {
+    return;
+  }
+
+  await deleteDefaultTemplateXml(file.name);
+
+  if (displayKey(selectedDefaultTemplate) === key) {
+    clearSelectedDisplay();
+  }
+
+  const nextFiles = currentDefaultRows.filter((rowFile) => displayKey(rowFile.name) !== key);
+  renderDefaultTemplates(nextFiles);
 }
 
 function renderDisplays(files) {
@@ -1321,7 +1623,6 @@ function renderDisplays(files) {
   if (!hasSelectedVisible && selectedDisplay) {
     clearSelectedDisplay();
   }
-  removeDisplayBtn.disabled = !selectedDisplay;
 
   if (!visibleFiles.length) {
     displaysList.innerHTML = '<li>No display XML files loaded yet.</li>';
@@ -1331,6 +1632,35 @@ function renderDisplays(files) {
 
   const displayFiles = visibleFiles.filter((file) => !isGlobalObjectFile(file));
   const globalObjectFiles = visibleFiles.filter((file) => isGlobalObjectFile(file));
+
+  const autoFolderMap = buildAutoDisplayFolderMap(displayFiles);
+
+  const filesByFolder = new Map();
+  for (const file of displayFiles) {
+    const folderName = resolveDisplayFolderName(file.name, autoFolderMap);
+    if (!filesByFolder.has(folderName)) {
+      filesByFolder.set(folderName, []);
+    }
+    filesByFolder.get(folderName).push(file);
+  }
+
+  const foldersInUse = [...new Set([...folderNames, ...filesByFolder.keys()])]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+  const hasSelectedFolder = selectedFolderName
+    && foldersInUse.some((name) => name.toLowerCase() === selectedFolderName.toLowerCase());
+  if (!hasSelectedFolder) {
+    selectedFolderName = '';
+    selectedFolderIsCustom = false;
+  }
+
+  removeDisplayBtn.disabled = !selectedDisplay;
+  if (removeFolderBtn) {
+    removeFolderBtn.disabled = !selectedFolderName;
+  }
+
+  const customFolderSet = new Set(folderNames.map((name) => name.toLowerCase()));
 
   const appendSectionHeader = (title) => {
     const section = document.createElement('li');
@@ -1342,6 +1672,7 @@ function renderDisplays(files) {
   const appendFileRow = (file, options = {}) => {
     const isGlobalObject = Boolean(options.isGlobalObject);
     const namePrefix = isGlobalObject ? '◆ ' : '';
+    const appendTo = options.appendTo || displaysList;
 
     const li = document.createElement('li');
     li.className = `display-item${isGlobalObject ? ' global-object-item' : ''}`;
@@ -1374,23 +1705,7 @@ function renderDisplays(files) {
       li.addEventListener('dragend', () => {
         draggedDisplayKey = '';
         li.classList.remove('dragging');
-        Array.from(displaysList.querySelectorAll('.display-item')).forEach((item) => item.classList.remove('drag-over'));
-      });
-      li.addEventListener('dragover', (event) => {
-        event.preventDefault();
-        if (!draggedDisplayKey || draggedDisplayKey === displayKey(file.name)) {
-          return;
-        }
-
-        li.classList.add('drag-over');
-      });
-      li.addEventListener('dragleave', () => {
-        li.classList.remove('drag-over');
-      });
-      li.addEventListener('drop', (event) => {
-        event.preventDefault();
-        li.classList.remove('drag-over');
-        moveDisplayRow(draggedDisplayKey, displayKey(file.name));
+        Array.from(displaysList.querySelectorAll('.folder-row')).forEach((item) => item.classList.remove('drag-over'));
       });
     }
 
@@ -1401,13 +1716,93 @@ function renderDisplays(files) {
       });
     });
 
-    displaysList.appendChild(li);
+    appendTo.appendChild(li);
   };
 
-  if (displayFiles.length) {
+  if (displayFiles.length || foldersInUse.length) {
     appendSectionHeader('Displays');
-    for (const file of displayFiles) {
-      appendFileRow(file);
+
+    for (const folderName of foldersInUse) {
+      const folderFiles = filesByFolder.get(folderName) || [];
+      const isCustomFolder = customFolderSet.has(String(folderName).toLowerCase());
+      const folderLi = document.createElement('li');
+      folderLi.className = 'folder-item';
+      if (folderCollapsedNames.has(folderName)) {
+        folderLi.classList.add('collapsed');
+      }
+
+      const folderRow = document.createElement('div');
+      folderRow.className = 'folder-row';
+      folderRow.dataset.folderName = folderName;
+      if (selectedFolderName && String(selectedFolderName).toLowerCase() === String(folderName).toLowerCase()) {
+        folderRow.classList.add('selected');
+      }
+
+      const toggle = document.createElement('span');
+      toggle.className = 'folder-toggle';
+      toggle.textContent = folderCollapsedNames.has(folderName) ? '▸' : '▾';
+
+      const folderLabel = document.createElement('span');
+      folderLabel.className = 'folder-name';
+      folderLabel.textContent = folderName;
+
+      const folderCount = document.createElement('span');
+      folderCount.className = 'folder-count';
+      folderCount.textContent = `${folderFiles.length}`;
+
+      folderRow.appendChild(toggle);
+      folderRow.appendChild(folderLabel);
+      folderRow.appendChild(folderCount);
+
+      folderRow.addEventListener('click', () => {
+        selectedFolderName = folderName;
+        selectedFolderIsCustom = isCustomFolder;
+        if (folderCollapsedNames.has(folderName)) {
+          folderCollapsedNames.delete(folderName);
+        } else {
+          folderCollapsedNames.add(folderName);
+        }
+        renderDisplays(currentDisplayRows);
+      });
+
+      folderRow.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        if (!draggedDisplayKey) {
+          return;
+        }
+        folderRow.classList.add('drag-over');
+      });
+
+      folderRow.addEventListener('dragleave', () => {
+        folderRow.classList.remove('drag-over');
+      });
+
+      folderRow.addEventListener('drop', async (event) => {
+        event.preventDefault();
+        folderRow.classList.remove('drag-over');
+        if (!draggedDisplayKey) {
+          return;
+        }
+
+        folderAssignments[draggedDisplayKey] = folderName;
+        try {
+          await saveDisplayFolders();
+          renderDisplays(currentDisplayRows);
+        } catch (err) {
+          console.error(err);
+          alert('Could not save folder assignment.');
+        }
+      });
+
+      folderLi.appendChild(folderRow);
+
+      const children = document.createElement('ul');
+      children.className = 'folder-children';
+      for (const file of folderFiles) {
+        appendFileRow(file, { appendTo: children });
+      }
+      folderLi.appendChild(children);
+      displaysList.appendChild(folderLi);
     }
   }
 
@@ -1415,6 +1810,146 @@ function renderDisplays(files) {
     appendSectionHeader('Global Objects');
     for (const file of globalObjectFiles) {
       appendFileRow(file, { isGlobalObject: true });
+    }
+  }
+}
+
+function renderDefaultTemplates(files) {
+  currentDefaultRows = [...files];
+  displaysList.innerHTML = '';
+
+  const hasSelectedVisible = files.some((file) => displayKey(file.name) === displayKey(selectedDefaultTemplate));
+  if (!hasSelectedVisible && selectedDefaultTemplate) {
+    selectedDefaultTemplate = '';
+  }
+
+  removeDisplayBtn.disabled = !selectedDefaultTemplate;
+  if (!files.length) {
+    displaysList.innerHTML = '<li>No default template XML files found in ftio/default-pages.</li>';
+    return;
+  }
+
+  const appendSectionHeader = (title) => {
+    const section = document.createElement('li');
+    section.className = 'list-section';
+    section.textContent = title;
+    displaysList.appendChild(section);
+  };
+
+  const appendDefaultFileRow = (file, options = {}) => {
+    const isGlobalObject = Boolean(options.isGlobalObject);
+    const appendTo = options.appendTo || displaysList;
+    const namePrefix = isGlobalObject ? '◆ ' : '';
+
+    const li = document.createElement('li');
+    li.className = `display-item${isGlobalObject ? ' global-object-item' : ''}`;
+    if (displayKey(selectedDefaultTemplate) === displayKey(file.name)) {
+      li.classList.add('active');
+    }
+
+    const row = document.createElement('div');
+    row.className = 'list-row';
+    const name = document.createElement('strong');
+    name.textContent = `${namePrefix}${file.name}`;
+    row.appendChild(name);
+
+    const meta = document.createElement('div');
+    const sizeLabel = file.width && file.height ? `${file.width}x${file.height}` : 'size unknown';
+    const sourceLabel = isGlobalObject ? 'default global object' : 'default template';
+    meta.textContent = `${sourceLabel} | ${sizeLabel} | ${kb(file.sizeBytes)} | ${shortDateTime(file.lastModified)}`;
+
+    li.appendChild(row);
+    li.appendChild(meta);
+    li.addEventListener('click', () => {
+      loadDefaultTemplate(file.name).catch((err) => {
+        console.error(err);
+        alert(err.message || 'Could not open default template XML');
+      });
+    });
+
+    appendTo.appendChild(li);
+  };
+
+  const globalObjectFiles = files.filter((file) => isGlobalObjectFile(file) || !isNumberedDisplayName(file.name));
+  const globalObjectKeySet = new Set(globalObjectFiles.map((file) => displayKey(file.name)));
+  const templateFiles = files.filter((file) => !globalObjectKeySet.has(displayKey(file.name)));
+
+  if (templateFiles.length) {
+    appendSectionHeader('Default Templates');
+  }
+
+  const grouped = new Map();
+  for (const file of templateFiles) {
+    const base = String(file.name || '').replace(/\.xml$/i, '');
+    const match = base.match(/^(\d{3})/);
+    const bucket = match ? Math.floor(Number(match[1]) / 100) * 100 : null;
+    const groupKey = Number.isFinite(bucket) ? String(bucket).padStart(3, '0') : 'UNGROUPED';
+    if (!grouped.has(groupKey)) {
+      grouped.set(groupKey, []);
+    }
+    grouped.get(groupKey).push(file);
+  }
+
+  const folderNames = [];
+  for (const [groupKey, groupFiles] of grouped.entries()) {
+    if (groupKey === 'UNGROUPED') {
+      folderNames.push({ key: groupKey, name: 'Ungrouped' });
+      continue;
+    }
+
+    const exact = groupFiles.find((file) => String(file.name || '').toLowerCase().startsWith(`${groupKey.toLowerCase()}_`));
+    const folderName = String((exact || groupFiles[0]).name || '').replace(/\.xml$/i, '');
+    folderNames.push({ key: groupKey, name: folderName });
+  }
+
+  folderNames.sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true, sensitivity: 'base' }));
+
+  for (const folder of folderNames) {
+    const folderFiles = grouped.get(folder.key) || [];
+
+    const folderLi = document.createElement('li');
+    folderLi.className = 'folder-item';
+
+    const folderRow = document.createElement('div');
+    folderRow.className = 'folder-row';
+
+    const toggle = document.createElement('span');
+    toggle.className = 'folder-toggle';
+    toggle.textContent = '▾';
+
+    const folderLabel = document.createElement('span');
+    folderLabel.className = 'folder-name';
+    folderLabel.textContent = folder.name;
+
+    const folderCount = document.createElement('span');
+    folderCount.className = 'folder-count';
+    folderCount.textContent = `${folderFiles.length}`;
+
+    folderRow.appendChild(toggle);
+    folderRow.appendChild(folderLabel);
+    folderRow.appendChild(folderCount);
+
+    folderRow.addEventListener('click', () => {
+      const collapsed = folderLi.classList.toggle('collapsed');
+      toggle.textContent = collapsed ? '▸' : '▾';
+    });
+
+    folderLi.appendChild(folderRow);
+
+    const children = document.createElement('ul');
+    children.className = 'folder-children';
+    for (const file of folderFiles) {
+      appendDefaultFileRow(file, { appendTo: children });
+    }
+
+    folderLi.appendChild(children);
+    displaysList.appendChild(folderLi);
+  }
+
+  if (globalObjectFiles.length) {
+    appendSectionHeader('Global Objects');
+    for (const file of globalObjectFiles) {
+      appendDefaultFileRow(file, { isGlobalObject: true });
     }
   }
 }
@@ -1439,12 +1974,47 @@ function keepCurrentDisplayOrder(nextFiles) {
 
 async function refreshDisplays() {
   previewImageNonce = Date.now();
-  const res = await fetch('/api/displays');
-  if (!res.ok) {
+  const [displayRes, folderRes] = await Promise.all([
+    fetch('/api/displays'),
+    fetch('/api/display-folders')
+  ]);
+
+  if (!displayRes.ok) {
     throw new Error('Failed to load displays');
   }
-  const data = await res.json();
+
+  if (folderRes.ok) {
+    const folderData = await folderRes.json();
+    folderNames = Array.isArray(folderData.folders)
+      ? [...new Set(folderData.folders.map((name) => normalizeFolderName(name)).filter(Boolean))]
+      : [];
+    const rawAssignments = folderData.assignments && typeof folderData.assignments === 'object'
+      ? folderData.assignments
+      : {};
+    const nextAssignments = {};
+    for (const [name, folder] of Object.entries(rawAssignments)) {
+      const key = displayKey(name);
+      const folderName = normalizeFolderName(folder);
+      if (key && folderName) {
+        nextAssignments[key] = folderName;
+      }
+    }
+    folderAssignments = nextAssignments;
+  }
+
+  const data = await displayRes.json();
   renderDisplays(keepCurrentDisplayOrder(data.files));
+}
+
+async function refreshDefaultTemplates() {
+  previewImageNonce = Date.now();
+  const res = await fetch('/api/default-pages');
+  if (!res.ok) {
+    throw new Error('Failed to load default templates');
+  }
+
+  const data = await res.json();
+  renderDefaultTemplates(data.files || []);
 }
 
 function resolveDisplayBackgroundColor(rawColor) {
@@ -1566,11 +2136,25 @@ function renderPreview() {
         || Array.from(el.children).find((child) => child.tagName === 'caption');
       const imageName = getNodeImageName(el);
       if (imageName && !isLineTag) {
+        const imageOpts = getNodeImageRenderOptions(el);
         const imageEl = document.createElement('img');
         imageEl.className = 'xml-object-image';
         imageEl.alt = imageName;
         imageEl.draggable = false;
         imageEl.src = `/api/images/${encodeURIComponent(imageName)}?v=${previewImageNonce}`;
+
+        if (imageOpts.scaled) {
+          const xPos = imageOpts.horizontal === 'left' ? 'left' : imageOpts.horizontal === 'right' ? 'right' : 'center';
+          const yPos = imageOpts.vertical === 'top' ? 'top' : imageOpts.vertical === 'bottom' ? 'bottom' : 'center';
+          imageEl.style.objectFit = 'contain';
+          imageEl.style.objectPosition = `${xPos} ${yPos}`;
+        } else {
+          imageEl.classList.add('unscaled');
+          imageEl.style.left = imageOpts.horizontal === 'left' ? '0' : imageOpts.horizontal === 'right' ? '100%' : '50%';
+          imageEl.style.top = imageOpts.vertical === 'top' ? '0' : imageOpts.vertical === 'bottom' ? '100%' : '50%';
+          imageEl.style.transform = `translate(${imageOpts.horizontal === 'left' ? '0' : '-50%'}, ${imageOpts.vertical === 'top' ? '0' : '-50%'})`;
+        }
+
         imageEl.addEventListener('error', () => {
           imageEl.remove();
           const fallbackEl = createImageFallback(imageName);
@@ -2156,6 +2740,12 @@ async function loadDisplay(name) {
   }
 }
 
+async function loadDefaultTemplate(name) {
+  const data = await loadDefaultTemplateXml(name);
+  setEditorTemplate(data.name, data.xml);
+  await refreshDefaultTemplates();
+}
+
 uploadInput.addEventListener('change', async () => {
   const files = Array.from(uploadInput.files || [])
     .filter((file) => file.name.toLowerCase().endsWith('.xml'));
@@ -2186,6 +2776,31 @@ uploadInput.addEventListener('change', async () => {
   }
 });
 
+defaultUploadInput.addEventListener('change', async () => {
+  const files = Array.from(defaultUploadInput.files || [])
+    .filter((file) => file.name.toLowerCase().endsWith('.xml'));
+
+  if (!files.length) {
+    alert('Choose one or more default template XML files to upload.');
+    return;
+  }
+
+  try {
+    for (const file of files) {
+      const xml = await readUploadedText(file);
+      validateDisplayXml(file.name, xml);
+      await saveDefaultTemplateXml(file.name, xml);
+    }
+
+    await refreshDefaultTemplates();
+  } catch (err) {
+    console.error(err);
+    alert(err.message || 'Could not upload default template XML files.');
+  } finally {
+    defaultUploadInput.value = '';
+  }
+});
+
 addDisplayBtn.addEventListener('click', () => {
   createDisplayFromTemplate().catch((err) => {
     console.error(err);
@@ -2193,18 +2808,124 @@ addDisplayBtn.addEventListener('click', () => {
   });
 });
 
+if (addFolderBtn) {
+  addFolderBtn.addEventListener('click', async () => {
+    const rawName = window.prompt('New folder name', 'New_Folder');
+    if (rawName === null) {
+      return;
+    }
+
+    const folderName = normalizeFolderName(rawName);
+    if (!folderName) {
+      alert('Enter a valid folder name.');
+      return;
+    }
+
+    if (!folderNames.some((name) => name.toLowerCase() === folderName.toLowerCase())) {
+      folderNames = [...folderNames, folderName];
+    }
+
+    selectedFolderName = folderName;
+    selectedFolderIsCustom = true;
+
+    try {
+      await saveDisplayFolders();
+      renderDisplays(currentDisplayRows);
+    } catch (err) {
+      console.error(err);
+      alert('Could not save the folder.');
+    }
+  });
+}
+
+if (removeFolderBtn) {
+  removeFolderBtn.addEventListener('click', async () => {
+    if (!selectedFolderName) {
+      alert('Select a folder first.');
+      return;
+    }
+
+    const folderName = selectedFolderName;
+    const displayFiles = currentDisplayRows.filter((file) => !isGlobalObjectFile(file));
+    const autoFolderMap = buildAutoDisplayFolderMap(displayFiles);
+    const filesInFolder = displayFiles.filter((file) =>
+      String(resolveDisplayFolderName(file.name, autoFolderMap)).toLowerCase() === folderName.toLowerCase());
+
+    const confirmed = confirm(
+      `Delete folder ${folderName} and permanently delete ${filesInFolder.length} screen(s)? This cannot be undone.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const failed = [];
+      const deletedKeys = new Set();
+      for (const file of filesInFolder) {
+        try {
+          await deleteDisplayXml(file.name, file.source);
+          deletedKeys.add(displayKey(file.name));
+        } catch (_err) {
+          failed.push(file.name);
+        }
+      }
+
+      // Remove the custom folder label itself if it was user-created.
+      if (selectedFolderIsCustom) {
+        folderNames = folderNames.filter((name) => name.toLowerCase() !== folderName.toLowerCase());
+      }
+
+      for (const key of Object.keys(folderAssignments)) {
+        const assignedFolder = String(folderAssignments[key] || '').toLowerCase();
+        if (assignedFolder === folderName.toLowerCase() || deletedKeys.has(key)) {
+          delete folderAssignments[key];
+        }
+      }
+
+      folderCollapsedNames.delete(folderName);
+      if (selectedDisplay && deletedKeys.has(displayKey(selectedDisplay))) {
+        clearSelectedDisplay();
+      }
+
+      selectedFolderName = '';
+      selectedFolderIsCustom = false;
+      await saveDisplayFolders();
+
+      if (failed.length) {
+        alert(`Folder deleted partially. Could not delete: ${failed.join(', ')}`);
+      }
+
+      usingUploadedList = false;
+      await refreshDisplays();
+    } catch (err) {
+      console.error(err);
+      alert('Could not remove folder.');
+    }
+  });
+}
+
 uploadDisplayBtn.addEventListener('click', () => {
+  if (isDefaultMode()) {
+    defaultUploadInput.click();
+    return;
+  }
+
   uploadInput.click();
 });
 
 removeDisplayBtn.addEventListener('click', async () => {
-  if (!selectedDisplay) {
-    alert('Select a display first.');
+  const targetName = isDefaultMode() ? selectedDefaultTemplate : selectedDisplay;
+  if (!targetName) {
+    alert(isDefaultMode() ? 'Select a default template first.' : 'Select a display first.');
     return;
   }
 
   try {
-    await removeDisplayByName(selectedDisplay);
+    if (isDefaultMode()) {
+      await removeDefaultTemplateByName(targetName);
+    } else {
+      await removeDisplayByName(targetName);
+    }
   } catch (err) {
     console.error(err);
     alert(err.message || 'Could not remove XML file');
@@ -2226,12 +2947,49 @@ if (toggleSidebarBtn) {
 }
 
 refreshBtn.addEventListener('click', () => {
-  usingUploadedList = false;
-  refreshDisplays().catch((err) => {
+  const refreshPromise = isDefaultMode()
+    ? refreshDefaultTemplates()
+    : (usingUploadedList = false, refreshDisplays());
+
+  refreshPromise.catch((err) => {
     console.error(err);
-    alert('Could not refresh display list');
+    alert(isDefaultMode() ? 'Could not refresh default templates' : 'Could not refresh display list');
   });
 });
+
+if (showDisplaysBtn) {
+  showDisplaysBtn.addEventListener('click', () => {
+    setSidebarMode(SIDEBAR_MODE_DISPLAYS);
+    refreshDisplays().catch(() => {});
+  });
+}
+
+if (showDefaultsBtn) {
+  showDefaultsBtn.addEventListener('click', () => {
+    setSidebarMode(SIDEBAR_MODE_DEFAULTS);
+    refreshDefaultTemplates().catch(() => {});
+  });
+}
+
+if (seedDefaultsBtn) {
+  seedDefaultsBtn.addEventListener('click', async () => {
+    try {
+      const files = currentDefaultRows.map((file) => file.name);
+      if (!files.length) {
+        alert('Upload default templates first.');
+        return;
+      }
+
+      const data = await seedDefaultTemplates(files);
+      alert(`Copied ${data.copied.length} default template page(s) into project edited pages.`);
+      setSidebarMode(SIDEBAR_MODE_DISPLAYS);
+      await refreshDisplays();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not copy defaults into project pages.');
+    }
+  });
+}
 
 applySizeBtn.addEventListener('click', async () => {
   const width = Number(screenWidth.value);
@@ -2337,6 +3095,11 @@ if (buildAllPackageBtn) {
 
 socket.on('bridge-status', (status) => {
   setBridgeCard(status);
+  if (isDefaultMode()) {
+    refreshDefaultTemplates().catch(() => {});
+    return;
+  }
+
   if (!usingUploadedList) {
     refreshDisplays().catch(() => {});
   }
@@ -2351,12 +3114,18 @@ async function init() {
   }
 
   const sidebarCollapsed = localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1';
+  const savedMode = localStorage.getItem(SIDEBAR_MODE_STORAGE_KEY);
+  setSidebarMode(savedMode === SIDEBAR_MODE_DEFAULTS ? SIDEBAR_MODE_DEFAULTS : SIDEBAR_MODE_DISPLAYS);
   setSidebarCollapsed(sidebarCollapsed);
 
   const res = await fetch('/api/bridge/status');
   const status = await res.json();
   setBridgeCard(status);
-  await refreshDisplays();
+  if (isDefaultMode()) {
+    await refreshDefaultTemplates();
+  } else {
+    await refreshDisplays();
+  }
   renderPreview();
 }
 

@@ -1,0 +1,9 @@
+{
+  "files": [
+    "201_prestart.xml",
+    "412_robot_io list.xml",
+    "504_sequence.xml",
+    "508_sequence.xml",
+    "main.xml"
+  ]
+}

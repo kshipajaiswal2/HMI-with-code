@@ -31,13 +31,21 @@
               <span class="edge-icon-bar"></span>
             </button>
           </div>
+          <div class="sidebar-mode-switch" id="sidebarModeSwitch">
+            <button id="showDisplaysBtn" type="button" class="mode-btn active">Project Pages</button>
+            <button id="showDefaultsBtn" type="button" class="mode-btn">Default Templates</button>
+          </div>
           <input id="uploadInput" type="file" accept=".xml,text/xml,application/xml" multiple />
+          <input id="defaultUploadInput" type="file" accept=".xml,text/xml,application/xml" multiple />
           <div class="display-tools">
             <button id="addDisplayBtn" type="button" class="icon-btn" title="Create new page from Template.xml">+</button>
+            <button id="addFolderBtn" type="button" class="icon-btn secondary" title="Add display folder">F+</button>
+            <button id="removeFolderBtn" type="button" class="icon-btn secondary" title="Remove selected custom folder">F-</button>
             <button id="uploadDisplayBtn" type="button" class="secondary toolbar-upload-btn">Upload XML</button>
             <button id="removeDisplayBtn" type="button" class="icon-btn secondary" title="Remove selected screen">-</button>
             <button id="refreshBtn" type="button" class="secondary">Saved List</button>
           </div>
+          <button id="seedDefaultsBtn" type="button" class="secondary sidebar-seed-btn hidden">Use Defaults In Project</button>
           <ul id="displaysList" class="single-list"></ul>
         </article>
 

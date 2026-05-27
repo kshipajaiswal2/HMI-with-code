@@ -17,8 +17,11 @@ const FACTORYTALK_EXPORT_DIR = process.env.FT_EXPORT_DIR || path.join(ROOT, '..'
 const IMAGE_LIBRARY_DIR = process.env.FT_IMAGE_DIR || path.join(ROOT, '..', 'hmi', 'MyPlantHMI', 'Images');
 const REIMPORT_DIR = path.join(FTIO_DIR, 'reimport');
 const PACKAGE_DIR = path.join(REIMPORT_DIR, 'packages');
+const DEFAULT_PAGES_DIR = path.join(FTIO_DIR, 'default-pages');
+const DISPLAY_FOLDERS_PATH = path.join(FTIO_DIR, 'display-folders.json');
+const DELETED_DISPLAYS_PATH = path.join(FTIO_DIR, 'deleted-displays.json');
 
-for (const dir of [FTIO_DIR, FACTORYTALK_EXPORT_DIR, REIMPORT_DIR, PACKAGE_DIR]) {
+for (const dir of [FTIO_DIR, FACTORYTALK_EXPORT_DIR, REIMPORT_DIR, PACKAGE_DIR, DEFAULT_PAGES_DIR]) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -70,8 +73,183 @@ function safeDisplayFileName(name) {
   return path.basename(String(name || ''));
 }
 
+function sanitizeFolderName(name) {
+  return String(name || '')
+    .replace(/[\\/:*?"<>|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function isDisplayXml(name) {
   return name.toLowerCase().endsWith('.xml') && !name.toLowerCase().startsWith('batchimport_');
+}
+
+function parseDisplayNumber(name) {
+  const base = path.basename(String(name || ''), path.extname(String(name || '')));
+  const match = base.match(/^(\d{3})/);
+  return match ? Number(match[1]) : null;
+}
+
+function buildFolderMap(fileNames) {
+  const grouped = new Map();
+  for (const name of fileNames) {
+    const number = parseDisplayNumber(name);
+    if (!Number.isFinite(number)) {
+      continue;
+    }
+
+    const bucket = Math.floor(number / 100) * 100;
+    if (!grouped.has(bucket)) {
+      grouped.set(bucket, []);
+    }
+    grouped.get(bucket).push(name);
+  }
+
+  const folderMap = new Map();
+  for (const [bucket, names] of grouped.entries()) {
+    const bucketPrefix = String(bucket).padStart(3, '0');
+    const exact = names.find((name) => path.basename(name, path.extname(name)).toLowerCase().startsWith(`${bucketPrefix}_`));
+    const folderName = path.basename(exact || names[0], path.extname(exact || names[0]));
+    folderMap.set(bucket, folderName);
+  }
+
+  return folderMap;
+}
+
+function readDisplayFolderConfig() {
+  if (!fs.existsSync(DISPLAY_FOLDERS_PATH)) {
+    return { folders: [], assignments: {} };
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(DISPLAY_FOLDERS_PATH, 'utf8'));
+    const folders = Array.isArray(parsed?.folders)
+      ? parsed.folders
+        .map((name) => sanitizeFolderName(name))
+        .filter(Boolean)
+      : [];
+    const assignmentsRaw = parsed?.assignments && typeof parsed.assignments === 'object'
+      ? parsed.assignments
+      : {};
+    const assignments = {};
+    for (const [name, folder] of Object.entries(assignmentsRaw)) {
+      const key = safeDisplayFileName(name).toLowerCase();
+      const normalizedFolder = sanitizeFolderName(folder);
+      if (key && normalizedFolder) {
+        assignments[key] = normalizedFolder;
+      }
+    }
+
+    return {
+      folders: [...new Set(folders)],
+      assignments
+    };
+  } catch (_err) {
+    return { folders: [], assignments: {} };
+  }
+}
+
+function writeDisplayFolderConfig(config) {
+  const folderNames = Array.isArray(config?.folders)
+    ? config.folders
+      .map((name) => sanitizeFolderName(name))
+      .filter(Boolean)
+    : [];
+  const assignments = {};
+  const assignmentsRaw = config?.assignments && typeof config.assignments === 'object'
+    ? config.assignments
+    : {};
+
+  for (const [name, folder] of Object.entries(assignmentsRaw)) {
+    const key = safeDisplayFileName(name).toLowerCase();
+    const normalizedFolder = sanitizeFolderName(folder);
+    if (key && normalizedFolder) {
+      assignments[key] = normalizedFolder;
+    }
+  }
+
+  const nextConfig = {
+    folders: [...new Set(folderNames)],
+    assignments
+  };
+
+  fs.writeFileSync(DISPLAY_FOLDERS_PATH, JSON.stringify(nextConfig, null, 2), 'utf8');
+  return nextConfig;
+}
+
+function resolveFolderedImportPath(name, folderMap, assignments = {}) {
+  const assigned = sanitizeFolderName(assignments[String(name || '').toLowerCase()] || '');
+  if (assigned) {
+    return `${assigned}\\${name}`;
+  }
+
+  const number = parseDisplayNumber(name);
+  if (!Number.isFinite(number)) {
+    return name;
+  }
+
+  const bucket = Math.floor(number / 100) * 100;
+  const folderName = folderMap.get(bucket);
+  if (!folderName) {
+    return name;
+  }
+
+  return `${folderName}\\${name}`;
+}
+
+function readDeletedDisplays() {
+  if (!fs.existsSync(DELETED_DISPLAYS_PATH)) {
+    return new Set();
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(DELETED_DISPLAYS_PATH, 'utf8'));
+    const names = Array.isArray(parsed?.files) ? parsed.files : [];
+    return new Set(names.map((name) => safeDisplayFileName(name).toLowerCase()).filter(Boolean));
+  } catch (_err) {
+    return new Set();
+  }
+}
+
+function writeDeletedDisplays(setOrNames) {
+  const names = Array.isArray(setOrNames)
+    ? setOrNames
+    : setOrNames instanceof Set
+      ? [...setOrNames]
+      : [];
+
+  const normalized = [...new Set(names
+    .map((name) => safeDisplayFileName(name).toLowerCase())
+    .filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+
+  fs.writeFileSync(DELETED_DISPLAYS_PATH, JSON.stringify({ files: normalized }, null, 2), 'utf8');
+}
+
+function markDisplayDeleted(name) {
+  const safeName = safeDisplayFileName(name).toLowerCase();
+  if (!safeName) {
+    return;
+  }
+
+  const deleted = readDeletedDisplays();
+  deleted.add(safeName);
+  writeDeletedDisplays(deleted);
+}
+
+function clearDeletedDisplay(name) {
+  const safeName = safeDisplayFileName(name).toLowerCase();
+  if (!safeName) {
+    return;
+  }
+
+  const deleted = readDeletedDisplays();
+  if (!deleted.has(safeName)) {
+    return;
+  }
+
+  deleted.delete(safeName);
+  writeDeletedDisplays(deleted);
 }
 
 function readTextAuto(filePath) {
@@ -186,7 +364,47 @@ function parseDisplayMeta(xml) {
   };
 }
 
+function getGlobalBatchImportFileNames() {
+  if (!fs.existsSync(FACTORYTALK_EXPORT_DIR)) {
+    return new Set();
+  }
+
+  const names = new Set();
+  const batchFiles = fs.readdirSync(FACTORYTALK_EXPORT_DIR)
+    .filter((file) => /^batchimport_global.*\.xml$/i.test(file));
+
+  for (const batchFile of batchFiles) {
+    const batchPath = path.join(FACTORYTALK_EXPORT_DIR, batchFile);
+    if (!fs.existsSync(batchPath)) {
+      continue;
+    }
+
+    let text = '';
+    try {
+      text = readTextAuto(batchPath);
+    } catch (_err) {
+      continue;
+    }
+
+    const importPattern = /importFile\s*=\s*"([^"]+)"/gi;
+    let match;
+    while ((match = importPattern.exec(text)) !== null) {
+      const importedName = safeDisplayFileName(match[1]);
+      if (importedName) {
+        names.add(importedName.toLowerCase());
+      }
+    }
+  }
+
+  return names;
+}
+
 function classifyXmlKind(name, xml) {
+  const globalBatchNames = getGlobalBatchImportFileNames();
+  if (globalBatchNames.has(String(name || '').toLowerCase())) {
+    return 'global-object';
+  }
+
   if (/_addons\.xml$/i.test(String(name || ''))) {
     return 'global-object';
   }
@@ -217,7 +435,8 @@ function getDisplayFiles() {
   }
 
   const merged = [...map.values()].sort((a, b) => a.lastModified.localeCompare(b.lastModified));
-  return merged;
+  const deleted = readDeletedDisplays();
+  return merged.filter((file) => !deleted.has(String(file.name || '').toLowerCase()));
 }
 
 function resolveDisplayPath(name) {
@@ -234,6 +453,30 @@ function resolveDisplayPath(name) {
   }
 
   return null;
+}
+
+function getDefaultPageFiles() {
+  return getFiles(DEFAULT_PAGES_DIR, isDisplayXml).map((file) => {
+    const xml = readTextAuto(path.join(DEFAULT_PAGES_DIR, file.name));
+    const meta = parseDisplayMeta(xml);
+    return {
+      ...file,
+      source: 'default-template',
+      kind: classifyXmlKind(file.name, xml),
+      width: meta.width,
+      height: meta.height
+    };
+  });
+}
+
+function resolveDefaultPagePath(name) {
+  const safeName = safeDisplayFileName(name);
+  const templatePath = path.join(DEFAULT_PAGES_DIR, safeName);
+  if (!fs.existsSync(templatePath)) {
+    return null;
+  }
+
+  return { filePath: templatePath, source: 'default-template', name: safeName };
 }
 
 function bridgeSnapshot() {
@@ -289,6 +532,20 @@ app.get('/api/displays', (_req, res) => {
   res.json({ files });
 });
 
+app.get('/api/display-folders', (_req, res) => {
+  const config = readDisplayFolderConfig();
+  return res.json(config);
+});
+
+app.post('/api/display-folders/save', (req, res) => {
+  const folders = Array.isArray(req.body?.folders) ? req.body.folders : [];
+  const assignments = req.body?.assignments && typeof req.body.assignments === 'object'
+    ? req.body.assignments
+    : {};
+  const saved = writeDisplayFolderConfig({ folders, assignments });
+  return res.json({ ok: true, ...saved });
+});
+
 app.get('/api/displays/:name', (req, res) => {
   const resolved = resolveDisplayPath(req.params.name);
   if (!resolved) {
@@ -329,6 +586,7 @@ app.post('/api/displays/:name/save', (req, res) => {
 
   const savePath = path.join(REIMPORT_DIR, safeName);
   fs.writeFileSync(savePath, xml, 'utf8');
+  clearDeletedDisplay(safeName);
   const meta = parseDisplayMeta(xml);
 
   return res.json({
@@ -368,7 +626,104 @@ app.delete('/api/displays/:name', (req, res) => {
     return res.status(404).json({ error: 'XML file not found' });
   }
 
+  markDisplayDeleted(safeName);
+
   return res.json({ ok: true, removed: safeName, paths: removed });
+});
+
+app.get('/api/default-pages', (_req, res) => {
+  const files = getDefaultPageFiles();
+  res.json({ files });
+});
+
+app.post('/api/default-pages/seed', (req, res) => {
+  const requested = Array.isArray(req.body?.files) ? req.body.files : [];
+  const available = new Set(getFiles(DEFAULT_PAGES_DIR, isDisplayXml).map((f) => f.name.toLowerCase()));
+  const selected = requested.length
+    ? requested
+        .map((name) => safeDisplayFileName(name))
+        .filter((name) => isDisplayXml(name) && available.has(name.toLowerCase()))
+    : getFiles(DEFAULT_PAGES_DIR, isDisplayXml).map((file) => file.name);
+
+  const uniqueSelected = [...new Set(selected)];
+  if (!uniqueSelected.length) {
+    return res.status(400).json({ error: 'No default template files selected' });
+  }
+
+  const copied = [];
+  for (const name of uniqueSelected) {
+    const fromPath = path.join(DEFAULT_PAGES_DIR, name);
+    if (!fs.existsSync(fromPath)) {
+      continue;
+    }
+
+    const toPath = path.join(REIMPORT_DIR, name);
+    fs.copyFileSync(fromPath, toPath);
+    clearDeletedDisplay(name);
+    copied.push(name);
+  }
+
+  if (!copied.length) {
+    return res.status(400).json({ error: 'No template files were copied' });
+  }
+
+  return res.json({ ok: true, copied, targetFolder: REIMPORT_DIR });
+});
+
+app.get('/api/default-pages/:name', (req, res) => {
+  const resolved = resolveDefaultPagePath(req.params.name);
+  if (!resolved) {
+    return res.status(404).json({ error: 'Default template file not found' });
+  }
+
+  const xml = readTextAuto(resolved.filePath);
+  const meta = parseDisplayMeta(xml);
+  return res.json({
+    name: resolved.name,
+    source: resolved.source,
+    kind: classifyXmlKind(resolved.name, xml),
+    xml,
+    width: meta.width,
+    height: meta.height
+  });
+});
+
+app.post('/api/default-pages/:name/save', (req, res) => {
+  const safeName = safeDisplayFileName(req.params.name);
+  if (!isDisplayXml(safeName)) {
+    return res.status(400).json({ error: 'Only XML files are supported' });
+  }
+
+  const xml = String(req.body?.xml || '');
+  if (!xml.trim()) {
+    return res.status(400).json({ error: 'xml content is required' });
+  }
+
+  const savePath = path.join(DEFAULT_PAGES_DIR, safeName);
+  fs.writeFileSync(savePath, xml, 'utf8');
+  const meta = parseDisplayMeta(xml);
+  return res.json({
+    ok: true,
+    saved: safeName,
+    path: savePath,
+    width: meta.width,
+    height: meta.height
+  });
+});
+
+app.delete('/api/default-pages/:name', (req, res) => {
+  const safeName = safeDisplayFileName(req.params.name);
+  if (!isDisplayXml(safeName)) {
+    return res.status(400).json({ error: 'Only XML files are supported' });
+  }
+
+  const filePath = path.join(DEFAULT_PAGES_DIR, safeName);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Default template file not found' });
+  }
+
+  fs.unlinkSync(filePath);
+  return res.json({ ok: true, removed: safeName, path: filePath });
 });
 
 app.post('/api/displays/package', (req, res) => {
@@ -391,6 +746,9 @@ app.post('/api/displays/package', (req, res) => {
   fs.mkdirSync(packagePath, { recursive: true });
 
   const copied = [];
+  const folderMap = buildFolderMap(uniqueSelected);
+  const folderConfig = readDisplayFolderConfig();
+  const folderedEntries = [];
   for (const name of uniqueSelected) {
     const resolved = resolveDisplayPath(name);
     if (!resolved) {
@@ -398,6 +756,13 @@ app.post('/api/displays/package', (req, res) => {
     }
 
     fs.copyFileSync(resolved.filePath, path.join(packagePath, name));
+    const folderedPath = resolveFolderedImportPath(name, folderMap, folderConfig.assignments);
+    folderedEntries.push(folderedPath);
+    if (folderedPath.includes('\\')) {
+      const destinationPath = path.join(packagePath, ...folderedPath.split('\\'));
+      fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
+      fs.copyFileSync(resolved.filePath, destinationPath);
+    }
     copied.push(name);
   }
 
@@ -410,14 +775,24 @@ app.post('/api/displays/package', (req, res) => {
     batchLines.push(`    <import importFile="${name}"/>`);
   }
   batchLines.push('</gfxImport>');
-  const batchXml = `${batchLines.join('\r\n')}\r\n`;
+  const batchXmlFlat = `${batchLines.join('\r\n')}\r\n`;
+
+  const batchFolderedLines = ['<gfxImport>'];
+  for (const entry of folderedEntries) {
+    batchFolderedLines.push(`    <import importFile="${entry}"/>`);
+  }
+  batchFolderedLines.push('</gfxImport>');
+  const batchXmlFoldered = `${batchFolderedLines.join('\r\n')}\r\n`;
 
   const batchName = 'BatchImport_WebBridge.xml';
   const batchCompatName = 'BatchImport.xml';
+  const batchFlatName = 'BatchImport_Flat.xml';
   const batchPath = path.join(packagePath, batchName);
   const batchCompatPath = path.join(packagePath, batchCompatName);
-  writeUtf16LeWithBom(batchPath, batchXml);
-  writeUtf16LeWithBom(batchCompatPath, batchXml);
+  const batchFlatPath = path.join(packagePath, batchFlatName);
+  writeUtf16LeWithBom(batchPath, batchXmlFoldered);
+  writeUtf16LeWithBom(batchCompatPath, batchXmlFoldered);
+  writeUtf16LeWithBom(batchFlatPath, batchXmlFlat);
 
   const notesName = 'DisplaysImport_WebBridge.txt';
   const notesCompatName = 'DisplaysImport.txt';
@@ -429,10 +804,13 @@ app.post('/api/displays/package', (req, res) => {
     ...copied,
     '',
     `Batch file: ${batchName}`,
+    `Flat fallback: ${batchFlatName}`,
     '',
     'Import steps (important):',
     '1. Close all target displays before import.',
     '2. In FactoryTalk Batch Import, choose BatchImport.xml from this extracted folder.',
+    '   This batch uses folder-style paths to preserve display grouping.',
+    `   If your FactoryTalk version does not accept folder paths, use ${batchFlatName}.`,
     '3. Set conflict handling to REPLACE/OVERWRITE existing displays (do not merge/update).',
     '4. If REPLACE is not available in your dialog, delete the target displays first, then import.',
     '5. If status says "element does not exist in the Display and cannot be updated", your import is in update/merge mode.',
@@ -461,6 +839,7 @@ app.post('/api/displays/package', (req, res) => {
     files: copied,
     batchFile: batchPath,
     batchFileCompat: batchCompatPath,
+    batchFileFlat: batchFlatPath,
     downloadUrl: '/api/packages/download/latest.zip'
   });
 });
@@ -475,7 +854,7 @@ app.get('/api/packages/download/latest.zip', (_req, res) => {
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
 
-  const archive = new archiver.ZipArchive({ zlib: { level: 9 } });
+  const archive = archiver('zip', { zlib: { level: 9 } });
   archive.on('error', (err) => {
     if (!res.headersSent) {
       res.status(500).json({ error: `Failed to build zip: ${err.message}` });
@@ -497,7 +876,7 @@ function notifyBridge() {
   io.emit('bridge-status', bridgeSnapshot());
 }
 
-const watcher = chokidar.watch([FACTORYTALK_EXPORT_DIR, REIMPORT_DIR, PACKAGE_DIR], {
+const watcher = chokidar.watch([FACTORYTALK_EXPORT_DIR, REIMPORT_DIR, PACKAGE_DIR, DEFAULT_PAGES_DIR], {
   ignoreInitial: true,
   awaitWriteFinish: {
     stabilityThreshold: 150,

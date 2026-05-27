@@ -1,0 +1,22 @@
+FactoryTalk Web Bridge package generated successfully.
+
+Display files: 4
+100_Overview.xml
+101_Production_Data.xml
+102_Prestart.xml
+200_Settings.xml
+
+Batch file: BatchImport_WebBridge.xml (grouped folder-style import paths)
+Fallback: BatchImport_Flat.xml (flat import paths)
+
+Import steps (important):
+1. Close all target displays before import.
+2. In FactoryTalk Batch Import, choose BatchImport.xml from this extracted folder.
+3. Set conflict handling to REPLACE/OVERWRITE existing displays (do not merge/update).
+4. If REPLACE is not available in your dialog, delete the target displays first, then import.
+5. If status says "element does not exist in the Display and cannot be updated", your import is in update/merge mode.
+   Switch to REPLACE, or delete targets first using DeleteTargets.txt, then re-import.
+
+If you import in merge mode, messages like "element already exists and will be ignored" are expected.
+
+If your FactoryTalk version does not accept grouped import paths, use BatchImport_Flat.xml instead.

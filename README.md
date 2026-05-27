@@ -6,6 +6,8 @@ This repository is now configured to generate FactoryTalk View engineering artif
 
 The setup supports an offline workflow (no live PLC needed) and is reusable for future projects by changing input paths and config mappings.
 
+In addition to the PowerShell asset pipeline, this repo now includes a browser-based XML editor and package builder at `web-hmi-bridge/` for page preview, editing, and Batch Import package generation.
+
 Core outcomes already implemented:
 
 - HMI tag generation from equipment templates.
@@ -17,6 +19,8 @@ Core outcomes already implemented:
 - Screen specification export for repeated screen creation.
 - Global object parameter export for standardized faceplates.
 - Reusable JSON config for sheet names, columns, defaults, and type mappings.
+- Live display XML browsing/editing with preview rendering through web-hmi-bridge.
+- Two package modes for FactoryTalk import: current page package and all edited files package.
 
 ## 2) Why This Approach
 
@@ -38,6 +42,14 @@ So the practical automation model is:
 
 - scripts/generate_factorytalk_assets.ps1  
   Main reusable pipeline that reads master sheet + config and generates device map, alarms, and screen specs.
+
+### Web Bridge
+
+- web-hmi-bridge/server.js  
+  Express + Socket.IO bridge that serves display files, image lookups, edited saves, and Batch Import package creation.
+
+- web-hmi-bridge/public/index.html and web-hmi-bridge/public/app.js  
+  Browser UI for display list management, visual preview, XML editing, object edits, and package download.
 
 ### Config
 
@@ -173,6 +185,59 @@ Optional CSV columns for `templates/equipment_list.csv`:
   -OutputDir "generated"
 ```
 
+### 6.3 Run Web HMI Bridge
+
+Install dependencies (first time only):
+
+```powershell
+cd .\web-hmi-bridge
+npm install
+```
+
+Start server:
+
+```powershell
+cd .\web-hmi-bridge
+npm start
+```
+
+Open:
+
+- http://localhost:5050
+
+Optional environment variables:
+
+- `PORT` (default: `5050`)
+- `FT_EXPORT_DIR` (default: `..\Export import`)
+- `FT_IMAGE_DIR` (default: `..\hmi\MyPlantHMI\Images`)
+
+Example:
+
+```powershell
+$env:FT_EXPORT_DIR = "D:\Kshipa\PlantHMI\Export import"
+$env:FT_IMAGE_DIR = "D:\Kshipa\PlantHMI\hmi\MyPlantHMI\Images"
+cd .\web-hmi-bridge
+npm start
+```
+
+### 6.4 Web Bridge Packaging Actions
+
+The editor exposes two import package buttons:
+
+- `Get Page Import`: packages the currently selected edited display and related edited global objects matching `<PageName>_AddOns*.xml`.
+- `Get All Import`: packages every edited XML currently in `web-hmi-bridge/ftio/reimport`.
+
+Each package includes:
+
+- `BatchImport.xml` and `BatchImport_WebBridge.xml` (UTF-16LE with BOM)
+- `DisplaysImport.txt` and `DisplaysImport_WebBridge.txt`
+- `DeleteTargets.txt`
+- Selected display/global object XML files
+
+Generated package folders are stored under:
+
+- `web-hmi-bridge/ftio/reimport/packages/`
+
 ## 7) Current Run Summary
 
 Latest generation summary:
@@ -217,6 +282,9 @@ The generated files provide structured input/specification to reduce manual work
 - If Excel COM cannot open workbook, verify Excel is installed and sheet is closed.
 - If alarm mappings are low, adjust sheet column mapping and naming normalization assumptions, then review `generated/device_key_issues.csv`.
 - If project copy had locked files, prefer working from `.apa` restore instead of live folder copy.
+- If web preview icons are missing, confirm image files exist under `hmi/MyPlantHMI/Images` or set `FT_IMAGE_DIR` to the correct image library.
+- If FactoryTalk import reports `element does not exist in the Display and cannot be updated`, import is running in merge/update mode. Re-run Batch Import using REPLACE/OVERWRITE, or delete targets first using `DeleteTargets.txt`.
+- In Batch Import, select `BatchImport.xml` from the extracted package folder, not the ZIP and not individual display XML files.
 
 ## 12) Versioning Advice
 
@@ -225,5 +293,9 @@ Keep these in source control for every project:
 - scripts/
 - templates/factorytalk_pipeline.config.json
 - docs/
+
+For web-hmi-bridge, consider ignoring generated package folders if they are only transient outputs:
+
+- `web-hmi-bridge/ftio/reimport/packages/`
 
 Treat generated/ as build artifacts that can be regenerated anytime from master sheet + restored project.

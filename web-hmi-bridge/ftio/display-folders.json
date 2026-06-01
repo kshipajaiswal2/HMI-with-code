@@ -1,4 +1,31 @@
 {
-  "folders": [],
-  "assignments": {}
+  "folders": [
+    "100_Overview",
+    "200_Settings",
+    "300_Manual_Operation",
+    "400_Active_Alarms",
+    "500_Recipe",
+    "600_Legends",
+    "700_User_Management"
+  ],
+  "assignments": {
+    "100_overview.xml": "100_Overview",
+    "101_production_data.xml": "100_Overview",
+    "102_prestart.xml": "100_Overview",
+    "103_safety.xml": "100_Overview",
+    "104_mimic_screen.xml": "100_Overview",
+    "105_cycle_time.xml": "100_Overview",
+    "200_settings.xml": "200_Settings",
+    "300_manual_operation.xml": "300_Manual_Operation",
+    "301_plc_io_list.xml": "300_Manual_Operation",
+    "302_plc_architecture.xml": "300_Manual_Operation",
+    "303_io_card.xml": "300_Manual_Operation",
+    "400_active_alarms.xml": "400_Active_Alarms",
+    "401_alarm_history.xml": "400_Active_Alarms",
+    "402_alarm_remedies_popup.xml": "400_Active_Alarms",
+    "500_recipe.xml": "500_Recipe",
+    "500_recipe_1.xml": "500_Recipe",
+    "600_legends.xml": "600_Legends",
+    "700_user_management.xml": "700_User_Management"
+  }
 }

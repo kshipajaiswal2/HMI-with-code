@@ -1,0 +1,7 @@
+
+> web-hmi-bridge@1.0.0 start
+> node server.js
+
+web-hmi-bridge running on http://localhost:5050
+Reading FactoryTalk display exports from: D:\Kshipa\PlantHMI\Export import
+Writing edited files and import packages to: D:\Kshipa\PlantHMI\web-hmi-bridge\ftio\reimport

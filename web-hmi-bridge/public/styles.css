@@ -56,6 +56,11 @@ body {
   font-size: clamp(1.42rem, 2.9vw, 2.25rem);
   letter-spacing: 0.01em;
 }
+.hero-title {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 .status-card {
   display: inline-flex;
@@ -177,11 +182,13 @@ h3 {
 }
 
 .exports-card {
-  padding: 11px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: linear-gradient(180deg, #fcfeff 0%, #eef5f9 100%);
+  background:
+    radial-gradient(120px 120px at 100% 0%, #ffffffcc 0%, #ffffff00 60%),
+    linear-gradient(180deg, #fcfeff 0%, #eef5f9 100%);
   transition: opacity 150ms ease, transform 150ms ease, padding 150ms ease;
   border-color: #2f5a6a;
   box-shadow: 0 12px 20px #1730421a, inset 0 1px 0 #ffffff;
@@ -193,15 +200,19 @@ h3 {
   pointer-events: auto;
   padding: 8px 6px;
   border: 1px solid #355b69;
-  align-items: center;
+  align-items: stretch;
 }
 
 .grid.sidebar-collapsed .displays-header {
+  position: relative;
   justify-content: center;
-  margin: 0;
+  align-items: center;
+  min-height: 34px;
+  margin: 0 0 8px;
 }
 
 .grid.sidebar-collapsed .displays-header h2,
+.grid.sidebar-collapsed .displays-header .mode-btn.accent,
 .grid.sidebar-collapsed .display-tools,
 .grid.sidebar-collapsed .single-list {
   display: none;
@@ -211,6 +222,77 @@ h3 {
 .grid.sidebar-collapsed .sidebar-seed-btn,
 .grid.sidebar-collapsed .sidebar-mode-help {
   display: none;
+}
+.grid.sidebar-collapsed .project-create-panel {
+  display: none;
+}
+.grid.sidebar-collapsed .exports-card ul {
+  display: none;
+}
+
+.exports-card > :not(.displays-header):not(.project-create-panel):not(.single-list) {
+  position: relative;
+  z-index: 1;
+}
+
+.grid.sidebar-collapsed .sidebar-edge-toggle {
+  position: static;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.grid.sidebar-collapsed .sidebar-edge-toggle::before {
+  transform: rotate(-45deg);
+}
+.sidebar-mode-switch .mode-btn.accent {
+  border-color: #9c6300;
+  background: linear-gradient(180deg, #ffd49a 0%, #ffb957 100%);
+  color: #482700;
+  font-weight: 700;
+}
+.sidebar-mode-switch .mode-btn.accent:hover {
+  border-color: #7a4a00;
+  box-shadow: 0 10px 16px #9a61001f;
+}
+
+.project-create-panel {
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid #9cb4bf;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #eef6fa 100%);
+  box-shadow: inset 0 1px 0 #ffffffd9, 0 8px 16px #18313c12;
+}
+
+.project-create-panel label {
+  display: block;
+  margin-bottom: 6px;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #25424f;
+}
+
+.project-create-panel input {
+  width: 100%;
+  margin-bottom: 8px;
+  border: 1px solid #7da1b0;
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: #fff;
+  color: var(--ink);
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.project-create-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.project-create-actions .mode-btn {
+  flex: 1 1 0;
 }
 
 .exports-card h2 {
@@ -388,10 +470,10 @@ h3 {
   min-height: 0;
   height: auto;
   border: 1px solid #89a8b3;
-  border-radius: 14px;
+  border-radius: 16px;
   background:
-    linear-gradient(180deg, #ffffff 0%, #f4f9fc 100%);
-  padding: 8px;
+    linear-gradient(180deg, #ffffff 0%, #f3f8fb 100%);
+  padding: 10px 9px;
   box-shadow: inset 0 1px 0 #ffffffd4, 0 8px 16px #1e344212;
 }
 
@@ -599,10 +681,10 @@ ul {
 }
 
 li {
-  padding: 10px 9px;
-  margin-bottom: 7px;
+  padding: 10px 10px;
+  margin-bottom: 8px;
   border: 1px solid #cfdee5;
-  border-radius: 10px;
+  border-radius: 12px;
   background: linear-gradient(180deg, #ffffff 0%, #f2f8fb 100%);
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.72rem;
@@ -619,6 +701,117 @@ li:hover {
 
 .display-item {
   cursor: pointer;
+}
+
+.project-item {
+  margin-bottom: 12px;
+  padding: 5px 0 0;
+  border-left: 3px solid #7fa5b4;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fbfdff 0%, #eef5f9 100%);
+  box-shadow: 0 4px 10px #1f34400a;
+  overflow: hidden;
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f8fb 100%);
+  border: 1px solid #dbe6eb;
+  min-width: 0;
+}
+
+.tree-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.tree-action-btn {
+  width: 22px;
+  height: 22px;
+  border: 1px solid #6b92a4;
+  border-radius: 999px;
+  padding: 0;
+  background: linear-gradient(180deg, #ffffff 0%, #dbe9f1 100%);
+  color: #1d3d4c;
+  font-size: 0.72rem;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.tree-action-btn:hover {
+  border-color: #315d71;
+  background: linear-gradient(180deg, #ffffff 0%, #cfe2ec 100%);
+}
+
+.tree-action-btn.danger {
+  border-color: #a85f5f;
+  background: linear-gradient(180deg, #fff6f6 0%, #f3dbdb 100%);
+  color: #772727;
+}
+
+.tree-action-btn.danger:hover {
+  border-color: #914040;
+  background: linear-gradient(180deg, #fffafa 0%, #f0cfcf 100%);
+}
+
+.project-row:hover {
+  background: linear-gradient(180deg, #f7fcff 0%, #e9f4fa 100%);
+  border-color: #b7ced8;
+}
+
+.project-item.drag-over,
+.folder-item.drag-over,
+.display-item.drag-over {
+  border-color: #1d70c9;
+  box-shadow: inset 0 0 0 1px #1d70c9;
+}
+
+.project-toggle {
+  width: 16px;
+  text-align: center;
+  color: #36596a;
+  font-size: 0.78rem;
+}
+
+.project-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #14323f;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-count {
+  margin-left: auto;
+  font-size: 0.66rem;
+  color: #4a6977;
+}
+
+.project-children {
+  margin: 8px 0 0 12px;
+  padding: 0 0 0 12px;
+  border-left: 1px solid #c0d3dc;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.project-item.collapsed .project-children {
+  display: none;
 }
 
 .list-section {
@@ -651,37 +844,42 @@ li:hover {
 }
 
 .display-item.drag-over {
-  box-shadow: inset 0 0 0 2px #1d70c9;
-  background: linear-gradient(180deg, #f1f8ff 0%, #e2eefc 100%);
+  box-shadow: inset 0 0 0 1px #1d70c9;
+  background: linear-gradient(180deg, #f5faff 0%, #eaf3fb 100%);
 }
 
 .display-item.active {
-  background: linear-gradient(180deg, #dcedfa 0%, #cde3f7 100%);
-  border-color: #6b9cc1;
-  box-shadow: inset 3px 0 0 #286f98, 0 5px 10px #1d435915;
+  background: linear-gradient(180deg, #e9f4fb 0%, #dcecf6 100%);
+  border-color: #78a7c5;
+  box-shadow: inset 3px 0 0 #2e7398;
 }
 
 .folder-item {
-  margin-bottom: 6px;
-  padding: 6px 6px 4px;
-  border: 1px solid #b6cad4;
-  border-radius: 10px;
-  background: linear-gradient(180deg, #f9fcff 0%, #edf5fa 100%);
-  box-shadow: 0 4px 10px #1f34400d;
+  margin-bottom: 10px;
+  padding: 4px 0 0;
+  border-left: 2px solid #b2c8d3;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fcfeff 0%, #f3f8fb 100%);
+  box-shadow: none;
+  overflow: hidden;
 }
 
 .folder-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 6px;
-  border-radius: 7px;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 9px;
   cursor: pointer;
   user-select: none;
+  background: linear-gradient(180deg, #ffffff 0%, #f6fafc 100%);
+  border: 1px solid #dfe9ee;
+  min-width: 0;
 }
 
 .folder-row:hover {
-  background: #e7f1f8;
+  background: linear-gradient(180deg, #fbfeff 0%, #e9f4fa 100%);
+  border-color: #b8ced8;
 }
 
 .folder-row.selected {
@@ -690,21 +888,25 @@ li:hover {
 }
 
 .folder-row.drag-over {
-  box-shadow: inset 0 0 0 2px #1d70c9;
-  background: #e5f1fb;
+  box-shadow: inset 0 0 0 1px #1d70c9;
+  background: #edf5fb;
 }
 
 .folder-toggle {
-  width: 14px;
+  width: 16px;
   text-align: center;
   color: #36596a;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
 }
 
 .folder-name {
-  font-size: 0.76rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: #223f4d;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .folder-count {
@@ -714,10 +916,9 @@ li:hover {
 }
 
 .folder-children {
-  margin-top: 4px;
-  margin-left: 14px;
-  border-left: 1px dashed #a5beca;
-  padding-left: 8px;
+  margin: 8px 0 0 14px;
+  padding-left: 12px;
+  border-left: 1px solid #c3d4dc;
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -734,16 +935,60 @@ li:hover {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  padding: 0 2px;
 }
 
 .display-item strong {
   color: #15323f;
-  font-size: 0.78rem;
+  font-size: 0.79rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.display-item > div:last-child {
+.display-item > div:nth-child(2) {
   color: #526b75;
-  font-size: 0.68rem;
+  font-size: 0.69rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.display-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px 9px;
+  margin-bottom: 8px;
+  border: 1px solid #d8e5eb;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
+  box-shadow: none;
+}
+
+.exports-card ul::-webkit-scrollbar,
+.editor-controls::-webkit-scrollbar {
+  width: 10px;
+}
+
+.exports-card ul::-webkit-scrollbar-track,
+.editor-controls::-webkit-scrollbar-track {
+  background: #e7f1f6;
+  border-radius: 999px;
+}
+
+.exports-card ul::-webkit-scrollbar-thumb,
+.editor-controls::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #89aebf 0%, #5d8595 100%);
+  border: 2px solid #e7f1f6;
+  border-radius: 999px;
+}
+
+.exports-card ul::-webkit-scrollbar-thumb:hover,
+.editor-controls::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #6f98ab 0%, #456d7d 100%);
 }
 
 .small-btn {
@@ -753,6 +998,140 @@ li:hover {
 
 .single-list {
   margin-top: 8px;
+}
+
+/* Sidebar tree: reset generic list styling and apply a cleaner hierarchy. */
+#displaysList {
+  border: 1px solid #87a9b8;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fafdff 0%, #edf5f9 100%);
+  padding: 10px;
+  height: calc(100% - 96px);
+  overflow: auto;
+}
+
+#displaysList ul {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  min-height: 0;
+  height: auto;
+  overflow: visible;
+  padding: 0;
+  margin: 0;
+}
+
+#displaysList li {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+#displaysList li:hover {
+  transform: none;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+#displaysList .project-item {
+  margin-bottom: 12px;
+  padding: 0;
+  border-left: 0;
+  border-radius: 12px;
+  background: #f3f8fc;
+}
+
+#displaysList .project-row {
+  border: 1px solid #b7cfdb;
+  background: #f8fcff;
+  padding: 10px 11px;
+}
+
+#displaysList .project-row:hover {
+  background: #f1f8fd;
+  border-color: #94b5c6;
+}
+
+#displaysList .project-children {
+  margin: 8px 0 4px 0;
+  padding: 0 0 0 10px;
+  border-left: 2px solid #c4d8e2;
+}
+
+#displaysList .folder-item {
+  margin: 0 0 9px;
+  padding: 0;
+  border-left: 0;
+  border-radius: 10px;
+  background: transparent;
+}
+
+#displaysList .folder-row {
+  border: 1px solid #c9dce6;
+  background: #f9fcff;
+  padding: 8px 10px;
+}
+
+#displaysList .folder-row:hover {
+  background: #f3f9fd;
+  border-color: #a8c3d1;
+}
+
+#displaysList .folder-children {
+  margin: 7px 0 0;
+  padding-left: 10px;
+  border-left: 1px solid #d4e2ea;
+}
+
+#displaysList .display-item {
+  margin: 0 0 7px;
+  padding: 8px 10px;
+  border: 1px solid #d5e2e9;
+  border-radius: 10px;
+  background: #ffffff;
+  gap: 3px;
+}
+
+#displaysList .display-item:hover {
+  border-color: #adc4d0;
+  background: #f7fbfe;
+}
+
+#displaysList .display-item strong {
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+#displaysList .display-item > div:nth-child(2) {
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: #4c6673;
+  font-variant-numeric: tabular-nums;
+  white-space: pre-line;
+}
+
+#displaysList .display-item > .tree-actions {
+  margin-top: 2px;
+  align-self: flex-end;
+}
+
+#displaysList .list-section {
+  margin: 0 0 8px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 8px;
+  background: #e0edf4;
+  color: #1d4457;
+}
+
+#displaysList .tree-action-btn {
+  width: 21px;
+  height: 21px;
 }
 
 .preview-pane {
@@ -803,6 +1182,7 @@ li:hover {
   border-radius: 4px;
   background: #d3d8dd;
   box-shadow: 0 10px 18px #1b33401e;
+  transform-origin: center center;
 }
 
 .xml-object {

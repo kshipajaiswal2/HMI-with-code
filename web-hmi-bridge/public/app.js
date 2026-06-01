@@ -15,6 +15,16 @@ const refreshBtn = document.getElementById('refreshBtn');
 const showDisplaysBtn = document.getElementById('showDisplaysBtn');
 const showDefaultsBtn = document.getElementById('showDefaultsBtn');
 const seedDefaultsBtn = document.getElementById('seedDefaultsBtn');
+const newProjectBtn = document.getElementById('newProjectBtn');
+const projectCreatePanel = document.getElementById('projectCreatePanel');
+const projectNameInput = document.getElementById('projectNameInput');
+const createProjectBtn = document.getElementById('createProjectBtn');
+const cancelProjectBtn = document.getElementById('cancelProjectBtn');
+const sidebarNamePanel = document.getElementById('sidebarNamePanel');
+const sidebarNameLabel = document.getElementById('sidebarNameLabel');
+const sidebarNameInput = document.getElementById('sidebarNameInput');
+const sidebarNameConfirmBtn = document.getElementById('sidebarNameConfirmBtn');
+const sidebarNameCancelBtn = document.getElementById('sidebarNameCancelBtn');
 const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
 const mainGrid = document.getElementById('mainGrid');
 
@@ -61,6 +71,7 @@ let selectedFolderName = '';
 let selectedFolderIsCustom = false;
 let hiddenDisplayNames = new Set();
 let draggedDisplayKey = '';
+let sidebarNameSubmit = null;
 let folderNames = [];
 let folderAssignments = {};
 let folderCollapsedNames = new Set();
@@ -77,11 +88,20 @@ const DEFAULT_PREVIEW_WIDTH = 1024;
 const DEFAULT_PREVIEW_HEIGHT = 768;
 const SIDEBAR_STORAGE_KEY = 'displayXmlBridge.sidebarCollapsed';
 const SIDEBAR_MODE_STORAGE_KEY = 'displayXmlBridge.sidebarMode';
+const PROJECT_NAME_STORAGE_KEY = 'displayXmlBridge.projectName';
+const PROJECTS_STORAGE_KEY = 'displayXmlBridge.projects';
+const ACTIVE_PROJECT_STORAGE_KEY = 'displayXmlBridge.activeProjectId';
 const SIDEBAR_MODE_DISPLAYS = 'displays';
 const SIDEBAR_MODE_DEFAULTS = 'defaults';
 const UNGROUPED_FOLDER_NAME = 'Ungrouped';
 const HISTORY_LIMIT = 120;
 let sidebarMode = SIDEBAR_MODE_DISPLAYS;
+let currentProjectName = normalizeProjectName(localStorage.getItem(PROJECT_NAME_STORAGE_KEY) || 'Untitled Project');
+let projectList = loadProjectList();
+let activeProjectId = localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY) || '';
+let activeProjectFolder = '';
+let activeProjectScreen = '';
+let activeProjectKey = '';
 
 function displayKey(name) {
   return String(name || '').toLowerCase();
@@ -115,6 +135,389 @@ function isEditableSource(file) {
 
 function isDefaultMode() {
   return sidebarMode === SIDEBAR_MODE_DEFAULTS;
+}
+
+function createProjectKey(projectId, folderName, screenName) {
+  return [projectId, folderName, screenName].map((part) => String(part || '')).join('::');
+}
+
+function loadProjectList() {
+  const text = localStorage.getItem(PROJECTS_STORAGE_KEY);
+  if (!text) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_err) {
+    return [];
+  }
+}
+
+function persistProjectList() {
+  localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projectList));
+}
+
+function normalizeProjectList() {
+  projectList = Array.isArray(projectList) ? projectList : [];
+  for (const project of projectList) {
+    project.id = String(project.id || `project-${Date.now()}`);
+    project.name = normalizeProjectName(project.name || 'Untitled Project');
+    project.collapsed = Boolean(project.collapsed);
+    project.folders = Array.isArray(project.folders) ? project.folders : [];
+    for (const folder of project.folders) {
+      folder.name = String(folder.name || 'Folder');
+      folder.collapsed = Boolean(folder.collapsed);
+      folder.screens = Array.isArray(folder.screens) ? folder.screens : [];
+      for (const screen of folder.screens) {
+        screen.name = String(screen.name || 'Screen.xml');
+        screen.xml = String(screen.xml || '');
+        screen.lastModified = String(screen.lastModified || new Date().toISOString());
+        screen.sizeBytes = Number.isFinite(Number(screen.sizeBytes)) ? Number(screen.sizeBytes) : new Blob([screen.xml]).size;
+        const meta = readSizeFromXml(screen.xml);
+        screen.width = Number.isFinite(Number(screen.width)) ? Number(screen.width) : meta.width;
+        screen.height = Number.isFinite(Number(screen.height)) ? Number(screen.height) : meta.height;
+      }
+    }
+  }
+}
+
+function saveProjectList() {
+  normalizeProjectList();
+  persistProjectList();
+}
+
+function getProjectById(projectId) {
+  return projectList.find((project) => project.id === projectId) || null;
+}
+
+function getActiveProject() {
+  return getProjectById(activeProjectId);
+}
+
+function setActiveProject(project) {
+  if (!project) {
+    activeProjectId = '';
+    activeProjectFolder = '';
+    activeProjectScreen = '';
+    activeProjectKey = '';
+    localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
+    setProjectName('Untitled Project');
+    return;
+  }
+
+  activeProjectId = project.id;
+  localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, activeProjectId);
+  setProjectName(project.name);
+}
+
+function setActiveProjectScreen(project, folderName, screenName) {
+  setActiveProject(project);
+  activeProjectFolder = String(folderName || '');
+  activeProjectScreen = String(screenName || '');
+  activeProjectKey = createProjectKey(project?.id, folderName, screenName);
+}
+
+function findProjectFolder(project, folderName) {
+  if (!project || !Array.isArray(project.folders)) {
+    return null;
+  }
+
+  const folderKey = String(folderName || '').toLowerCase();
+  return project.folders.find((folder) => String(folder.name || '').toLowerCase() === folderKey) || null;
+}
+
+function findProjectScreen(project, folderName, screenName) {
+  const folder = findProjectFolder(project, folderName);
+  if (!folder || !Array.isArray(folder.screens)) {
+    return null;
+  }
+
+  const screenKey = String(screenName || '').toLowerCase();
+  return folder.screens.find((screen) => String(screen.name || '').toLowerCase() === screenKey) || null;
+}
+
+function ensureProjectFolder(project, folderName) {
+  if (!project) {
+    return null;
+  }
+
+  const normalizedName = String(folderName || '').trim() || 'Ungrouped';
+  let folder = findProjectFolder(project, normalizedName);
+  if (!folder) {
+    folder = {
+      name: normalizedName,
+      collapsed: false,
+      screens: []
+    };
+    project.folders.push(folder);
+  }
+
+  return folder;
+}
+
+function uniqueScreenName(folder, rawName) {
+  const base = String(rawName || '').trim().replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const candidateBase = base.endsWith('.xml') ? base : `${base || 'New_Screen'}.xml`;
+  const existingNames = new Set((folder?.screens || []).map((screen) => displayKey(screen.name)));
+  if (!existingNames.has(displayKey(candidateBase))) {
+    return candidateBase;
+  }
+
+  const stem = candidateBase.replace(/\.xml$/i, '');
+  let counter = 1;
+  while (existingNames.has(displayKey(`${stem}_${counter}.xml`))) {
+    counter += 1;
+  }
+
+  return `${stem}_${counter}.xml`;
+}
+
+function projectScreenFromTemplate(name, xml) {
+  const meta = readSizeFromXml(xml);
+  return {
+    name,
+    xml,
+    width: meta.width,
+    height: meta.height,
+    sizeBytes: new Blob([xml]).size,
+    lastModified: new Date().toISOString()
+  };
+}
+
+function getProjectTemplateXml(project) {
+  if (!project || !Array.isArray(project.folders)) {
+    return '';
+  }
+
+  const templateKey = displayKey(TEMPLATE_DISPLAY_NAME);
+  for (const folder of project.folders) {
+    for (const screen of folder?.screens || []) {
+      if (displayKey(screen?.name) === templateKey && typeof screen?.xml === 'string' && screen.xml.trim()) {
+        return screen.xml;
+      }
+    }
+  }
+
+  return '';
+}
+
+async function loadDisplayXmlDirect(name) {
+  const res = await fetch(`/api/displays/${encodeURIComponent(name)}`);
+  const data = await readApiJson(res);
+  if (!res.ok) {
+    throw new Error(data.error || `Failed to load ${name}`);
+  }
+
+  return data;
+}
+
+async function resolveNewProjectScreenTemplateXml(project) {
+  const projectTemplateXml = getProjectTemplateXml(project);
+  if (projectTemplateXml) {
+    return projectTemplateXml;
+  }
+
+  try {
+    const template = await loadDefaultTemplateXml(TEMPLATE_DISPLAY_NAME);
+    if (typeof template?.xml === 'string' && template.xml.trim()) {
+      return template.xml;
+    }
+  } catch (_err) {
+    // Fallback to edited/uploaded displays if default template isn't present.
+  }
+
+  const displayTemplate = await loadDisplayXmlDirect(TEMPLATE_DISPLAY_NAME);
+  return String(displayTemplate?.xml || '');
+}
+
+async function createProjectScreen(projectId, folderName, rawName) {
+  const project = getProjectById(projectId);
+  if (!project) {
+    throw new Error('Project not found');
+  }
+
+  const folder = ensureProjectFolder(project, folderName);
+  if (!folder) {
+    throw new Error('Folder not found');
+  }
+
+  const screenName = uniqueScreenName(folder, rawName);
+  const templateXml = await resolveNewProjectScreenTemplateXml(project);
+  const screen = projectScreenFromTemplate(screenName, templateXml);
+  folder.screens.push(screen);
+  saveProjectList();
+  setActiveProjectScreen(project, folder.name, screen.name);
+  setEditorProjectScreen(project, folder.name, screen, screen.xml);
+  renderProjectSidebar();
+  return screen;
+}
+
+function removeProjectById(projectId) {
+  const projectIndex = projectList.findIndex((project) => project.id === projectId);
+  if (projectIndex < 0) {
+    return false;
+  }
+
+  projectList.splice(projectIndex, 1);
+  if (activeProjectId === projectId) {
+    const nextProject = projectList[projectIndex] || projectList[projectIndex - 1] || null;
+    setActiveProject(nextProject);
+  }
+  saveProjectList();
+  renderProjectSidebar();
+  return true;
+}
+
+function removeProjectScreen(projectId, folderName, screenName) {
+  const project = getProjectById(projectId);
+  if (!project) {
+    return false;
+  }
+
+  const folder = findProjectFolder(project, folderName);
+  if (!folder) {
+    return false;
+  }
+
+  const screenIndex = folder.screens.findIndex((screen) => displayKey(screen.name) === displayKey(screenName));
+  if (screenIndex < 0) {
+    return false;
+  }
+
+  const removed = folder.screens.splice(screenIndex, 1)[0];
+  if (activeProjectKey === createProjectKey(projectId, folderName, screenName)) {
+    const nextScreen = folder.screens[screenIndex] || folder.screens[screenIndex - 1] || null;
+    if (nextScreen) {
+      setEditorProjectScreen(project, folder.name, nextScreen, nextScreen.xml);
+    } else {
+      setActiveProject(project);
+      selectedDisplay = '';
+      selectedFiles = [];
+      displayName.value = 'None';
+      xmlEditor.value = '';
+      renderPreview();
+    }
+  }
+
+  saveProjectList();
+  renderProjectSidebar();
+  return removed;
+}
+
+function moveProjectScreen(fromProjectId, fromFolderName, screenName, toProjectId, toFolderName, insertBeforeScreenName = '') {
+  const fromProject = getProjectById(fromProjectId);
+  const toProject = getProjectById(toProjectId);
+  if (!fromProject || !toProject) {
+    return false;
+  }
+
+  const fromFolder = findProjectFolder(fromProject, fromFolderName);
+  const toFolder = ensureProjectFolder(toProject, toFolderName);
+  if (!fromFolder || !toFolder) {
+    return false;
+  }
+
+  const screenIndex = fromFolder.screens.findIndex((screen) => displayKey(screen.name) === displayKey(screenName));
+  if (screenIndex < 0) {
+    return false;
+  }
+
+  const [screen] = fromFolder.screens.splice(screenIndex, 1);
+  let targetIndex = toFolder.screens.length;
+  if (insertBeforeScreenName) {
+    const beforeIndex = toFolder.screens.findIndex((item) => displayKey(item.name) === displayKey(insertBeforeScreenName));
+    if (beforeIndex >= 0) {
+      targetIndex = beforeIndex;
+    }
+  }
+
+  toFolder.screens.splice(targetIndex, 0, screen);
+  saveProjectList();
+  renderProjectSidebar();
+  return true;
+}
+
+function findProjectScreenByLocation(projectId, folderName, screenName) {
+  const project = getProjectById(projectId);
+  const folder = findProjectFolder(project, folderName);
+  const screen = folder ? findProjectScreen(project, folder.name, screenName) : null;
+  return { project, folder, screen };
+}
+
+function getProjectScreenByKey(projectKey) {
+  for (const project of projectList) {
+    for (const folder of project.folders || []) {
+      for (const screen of folder.screens || []) {
+        if (createProjectKey(project.id, folder.name, screen.name) === projectKey) {
+          return { project, folder, screen };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function groupTemplateFiles(files) {
+  const globalObjectFiles = files.filter((file) => isGlobalObjectFile(file) || !isNumberedDisplayName(file.name));
+  const globalObjectKeySet = new Set(globalObjectFiles.map((file) => displayKey(file.name)));
+  const templateFiles = files.filter((file) => !globalObjectKeySet.has(displayKey(file.name)));
+
+  const grouped = new Map();
+  for (const file of templateFiles) {
+    const base = String(file.name || '').replace(/\.xml$/i, '');
+    const match = base.match(/^(\d{3})/);
+    const bucket = match ? Math.floor(Number(match[1]) / 100) * 100 : null;
+    const groupKey = Number.isFinite(bucket) ? String(bucket).padStart(3, '0') : 'UNGROUPED';
+    if (!grouped.has(groupKey)) {
+      grouped.set(groupKey, []);
+    }
+    grouped.get(groupKey).push(file);
+  }
+
+  const folders = [];
+  for (const [groupKey, groupFiles] of grouped.entries()) {
+    if (groupKey === 'UNGROUPED') {
+      folders.push({ key: groupKey, name: 'Ungrouped', screens: groupFiles });
+      continue;
+    }
+
+    const exact = groupFiles.find((file) => String(file.name || '').toLowerCase().startsWith(`${groupKey.toLowerCase()}_`));
+    const folderName = String((exact || groupFiles[0]).name || '').replace(/\.xml$/i, '');
+    folders.push({ key: groupKey, name: folderName, screens: groupFiles });
+  }
+
+  folders.sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true, sensitivity: 'base' }));
+
+  return { folders, globalObjectFiles };
+}
+
+function screenMetaFromXml(name, xml) {
+  const meta = readSizeFromXml(xml);
+  return {
+    name,
+    xml,
+    width: meta.width,
+    height: meta.height,
+    sizeBytes: new Blob([xml]).size,
+    lastModified: new Date().toISOString()
+  };
+}
+
+function normalizeProjectName(name) {
+  const next = String(name || '').trim().replace(/\s+/g, ' ');
+  return next || 'Untitled Project';
+}
+
+function setProjectName(name) {
+  currentProjectName = normalizeProjectName(name);
+  localStorage.setItem(PROJECT_NAME_STORAGE_KEY, currentProjectName);
+  if (sidebarTitle) {
+    sidebarTitle.textContent = 'Projects';
+  }
+  document.title = `${currentProjectName} - Display XML Bridge`;
 }
 
 function normalizeFolderName(name) {
@@ -222,7 +625,7 @@ function setSidebarMode(mode) {
   }
 
   if (sidebarTitle) {
-    sidebarTitle.textContent = isDefaultMode() ? 'Default Templates' : 'Displays';
+    sidebarTitle.textContent = 'Projects';
   }
 
   if (addDisplayBtn) {
@@ -255,6 +658,117 @@ function setSidebarMode(mode) {
     removeDisplayBtn.title = isDefaultMode() ? 'Remove selected default template' : 'Remove selected screen';
   }
 
+}
+
+async function createNewProject(rawName) {
+  const projectName = normalizeProjectName(rawName);
+
+  try {
+    const defaultsResponse = await fetch('/api/default-pages');
+    if (!defaultsResponse.ok) {
+      throw new Error('Failed to load default templates');
+    }
+
+    const defaultsData = await defaultsResponse.json();
+    const { folders, globalObjectFiles } = groupTemplateFiles(defaultsData.files || []);
+    const project = {
+      id: `project-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name: projectName,
+      collapsed: false,
+      folders: []
+    };
+
+    for (const folder of folders) {
+      const screens = [];
+      for (const file of folder.screens) {
+        const xmlData = await loadDefaultTemplateXml(file.name);
+        screens.push(screenMetaFromXml(xmlData.name, xmlData.xml));
+      }
+
+      project.folders.push({
+        name: folder.name,
+        collapsed: false,
+        screens
+      });
+    }
+
+    if (globalObjectFiles.length) {
+      const screens = [];
+      for (const file of globalObjectFiles) {
+        const xmlData = await loadDefaultTemplateXml(file.name);
+        screens.push(screenMetaFromXml(xmlData.name, xmlData.xml));
+      }
+
+      project.folders.push({
+        name: 'Global Objects',
+        collapsed: false,
+        screens
+      });
+    }
+
+    projectList = [...projectList.filter((item) => displayKey(item.name) !== displayKey(project.name)), project];
+    saveProjectList();
+    setActiveProject(project);
+    setSidebarCollapsed(false);
+    renderProjectSidebar();
+
+    const firstFolder = project.folders[0];
+    const firstScreen = firstFolder?.screens?.[0];
+    if (firstFolder && firstScreen) {
+      setEditorProjectScreen(project, firstFolder.name, firstScreen, firstScreen.xml);
+    }
+
+    packageResult.textContent = `Project ready: ${projectName}.`;
+  } catch (err) {
+    console.error(err);
+    alert(err.message || 'Could not create new project.');
+  }
+}
+
+function showProjectCreatePanel() {
+  if (!projectCreatePanel) {
+    return;
+  }
+
+  hideSidebarNamePanel();
+  projectCreatePanel.classList.remove('hidden');
+  if (projectNameInput) {
+    projectNameInput.value = currentProjectName === 'Untitled Project' ? 'New Project' : currentProjectName;
+    projectNameInput.focus();
+    projectNameInput.select();
+  }
+}
+
+function hideProjectCreatePanel() {
+  if (!projectCreatePanel) {
+    return;
+  }
+
+  projectCreatePanel.classList.add('hidden');
+}
+
+function showSidebarNamePanel(options = {}) {
+  if (!sidebarNamePanel || !sidebarNameLabel || !sidebarNameInput || !sidebarNameConfirmBtn || !sidebarNameCancelBtn) {
+    return;
+  }
+
+  sidebarNameSubmit = typeof options.onConfirm === 'function' ? options.onConfirm : null;
+  sidebarNameLabel.textContent = options.label || 'Name';
+  sidebarNameInput.value = options.value || '';
+  sidebarNameInput.placeholder = options.placeholder || 'New item';
+  sidebarNameConfirmBtn.textContent = options.confirmText || 'Save';
+  sidebarNamePanel.classList.remove('hidden');
+  sidebarNameInput.focus();
+  sidebarNameInput.select();
+}
+
+function hideSidebarNamePanel() {
+  if (!sidebarNamePanel) {
+    return;
+  }
+
+  sidebarNameSubmit = null;
+  sidebarNamePanel.classList.add('hidden');
 }
 
 function updatePackageSelection(files = currentDisplayRows) {
@@ -306,11 +820,14 @@ async function autoSaveCurrentDisplay() {
   }
 }
 
-async function buildImportPackage(files, packageLabel) {
+async function buildImportPackage(files, packageLabel, options = {}) {
+  const packageMode = String(options.packageMode || 'xml').toLowerCase() === 'restore'
+    ? 'restore'
+    : 'xml';
   const res = await fetch('/api/displays/package', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ files })
+    body: JSON.stringify({ files, packageMode })
   });
 
   const data = await res.json();
@@ -322,17 +839,36 @@ async function buildImportPackage(files, packageLabel) {
   packageResult.innerHTML = '';
   const warn = document.createElement('div');
   warn.className = 'import-checklist';
-  warn.innerHTML =
-    `<strong>Before importing in FactoryTalk (${packageLabel}):</strong>` +
-    '<ol>' +
-    '<li><b>Close every display you are about to import</b> (e.g. close MAIN, Testscreen, etc.)</li>' +
-    '<li>Extract the downloaded ZIP to a local folder.</li>' +
-    '<li>In FactoryTalk, use <em>Batch Import</em> and select <code>BatchImport.xml</code>.</li>' +
-    '<li><b>Set conflict handling to REPLACE/OVERWRITE existing displays</b> (do not merge/update).</li>' +
-    '<li>If you see: <code>element does not exist in the Display and cannot be updated</code>, your import is in update/merge mode. Switch to REPLACE, or delete targets first (see <code>DeleteTargets.txt</code>) and then import.</li>' +
-    '<li>Do <b>NOT</b> select the ZIP, the display XML, or any .txt file.</li>' +
-    '</ol>' +
-    `<small>Files packaged: ${data.files.join(', ')}</small>`;
+  if (data.packageType === 'restore-bundle') {
+    const archiveExt = String(data.archiveType || '').toLowerCase();
+    const restoreMenu = archiveExt === 'mer' ? 'Restore Runtime Application' : 'Restore Application';
+    const archiveLabel = archiveExt === 'mer' ? '.mer' : '.apa';
+    warn.innerHTML =
+      `<strong>Before importing in FactoryTalk (${packageLabel}):</strong>` +
+      '<ol>' +
+      '<li>Extract the downloaded ZIP to a local folder.</li>' +
+      `<li><b>Restore the included <code>${archiveLabel}</code> archive first</b> in FactoryTalk View Studio using <code>${restoreMenu}</code>.</li>` +
+      '<li>Open the restored project.</li>' +
+      '<li>Go into the extracted <code>Edited_Display_Import</code> folder.</li>' +
+      '<li>Run <em>Batch Import</em> and select <code>Edited_Display_Import/BatchImport.xml</code>.</li>' +
+      '<li><b>Set conflict handling to REPLACE/OVERWRITE existing displays</b> (do not merge/update).</li>' +
+      '<li>If REPLACE is not available, use <code>Edited_Display_Import/DeleteTargets.txt</code> first, then import.</li>' +
+      '<li>If the archive is <code>.mer</code>, restore/editability depends on how that MER was built and your FT version.</li>' +
+      '</ol>' +
+      `<small>Restore bundle files packaged: ${data.files.join(', ')}</small>`;
+  } else {
+    warn.innerHTML =
+      `<strong>Before importing in FactoryTalk (${packageLabel}):</strong>` +
+      '<ol>' +
+      '<li><b>Close every display you are about to import</b> (e.g. close MAIN, Testscreen, etc.)</li>' +
+      '<li>Extract the downloaded ZIP to a local folder.</li>' +
+      '<li>In FactoryTalk, use <em>Batch Import</em> and select <code>BatchImport.xml</code>.</li>' +
+      '<li><b>Set conflict handling to REPLACE/OVERWRITE existing displays</b> (do not merge/update).</li>' +
+      '<li>If you see: <code>element does not exist in the Display and cannot be updated</code>, your import is in update/merge mode. Switch to REPLACE, or delete targets first (see <code>DeleteTargets.txt</code>) and then import.</li>' +
+      '<li>Do <b>NOT</b> select the ZIP, the display XML, or any .txt file.</li>' +
+      '</ol>' +
+      `<small>Files packaged: ${data.files.join(', ')}</small>`;
+  }
   packageResult.appendChild(warn);
 
   const downloadUrl = data.downloadUrl || '/api/packages/download/latest.zip';
@@ -530,6 +1066,24 @@ function applyBorderStyles(box, baseNode, sourceNode) {
   const backColor = sourceNode?.getAttribute('backColor') || baseNode.getAttribute('backColor');
   const px = Number.isFinite(borderWidth) && borderWidth > 0 ? `${borderWidth}px` : '1px';
   const baseColor = borderUsesBackColor ? (backColor || '#8a8a8a') : (borderColor || '#1a1a1a');
+  const normalizedBase = normalizeColor(baseColor) || '#8A8A8A';
+
+  const offsetHexColor = (hexColor, delta) => {
+    const match = String(hexColor || '').trim().match(/^#([0-9a-fA-F]{6})$/);
+    if (!match) {
+      return hexColor;
+    }
+
+    const clampByte = (n) => Math.max(0, Math.min(255, n));
+    const toHex = (n) => clampByte(n).toString(16).padStart(2, '0').toUpperCase();
+    const r = Number.parseInt(match[1].slice(0, 2), 16);
+    const g = Number.parseInt(match[1].slice(2, 4), 16);
+    const b = Number.parseInt(match[1].slice(4, 6), 16);
+    return `#${toHex(r + delta)}${toHex(g + delta)}${toHex(b + delta)}`;
+  };
+
+  const lightEdge = offsetHexColor(normalizedBase, 58);
+  const darkEdge = offsetHexColor(normalizedBase, -62);
 
   box.style.boxShadow = 'none';
   box.style.borderTopColor = '';
@@ -545,10 +1099,10 @@ function applyBorderStyles(box, baseNode, sourceNode) {
   if (borderStyleRaw.includes('raised') || borderStyleRaw.includes('outset')) {
     box.style.borderStyle = 'solid';
     box.style.borderWidth = px;
-    box.style.borderTopColor = '#ffffff';
-    box.style.borderLeftColor = '#ffffff';
-    box.style.borderRightColor = '#707070';
-    box.style.borderBottomColor = '#707070';
+    box.style.borderTopColor = lightEdge;
+    box.style.borderLeftColor = lightEdge;
+    box.style.borderRightColor = darkEdge;
+    box.style.borderBottomColor = darkEdge;
     box.style.boxShadow = 'inset 0 0 0 1px rgba(255,255,255,0.18)';
     return;
   }
@@ -556,10 +1110,10 @@ function applyBorderStyles(box, baseNode, sourceNode) {
   if (borderStyleRaw.includes('sunken') || borderStyleRaw.includes('inset')) {
     box.style.borderStyle = 'solid';
     box.style.borderWidth = px;
-    box.style.borderTopColor = '#6a6a6a';
-    box.style.borderLeftColor = '#6a6a6a';
-    box.style.borderRightColor = '#ffffff';
-    box.style.borderBottomColor = '#ffffff';
+    box.style.borderTopColor = darkEdge;
+    box.style.borderLeftColor = darkEdge;
+    box.style.borderRightColor = lightEdge;
+    box.style.borderBottomColor = lightEdge;
     box.style.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,0.12)';
     return;
   }
@@ -688,8 +1242,14 @@ function previewTextForNode(node, captionNode) {
   }
 
   if (tag === 'numericdisplay') {
-    const digits = Math.max(1, Math.min(8, Number(node.getAttribute('numberOfDigits')) || 5));
-    return 'N'.repeat(digits);
+    const digits = Math.max(1, Math.min(12, Number(node.getAttribute('numberOfDigits')) || 5));
+    const decimals = Math.max(0, Math.min(6, Number(node.getAttribute('decimalPlaces')) || 0));
+    if (decimals > 0) {
+      // FactoryTalk exports often include the decimal separator in numberOfDigits.
+      const integerDigits = Math.max(1, Math.min(8, digits - decimals - 1));
+      return `${'N'.repeat(integerDigits)}.${'N'.repeat(decimals)}`;
+    }
+    return 'N'.repeat(Math.min(8, digits));
   }
 
   if (tag === 'timeanddatedisplay') {
@@ -1048,12 +1608,13 @@ function setSidebarCollapsed(collapsed) {
     return;
   }
 
-  mainGrid.classList.toggle('sidebar-collapsed', collapsed);
-  toggleSidebarBtn.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
-  const actionLabel = collapsed ? 'Show displays sidebar' : 'Hide displays sidebar';
+  const nextCollapsed = Boolean(collapsed);
+  mainGrid.classList.toggle('sidebar-collapsed', nextCollapsed);
+  toggleSidebarBtn.setAttribute('aria-pressed', nextCollapsed ? 'true' : 'false');
+  const actionLabel = nextCollapsed ? 'Show projects sidebar' : 'Hide projects sidebar';
   toggleSidebarBtn.setAttribute('aria-label', actionLabel);
   toggleSidebarBtn.setAttribute('title', actionLabel);
-  localStorage.setItem(SIDEBAR_STORAGE_KEY, collapsed ? '1' : '0');
+  localStorage.setItem(SIDEBAR_STORAGE_KEY, nextCollapsed ? '1' : '0');
 }
 
 function shortDateTime(iso) {
@@ -1298,6 +1859,10 @@ function setEditorDisplay(name, xml) {
   if (size.width) screenWidth.value = size.width;
   if (size.height) screenHeight.value = size.height;
 
+  if (currentProjectName === 'Untitled Project') {
+    setProjectName(baseFileName(name));
+  }
+
   updatePackageSelection(currentDisplayRows);
   renderPreview();
 }
@@ -1314,6 +1879,10 @@ function setEditorTemplate(name, xml) {
   const size = readSizeFromXml(xml);
   if (size.width) screenWidth.value = size.width;
   if (size.height) screenHeight.value = size.height;
+
+  if (currentProjectName === 'Untitled Project') {
+    setProjectName(baseFileName(name));
+  }
 
   updatePackageSelection(currentDisplayRows);
   renderPreview();
@@ -1364,6 +1933,21 @@ async function readApiJson(res) {
 }
 
 async function saveDisplayXml(name, xml) {
+  if (activeProjectKey) {
+    const record = getProjectScreenByKey(activeProjectKey);
+    if (record) {
+      record.screen.xml = xml;
+      const meta = screenMetaFromXml(record.screen.name, xml);
+      record.screen.width = meta.width;
+      record.screen.height = meta.height;
+      record.screen.sizeBytes = meta.sizeBytes;
+      record.screen.lastModified = meta.lastModified;
+      saveProjectList();
+      renderProjectSidebar();
+      return { ok: true, saved: record.screen.name, projectId: record.project.id };
+    }
+  }
+
   const res = await fetch(`/api/displays/${encodeURIComponent(name)}/save`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1379,6 +1963,18 @@ async function saveDisplayXml(name, xml) {
 }
 
 async function loadDisplayXml(name) {
+  if (activeProjectKey) {
+    const record = getProjectScreenByKey(activeProjectKey);
+    if (record) {
+      return {
+        name: record.screen.name,
+        xml: record.screen.xml,
+        projectId: record.project.id,
+        folderName: record.folder.name
+      };
+    }
+  }
+
   const res = await fetch(`/api/displays/${encodeURIComponent(name)}`);
   const data = await readApiJson(res);
   if (!res.ok) {
@@ -1691,8 +2287,8 @@ function renderDisplays(files) {
 
     const meta = document.createElement('div');
     const sizeLabel = file.width && file.height ? `${file.width}x${file.height}` : 'size unknown';
-    const sourceLabel = isGlobalObject ? `${file.source} | global object` : file.source;
-    meta.textContent = `${sourceLabel} | ${sizeLabel} | ${kb(file.sizeBytes)} | ${shortDateTime(file.lastModified)}`;
+    const sourceLabel = isGlobalObject ? `${file.source} · global object` : file.source;
+    meta.textContent = `${sourceLabel} · ${sizeLabel} · ${kb(file.sizeBytes)}\n${shortDateTime(file.lastModified)}`;
 
     li.appendChild(row);
     li.appendChild(meta);
@@ -1836,6 +2432,43 @@ function renderDefaultTemplates(files) {
     displaysList.appendChild(section);
   };
 
+  const appendProjectHeader = (title) => {
+    const section = document.createElement('li');
+    section.className = 'project-item';
+
+    const row = document.createElement('div');
+    row.className = 'project-row';
+
+    const toggle = document.createElement('span');
+    toggle.className = 'project-toggle';
+    toggle.textContent = '▾';
+
+    const label = document.createElement('span');
+    label.className = 'project-name';
+    label.textContent = title;
+
+    const count = document.createElement('span');
+    count.className = 'project-count';
+    count.textContent = `${files.length}`;
+
+    row.appendChild(toggle);
+    row.appendChild(label);
+    row.appendChild(count);
+    section.appendChild(row);
+
+    const children = document.createElement('ul');
+    children.className = 'project-children';
+    section.appendChild(children);
+
+    row.addEventListener('click', () => {
+      const collapsed = section.classList.toggle('collapsed');
+      toggle.textContent = collapsed ? '▸' : '▾';
+    });
+
+    displaysList.appendChild(section);
+    return children;
+  };
+
   const appendDefaultFileRow = (file, options = {}) => {
     const isGlobalObject = Boolean(options.isGlobalObject);
     const appendTo = options.appendTo || displaysList;
@@ -1889,6 +2522,8 @@ function renderDefaultTemplates(files) {
     }
     grouped.get(groupKey).push(file);
   }
+
+  const projectChildren = appendProjectHeader(currentProjectName);
 
   const folderNames = [];
   for (const [groupKey, groupFiles] of grouped.entries()) {
@@ -1951,6 +2586,332 @@ function renderDefaultTemplates(files) {
     for (const file of globalObjectFiles) {
       appendDefaultFileRow(file, { isGlobalObject: true });
     }
+  }
+}
+
+function renderProjectSidebar() {
+  displaysList.innerHTML = '';
+
+  normalizeProjectList();
+  if (!projectList.length) {
+    displaysList.innerHTML = '<li>No projects yet. Click New Project to create one.</li>';
+    if (sidebarTitle) {
+      sidebarTitle.textContent = 'Projects';
+    }
+    return;
+  }
+
+  const appendProjectHeader = (project) => {
+    const section = document.createElement('li');
+    section.className = 'project-item';
+    if (project.collapsed) {
+      section.classList.add('collapsed');
+    }
+
+    const row = document.createElement('div');
+    row.className = 'project-row';
+    if (project.id === activeProjectId) {
+      row.classList.add('selected');
+    }
+
+    const toggle = document.createElement('span');
+    toggle.className = 'project-toggle';
+    toggle.textContent = project.collapsed ? '▸' : '▾';
+
+    const label = document.createElement('span');
+    label.className = 'project-name';
+    label.textContent = project.name;
+
+    const count = document.createElement('span');
+    count.className = 'project-count';
+    count.textContent = `${project.folders.length}`;
+
+    const actions = document.createElement('div');
+    actions.className = 'tree-actions';
+
+    const addFolderBtn = document.createElement('button');
+    addFolderBtn.type = 'button';
+    addFolderBtn.className = 'tree-action-btn';
+    addFolderBtn.textContent = '+';
+    addFolderBtn.title = 'Add folder';
+    addFolderBtn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      showSidebarNamePanel({
+        label: `Folder name for ${project.name}`,
+        value: 'New_Folder',
+        placeholder: 'New_Folder',
+        confirmText: 'Add folder',
+        onConfirm: (rawName) => {
+          const trimmedName = String(rawName || '').trim();
+          if (!trimmedName) {
+            alert('Enter a valid folder name.');
+            return false;
+          }
+
+          if (findProjectFolder(project, trimmedName)) {
+            alert('That folder already exists.');
+            return false;
+          }
+
+          project.folders.push({ name: trimmedName, collapsed: false, screens: [] });
+          saveProjectList();
+          renderProjectSidebar();
+          return true;
+        }
+      });
+    });
+
+    const removeProjectBtn = document.createElement('button');
+    removeProjectBtn.type = 'button';
+    removeProjectBtn.className = 'tree-action-btn danger';
+    removeProjectBtn.textContent = '×';
+    removeProjectBtn.title = 'Remove project';
+    removeProjectBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (!window.confirm(`Remove project ${project.name}? This deletes its tree from the browser.`)) {
+        return;
+      }
+      removeProjectById(project.id);
+    });
+
+    actions.appendChild(addFolderBtn);
+    actions.appendChild(removeProjectBtn);
+
+    row.appendChild(toggle);
+    row.appendChild(label);
+    row.appendChild(count);
+    row.appendChild(actions);
+    section.appendChild(row);
+
+    const children = document.createElement('ul');
+    children.className = 'project-children';
+    section.appendChild(children);
+
+    row.addEventListener('click', () => {
+      project.collapsed = !project.collapsed;
+      saveProjectList();
+      renderProjectSidebar();
+    });
+
+    return { section, children };
+  };
+
+  const appendFolder = (project, folder, appendTo) => {
+    const folderLi = document.createElement('li');
+    folderLi.className = 'folder-item';
+    if (folder.collapsed) {
+      folderLi.classList.add('collapsed');
+    }
+
+    const folderRow = document.createElement('div');
+    folderRow.className = 'folder-row';
+
+    const toggle = document.createElement('span');
+    toggle.className = 'folder-toggle';
+    toggle.textContent = folder.collapsed ? '▸' : '▾';
+
+    const folderLabel = document.createElement('span');
+    folderLabel.className = 'folder-name';
+    folderLabel.textContent = folder.name;
+
+    const folderCount = document.createElement('span');
+    folderCount.className = 'folder-count';
+    folderCount.textContent = `${folder.screens.length}`;
+
+    const folderActions = document.createElement('div');
+    folderActions.className = 'tree-actions';
+
+    const addScreenBtn = document.createElement('button');
+    addScreenBtn.type = 'button';
+    addScreenBtn.className = 'tree-action-btn';
+    addScreenBtn.textContent = '+';
+    addScreenBtn.title = 'Add screen';
+    addScreenBtn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      showSidebarNamePanel({
+        label: `Screen name for ${folder.name}`,
+        value: 'New_Screen',
+        placeholder: 'New_Screen',
+        confirmText: 'Add screen',
+        onConfirm: async (rawName) => {
+          const screenName = String(rawName || '').trim();
+          if (!screenName) {
+            alert('Enter a screen name.');
+            return false;
+          }
+
+          try {
+            await createProjectScreen(project.id, folder.name, screenName);
+            return true;
+          } catch (err) {
+            console.error(err);
+            alert(err.message || 'Could not add screen.');
+            return false;
+          }
+        }
+      });
+    });
+
+    folderActions.appendChild(addScreenBtn);
+
+    folderRow.appendChild(toggle);
+    folderRow.appendChild(folderLabel);
+    folderRow.appendChild(folderCount);
+    folderRow.appendChild(folderActions);
+    folderLi.appendChild(folderRow);
+
+    const children = document.createElement('ul');
+    children.className = 'folder-children';
+
+    for (const screen of folder.screens) {
+      const screenLi = document.createElement('li');
+      screenLi.className = 'display-item';
+      screenLi.draggable = true;
+      if (activeProjectKey === createProjectKey(project.id, folder.name, screen.name)) {
+        screenLi.classList.add('active');
+      }
+
+      const row = document.createElement('div');
+      row.className = 'list-row';
+
+      const name = document.createElement('strong');
+      name.textContent = screen.name;
+      row.appendChild(name);
+
+      const meta = document.createElement('div');
+      const sizeLabel = screen.width && screen.height ? `${screen.width}x${screen.height}` : 'size unknown';
+      meta.textContent = `project screen · ${sizeLabel} · ${kb(screen.sizeBytes)}\n${shortDateTime(screen.lastModified)}`;
+
+      const actions = document.createElement('div');
+      actions.className = 'tree-actions';
+
+      const removeScreenBtn = document.createElement('button');
+      removeScreenBtn.type = 'button';
+      removeScreenBtn.className = 'tree-action-btn danger';
+      removeScreenBtn.textContent = '×';
+      removeScreenBtn.title = 'Remove screen';
+      removeScreenBtn.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        if (!window.confirm(`Remove screen ${screen.name}?`)) {
+          return;
+        }
+
+        removeProjectScreen(project.id, folder.name, screen.name);
+      });
+
+      actions.appendChild(removeScreenBtn);
+
+      screenLi.appendChild(row);
+      screenLi.appendChild(meta);
+      screenLi.appendChild(actions);
+      screenLi.dataset.projectId = project.id;
+      screenLi.dataset.folderName = folder.name;
+      screenLi.dataset.screenName = screen.name;
+
+      screenLi.addEventListener('dragstart', (event) => {
+        draggedDisplayKey = createProjectKey(project.id, folder.name, screen.name);
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', draggedDisplayKey);
+      });
+
+      screenLi.addEventListener('dragend', () => {
+        draggedDisplayKey = '';
+        Array.from(displaysList.querySelectorAll('.folder-row, .display-item')).forEach((item) => item.classList.remove('drag-over'));
+      });
+
+      screenLi.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        if (!draggedDisplayKey) {
+          return;
+        }
+        screenLi.classList.add('drag-over');
+      });
+
+      screenLi.addEventListener('dragleave', () => {
+        screenLi.classList.remove('drag-over');
+      });
+
+      screenLi.addEventListener('drop', async (event) => {
+        event.preventDefault();
+        screenLi.classList.remove('drag-over');
+        if (!draggedDisplayKey) {
+          return;
+        }
+
+        const dragged = getProjectScreenByKey(draggedDisplayKey);
+        if (!dragged) {
+          return;
+        }
+
+        if (dragged.project.id === project.id && dragged.folder.name === folder.name && dragged.screen.name === screen.name) {
+          return;
+        }
+
+        moveProjectScreen(dragged.project.id, dragged.folder.name, dragged.screen.name, project.id, folder.name, screen.name);
+      });
+      screenLi.addEventListener('click', async () => {
+        try {
+          await openProjectScreen(project.id, folder.name, screen.name);
+        } catch (err) {
+          console.error(err);
+          alert(err.message || 'Could not open screen.');
+        }
+      });
+
+      children.appendChild(screenLi);
+    }
+
+    folderRow.addEventListener('click', () => {
+      folder.collapsed = !folder.collapsed;
+      saveProjectList();
+      renderProjectSidebar();
+    });
+
+    folderRow.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      if (!draggedDisplayKey) {
+        return;
+      }
+      folderRow.classList.add('drag-over');
+    });
+
+    folderRow.addEventListener('dragleave', () => {
+      folderRow.classList.remove('drag-over');
+    });
+
+    folderRow.addEventListener('drop', async (event) => {
+      event.preventDefault();
+      folderRow.classList.remove('drag-over');
+      if (!draggedDisplayKey) {
+        return;
+      }
+
+      const dragged = getProjectScreenByKey(draggedDisplayKey);
+      if (!dragged) {
+        return;
+      }
+
+      if (dragged.project.id === project.id && dragged.folder.name === folder.name) {
+        return;
+      }
+
+      moveProjectScreen(dragged.project.id, dragged.folder.name, dragged.screen.name, project.id, folder.name);
+    });
+
+    folderLi.appendChild(children);
+    appendTo.appendChild(folderLi);
+  };
+
+  for (const project of projectList) {
+    const { section, children } = appendProjectHeader(project);
+    for (const folder of project.folders) {
+      appendFolder(project, folder, children);
+    }
+    displaysList.appendChild(section);
+  }
+
+  if (sidebarTitle) {
+    sidebarTitle.textContent = 'Projects';
   }
 }
 
@@ -2072,7 +3033,6 @@ function renderPreview() {
   const canvas = document.createElement('div');
   canvas.className = 'xml-canvas';
   canvas.style.background = backColor;
-  fitCanvasToFrame(frame, canvas, width, height);
 
   const objectNodes = getObjectNodes(doc);
   const gfxRoot = doc.querySelector('gfx');
@@ -2623,43 +3583,56 @@ function readDownloadFileName(response, fallbackName) {
 }
 
 async function savePackageAs(downloadUrl) {
-  const response = await fetch(downloadUrl);
-  if (!response.ok) {
-    throw new Error('Failed to download ZIP package');
-  }
-
-  const zipBlob = await response.blob();
   const fallbackName = `display-package-${Date.now()}.zip`;
-  const fileName = readDownloadFileName(response, fallbackName);
+  const triggerDirectDownload = (suggestedName = fallbackName) => {
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = suggestedName;
+    a.rel = 'noopener';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return { mode: 'download', fileName: suggestedName };
+  };
 
   if (typeof window.showSaveFilePicker === 'function') {
-    const handle = await window.showSaveFilePicker({
-      suggestedName: fileName,
-      types: [
-        {
-          description: 'ZIP package',
-          accept: { 'application/zip': ['.zip'] }
-        }
-      ]
-    });
+    try {
+      const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        throw new Error('Failed to download ZIP package');
+      }
 
-    const writable = await handle.createWritable();
-    await writable.write(zipBlob);
-    await writable.close();
-    return { mode: 'save-as', fileName };
+      const zipBlob = await response.blob();
+      const fileName = readDownloadFileName(response, fallbackName);
+      const handle = await window.showSaveFilePicker({
+        suggestedName: fileName,
+        types: [
+          {
+            description: 'ZIP package',
+            accept: { 'application/zip': ['.zip'] }
+          }
+        ]
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(zipBlob);
+      await writable.close();
+      return { mode: 'save-as', fileName };
+    } catch (err) {
+      if (err && err.name === 'AbortError') {
+        throw err;
+      }
+
+      // Some browser/webview contexts block showSaveFilePicker after async work.
+      // Fall back to direct download instead of failing the package flow.
+      console.warn('Falling back to direct ZIP download:', err);
+      return triggerDirectDownload();
+    }
   }
 
-  // Fallback for browsers that do not support showSaveFilePicker.
-  const objectUrl = URL.createObjectURL(zipBlob);
-  const a = document.createElement('a');
-  a.href = objectUrl;
-  a.download = fileName;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(objectUrl);
-  return { mode: 'download', fileName };
+  // Fallback for browsers/webviews that do not support showSaveFilePicker.
+  return triggerDirectDownload();
 }
 
 function applyObjectChangesToXml() {
@@ -2746,67 +3719,106 @@ async function loadDefaultTemplate(name) {
   await refreshDefaultTemplates();
 }
 
-uploadInput.addEventListener('change', async () => {
-  const files = Array.from(uploadInput.files || [])
-    .filter((file) => file.name.toLowerCase().endsWith('.xml'));
+function setEditorProjectScreen(project, folderName, screen, xml) {
+  setActiveProjectScreen(project, folderName, screen.name);
+  selectedDisplay = screen.name;
+  selectedDefaultTemplate = '';
+  selectedFiles = [screen.name];
+  displayName.value = `${project.name} / ${folderName} / ${screen.name}`;
+  xmlEditor.value = xml;
+  resetHistory(xml);
+  selectedObjectIndex = null;
+  clearObjectPanel();
 
-  if (!files.length) {
-    alert('Choose one or more display XML files to upload.');
-    return;
+  const size = readSizeFromXml(xml);
+  if (size.width) screenWidth.value = size.width;
+  if (size.height) screenHeight.value = size.height;
+
+  renderPreview();
+}
+
+async function openProjectScreen(projectId, folderName, screenName) {
+  const project = getProjectById(projectId);
+  if (!project) {
+    throw new Error('Project not found');
   }
 
-  try {
-    const uploadedRows = [];
-    for (const file of files) {
-      const xml = await readUploadedText(file);
-      const row = validateDisplayXml(file.name, xml);
-      await saveDisplayXml(file.name, xml);
-      hiddenDisplayNames.delete(displayKey(file.name));
-      uploadedRows.push(row);
+  const screen = findProjectScreen(project, folderName, screenName);
+  if (!screen) {
+    throw new Error('Screen not found');
+  }
+
+  setEditorProjectScreen(project, folderName, screen, screen.xml);
+  renderProjectSidebar();
+}
+
+if (uploadInput) {
+  uploadInput.addEventListener('change', async () => {
+    const files = Array.from(uploadInput.files || [])
+      .filter((file) => file.name.toLowerCase().endsWith('.xml'));
+
+    if (!files.length) {
+      alert('Choose one or more display XML files to upload.');
+      return;
     }
 
-    usingUploadedList = true;
-    renderDisplays(uploadedRows.sort((a, b) => a.lastModified.localeCompare(b.lastModified)));
-    await loadDisplay(uploadedRows[0].name);
-  } catch (err) {
-    console.error(err);
-    alert(err.message || 'Could not upload the selected XML files.');
-  } finally {
-    uploadInput.value = '';
-  }
-});
+    try {
+      const uploadedRows = [];
+      for (const file of files) {
+        const xml = await readUploadedText(file);
+        const row = validateDisplayXml(file.name, xml);
+        await saveDisplayXml(file.name, xml);
+        hiddenDisplayNames.delete(displayKey(file.name));
+        uploadedRows.push(row);
+      }
 
-defaultUploadInput.addEventListener('change', async () => {
-  const files = Array.from(defaultUploadInput.files || [])
-    .filter((file) => file.name.toLowerCase().endsWith('.xml'));
-
-  if (!files.length) {
-    alert('Choose one or more default template XML files to upload.');
-    return;
-  }
-
-  try {
-    for (const file of files) {
-      const xml = await readUploadedText(file);
-      validateDisplayXml(file.name, xml);
-      await saveDefaultTemplateXml(file.name, xml);
+      usingUploadedList = true;
+      renderDisplays(uploadedRows.sort((a, b) => a.lastModified.localeCompare(b.lastModified)));
+      await loadDisplay(uploadedRows[0].name);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not upload the selected XML files.');
+    } finally {
+      uploadInput.value = '';
     }
-
-    await refreshDefaultTemplates();
-  } catch (err) {
-    console.error(err);
-    alert(err.message || 'Could not upload default template XML files.');
-  } finally {
-    defaultUploadInput.value = '';
-  }
-});
-
-addDisplayBtn.addEventListener('click', () => {
-  createDisplayFromTemplate().catch((err) => {
-    console.error(err);
-    alert(err.message || `Could not create a new page from ${TEMPLATE_DISPLAY_NAME}.`);
   });
-});
+}
+
+if (defaultUploadInput) {
+  defaultUploadInput.addEventListener('change', async () => {
+    const files = Array.from(defaultUploadInput.files || [])
+      .filter((file) => file.name.toLowerCase().endsWith('.xml'));
+
+    if (!files.length) {
+      alert('Choose one or more default template XML files to upload.');
+      return;
+    }
+
+    try {
+      for (const file of files) {
+        const xml = await readUploadedText(file);
+        validateDisplayXml(file.name, xml);
+        await saveDefaultTemplateXml(file.name, xml);
+      }
+
+      await refreshDefaultTemplates();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not upload default template XML files.');
+    } finally {
+      defaultUploadInput.value = '';
+    }
+  });
+}
+
+if (addDisplayBtn) {
+  addDisplayBtn.addEventListener('click', () => {
+    createDisplayFromTemplate().catch((err) => {
+      console.error(err);
+      alert(err.message || `Could not create a new page from ${TEMPLATE_DISPLAY_NAME}.`);
+    });
+  });
+}
 
 if (addFolderBtn) {
   addFolderBtn.addEventListener('click', async () => {
@@ -2904,33 +3916,37 @@ if (removeFolderBtn) {
   });
 }
 
-uploadDisplayBtn.addEventListener('click', () => {
-  if (isDefaultMode()) {
-    defaultUploadInput.click();
-    return;
-  }
-
-  uploadInput.click();
-});
-
-removeDisplayBtn.addEventListener('click', async () => {
-  const targetName = isDefaultMode() ? selectedDefaultTemplate : selectedDisplay;
-  if (!targetName) {
-    alert(isDefaultMode() ? 'Select a default template first.' : 'Select a display first.');
-    return;
-  }
-
-  try {
+if (uploadDisplayBtn) {
+  uploadDisplayBtn.addEventListener('click', () => {
     if (isDefaultMode()) {
-      await removeDefaultTemplateByName(targetName);
-    } else {
-      await removeDisplayByName(targetName);
+      defaultUploadInput.click();
+      return;
     }
-  } catch (err) {
-    console.error(err);
-    alert(err.message || 'Could not remove XML file');
-  }
-});
+
+    uploadInput.click();
+  });
+}
+
+if (removeDisplayBtn) {
+  removeDisplayBtn.addEventListener('click', async () => {
+    const targetName = isDefaultMode() ? selectedDefaultTemplate : selectedDisplay;
+    if (!targetName) {
+      alert(isDefaultMode() ? 'Select a default template first.' : 'Select a display first.');
+      return;
+    }
+
+    try {
+      if (isDefaultMode()) {
+        await removeDefaultTemplateByName(targetName);
+      } else {
+        await removeDisplayByName(targetName);
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not remove XML file');
+    }
+  });
+}
 
 previewBtn.addEventListener('click', renderPreview);
 if (addObjectBtn) {
@@ -2946,16 +3962,18 @@ if (toggleSidebarBtn) {
   });
 }
 
-refreshBtn.addEventListener('click', () => {
-  const refreshPromise = isDefaultMode()
-    ? refreshDefaultTemplates()
-    : (usingUploadedList = false, refreshDisplays());
+if (refreshBtn) {
+  refreshBtn.addEventListener('click', () => {
+    const refreshPromise = isDefaultMode()
+      ? refreshDefaultTemplates()
+      : (usingUploadedList = false, refreshDisplays());
 
-  refreshPromise.catch((err) => {
-    console.error(err);
-    alert(isDefaultMode() ? 'Could not refresh default templates' : 'Could not refresh display list');
+    refreshPromise.catch((err) => {
+      console.error(err);
+      alert(isDefaultMode() ? 'Could not refresh default templates' : 'Could not refresh display list');
+    });
   });
-});
+}
 
 if (showDisplaysBtn) {
   showDisplaysBtn.addEventListener('click', () => {
@@ -2968,6 +3986,73 @@ if (showDefaultsBtn) {
   showDefaultsBtn.addEventListener('click', () => {
     setSidebarMode(SIDEBAR_MODE_DEFAULTS);
     refreshDefaultTemplates().catch(() => {});
+  });
+}
+
+if (newProjectBtn) {
+  newProjectBtn.addEventListener('click', () => {
+    showProjectCreatePanel();
+  });
+}
+
+if (createProjectBtn) {
+  createProjectBtn.addEventListener('click', () => {
+    createNewProject(projectNameInput?.value || '').catch((err) => {
+      console.error(err);
+      alert(err.message || 'Could not create new project.');
+    });
+  });
+}
+
+if (cancelProjectBtn) {
+  cancelProjectBtn.addEventListener('click', () => {
+    hideProjectCreatePanel();
+  });
+}
+
+if (sidebarNameConfirmBtn) {
+  sidebarNameConfirmBtn.addEventListener('click', async () => {
+    if (!sidebarNameInput || !sidebarNameSubmit) {
+      hideSidebarNamePanel();
+      return;
+    }
+
+    const shouldClose = await sidebarNameSubmit(sidebarNameInput.value);
+    if (shouldClose !== false) {
+      hideSidebarNamePanel();
+    }
+  });
+}
+
+if (sidebarNameCancelBtn) {
+  sidebarNameCancelBtn.addEventListener('click', () => {
+    hideSidebarNamePanel();
+  });
+}
+
+if (sidebarNameInput) {
+  sidebarNameInput.addEventListener('keydown', async (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      sidebarNameConfirmBtn?.click();
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      hideSidebarNamePanel();
+    }
+  });
+}
+
+if (projectNameInput) {
+  projectNameInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      createProjectBtn?.click();
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      hideProjectCreatePanel();
+    }
   });
 }
 
@@ -3085,7 +4170,7 @@ if (buildAllPackageBtn) {
         return;
       }
 
-      await buildImportPackage(allFiles, 'all edited files');
+      await buildImportPackage(allFiles, 'all edited files', { packageMode: 'restore' });
     } catch (err) {
       console.error(err);
       alert('Could not save package ZIP. Please try again.');
@@ -3095,14 +4180,7 @@ if (buildAllPackageBtn) {
 
 socket.on('bridge-status', (status) => {
   setBridgeCard(status);
-  if (isDefaultMode()) {
-    refreshDefaultTemplates().catch(() => {});
-    return;
-  }
-
-  if (!usingUploadedList) {
-    refreshDisplays().catch(() => {});
-  }
+  renderProjectSidebar();
 });
 
 async function init() {
@@ -3113,19 +4191,23 @@ async function init() {
     screenHeight.value = DEFAULT_PREVIEW_HEIGHT;
   }
 
+  setProjectName(currentProjectName);
+  normalizeProjectList();
+
+  const restoredProject = getProjectById(activeProjectId) || projectList[0] || null;
+  if (restoredProject) {
+    setActiveProject(restoredProject);
+  } else {
+    setProjectName(currentProjectName);
+  }
+
   const sidebarCollapsed = localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1';
-  const savedMode = localStorage.getItem(SIDEBAR_MODE_STORAGE_KEY);
-  setSidebarMode(savedMode === SIDEBAR_MODE_DEFAULTS ? SIDEBAR_MODE_DEFAULTS : SIDEBAR_MODE_DISPLAYS);
   setSidebarCollapsed(sidebarCollapsed);
 
   const res = await fetch('/api/bridge/status');
   const status = await res.json();
   setBridgeCard(status);
-  if (isDefaultMode()) {
-    await refreshDefaultTemplates();
-  } else {
-    await refreshDisplays();
-  }
+  renderProjectSidebar();
   renderPreview();
 }
 

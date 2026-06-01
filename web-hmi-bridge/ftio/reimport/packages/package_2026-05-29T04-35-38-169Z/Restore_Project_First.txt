@@ -1,0 +1,12 @@
+FactoryTalk Restore Bundle
+
+1. Restore the base project archive: MyPlantHMI.apa
+2. Open the restored project in FactoryTalk View Studio.
+3. Go to the Edited_Display_Import folder inside this ZIP extraction.
+4. Run Batch Import using Edited_Display_Import\BatchImport.xml.
+5. If needed, delete existing target displays first using Edited_Display_Import\DeleteTargets.txt.
+
+Important:
+- The APA archive is the base project restore source.
+- The edited XML files are still imported as a second step after restore.
+- FactoryTalk ME batch import does not recreate display folders automatically.

@@ -1,0 +1,852 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gfx xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="Gfx-ME15.xsd">
+    <displaySettings displayType="onTop" cannotBeReplaced="false" positionX="187" positionY="105" securityCode="*" backColor="#EFEFEF" titleBar="false" maximumTagUpdateRate="0.05" focusHighlightColor="gray" disableFocusHighlight="false" size="specifySizeInPixels" width="653" height="486" displayNumber="0" disableInitialInputFocus="false" startupMacro="" shutdownMacro="" useGradientStyle="false" endColor="teal" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon1" height="25" width="101" left="532" top="44" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="silver" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <group name="Group18" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon24" height="29" width="612" left="22" top="3" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="silver" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="3" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromInside"/>
+        <text name="Text2" height="24" width="306" left="175" top="5" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="11" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#1}*/"/>
+    </group>
+    <rectangle name="Polygon6" height="25" width="357" left="178" top="44" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="silver" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon18" height="25" width="50" left="22" top="44" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="silver" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon19" height="25" width="113" left="70" top="44" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="silver" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <text name="Text14" height="19" width="69" left="88" top="48" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="9" bold="true" italic="false" underline="false" strikethrough="false" caption="IO NUMBER"/>
+    <text name="Text15" height="19" width="113" left="268" top="48" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="9" bold="true" italic="false" underline="false" strikethrough="false" caption="DESCRIPTION"/>
+    <text name="Text16" height="19" width="64" left="539" top="48" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="9" bold="true" italic="false" underline="false" strikethrough="false" caption="STATUS"/>
+    <text name="Text17" height="19" width="44" left="23" top="48" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="9" bold="true" italic="false" underline="false" strikethrough="false" caption="SR. NO."/>
+    <closeButton name="BTN_CloseFP" height="29" width="69" left="563" top="448" visible="true" wallpaper="false" isReferenceObject="false" audio="true" backColor="yellow" backStyle="solid" borderStyle="none" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="navy" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" closeValue="0" writeOnClose="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <caption fontFamily="Arial" fontSize="9" bold="false" italic="false" underline="false" strikethrough="false" caption="" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+        <imageSettings imageName="BTN_Close" alignment="middleCenter" backStyle="solid" color="black" backColor="white" scaled="true" blink="false"/>
+        <connections>
+            <connection name="Value" expression="{Clean_Screen_BTN}"/>
+        </connections>
+    </closeButton>
+    <group name="Group16" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon23" height="25" width="611" left="22" top="413" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon53" height="25" width="101" left="532" top="413" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon38" height="25" width="112" left="71" top="413" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <text name="Text25" height="20" width="37" left="28" top="415" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="16"/>
+        <multistateIndicator name="MultistateIndicator17" height="20" width="78" left="544" top="415" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.15}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text52" height="20" width="305" left="186" top="415" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#25}*/"/>
+        <text name="Text53" height="20" width="107" left="74" top="415" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.15}*/"/>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 16" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group15" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon22" height="25" width="611" left="22" top="390" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon52" height="25" width="101" left="532" top="390" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon37" height="25" width="112" left="71" top="390" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <text name="Text24" height="20" width="37" left="28" top="392" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="15"/>
+        <multistateIndicator name="MultistateIndicator16" height="20" width="78" left="544" top="392" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.14}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text50" height="20" width="305" left="186" top="392" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#24}*/"/>
+        <text name="Text51" height="20" width="107" left="74" top="392" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.14}*/"/>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 15" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group14" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon21" height="25" width="611" left="22" top="367" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon51" height="25" width="101" left="532" top="367" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon36" height="25" width="112" left="71" top="367" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <text name="Text23" height="20" width="36" left="28" top="369" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="14"/>
+        <multistateIndicator name="MultistateIndicator15" height="20" width="78" left="544" top="369" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.13}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text48" height="20" width="107" left="74" top="369" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.13}*/"/>
+        <text name="Text49" height="20" width="305" left="186" top="369" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#23}*/"/>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 14" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group13" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon20" height="25" width="611" left="22" top="344" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon50" height="25" width="101" left="532" top="344" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon35" height="25" width="112" left="71" top="344" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <text name="Text22" height="20" width="37" left="28" top="346" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="13"/>
+        <multistateIndicator name="MultistateIndicator14" height="20" width="78" left="544" top="346" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.12}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text46" height="20" width="107" left="74" top="346" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.12}*/"/>
+        <text name="Text47" height="20" width="305" left="186" top="346" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#22}*/"/>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 13" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group12" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon8" height="25" width="611" left="22" top="321" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon49" height="25" width="101" left="532" top="321" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon34" height="25" width="112" left="71" top="321" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <text name="Text21" height="20" width="37" left="28" top="323" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="12"/>
+        <multistateIndicator name="MultistateIndicator13" height="20" width="78" left="544" top="324" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.11}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text44" height="20" width="107" left="74" top="323" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.11}*/"/>
+        <text name="Text45" height="20" width="305" left="186" top="323" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#21}*/"/>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 12" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group11" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon7" height="25" width="611" left="22" top="298" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon48" height="25" width="101" left="532" top="298" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon33" height="25" width="112" left="71" top="298" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <text name="Text8" height="20" width="36" left="28" top="300" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="11"/>
+        <multistateIndicator name="MultistateIndicator12" height="20" width="78" left="544" top="300" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.10}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text42" height="20" width="107" left="74" top="300" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.10}*/"/>
+        <text name="Text43" height="20" width="305" left="186" top="300" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#20}*/"/>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 11" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group10" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon4" height="25" width="611" left="22" top="275" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon47" height="25" width="101" left="532" top="275" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon32" height="25" width="112" left="71" top="275" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <text name="Text7" height="20" width="37" left="28" top="277" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="10"/>
+        <multistateIndicator name="MultistateIndicator11" height="20" width="78" left="544" top="277" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.9}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text40" height="20" width="305" left="186" top="277" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#19}*/"/>
+        <text name="Text41" height="20" width="107" left="74" top="277" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.9}*/"/>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 10" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group9" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon2" height="25" width="611" left="22" top="252" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon46" height="25" width="101" left="532" top="252" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon31" height="25" width="112" left="71" top="252" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <text name="Text6" height="20" width="37" left="25" top="254" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="9"/>
+        <multistateIndicator name="MultistateIndicator10" height="20" width="78" left="544" top="254" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.8}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text38" height="20" width="305" left="186" top="254" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#18}*/"/>
+        <text name="Text39" height="20" width="107" left="74" top="254" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.8}*/"/>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 9" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group8" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon16" height="25" width="611" left="22" top="229" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon45" height="25" width="101" left="532" top="229" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon30" height="25" width="112" left="71" top="229" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <multistateIndicator name="MultistateIndicator24" height="20" width="78" left="544" top="231" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.Pt07Data}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text13" height="20" width="37" left="25" top="231" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="8"/>
+        <multistateIndicator name="MultistateIndicator8" height="20" width="78" left="544" top="231" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.7}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text36" height="20" width="305" left="186" top="231" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#17}*/"/>
+        <text name="Text37" height="20" width="107" left="74" top="231" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.7}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <text name="Text66" height="20" width="107" left="74" top="231" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.Pt07}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 8" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group7" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon15" height="25" width="611" left="22" top="206" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon44" height="25" width="101" left="532" top="206" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <multistateIndicator name="MultistateIndicator23" height="20" width="78" left="544" top="208" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.Pt06Data}"/>
+            </connections>
+        </multistateIndicator>
+        <rectangle name="Polygon29" height="25" width="112" left="71" top="206" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <text name="Text12" height="20" width="37" left="25" top="208" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="7"/>
+        <multistateIndicator name="MultistateIndicator7" height="20" width="78" left="544" top="208" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.6}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text34" height="20" width="107" left="74" top="208" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.6}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <text name="Text35" height="20" width="305" left="186" top="208" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#16}*/"/>
+        <text name="Text65" height="20" width="107" left="74" top="208" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.Pt06}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 7" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group6" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon14" height="25" width="611" left="22" top="183" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon43" height="25" width="101" left="532" top="183" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon28" height="25" width="112" left="71" top="183" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <multistateIndicator name="MultistateIndicator22" height="20" width="78" left="544" top="185" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.Pt05Data}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text11" height="20" width="36" left="25" top="185" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="6"/>
+        <multistateIndicator name="MultistateIndicator6" height="20" width="78" left="544" top="185" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.5}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text32" height="20" width="107" left="74" top="185" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.5}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <text name="Text33" height="20" width="305" left="186" top="185" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#15}*/"/>
+        <text name="Text64" height="20" width="107" left="74" top="185" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.Pt05}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 6" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group5" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon13" height="25" width="611" left="22" top="160" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon42" height="25" width="101" left="532" top="160" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon27" height="25" width="112" left="71" top="160" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <multistateIndicator name="MultistateIndicator21" height="20" width="78" left="544" top="162" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.Pt04Data}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text10" height="20" width="37" left="25" top="162" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="5"/>
+        <multistateIndicator name="MultistateIndicator5" height="20" width="78" left="544" top="162" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="#4 == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.4}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text30" height="20" width="107" left="74" top="162" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.4}*/">
+            <animations>
+                <animateVisibility expression="#4 == 0" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <text name="Text31" height="20" width="305" left="186" top="162" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#14}*/"/>
+        <text name="Text63" height="20" width="107" left="74" top="162" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.Pt04}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 5" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group4" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon12" height="25" width="611" left="22" top="137" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon41" height="25" width="101" left="532" top="137" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon26" height="25" width="112" left="71" top="137" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <multistateIndicator name="MultistateIndicator20" height="20" width="78" left="544" top="139" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.Pt03Data}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text9" height="20" width="37" left="25" top="139" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="4"/>
+        <multistateIndicator name="MultistateIndicator4" height="20" width="78" left="544" top="139" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.3}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text28" height="20" width="107" left="74" top="139" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.3}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <text name="Text29" height="20" width="305" left="186" top="139" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#13}*/"/>
+        <numericDisplay name="NumericDisplay1" height="20" width="78" left="544" top="139" visible="true" isReferenceObject="false" backColor="#A0A0A4" backStyle="solid" borderColor="#A0A0A4" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="6" fillLeftWith="none" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+            <animations>
+                <animateVisibility expression="{#4} == 1" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Value" expression="{#2.Ch3Data}"/>
+            </connections>
+        </numericDisplay>
+        <text name="Text57" height="20" width="107" left="74" top="139" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.CH3}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 1" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <text name="Text62" height="20" width="107" left="74" top="139" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.Pt03}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 4" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group3" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon11" height="25" width="611" left="22" top="114" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon40" height="25" width="101" left="532" top="114" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon25" height="25" width="112" left="71" top="114" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <multistateIndicator name="MultistateIndicator19" height="20" width="78" left="544" top="116" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.Pt02Data}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text20" height="20" width="36" left="25" top="116" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="3"/>
+        <multistateIndicator name="MultistateIndicator3" height="20" width="78" left="544" top="116" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.2}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text26" height="20" width="107" left="74" top="116" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.2}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <text name="Text27" height="20" width="305" left="186" top="116" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#12}*/"/>
+        <numericDisplay name="NumericDisplay4" height="20" width="78" left="544" top="116" visible="true" isReferenceObject="false" backColor="#A0A0A4" backStyle="solid" borderColor="#A0A0A4" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="6" fillLeftWith="none" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+            <animations>
+                <animateVisibility expression="{#4} == 1" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Value" expression="{#2.Ch2Data}"/>
+            </connections>
+        </numericDisplay>
+        <text name="Text56" height="20" width="107" left="74" top="116" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.CH2}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 1" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <text name="Text61" height="20" width="107" left="74" top="116" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.Pt02}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 3" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group2" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon10" height="25" width="611" left="22" top="91" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon39" height="25" width="101" left="532" top="91" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon17" height="25" width="112" left="71" top="91" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <multistateIndicator name="MultistateIndicator18" height="20" width="78" left="544" top="93" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.Pt01Data}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text19" height="20" width="37" left="25" top="95" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="2"/>
+        <multistateIndicator name="MultistateIndicator2" height="20" width="78" left="544" top="93" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.1}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text4" height="20" width="331" left="186" top="93" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#11}*/"/>
+        <text name="Text5" height="20" width="107" left="74" top="93" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.1}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <numericDisplay name="NumericDisplay3" height="20" width="78" left="544" top="93" visible="true" isReferenceObject="false" backColor="#A0A0A4" backStyle="solid" borderColor="#A0A0A4" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="6" fillLeftWith="none" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+            <animations>
+                <animateVisibility expression="{#4} == 1" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Value" expression="{#2.Ch1Data}"/>
+            </connections>
+        </numericDisplay>
+        <text name="Text55" height="20" width="107" left="74" top="93" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.CH1}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 1" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <text name="Text60" height="20" width="107" left="74" top="93" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.Pt01}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 2" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <group name="Group1" visible="true" wallpaper="false" isReferenceObject="false">
+        <rectangle name="Polygon9" height="25" width="611" left="22" top="68" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <rectangle name="Polygon5" height="25" width="101" left="532" top="68" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <multistateIndicator name="MultistateIndicator9" height="20" width="78" left="544" top="71" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.Pt00Data}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text18" height="20" width="37" left="25" top="72" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="false" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="1"/>
+        <multistateIndicator name="MultistateIndicator1" height="20" width="78" left="544" top="71" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="false" italic="false" underline="false" strikethrough="false" caption="?" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Indicator" expression="{#2.0}"/>
+            </connections>
+        </multistateIndicator>
+        <text name="Text3" height="20" width="331" left="186" top="70" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleLeft" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#10}*/"/>
+        <numericDisplay name="NumericDisplay2" height="20" width="78" left="544" top="71" visible="true" isReferenceObject="false" backColor="#A0A0A4" backStyle="solid" borderColor="#A0A0A4" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="6" fillLeftWith="none" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+            <animations>
+                <animateVisibility expression="{#4} == 1" expressionTrueState="visible"/>
+            </animations>
+            <connections>
+                <connection name="Value" expression="{#2.Ch0Data}"/>
+            </connections>
+        </numericDisplay>
+        <rectangle name="Polygon3" height="25" width="112" left="71" top="68" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#E8E8E8" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="black" endColor="white" gradientStop="1" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <text name="Text54" height="20" width="107" left="74" top="70" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.CH0}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 1" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <text name="Text58" height="20" width="107" left="74" top="70" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.Pt00}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 2" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <text name="Text1" height="19" width="107" left="74" top="70" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="false" alignment="middleCenter" fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="/*LS:0 {#3.0}*/">
+            <animations>
+                <animateVisibility expression="{#4} == 0" expressionTrueState="visible"/>
+            </animations>
+        </text>
+        <animations>
+            <animateVisibility expression="{#5} &gt;= 1" expressionTrueState="visible"/>
+        </animations>
+    </group>
+    <rectangle name="Polygon54" height="484" width="651" left="1" top="1" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="black" lineStyle="solid" lineWidth="1" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+</gfx>

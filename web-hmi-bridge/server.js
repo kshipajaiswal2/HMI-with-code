@@ -15,11 +15,35 @@ const ROOT = __dirname;
 const FTIO_DIR = path.join(ROOT, 'ftio');
 const FACTORYTALK_EXPORT_DIR = process.env.FT_EXPORT_DIR || path.join(ROOT, '..', 'Export import');
 const IMAGE_LIBRARY_DIR = process.env.FT_IMAGE_DIR || path.join(ROOT, '..', 'hmi', 'MyPlantHMI', 'Images');
+const FACTORYTALK_HMI_DIR = process.env.FT_HMI_DIR || path.join(ROOT, '..', 'hmi');
+const FACTORYTALK_PROJECT_ARCHIVE_PATH = process.env.FT_PROJECT_ARCHIVE || '';
 const REIMPORT_DIR = path.join(FTIO_DIR, 'reimport');
 const PACKAGE_DIR = path.join(REIMPORT_DIR, 'packages');
 const DEFAULT_PAGES_DIR = path.join(FTIO_DIR, 'default-pages');
 const DISPLAY_FOLDERS_PATH = path.join(FTIO_DIR, 'display-folders.json');
 const DELETED_DISPLAYS_PATH = path.join(FTIO_DIR, 'deleted-displays.json');
+
+function createZipArchive() {
+  const options = { zlib: { level: 9 } };
+
+  if (typeof archiver === 'function') {
+    return archiver('zip', options);
+  }
+
+  if (archiver && typeof archiver.default === 'function') {
+    return archiver.default('zip', options);
+  }
+
+  if (archiver && typeof archiver.create === 'function') {
+    return archiver.create('zip', options);
+  }
+
+  if (archiver && typeof archiver.ZipArchive === 'function') {
+    return new archiver.ZipArchive(options);
+  }
+
+  throw new Error('Unsupported archiver export format');
+}
 
 for (const dir of [FTIO_DIR, FACTORYTALK_EXPORT_DIR, REIMPORT_DIR, PACKAGE_DIR, DEFAULT_PAGES_DIR]) {
   if (!fs.existsSync(dir)) {
@@ -180,7 +204,7 @@ function writeDisplayFolderConfig(config) {
 function resolveFolderedImportPath(name, folderMap, assignments = {}) {
   const assigned = sanitizeFolderName(assignments[String(name || '').toLowerCase()] || '');
   if (assigned) {
-    return `${assigned}\\${name}`;
+    return `${assigned}/${name}`;
   }
 
   const number = parseDisplayNumber(name);
@@ -194,7 +218,7 @@ function resolveFolderedImportPath(name, folderMap, assignments = {}) {
     return name;
   }
 
-  return `${folderName}\\${name}`;
+  return `${folderName}/${name}`;
 }
 
 function readDeletedDisplays() {
@@ -277,9 +301,30 @@ function findImagePath(name) {
     return null;
   }
 
+  const normalizeImageKey = (value) => String(value || '')
+    .toLowerCase()
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^a-z0-9]+/g, '');
+
   const directoryFiles = fs.readdirSync(IMAGE_LIBRARY_DIR)
     .filter((file) => fs.statSync(path.join(IMAGE_LIBRARY_DIR, file)).isFile());
   const byLower = new Map(directoryFiles.map((file) => [file.toLowerCase(), file]));
+  const normalizedEntries = directoryFiles
+    .map((file) => ({
+      file,
+      key: normalizeImageKey(path.basename(file, path.extname(file)))
+    }))
+    .filter((entry) => entry.key);
+
+  function pickSingleNormalizedMatch(key) {
+    const matches = normalizedEntries.filter((entry) => entry.key === key);
+    return matches.length === 1 ? path.join(IMAGE_LIBRARY_DIR, matches[0].file) : null;
+  }
+
+  function pickSinglePredicateMatch(predicate) {
+    const matches = normalizedEntries.filter((entry) => predicate(entry.key));
+    return matches.length === 1 ? path.join(IMAGE_LIBRARY_DIR, matches[0].file) : null;
+  }
 
   const ext = path.extname(safeName);
   const candidates = ext
@@ -305,7 +350,12 @@ function findImagePath(name) {
   const safeBase = path.basename(safeName, path.extname(safeName));
   const aliases = new Map([
     ['manual2', 'manual1'],
-    ['machinesequence2', 'machinesequence1']
+    ['machinesequence2', 'machinesequence1'],
+    ['double arrow up', 'arrow up'],
+    ['double arrow down', 'arrow down'],
+    ['mute2_1-photoroom', 'mute1-photoroom'],
+    ['recipe2 - copy', 'recipe1 1'],
+    ['microsoftteams-image (12)', 'microsoftteams-image (11)']
   ]);
   const aliasBase = aliases.get(safeBase.toLowerCase());
   if (aliasBase) {
@@ -347,6 +397,35 @@ function findImagePath(name) {
       const matched = byLower.get(candidate.toLowerCase());
       if (matched) {
         return path.join(IMAGE_LIBRARY_DIR, matched);
+      }
+    }
+  }
+
+  // Final fallback for inconsistent names in exported XML (spaces, suffixes, numbering).
+  const normalizedBase = normalizeImageKey(safeBase);
+  if (normalizedBase) {
+    const exactNormalized = pickSingleNormalizedMatch(normalizedBase);
+    if (exactNormalized) {
+      return exactNormalized;
+    }
+
+    const noTrailingDigits = normalizedBase.replace(/\d+$/, '');
+    if (noTrailingDigits && noTrailingDigits !== normalizedBase) {
+      const exactNoDigits = pickSingleNormalizedMatch(noTrailingDigits);
+      if (exactNoDigits) {
+        return exactNoDigits;
+      }
+    }
+
+    const prefixMatch = pickSinglePredicateMatch((key) => key.startsWith(normalizedBase));
+    if (prefixMatch) {
+      return prefixMatch;
+    }
+
+    if (noTrailingDigits && noTrailingDigits !== normalizedBase) {
+      const noDigitsPrefixMatch = pickSinglePredicateMatch((key) => key.startsWith(noTrailingDigits));
+      if (noDigitsPrefixMatch) {
+        return noDigitsPrefixMatch;
       }
     }
   }
@@ -502,6 +581,153 @@ function getLatestPackageFolder() {
   return {
     folderName,
     folderPath: path.join(PACKAGE_DIR, folderName)
+  };
+}
+
+function toArchiveInfo(filePath) {
+  const ext = path.extname(String(filePath || '')).toLowerCase();
+  if (ext === '.apa') {
+    return {
+      archivePath: filePath,
+      archiveType: 'apa',
+      restoreMenuLabel: 'Restore Application'
+    };
+  }
+
+  if (ext === '.mer') {
+    return {
+      archivePath: filePath,
+      archiveType: 'mer',
+      restoreMenuLabel: 'Restore Runtime Application'
+    };
+  }
+
+  return null;
+}
+
+function findProjectArchiveInfo() {
+  const configured = String(FACTORYTALK_PROJECT_ARCHIVE_PATH || '').trim();
+  if (configured && fs.existsSync(configured)) {
+    const configuredInfo = toArchiveInfo(configured);
+    if (configuredInfo) {
+      return configuredInfo;
+    }
+  }
+
+  if (!fs.existsSync(FACTORYTALK_HMI_DIR)) {
+    return null;
+  }
+
+  const archiveFiles = fs.readdirSync(FACTORYTALK_HMI_DIR)
+    .filter((name) => /\.(apa|mer)$/i.test(name))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+  if (!archiveFiles.length) {
+    return null;
+  }
+
+  const preferredApa = archiveFiles.find((name) => /\.apa$/i.test(name));
+  const fallbackMer = archiveFiles.find((name) => /\.mer$/i.test(name));
+  const chosen = preferredApa || fallbackMer;
+  if (!chosen) {
+    return null;
+  }
+
+  return toArchiveInfo(path.join(FACTORYTALK_HMI_DIR, chosen));
+}
+
+function buildDisplayBatchFiles(targetDir, copied, notesIntroLines = []) {
+  const folderConfig = readDisplayFolderConfig();
+  const folderMap = buildFolderMap(copied);
+  const folderedImports = copied.map((name) => resolveFolderedImportPath(name, folderMap, folderConfig.assignments));
+  const hasFolderedPaths = folderedImports.some((entry) => entry.includes('/'));
+
+  // Copy files into foldered paths so FactoryTalk can resolve importFile="Folder/File.xml" entries.
+  for (let index = 0; index < copied.length; index += 1) {
+    const sourceName = copied[index];
+    const folderedRelPath = folderedImports[index];
+    if (!folderedRelPath || folderedRelPath === sourceName) {
+      continue;
+    }
+
+    const sourcePath = path.join(targetDir, sourceName);
+    const destinationPath = path.join(targetDir, ...folderedRelPath.split('/'));
+    fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
+    fs.copyFileSync(sourcePath, destinationPath);
+  }
+
+  const batchFolderedLines = ['<gfxImport>'];
+  for (const relPath of folderedImports) {
+    batchFolderedLines.push(`    <import importFile="${relPath}"/>`);
+  }
+  batchFolderedLines.push('</gfxImport>');
+  const batchXmlFoldered = `${batchFolderedLines.join('\r\n')}\r\n`;
+
+  const batchFlatLines = ['<gfxImport>'];
+  for (const name of copied) {
+    batchFlatLines.push(`    <import importFile="${name}"/>`);
+  }
+  batchFlatLines.push('</gfxImport>');
+  const batchXmlFlat = `${batchFlatLines.join('\r\n')}\r\n`;
+
+  const batchName = 'BatchImport.xml';
+  const batchFolderedName = 'BatchImport_Foldered.xml';
+  const batchFlatName = 'BatchImport_Flat.xml';
+  const batchPath = path.join(targetDir, batchName);
+  const batchFolderedPath = path.join(targetDir, batchFolderedName);
+  const batchFlatPath = path.join(targetDir, batchFlatName);
+
+  // Primary batch file uses foldered paths when available.
+  writeUtf16LeWithBom(batchPath, hasFolderedPaths ? batchXmlFoldered : batchXmlFlat);
+  writeUtf16LeWithBom(batchFolderedPath, batchXmlFoldered);
+  writeUtf16LeWithBom(batchFlatPath, batchXmlFlat);
+
+  const notesName = 'DisplaysImport_WebBridge.txt';
+  const notesCompatName = 'DisplaysImport.txt';
+  const deleteListName = 'DeleteTargets.txt';
+  const notesLines = [
+    ...notesIntroLines,
+    'FactoryTalk Web Bridge package generated successfully.',
+    '',
+    `Display files: ${copied.length}`,
+    ...copied,
+    '',
+    `Primary batch file: ${batchName}${hasFolderedPaths ? ' (foldered paths)' : ''}`,
+    `Explicit foldered batch: ${batchFolderedName}`,
+    `Alternate flat batch: ${batchFlatName}`,
+    '',
+    'Import steps (important):',
+    '1. Close all target displays before import.',
+    '2. In FactoryTalk Batch Import, choose BatchImport.xml from this extracted folder.',
+    '3. Set conflict handling to REPLACE/OVERWRITE existing displays (do not merge/update).',
+    '4. If REPLACE is not available in your dialog, delete the target displays first using DeleteTargets.txt, then import.',
+    '',
+    hasFolderedPaths
+      ? 'NOTE: This package includes foldered import paths. Use BatchImport.xml to recreate display grouping in FactoryTalk.'
+      : 'NOTE: No folder assignments were found, so imports are flat. Use BatchImport_Foldered.xml only if you edit folder paths manually.',
+    '',
+    'If you import in merge mode, messages like "element already exists and will be ignored" are expected.',
+    'This means the display already existed - delete it first, then reimport.'
+  ];
+  const notesText = `${notesLines.join('\r\n')}\r\n`;
+  fs.writeFileSync(path.join(targetDir, notesName), notesText, 'utf8');
+  fs.writeFileSync(path.join(targetDir, notesCompatName), notesText, 'utf8');
+
+  const displayNames = copied.map((name) => name.replace(/\.xml$/i, ''));
+  const deleteText = [
+    'Delete these displays first if FactoryTalk import is merging instead of replacing:',
+    ...displayNames.map((name) => `- ${name}`),
+    '',
+    'After deleting, run Batch Import with BatchImport.xml from this folder.'
+  ].join('\r\n') + '\r\n';
+  fs.writeFileSync(path.join(targetDir, deleteListName), deleteText, 'utf8');
+
+  return {
+    batchPath,
+    batchFolderedPath,
+    batchFlatPath,
+    notesPath: path.join(targetDir, notesName),
+    deleteListPath: path.join(targetDir, deleteListName)
   };
 }
 
@@ -728,6 +954,9 @@ app.delete('/api/default-pages/:name', (req, res) => {
 
 app.post('/api/displays/package', (req, res) => {
   const requested = Array.isArray(req.body?.files) ? req.body.files : [];
+  const packageMode = String(req.body?.packageMode || 'xml').toLowerCase() === 'restore'
+    ? 'restore'
+    : 'xml';
   if (!requested.length) {
     return res.status(400).json({ error: 'No files selected for package' });
   }
@@ -745,24 +974,19 @@ app.post('/api/displays/package', (req, res) => {
   const packagePath = path.join(PACKAGE_DIR, `package_${stamp}`);
   fs.mkdirSync(packagePath, { recursive: true });
 
+  const importPackageDir = packageMode === 'restore'
+    ? path.join(packagePath, 'Edited_Display_Import')
+    : packagePath;
+  fs.mkdirSync(importPackageDir, { recursive: true });
+
   const copied = [];
-  const folderMap = buildFolderMap(uniqueSelected);
-  const folderConfig = readDisplayFolderConfig();
-  const folderedEntries = [];
   for (const name of uniqueSelected) {
     const resolved = resolveDisplayPath(name);
     if (!resolved) {
       continue;
     }
 
-    fs.copyFileSync(resolved.filePath, path.join(packagePath, name));
-    const folderedPath = resolveFolderedImportPath(name, folderMap, folderConfig.assignments);
-    folderedEntries.push(folderedPath);
-    if (folderedPath.includes('\\')) {
-      const destinationPath = path.join(packagePath, ...folderedPath.split('\\'));
-      fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
-      fs.copyFileSync(resolved.filePath, destinationPath);
-    }
+    fs.copyFileSync(resolved.filePath, path.join(importPackageDir, name));
     copied.push(name);
   }
 
@@ -770,76 +994,65 @@ app.post('/api/displays/package', (req, res) => {
     return res.status(400).json({ error: 'No valid files found to package' });
   }
 
-  const batchLines = ['<gfxImport>'];
-  for (const name of copied) {
-    batchLines.push(`    <import importFile="${name}"/>`);
+  const packageFiles = buildDisplayBatchFiles(
+    importPackageDir,
+    copied,
+    packageMode === 'restore'
+      ? [
+          'This restore bundle contains a base FactoryTalk archive (.apa/.mer) plus the edited XML import package.',
+          'Restore the included archive first, then import the edited displays from the Edited_Display_Import folder.',
+          ''
+        ]
+      : []
+  );
+
+  let packageType = 'xml-batch';
+  let archivePath = null;
+  let archiveType = null;
+  let restoreMenuLabel = null;
+  if (packageMode === 'restore') {
+    const archiveInfo = findProjectArchiveInfo();
+    if (!archiveInfo) {
+      return res.status(500).json({ error: 'FactoryTalk archive (.apa or .mer) was not found for restore bundle packaging' });
+    }
+
+    archivePath = archiveInfo.archivePath;
+    archiveType = archiveInfo.archiveType;
+    restoreMenuLabel = archiveInfo.restoreMenuLabel;
+
+    const archiveName = path.basename(archivePath);
+    fs.copyFileSync(archivePath, path.join(packagePath, archiveName));
+    const restoreGuide = [
+      'FactoryTalk Restore Bundle',
+      '',
+      `1. Restore the base project archive: ${archiveName}`,
+      `   Use Application Manager -> ${restoreMenuLabel}.`,
+      '2. Open the restored project in FactoryTalk View Studio.',
+      '3. Go to the Edited_Display_Import folder inside this ZIP extraction.',
+      '4. Run Batch Import using Edited_Display_Import\\BatchImport.xml.',
+      '5. If needed, delete existing target displays first using Edited_Display_Import\\DeleteTargets.txt.',
+      '',
+      'Important:',
+      '- The included archive is the base project restore source.',
+      '- The edited XML files are still imported as a second step after restore.',
+      '- If the archive is .mer, runtime restore/editability depends on how that MER was created and your FactoryTalk version.',
+      '- FactoryTalk ME batch import does not recreate display folders automatically.'
+    ].join('\r\n') + '\r\n';
+    fs.writeFileSync(path.join(packagePath, 'Restore_Project_First.txt'), restoreGuide, 'utf8');
+    packageType = 'restore-bundle';
   }
-  batchLines.push('</gfxImport>');
-  const batchXmlFlat = `${batchLines.join('\r\n')}\r\n`;
-
-  const batchFolderedLines = ['<gfxImport>'];
-  for (const entry of folderedEntries) {
-    batchFolderedLines.push(`    <import importFile="${entry}"/>`);
-  }
-  batchFolderedLines.push('</gfxImport>');
-  const batchXmlFoldered = `${batchFolderedLines.join('\r\n')}\r\n`;
-
-  const batchName = 'BatchImport_WebBridge.xml';
-  const batchCompatName = 'BatchImport.xml';
-  const batchFlatName = 'BatchImport_Flat.xml';
-  const batchPath = path.join(packagePath, batchName);
-  const batchCompatPath = path.join(packagePath, batchCompatName);
-  const batchFlatPath = path.join(packagePath, batchFlatName);
-  writeUtf16LeWithBom(batchPath, batchXmlFoldered);
-  writeUtf16LeWithBom(batchCompatPath, batchXmlFoldered);
-  writeUtf16LeWithBom(batchFlatPath, batchXmlFlat);
-
-  const notesName = 'DisplaysImport_WebBridge.txt';
-  const notesCompatName = 'DisplaysImport.txt';
-  const deleteListName = 'DeleteTargets.txt';
-  const notesLines = [
-    'FactoryTalk Web Bridge package generated successfully.',
-    '',
-    `Display files: ${copied.length}`,
-    ...copied,
-    '',
-    `Batch file: ${batchName}`,
-    `Flat fallback: ${batchFlatName}`,
-    '',
-    'Import steps (important):',
-    '1. Close all target displays before import.',
-    '2. In FactoryTalk Batch Import, choose BatchImport.xml from this extracted folder.',
-    '   This batch uses folder-style paths to preserve display grouping.',
-    `   If your FactoryTalk version does not accept folder paths, use ${batchFlatName}.`,
-    '3. Set conflict handling to REPLACE/OVERWRITE existing displays (do not merge/update).',
-    '4. If REPLACE is not available in your dialog, delete the target displays first, then import.',
-    '5. If status says "element does not exist in the Display and cannot be updated", your import is in update/merge mode.',
-    '   Switch to REPLACE, or delete targets first using DeleteTargets.txt, then re-import.',
-    '',
-    'If you import in merge mode, messages like "element already exists and will be ignored" are expected.'
-  ];
-  const notesText = `${notesLines.join('\r\n')}\r\n`;
-  const notesPath = path.join(packagePath, notesName);
-  const notesCompatPath = path.join(packagePath, notesCompatName);
-  fs.writeFileSync(notesPath, notesText, 'utf8');
-  fs.writeFileSync(notesCompatPath, notesText, 'utf8');
-
-  const displayNames = copied.map((name) => name.replace(/\.xml$/i, ''));
-  const deleteText = [
-    'Delete these displays first if FactoryTalk import is merging instead of replacing:',
-    ...displayNames.map((name) => `- ${name}`),
-    '',
-    'After deleting, run Batch Import with BatchImport.xml from this folder.'
-  ].join('\r\n') + '\r\n';
-  fs.writeFileSync(path.join(packagePath, deleteListName), deleteText, 'utf8');
 
   return res.json({
     ok: true,
     packagePath,
     files: copied,
-    batchFile: batchPath,
-    batchFileCompat: batchCompatPath,
-    batchFileFlat: batchFlatPath,
+    batchFile: packageFiles.batchPath,
+    batchFileFoldered: packageFiles.batchFolderedPath,
+    batchFileFlat: packageFiles.batchFlatPath,
+    archivePath,
+    archiveType,
+    restoreMenuLabel,
+    packageType,
     downloadUrl: '/api/packages/download/latest.zip'
   });
 });
@@ -854,7 +1067,13 @@ app.get('/api/packages/download/latest.zip', (_req, res) => {
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
 
-  const archive = archiver('zip', { zlib: { level: 9 } });
+  let archive;
+  try {
+    archive = createZipArchive();
+  } catch (err) {
+    return res.status(500).json({ error: `Failed to initialize zip archiver: ${err.message}` });
+  }
+
   archive.on('error', (err) => {
     if (!res.headersSent) {
       res.status(500).json({ error: `Failed to build zip: ${err.message}` });

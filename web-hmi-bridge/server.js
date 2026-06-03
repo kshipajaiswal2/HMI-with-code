@@ -108,6 +108,91 @@ function isDisplayXml(name) {
   return name.toLowerCase().endsWith('.xml') && !name.toLowerCase().startsWith('batchimport_');
 }
 
+function sanitizeXmlForFactoryTalk(xml) {
+  const source = String(xml || '');
+  if (!source) {
+    return source;
+  }
+
+  let sanitized = source
+    .replace(/\s+popupGroupId="[^"]*"/gi, '')
+    .replace(/\s+popupGroupId='[^']*'/gi, '');
+
+  const stripConnectionGeometry = /(<\s*connections?\b[^>]*?)\s+(left|top|width|height)=("[^"]*"|'[^']*')/gi;
+  let previous = null;
+  while (sanitized !== previous) {
+    previous = sanitized;
+    sanitized = sanitized.replace(stripConnectionGeometry, '$1');
+  }
+
+  const normalizePopupGroupBlock = (block) => {
+    const openTagMatch = block.match(/^<group\b[^>]*>/i);
+    const closeTag = '</group>';
+    if (!openTagMatch || !block.endsWith(closeTag)) {
+      return block;
+    }
+
+    let openTag = openTagMatch[0];
+    let inner = block.slice(openTag.length, block.length - closeTag.length);
+    const widthMatch = openTag.match(/\bwidth="(-?\d+)"/i);
+    const heightMatch = openTag.match(/\bheight="(-?\d+)"/i);
+    const groupWidth = Number(widthMatch?.[1] || 1);
+    const groupHeight = Number(heightMatch?.[1] || 1);
+
+    const childPoints = [];
+    const pointPattern = /\bleft="(-?\d+)"[^>]*\btop="(-?\d+)"|\btop="(-?\d+)"[^>]*\bleft="(-?\d+)"/gi;
+    let pointMatch = pointPattern.exec(inner);
+    while (pointMatch) {
+      const left = Number(pointMatch[1] || pointMatch[4]);
+      const top = Number(pointMatch[2] || pointMatch[3]);
+      if (Number.isFinite(left) && Number.isFinite(top)) {
+        childPoints.push({ left, top });
+      }
+      pointMatch = pointPattern.exec(inner);
+    }
+
+    if (!childPoints.length) {
+      return block;
+    }
+
+    const minLeft = Math.min(...childPoints.map((entry) => entry.left));
+    const minTop = Math.min(...childPoints.map((entry) => entry.top));
+    const appearsAbsolute = minLeft > Math.max(1, groupWidth) || minTop > Math.max(1, groupHeight);
+    if (!appearsAbsolute) {
+      return block;
+    }
+
+    inner = inner
+      .replace(/\bleft="(-?\d+)"/gi, (_m, value) => `left="${Math.round(Number(value) - minLeft)}"`)
+      .replace(/\btop="(-?\d+)"/gi, (_m, value) => `top="${Math.round(Number(value) - minTop)}"`);
+
+    if (/\bleft="-?\d+"/i.test(openTag)) {
+      openTag = openTag.replace(/\bleft="-?\d+"/i, `left="${Math.round(minLeft)}"`);
+    } else {
+      openTag = openTag.replace(/<group\b/i, `<group left="${Math.round(minLeft)}"`);
+    }
+
+    if (/\btop="-?\d+"/i.test(openTag)) {
+      openTag = openTag.replace(/\btop="-?\d+"/i, `top="${Math.round(minTop)}"`);
+    } else {
+      openTag = openTag.replace(/<group\b/i, `<group top="${Math.round(minTop)}"`);
+    }
+
+    return `${openTag}${inner}${closeTag}`;
+  };
+
+  sanitized = sanitized.replace(
+    /<group\b[^>]*name="[^"]*popup[^"]*"[^>]*>[\s\S]*?<\/group>/gi,
+    (block) => normalizePopupGroupBlock(block)
+  );
+
+  sanitized = sanitized
+    .replace(/(<\s*numericInputCursorPoint\b[^>]*?)\s+caption=("[^"]*"|'[^']*')/gi, '$1')
+    .replace(/<\s*numericInputCursorPoint\b([^>]*)>([\s\S]*?)<\s*caption\b[^>]*\/?>(?:<\s*\/\s*caption\s*>)?/gi, '<numericInputCursorPoint$1>$2');
+
+  return sanitized;
+}
+
 function parseDisplayNumber(name) {
   const base = path.basename(String(name || ''), path.extname(String(name || '')));
   const match = base.match(/^(\d{3})/);
@@ -219,6 +304,24 @@ function resolveFolderedImportPath(name, folderMap, assignments = {}) {
   }
 
   return `${folderName}/${name}`;
+}
+
+function resolveDisplayGroupName(name, folderMap, assignments = {}) {
+  const assigned = sanitizeFolderName(assignments[String(name || '').toLowerCase()] || '');
+  if (assigned) {
+    return assigned;
+  }
+
+  const number = parseDisplayNumber(name);
+  if (Number.isFinite(number)) {
+    const bucket = Math.floor(number / 100) * 100;
+    const folderName = folderMap.get(bucket);
+    if (folderName) {
+      return folderName;
+    }
+  }
+
+  return path.basename(String(name || ''), path.extname(String(name || '')));
 }
 
 function readDeletedDisplays() {
@@ -637,50 +740,20 @@ function findProjectArchiveInfo() {
 }
 
 function buildDisplayBatchFiles(targetDir, copied, notesIntroLines = []) {
-  const folderConfig = readDisplayFolderConfig();
+  const { assignments } = readDisplayFolderConfig();
   const folderMap = buildFolderMap(copied);
-  const folderedImports = copied.map((name) => resolveFolderedImportPath(name, folderMap, folderConfig.assignments));
-  const hasFolderedPaths = folderedImports.some((entry) => entry.includes('/'));
-
-  // Copy files into foldered paths so FactoryTalk can resolve importFile="Folder/File.xml" entries.
-  for (let index = 0; index < copied.length; index += 1) {
-    const sourceName = copied[index];
-    const folderedRelPath = folderedImports[index];
-    if (!folderedRelPath || folderedRelPath === sourceName) {
-      continue;
-    }
-
-    const sourcePath = path.join(targetDir, sourceName);
-    const destinationPath = path.join(targetDir, ...folderedRelPath.split('/'));
-    fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
-    fs.copyFileSync(sourcePath, destinationPath);
-  }
-
-  const batchFolderedLines = ['<gfxImport>'];
-  for (const relPath of folderedImports) {
-    batchFolderedLines.push(`    <import importFile="${relPath}"/>`);
-  }
-  batchFolderedLines.push('</gfxImport>');
-  const batchXmlFoldered = `${batchFolderedLines.join('\r\n')}\r\n`;
-
   const batchFlatLines = ['<gfxImport>'];
   for (const name of copied) {
-    batchFlatLines.push(`    <import importFile="${name}"/>`);
+    const displayGroup = resolveDisplayGroupName(name, folderMap, assignments);
+    batchFlatLines.push(`    <import importFile="${name}" displayGroup="${displayGroup}"/>`);
   }
   batchFlatLines.push('</gfxImport>');
   const batchXmlFlat = `${batchFlatLines.join('\r\n')}\r\n`;
 
   const batchName = 'BatchImport.xml';
-  const batchFolderedName = 'BatchImport_Foldered.xml';
-  const batchFlatName = 'BatchImport_Flat.xml';
   const batchPath = path.join(targetDir, batchName);
-  const batchFolderedPath = path.join(targetDir, batchFolderedName);
-  const batchFlatPath = path.join(targetDir, batchFlatName);
 
-  // Primary batch file uses foldered paths when available.
-  writeUtf16LeWithBom(batchPath, hasFolderedPaths ? batchXmlFoldered : batchXmlFlat);
-  writeUtf16LeWithBom(batchFolderedPath, batchXmlFoldered);
-  writeUtf16LeWithBom(batchFlatPath, batchXmlFlat);
+  writeUtf16LeWithBom(batchPath, batchXmlFlat);
 
   const notesName = 'DisplaysImport_WebBridge.txt';
   const notesCompatName = 'DisplaysImport.txt';
@@ -692,19 +765,14 @@ function buildDisplayBatchFiles(targetDir, copied, notesIntroLines = []) {
     `Display files: ${copied.length}`,
     ...copied,
     '',
-    `Primary batch file: ${batchName}${hasFolderedPaths ? ' (foldered paths)' : ''}`,
-    `Explicit foldered batch: ${batchFolderedName}`,
-    `Alternate flat batch: ${batchFlatName}`,
+    `Batch file: ${batchName}`,
     '',
     'Import steps (important):',
     '1. Close all target displays before import.',
     '2. In FactoryTalk Batch Import, choose BatchImport.xml from this extracted folder.',
     '3. Set conflict handling to REPLACE/OVERWRITE existing displays (do not merge/update).',
     '4. If REPLACE is not available in your dialog, delete the target displays first using DeleteTargets.txt, then import.',
-    '',
-    hasFolderedPaths
-      ? 'NOTE: This package includes foldered import paths. Use BatchImport.xml to recreate display grouping in FactoryTalk.'
-      : 'NOTE: No folder assignments were found, so imports are flat. Use BatchImport_Foldered.xml only if you edit folder paths manually.',
+    '5. If status says "display does not exist", your import is in update mode; switch to replace/create mode or create that display once and retry.',
     '',
     'If you import in merge mode, messages like "element already exists and will be ignored" are expected.',
     'This means the display already existed - delete it first, then reimport.'
@@ -724,8 +792,8 @@ function buildDisplayBatchFiles(targetDir, copied, notesIntroLines = []) {
 
   return {
     batchPath,
-    batchFolderedPath,
-    batchFlatPath,
+    batchFolderedPath: null,
+    batchFlatPath: batchPath,
     notesPath: path.join(targetDir, notesName),
     deleteListPath: path.join(targetDir, deleteListName)
   };
@@ -805,7 +873,7 @@ app.post('/api/displays/:name/save', (req, res) => {
     return res.status(400).json({ error: 'Only display XML files are supported' });
   }
 
-  const xml = String(req.body?.xml || '');
+  const xml = sanitizeXmlForFactoryTalk(String(req.body?.xml || ''));
   if (!xml.trim()) {
     return res.status(400).json({ error: 'xml content is required' });
   }
@@ -920,7 +988,7 @@ app.post('/api/default-pages/:name/save', (req, res) => {
     return res.status(400).json({ error: 'Only XML files are supported' });
   }
 
-  const xml = String(req.body?.xml || '');
+  const xml = sanitizeXmlForFactoryTalk(String(req.body?.xml || ''));
   if (!xml.trim()) {
     return res.status(400).json({ error: 'xml content is required' });
   }
@@ -954,9 +1022,7 @@ app.delete('/api/default-pages/:name', (req, res) => {
 
 app.post('/api/displays/package', (req, res) => {
   const requested = Array.isArray(req.body?.files) ? req.body.files : [];
-  const packageMode = String(req.body?.packageMode || 'xml').toLowerCase() === 'restore'
-    ? 'restore'
-    : 'xml';
+  const packageMode = 'xml';
   if (!requested.length) {
     return res.status(400).json({ error: 'No files selected for package' });
   }
@@ -974,9 +1040,7 @@ app.post('/api/displays/package', (req, res) => {
   const packagePath = path.join(PACKAGE_DIR, `package_${stamp}`);
   fs.mkdirSync(packagePath, { recursive: true });
 
-  const importPackageDir = packageMode === 'restore'
-    ? path.join(packagePath, 'Edited_Display_Import')
-    : packagePath;
+  const importPackageDir = packagePath;
   fs.mkdirSync(importPackageDir, { recursive: true });
 
   const copied = [];
@@ -986,7 +1050,9 @@ app.post('/api/displays/package', (req, res) => {
       continue;
     }
 
-    fs.copyFileSync(resolved.filePath, path.join(importPackageDir, name));
+    const sourceXml = readTextAuto(resolved.filePath);
+    const safeXml = sanitizeXmlForFactoryTalk(sourceXml);
+    fs.writeFileSync(path.join(importPackageDir, name), safeXml, 'utf8');
     copied.push(name);
   }
 
@@ -997,50 +1063,13 @@ app.post('/api/displays/package', (req, res) => {
   const packageFiles = buildDisplayBatchFiles(
     importPackageDir,
     copied,
-    packageMode === 'restore'
-      ? [
-          'This restore bundle contains a base FactoryTalk archive (.apa/.mer) plus the edited XML import package.',
-          'Restore the included archive first, then import the edited displays from the Edited_Display_Import folder.',
-          ''
-        ]
-      : []
+    []
   );
 
   let packageType = 'xml-batch';
   let archivePath = null;
   let archiveType = null;
   let restoreMenuLabel = null;
-  if (packageMode === 'restore') {
-    const archiveInfo = findProjectArchiveInfo();
-    if (!archiveInfo) {
-      return res.status(500).json({ error: 'FactoryTalk archive (.apa or .mer) was not found for restore bundle packaging' });
-    }
-
-    archivePath = archiveInfo.archivePath;
-    archiveType = archiveInfo.archiveType;
-    restoreMenuLabel = archiveInfo.restoreMenuLabel;
-
-    const archiveName = path.basename(archivePath);
-    fs.copyFileSync(archivePath, path.join(packagePath, archiveName));
-    const restoreGuide = [
-      'FactoryTalk Restore Bundle',
-      '',
-      `1. Restore the base project archive: ${archiveName}`,
-      `   Use Application Manager -> ${restoreMenuLabel}.`,
-      '2. Open the restored project in FactoryTalk View Studio.',
-      '3. Go to the Edited_Display_Import folder inside this ZIP extraction.',
-      '4. Run Batch Import using Edited_Display_Import\\BatchImport.xml.',
-      '5. If needed, delete existing target displays first using Edited_Display_Import\\DeleteTargets.txt.',
-      '',
-      'Important:',
-      '- The included archive is the base project restore source.',
-      '- The edited XML files are still imported as a second step after restore.',
-      '- If the archive is .mer, runtime restore/editability depends on how that MER was created and your FactoryTalk version.',
-      '- FactoryTalk ME batch import does not recreate display folders automatically.'
-    ].join('\r\n') + '\r\n';
-    fs.writeFileSync(path.join(packagePath, 'Restore_Project_First.txt'), restoreGuide, 'utf8');
-    packageType = 'restore-bundle';
-  }
 
   return res.json({
     ok: true,

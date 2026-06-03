@@ -117,6 +117,7 @@ const SIDEBAR_MODE_DISPLAYS = 'displays';
 const SIDEBAR_MODE_DEFAULTS = 'defaults';
 const UNGROUPED_FOLDER_NAME = 'Ungrouped';
 const HISTORY_LIMIT = 120;
+const POPUP_GROUP_PREFIX = 'WB_POPUP';
 let sidebarMode = SIDEBAR_MODE_DISPLAYS;
 let currentProjectName = normalizeProjectName(localStorage.getItem(PROJECT_NAME_STORAGE_KEY) || 'Untitled Project');
 let projectList = loadProjectList();
@@ -960,6 +961,25 @@ function updateSidebarScreenFormattedName() {
 }
 
 function updatePackageSelection(files = currentDisplayRows) {
+  if (activeProjectKey) {
+    const record = getProjectScreenByKey(activeProjectKey);
+    const projectScreenName = String(record?.screen?.name || '');
+    if (projectScreenName) {
+      const sourceFiles = Array.isArray(files) ? files : [];
+      const base = baseFileName(projectScreenName).toLowerCase();
+      const relatedGlobals = sourceFiles
+        .filter((file) => isEditableSource(file) && isGlobalObjectFile(file))
+        .filter((file) => {
+          const fileBase = baseFileName(file.name).toLowerCase();
+          return fileBase === `${base}_addons` || fileBase.startsWith(`${base}_addons_`);
+        })
+        .map((file) => file.name);
+
+      selectedFiles = [...new Set([projectScreenName, ...relatedGlobals])];
+      return;
+    }
+  }
+
   if (!Array.isArray(files) || !files.length) {
     selectedFiles = [];
     return;
@@ -998,9 +1018,14 @@ async function autoSaveCurrentDisplay() {
     return true;
   }
 
+  const sanitizedXml = sanitizeXmlForFactoryTalk(xmlEditor.value);
+  if (sanitizedXml !== xmlEditor.value) {
+    xmlEditor.value = sanitizedXml;
+  }
+
   try {
-    await saveDisplayXml(selectedDisplay, xmlEditor.value);
-    updateCurrentDisplayRow(selectedDisplay, xmlEditor.value);
+    await saveDisplayXml(selectedDisplay, sanitizedXml);
+    updateCurrentDisplayRow(selectedDisplay, sanitizedXml);
     return true;
   } catch (_err) {
     alert('Could not auto-save the current display. Please try again.');
@@ -1008,14 +1033,11 @@ async function autoSaveCurrentDisplay() {
   }
 }
 
-async function buildImportPackage(files, packageLabel, options = {}) {
-  const packageMode = String(options.packageMode || 'xml').toLowerCase() === 'restore'
-    ? 'restore'
-    : 'xml';
+async function buildImportPackage(files, packageLabel) {
   const res = await fetch('/api/displays/package', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ files, packageMode })
+    body: JSON.stringify({ files, packageMode: 'xml' })
   });
 
   const data = await res.json();
@@ -1027,36 +1049,17 @@ async function buildImportPackage(files, packageLabel, options = {}) {
   packageResult.innerHTML = '';
   const warn = document.createElement('div');
   warn.className = 'import-checklist';
-  if (data.packageType === 'restore-bundle') {
-    const archiveExt = String(data.archiveType || '').toLowerCase();
-    const restoreMenu = archiveExt === 'mer' ? 'Restore Runtime Application' : 'Restore Application';
-    const archiveLabel = archiveExt === 'mer' ? '.mer' : '.apa';
-    warn.innerHTML =
-      `<strong>Before importing in FactoryTalk (${packageLabel}):</strong>` +
-      '<ol>' +
-      '<li>Extract the downloaded ZIP to a local folder.</li>' +
-      `<li><b>Restore the included <code>${archiveLabel}</code> archive first</b> in FactoryTalk View Studio using <code>${restoreMenu}</code>.</li>` +
-      '<li>Open the restored project.</li>' +
-      '<li>Go into the extracted <code>Edited_Display_Import</code> folder.</li>' +
-      '<li>Run <em>Batch Import</em> and select <code>Edited_Display_Import/BatchImport.xml</code>.</li>' +
-      '<li><b>Set conflict handling to REPLACE/OVERWRITE existing displays</b> (do not merge/update).</li>' +
-      '<li>If REPLACE is not available, use <code>Edited_Display_Import/DeleteTargets.txt</code> first, then import.</li>' +
-      '<li>If the archive is <code>.mer</code>, restore/editability depends on how that MER was built and your FT version.</li>' +
-      '</ol>' +
-      `<small>Restore bundle files packaged: ${data.files.join(', ')}</small>`;
-  } else {
-    warn.innerHTML =
-      `<strong>Before importing in FactoryTalk (${packageLabel}):</strong>` +
-      '<ol>' +
-      '<li><b>Close every display you are about to import</b> (e.g. close MAIN, Testscreen, etc.)</li>' +
-      '<li>Extract the downloaded ZIP to a local folder.</li>' +
-      '<li>In FactoryTalk, use <em>Batch Import</em> and select <code>BatchImport.xml</code>.</li>' +
-      '<li><b>Set conflict handling to REPLACE/OVERWRITE existing displays</b> (do not merge/update).</li>' +
-      '<li>If you see: <code>element does not exist in the Display and cannot be updated</code>, your import is in update/merge mode. Switch to REPLACE, or delete targets first (see <code>DeleteTargets.txt</code>) and then import.</li>' +
-      '<li>Do <b>NOT</b> select the ZIP, the display XML, or any .txt file.</li>' +
-      '</ol>' +
-      `<small>Files packaged: ${data.files.join(', ')}</small>`;
-  }
+  warn.innerHTML =
+    `<strong>Before importing in FactoryTalk (${packageLabel}):</strong>` +
+    '<ol>' +
+    '<li><b>Close every display you are about to import</b> (e.g. close MAIN, Testscreen, etc.)</li>' +
+    '<li>Extract the downloaded ZIP to a local folder.</li>' +
+    '<li>In FactoryTalk, use <em>Batch Import</em> and select <code>BatchImport.xml</code>.</li>' +
+    '<li><b>Set conflict handling to REPLACE/OVERWRITE existing displays</b> (do not merge/update).</li>' +
+    '<li>If you see: <code>element does not exist in the Display and cannot be updated</code>, your import is in update/merge mode. Switch to REPLACE, or delete targets first (see <code>DeleteTargets.txt</code>) and then import.</li>' +
+    '<li>Do <b>NOT</b> select the ZIP, the display XML, or any .txt file.</li>' +
+    '</ol>' +
+    `<small>Files packaged: ${data.files.join(', ')}</small>`;
   packageResult.appendChild(warn);
 
   const downloadUrl = data.downloadUrl || '/api/packages/download/latest.zip';
@@ -1639,16 +1642,13 @@ function copySelectedObject() {
     return;
   }
 
-  const popupGroupId = String(node.getAttribute('popupGroupId') || '').trim();
-  if (popupGroupId) {
-    const groupedNodes = nodes.filter((item) => String(item.getAttribute('popupGroupId') || '').trim() === popupGroupId);
-    if (groupedNodes.length) {
-      copiedObjectXml = groupedNodes.map((item) => new XMLSerializer().serializeToString(item)).join('');
-      copiedObjectName = String(node.getAttribute('name') || node.tagName || 'Popup');
-      copiedObjectGroupId = popupGroupId;
-      copiedPasteCount = 0;
-      return;
-    }
+  const popupGroup = getPopupGroupAncestor(node);
+  if (popupGroup) {
+    copiedObjectXml = new XMLSerializer().serializeToString(popupGroup);
+    copiedObjectName = String(popupGroup.getAttribute('name') || node.getAttribute('name') || node.tagName || 'Popup');
+    copiedObjectGroupId = copiedObjectName;
+    copiedPasteCount = 0;
+    return;
   }
 
   copiedObjectXml = new XMLSerializer().serializeToString(node);
@@ -1690,76 +1690,48 @@ function pasteCopiedObject() {
   copiedPasteCount += 1;
   const shift = 12 * copiedPasteCount;
 
-  if (copiedObjectGroupId && sourceNodes.length > 1) {
-    const geometry = sourceNodes
-      .map((item) => {
-        const left = Number(item.getAttribute('left'));
-        const top = Number(item.getAttribute('top'));
-        const width = Math.max(1, Number(item.getAttribute('width') || 1));
-        const height = Math.max(1, Number(item.getAttribute('height') || 1));
-        if (!Number.isFinite(left) || !Number.isFinite(top)) {
-          return null;
-        }
+  const sourceNode = sourceNodes[0];
+  const sourceTag = String(sourceNode.tagName || '').toLowerCase();
+  if (sourceTag === 'group' && isPopupGroupName(sourceNode.getAttribute('name'))) {
+    const newGroup = sourceNode.cloneNode(true);
+    const nextGroupName = nextIncrementedName(doc, newGroup.getAttribute('name') || copiedObjectName, POPUP_GROUP_PREFIX);
+    newGroup.setAttribute('name', nextGroupName);
+    const groupWidth = Math.max(1, Number(newGroup.getAttribute('width') || 1));
+    const groupHeight = Math.max(1, Number(newGroup.getAttribute('height') || 1));
+    const groupLeft = Number(newGroup.getAttribute('left') || 0);
+    const groupTop = Number(newGroup.getAttribute('top') || 0);
+    const nextGroupLeft = clamp(groupLeft + shift, 0, Math.max(0, displayWidth - groupWidth));
+    const nextGroupTop = clamp(groupTop + shift, 0, Math.max(0, displayHeight - groupHeight));
+    newGroup.setAttribute('left', String(Math.round(nextGroupLeft)));
+    newGroup.setAttribute('top', String(Math.round(nextGroupTop)));
+    root.appendChild(newGroup);
 
-        return { left, top, width, height };
-      })
-      .filter(Boolean);
+    xmlEditor.value = serializeXmlDoc(doc);
+    recordHistory(xmlEditor.value);
 
-    const minLeft = geometry.length ? Math.min(...geometry.map((item) => item.left)) : 0;
-    const minTop = geometry.length ? Math.min(...geometry.map((item) => item.top)) : 0;
-    const maxRight = geometry.length
-      ? Math.max(...geometry.map((item) => item.left + item.width))
-      : minLeft + 1;
-    const maxBottom = geometry.length
-      ? Math.max(...geometry.map((item) => item.top + item.height))
-      : minTop + 1;
-    const groupWidth = Math.max(1, maxRight - minLeft);
-    const groupHeight = Math.max(1, maxBottom - minTop);
-    const nextGroupLeft = clamp(minLeft + shift, 0, Math.max(0, displayWidth - groupWidth));
-    const nextGroupTop = clamp(minTop + shift, 0, Math.max(0, displayHeight - groupHeight));
-    const deltaLeft = nextGroupLeft - minLeft;
-    const deltaTop = nextGroupTop - minTop;
-    const nextGroupId = `popup-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-    for (const sourceNode of sourceNodes) {
-      const newNode = sourceNode.cloneNode(true);
-      if (newNode.hasAttribute('name')) {
-        const nextName = nextIncrementedName(doc, newNode.getAttribute('name') || copiedObjectName, 'Object');
-        newNode.setAttribute('name', nextName);
-      }
-
-      const left = Number(newNode.getAttribute('left'));
-      const top = Number(newNode.getAttribute('top'));
-      const nodeWidth = Math.max(1, Number(newNode.getAttribute('width') || 1));
-      const nodeHeight = Math.max(1, Number(newNode.getAttribute('height') || 1));
-      if (Number.isFinite(left) && Number.isFinite(top)) {
-        const nextLeft = clamp(left + deltaLeft, 0, Math.max(0, displayWidth - nodeWidth));
-        const nextTop = clamp(top + deltaTop, 0, Math.max(0, displayHeight - nodeHeight));
-        newNode.setAttribute('left', String(Math.round(nextLeft)));
-        newNode.setAttribute('top', String(Math.round(nextTop)));
-        newNode.setAttribute('popupGroupId', nextGroupId);
-      }
-
-      root.appendChild(newNode);
-    }
-  } else {
-    const sourceNode = sourceNodes[0];
-    const newNode = sourceNode.cloneNode(true);
-    const nextName = nextIncrementedName(doc, copiedObjectName, 'Object');
-    newNode.setAttribute('name', nextName);
-
-    const nodeWidth = Math.max(1, Number(newNode.getAttribute('width') || 1));
-    const nodeHeight = Math.max(1, Number(newNode.getAttribute('height') || 1));
-    const left = Number(newNode.getAttribute('left') || 0);
-    const top = Number(newNode.getAttribute('top') || 0);
-    const nextLeft = clamp(left + shift, 0, Math.max(0, displayWidth - nodeWidth));
-    const nextTop = clamp(top + shift, 0, Math.max(0, displayHeight - nodeHeight));
-
-    newNode.setAttribute('left', String(Math.round(nextLeft)));
-    newNode.setAttribute('top', String(Math.round(nextTop)));
-
-    root.appendChild(newNode);
+    const nodes = getObjectNodes(doc);
+    selectedObjectIndex = nodes.length - 1;
+    populateObjectPanel(doc, selectedObjectIndex);
+    renderPreview();
+    persistCurrentXmlState();
+    return;
   }
+
+  const newNode = sourceNode.cloneNode(true);
+  const nextName = nextIncrementedName(doc, copiedObjectName, 'Object');
+  newNode.setAttribute('name', nextName);
+
+  const nodeWidth = Math.max(1, Number(newNode.getAttribute('width') || 1));
+  const nodeHeight = Math.max(1, Number(newNode.getAttribute('height') || 1));
+  const left = Number(newNode.getAttribute('left') || 0);
+  const top = Number(newNode.getAttribute('top') || 0);
+  const nextLeft = clamp(left + shift, 0, Math.max(0, displayWidth - nodeWidth));
+  const nextTop = clamp(top + shift, 0, Math.max(0, displayHeight - nodeHeight));
+
+  newNode.setAttribute('left', String(Math.round(nextLeft)));
+  newNode.setAttribute('top', String(Math.round(nextTop)));
+
+  root.appendChild(newNode);
 
   xmlEditor.value = serializeXmlDoc(doc);
   recordHistory(xmlEditor.value);
@@ -1797,6 +1769,39 @@ function nudgeSelectedObject(deltaX, deltaY) {
   const top = Number(node.getAttribute('top') || 0);
   const w = Math.max(1, Number(node.getAttribute('width') || 1));
   const h = Math.max(1, Number(node.getAttribute('height') || 1));
+  const popupGroup = getPopupGroupAncestor(node);
+  if (popupGroup) {
+    const groupWidth = Math.max(1, Number(popupGroup.getAttribute('width') || 1));
+    const groupHeight = Math.max(1, Number(popupGroup.getAttribute('height') || 1));
+    const groupLeft = Number(popupGroup.getAttribute('left') || 0);
+    const groupTop = Number(popupGroup.getAttribute('top') || 0);
+    const nextGroupLeft = clamp(groupLeft + deltaX, 0, Math.max(0, width - groupWidth));
+    const nextGroupTop = clamp(groupTop + deltaY, 0, Math.max(0, height - groupHeight));
+    if (nextGroupLeft === groupLeft && nextGroupTop === groupTop) {
+      return;
+    }
+
+    popupGroup.setAttribute('left', String(Math.round(nextGroupLeft)));
+    popupGroup.setAttribute('top', String(Math.round(nextGroupTop)));
+    xmlEditor.value = serializeXmlDoc(doc);
+    recordHistory(xmlEditor.value);
+    populateObjectPanel(doc, selectedObjectIndex);
+    renderPreview();
+
+    if (selectedDisplay) {
+      saveDisplayXml(selectedDisplay, xmlEditor.value)
+        .then(() => {
+          updateCurrentDisplayRow(selectedDisplay, xmlEditor.value);
+          if (usingUploadedList) {
+            renderDisplays(currentDisplayRows);
+          } else {
+            refreshDisplays().catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }
+    return;
+  }
 
   const nextLeft = clamp(left + deltaX, 0, Math.max(0, width - w));
   const nextTop = clamp(top + deltaY, 0, Math.max(0, height - h));
@@ -1806,8 +1811,8 @@ function nudgeSelectedObject(deltaX, deltaY) {
 
   node.setAttribute('left', String(Math.round(nextLeft)));
   node.setAttribute('top', String(Math.round(nextTop)));
-  const groupId = String(node.getAttribute('popupGroupId') || '');
-  movePopupGroupByDelta(doc, groupId, node, nextLeft - left, nextTop - top, width, height);
+  const groupName = getPopupGroupNameForNode(node);
+  movePopupGroupByDelta(doc, groupName, node, nextLeft - left, nextTop - top, width, height);
   xmlEditor.value = serializeXmlDoc(doc);
   recordHistory(xmlEditor.value);
   populateObjectPanel(doc, selectedObjectIndex);
@@ -1845,15 +1850,11 @@ function deleteSelectedObject() {
   }
 
   const removedIndex = selectedObjectIndex;
-  const popupGroupId = String(node.getAttribute('popupGroupId') || '').trim();
-  if (popupGroupId) {
+  const popupGroupName = getPopupGroupNameForNode(node);
+  if (popupGroupName) {
     let removedAny = false;
-    for (const candidate of nodes) {
+    for (const candidate of getPopupGroupNodes(doc, popupGroupName)) {
       if (!candidate || !candidate.parentNode) {
-        continue;
-      }
-
-      if (String(candidate.getAttribute('popupGroupId') || '').trim() !== popupGroupId) {
         continue;
       }
 
@@ -1925,9 +1926,14 @@ function persistCurrentXmlState() {
     return;
   }
 
-  saveDisplayXml(selectedDisplay, xmlEditor.value)
+  const sanitizedXml = sanitizeXmlForFactoryTalk(xmlEditor.value);
+  if (sanitizedXml !== xmlEditor.value) {
+    xmlEditor.value = sanitizedXml;
+  }
+
+  saveDisplayXml(selectedDisplay, sanitizedXml)
     .then(() => {
-      updateCurrentDisplayRow(selectedDisplay, xmlEditor.value);
+      updateCurrentDisplayRow(selectedDisplay, sanitizedXml);
       if (usingUploadedList) {
         renderDisplays(currentDisplayRows);
       } else {
@@ -2262,23 +2268,6 @@ function copyPopupDraftToClipboardBuffer(draft) {
   packageResult.textContent = `Copied popup template: ${draft.label}. Use Ctrl+V to paste into the active screen.`;
 }
 
-function assignPopupGroupId(node, groupId) {
-  if (!node || !groupId) {
-    return;
-  }
-
-  const allNodes = [node, ...Array.from(node.querySelectorAll('*'))];
-  for (const child of allNodes) {
-    if (!child?.tagName) {
-      continue;
-    }
-
-    if (child.hasAttribute('left') && child.hasAttribute('top')) {
-      child.setAttribute('popupGroupId', groupId);
-    }
-  }
-}
-
 function applyPopupDraftAttributes(newNode, draft) {
   const profile = getPopupTypeProfile(draft.popupTypeId);
   const popupLabel = `${draft.popupName}${Number(draft.sequence) > 1 ? ` ${draft.sequence}` : ''}`;
@@ -2357,8 +2346,9 @@ function insertGeneratedPopupDraft(draft, options = {}) {
   }
 
   const newNode = templateNode.cloneNode(true);
-  const sourceName = String(newNode.getAttribute('name') || `${draft.templateName}_${draft.sequence}`);
-  newNode.setAttribute('name', nextIncrementedName(doc, sourceName, 'Popup'));
+  const popupLabelToken = toCodeToken(draft.popupName || 'Popup') || 'Popup';
+  const sourceName = String(newNode.getAttribute('name') || `${POPUP_GROUP_PREFIX}_${popupLabelToken}`);
+  newNode.setAttribute('name', nextIncrementedName(doc, sourceName, POPUP_GROUP_PREFIX));
 
   const displaySettings = doc.querySelector('displaySettings');
   const displayWidth = Number(displaySettings?.getAttribute('width')) || Number(screenWidth.value) || DEFAULT_PREVIEW_WIDTH;
@@ -2380,9 +2370,6 @@ function insertGeneratedPopupDraft(draft, options = {}) {
   newNode.setAttribute('top', String(Math.round(nextTop)));
   newNode.setAttribute('width', String(Math.round(nodeWidth)));
   newNode.setAttribute('height', String(Math.round(nodeHeight)));
-
-  const popupGroupId = `popup-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  assignPopupGroupId(newNode, popupGroupId);
 
   applyPopupDraftAttributes(newNode, draft);
 
@@ -2764,25 +2751,47 @@ async function readApiJson(res) {
 }
 
 async function saveDisplayXml(name, xml) {
+  const safeXml = sanitizeXmlForFactoryTalk(xml);
+
   if (activeProjectKey) {
     const record = getProjectScreenByKey(activeProjectKey);
     if (record) {
-      record.screen.xml = xml;
-      const meta = screenMetaFromXml(record.screen.name, xml);
+      record.screen.xml = safeXml;
+      const meta = screenMetaFromXml(record.screen.name, safeXml);
       record.screen.width = meta.width;
       record.screen.height = meta.height;
       record.screen.sizeBytes = meta.sizeBytes;
       record.screen.lastModified = meta.lastModified;
+
+      const res = await fetch(`/api/displays/${encodeURIComponent(record.screen.name)}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ xml: safeXml })
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) {
+        throw new Error(data.error || `Failed to save ${record.screen.name}`);
+      }
+
+      upsertCurrentDisplayRow({
+        name: record.screen.name,
+        source: 'edited',
+        sizeBytes: meta.sizeBytes,
+        lastModified: meta.lastModified,
+        width: meta.width,
+        height: meta.height
+      });
+
       saveProjectList();
       renderProjectSidebar();
-      return { ok: true, saved: record.screen.name, projectId: record.project.id };
+      return { ok: true, saved: record.screen.name, projectId: record.project.id, mirrored: true };
     }
   }
 
   const res = await fetch(`/api/displays/${encodeURIComponent(name)}/save`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ xml })
+    body: JSON.stringify({ xml: safeXml })
   });
 
   const data = await readApiJson(res);
@@ -2791,6 +2800,102 @@ async function saveDisplayXml(name, xml) {
   }
 
   return data;
+}
+
+function sanitizeXmlForFactoryTalk(xml) {
+  const source = String(xml || '');
+  if (!source.trim()) {
+    return source;
+  }
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(source, 'text/xml');
+    if (doc.querySelector('parsererror')) {
+      return source;
+    }
+
+    let changed = false;
+
+    const nodes = doc.querySelectorAll('[popupGroupId]');
+    nodes.forEach((node) => {
+      node.removeAttribute('popupGroupId');
+      changed = true;
+    });
+
+    const nonVisualTags = ['connections', 'connection'];
+    for (const tag of nonVisualTags) {
+      const badNodes = doc.querySelectorAll(`${tag}[left], ${tag}[top], ${tag}[width], ${tag}[height]`);
+      badNodes.forEach((node) => {
+        node.removeAttribute('left');
+        node.removeAttribute('top');
+        node.removeAttribute('width');
+        node.removeAttribute('height');
+        changed = true;
+      });
+    }
+
+    const numericInputs = doc.querySelectorAll('numericInputCursorPoint');
+    numericInputs.forEach((node) => {
+      if (node.hasAttribute('caption')) {
+        node.removeAttribute('caption');
+        changed = true;
+      }
+
+      const invalidCaptionChildren = Array.from(node.children).filter((child) => String(child.tagName || '').toLowerCase() === 'caption');
+      invalidCaptionChildren.forEach((child) => {
+        node.removeChild(child);
+        changed = true;
+      });
+    });
+
+    const popupGroups = Array.from(doc.querySelectorAll('group')).filter((group) => isPopupGroupName(group.getAttribute('name')));
+    popupGroups.forEach((group) => {
+      const descendants = Array.from(group.querySelectorAll('*'))
+        .filter((node) => node.hasAttribute('left') && node.hasAttribute('top'));
+      if (!descendants.length) {
+        return;
+      }
+
+      const points = descendants
+        .map((node) => ({
+          node,
+          left: Number(node.getAttribute('left')),
+          top: Number(node.getAttribute('top'))
+        }))
+        .filter((entry) => Number.isFinite(entry.left) && Number.isFinite(entry.top));
+      if (!points.length) {
+        return;
+      }
+
+      const minLeft = Math.min(...points.map((entry) => entry.left));
+      const minTop = Math.min(...points.map((entry) => entry.top));
+      const groupWidth = Math.max(1, Number(group.getAttribute('width') || 1));
+      const groupHeight = Math.max(1, Number(group.getAttribute('height') || 1));
+
+      // Normalize only when popup children are clearly stored as absolute display coordinates.
+      const appearsAbsolute = minLeft > groupWidth || minTop > groupHeight;
+      if (!appearsAbsolute) {
+        return;
+      }
+
+      points.forEach((entry) => {
+        entry.node.setAttribute('left', String(Math.round(entry.left - minLeft)));
+        entry.node.setAttribute('top', String(Math.round(entry.top - minTop)));
+      });
+      group.setAttribute('left', String(Math.round(minLeft)));
+      group.setAttribute('top', String(Math.round(minTop)));
+      changed = true;
+    });
+
+    if (!changed) {
+      return source;
+    }
+
+    return serializeXmlDoc(doc);
+  } catch (_err) {
+    return source;
+  }
 }
 
 async function loadDisplayXml(name) {
@@ -3936,8 +4041,9 @@ function renderPreview() {
       const isLineTag = tag === 'line';
       const activeStateNode = getActiveStateNode(el);
       const visualSource = activeStateNode || el;
-      const left = Number(el.getAttribute('left'));
-      const top = Number(el.getAttribute('top'));
+      const absolutePosition = getNodeAbsolutePosition(el);
+      const left = absolutePosition.left;
+      const top = absolutePosition.top;
       const w = Number(el.getAttribute('width'));
       const h = Number(el.getAttribute('height'));
       if (!Number.isFinite(left) || !Number.isFinite(top) || !Number.isFinite(w) || !Number.isFinite(h)) {
@@ -4045,29 +4151,44 @@ function renderPreview() {
           return;
         }
 
-        const previousLeft = Number(node.getAttribute('left') || 0);
-        const previousTop = Number(node.getAttribute('top') || 0);
+        const previousPosition = getNodeAbsolutePosition(node);
+        const previousLeft = previousPosition.left;
+        const previousTop = previousPosition.top;
         const previousWidth = Math.max(1, Number(node.getAttribute('width') || 1));
         const previousHeight = Math.max(1, Number(node.getAttribute('height') || 1));
 
-        node.setAttribute('left', String(Math.round(nextLeft)));
-        node.setAttribute('top', String(Math.round(nextTop)));
-        node.setAttribute('width', String(Math.max(1, Math.round(nextWidth))));
-        node.setAttribute('height', String(Math.max(1, Math.round(nextHeight))));
-
+        const popupGroup = getPopupGroupAncestor(node);
         const movedOnly = Math.round(nextWidth) === Math.round(previousWidth)
           && Math.round(nextHeight) === Math.round(previousHeight);
-        if (movedOnly) {
-          const groupId = String(node.getAttribute('popupGroupId') || '');
-          movePopupGroupByDelta(
-            workingDoc,
-            groupId,
-            node,
-            Math.round(nextLeft) - Math.round(previousLeft),
-            Math.round(nextTop) - Math.round(previousTop),
-            width,
-            height
-          );
+        if (movedOnly && popupGroup) {
+          const groupWidth = Math.max(1, Number(popupGroup.getAttribute('width') || 1));
+          const groupHeight = Math.max(1, Number(popupGroup.getAttribute('height') || 1));
+          const currentGroupLeft = Number(popupGroup.getAttribute('left') || 0);
+          const currentGroupTop = Number(popupGroup.getAttribute('top') || 0);
+          const deltaLeft = Math.round(nextLeft) - Math.round(previousLeft);
+          const deltaTop = Math.round(nextTop) - Math.round(previousTop);
+          const nextGroupLeft = clamp(currentGroupLeft + deltaLeft, 0, Math.max(0, width - groupWidth));
+          const nextGroupTop = clamp(currentGroupTop + deltaTop, 0, Math.max(0, height - groupHeight));
+          popupGroup.setAttribute('left', String(Math.round(nextGroupLeft)));
+          popupGroup.setAttribute('top', String(Math.round(nextGroupTop)));
+        } else {
+          node.setAttribute('left', String(Math.round(nextLeft)));
+          node.setAttribute('top', String(Math.round(nextTop)));
+          node.setAttribute('width', String(Math.max(1, Math.round(nextWidth))));
+          node.setAttribute('height', String(Math.max(1, Math.round(nextHeight))));
+
+          if (movedOnly) {
+            const groupId = getPopupGroupNameForNode(node);
+            movePopupGroupByDelta(
+              workingDoc,
+              groupId,
+              node,
+              Math.round(nextLeft) - Math.round(previousLeft),
+              Math.round(nextTop) - Math.round(previousTop),
+              width,
+              height
+            );
+          }
         }
 
         xmlEditor.value = serializeXmlDoc(workingDoc);
@@ -4354,8 +4475,24 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function movePopupGroupByDelta(doc, groupId, excludeNode, deltaX, deltaY, displayWidth, displayHeight) {
-  if (!groupId || (!deltaX && !deltaY)) {
+function movePopupGroupByDelta(doc, groupName, excludeNode, deltaX, deltaY, displayWidth, displayHeight) {
+  if (!groupName || (!deltaX && !deltaY)) {
+    return;
+  }
+
+  const popupGroups = Array.from(doc.querySelectorAll('group')).filter(
+    (group) => String(group.getAttribute('name') || '') === String(groupName)
+  );
+  if (popupGroups.length) {
+    const group = popupGroups[0];
+    const currentLeft = Number(group.getAttribute('left') || 0);
+    const currentTop = Number(group.getAttribute('top') || 0);
+    const groupWidth = Math.max(1, Number(group.getAttribute('width') || 1));
+    const groupHeight = Math.max(1, Number(group.getAttribute('height') || 1));
+    const nextLeft = clamp(currentLeft + deltaX, 0, Math.max(0, displayWidth - groupWidth));
+    const nextTop = clamp(currentTop + deltaY, 0, Math.max(0, displayHeight - groupHeight));
+    group.setAttribute('left', String(Math.round(nextLeft)));
+    group.setAttribute('top', String(Math.round(nextTop)));
     return;
   }
 
@@ -4365,7 +4502,11 @@ function movePopupGroupByDelta(doc, groupId, excludeNode, deltaX, deltaY, displa
       continue;
     }
 
-    if (String(item.getAttribute('popupGroupId') || '') !== String(groupId)) {
+    if (getPopupGroupNameForNode(item) !== String(groupName)) {
+      continue;
+    }
+
+    if (!item.hasAttribute('left') || !item.hasAttribute('top')) {
       continue;
     }
 
@@ -4384,6 +4525,101 @@ function movePopupGroupByDelta(doc, groupId, excludeNode, deltaX, deltaY, displa
   }
 }
 
+function getNodeAbsolutePosition(node) {
+  let left = 0;
+  let top = 0;
+  let current = node;
+
+  while (current && current.tagName) {
+    if (current.hasAttribute('left')) {
+      const value = Number(current.getAttribute('left'));
+      if (Number.isFinite(value)) {
+        left += value;
+      }
+    }
+    if (current.hasAttribute('top')) {
+      const value = Number(current.getAttribute('top'));
+      if (Number.isFinite(value)) {
+        top += value;
+      }
+    }
+
+    const parent = current.parentNode;
+    if (!parent || String(parent.tagName || '').toLowerCase() === 'gfx') {
+      break;
+    }
+    current = parent;
+  }
+
+  return { left, top };
+}
+
+function isPopupGroupName(name) {
+  const value = String(name || '').trim();
+  if (!value) {
+    return false;
+  }
+
+  if (value.toLowerCase().startsWith(POPUP_GROUP_PREFIX.toLowerCase())) {
+    return true;
+  }
+
+  return /(?:^|_)popup(?:_|$)/i.test(value);
+}
+
+function getPopupGroupAncestor(node) {
+  let current = node;
+  while (current && current.tagName) {
+    if (String(current.tagName || '').toLowerCase() === 'group' && isPopupGroupName(current.getAttribute('name'))) {
+      return current;
+    }
+
+    const parent = current.parentNode;
+    if (!parent || String(parent.tagName || '').toLowerCase() === 'gfx') {
+      break;
+    }
+    current = parent;
+  }
+
+  return null;
+}
+
+function getPopupGroupNameForNode(node) {
+  const group = getPopupGroupAncestor(node);
+  return String(group?.getAttribute('name') || '');
+}
+
+function getPopupGroupNodes(doc, groupName) {
+  const key = String(groupName || '');
+  if (!key) {
+    return [];
+  }
+
+  return getObjectNodes(doc).filter((item) => getPopupGroupNameForNode(item) === key);
+}
+
+function shiftPositionedNodesInTree(rootNode, deltaX, deltaY, displayWidth, displayHeight) {
+  const allNodes = [rootNode, ...Array.from(rootNode.querySelectorAll('*'))];
+  for (const node of allNodes) {
+    if (!node || !node.hasAttribute || !node.hasAttribute('left') || !node.hasAttribute('top')) {
+      continue;
+    }
+
+    const currentLeft = Number(node.getAttribute('left'));
+    const currentTop = Number(node.getAttribute('top'));
+    const nodeWidth = Math.max(1, Number(node.getAttribute('width') || 1));
+    const nodeHeight = Math.max(1, Number(node.getAttribute('height') || 1));
+    if (!Number.isFinite(currentLeft) || !Number.isFinite(currentTop)) {
+      continue;
+    }
+
+    const nextLeft = clamp(currentLeft + deltaX, 0, Math.max(0, displayWidth - nodeWidth));
+    const nextTop = clamp(currentTop + deltaY, 0, Math.max(0, displayHeight - nodeHeight));
+    node.setAttribute('left', String(Math.round(nextLeft)));
+    node.setAttribute('top', String(Math.round(nextTop)));
+  }
+}
+
 function getObjectNodes(doc) {
   const root = doc.querySelector('gfx');
   if (!root) {
@@ -4397,7 +4633,11 @@ function getObjectNodes(doc) {
         return;
       }
 
-      if (child.tagName.toLowerCase() !== 'group') {
+      if (
+        child.tagName.toLowerCase() !== 'group'
+        && child.hasAttribute('left')
+        && child.hasAttribute('top')
+      ) {
         nodes.push(child);
       }
 
@@ -4614,14 +4854,22 @@ function applyObjectChangesToXml() {
 
   let captionNode = Array.from(node.children).find((child) => child.tagName === 'caption');
   const hasNodeCaption = node.hasAttribute('caption');
+  const nodeTag = String(node.tagName || '').toLowerCase();
+  const supportsCaptionChild = [
+    'gotobutton',
+    'momentarybutton',
+    'pushbutton',
+    'button',
+    'multistatepushbutton'
+  ].includes(nodeTag);
   const nextCaption = objCaption.value || node.getAttribute('name') || node.tagName;
-  const needsCaption = hasNodeCaption || objCaption.value.trim() || objTextColor.value.trim() || Number(objFontSize.value) > 0;
+  const needsCaption = hasNodeCaption || Boolean(captionNode) || objCaption.value.trim() || objTextColor.value.trim();
 
   if (hasNodeCaption) {
     node.setAttribute('caption', nextCaption);
   }
 
-  if (!captionNode && needsCaption && !hasNodeCaption) {
+  if (!captionNode && supportsCaptionChild && needsCaption && !hasNodeCaption) {
     captionNode = doc.createElement('caption');
     node.appendChild(captionNode);
   }
@@ -5277,7 +5525,7 @@ if (buildAllPackageBtn) {
         return;
       }
 
-      await buildImportPackage(allFiles, 'all edited files', { packageMode: 'restore' });
+      await buildImportPackage(allFiles, 'all edited files');
     } catch (err) {
       console.error(err);
       alert('Could not save package ZIP. Please try again.');

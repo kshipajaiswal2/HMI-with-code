@@ -43,6 +43,20 @@
           <div id="sidebarNamePanel" class="project-create-panel hidden">
             <label id="sidebarNameLabel" for="sidebarNameInput">Name</label>
             <input id="sidebarNameInput" type="text" maxlength="80" placeholder="New item" />
+            <div id="sidebarScreenFields" class="sidebar-screen-fields hidden">
+              <div>
+                <label for="sidebarPageNoInput">Page No</label>
+                <input id="sidebarPageNoInput" type="text" inputmode="numeric" maxlength="6" placeholder="200" />
+              </div>
+              <div>
+                <label for="sidebarScreenNameInput">Screen Name</label>
+                <input id="sidebarScreenNameInput" type="text" maxlength="80" placeholder="Settings" />
+              </div>
+              <div class="sidebar-screen-preview-row">
+                <span>Screen ID:</span>
+                <strong id="sidebarScreenPreview">New_Screen</strong>
+              </div>
+            </div>
             <div class="project-create-actions">
               <button id="sidebarNameConfirmBtn" type="button" class="mode-btn accent">Save</button>
               <button id="sidebarNameCancelBtn" type="button" class="mode-btn">Cancel</button>
@@ -56,110 +70,155 @@
         <article class="card editor-card">
           <h2>Display Visual Editor</h2>
 
-          <div class="editor-layout">
-            <div class="editor-controls">
+          <div class="workspace-toolbar">
+            <div class="workspace-screen">
               <label for="displayName">Selected screen</label>
               <input id="displayName" type="text" readonly value="None" />
-
-              <div class="size-grid">
-                <div>
-                  <label for="screenWidth">Width</label>
-                  <input id="screenWidth" type="number" min="1" value="1024" />
-                </div>
-                <div>
-                  <label for="screenHeight">Height</label>
-                  <input id="screenHeight" type="number" min="1" value="768" />
-                </div>
-              </div>
-
-              <div class="actions">
-                <button id="previewBtn" type="button">Preview</button>
-                <button id="addObjectBtn" type="button" class="secondary">Add Button</button>
-                <button id="applySizeBtn" type="button" class="secondary">Apply Size to HMI</button>
-                <button id="buildPackageBtn" type="button">Get Page Import</button>
-                <button id="buildAllPackageBtn" type="button" class="secondary">Get All Import</button>
-              </div>
-
-              <details class="object-panel" id="objectPanelDetails">
-                <summary>Selected Object Properties</summary>
-                <p>Click any object in preview, edit fields, then apply.</p>
-
-                <div class="prop-grid">
-                  <div>
-                    <label for="objType">Type</label>
-                    <input id="objType" type="text" readonly value="None" />
-                  </div>
-                  <div>
-                    <label for="objName">Name</label>
-                    <input id="objName" type="text" value="" />
-                  </div>
-                  <div>
-                    <label for="objCaption">Caption</label>
-                    <input id="objCaption" type="text" value="" />
-                  </div>
-                  <div>
-                    <label for="objLeft">Left</label>
-                    <input id="objLeft" type="number" min="0" value="0" />
-                  </div>
-                  <div>
-                    <label for="objTop">Top</label>
-                    <input id="objTop" type="number" min="0" value="0" />
-                  </div>
-                  <div>
-                    <label for="objWidth">Width</label>
-                    <input id="objWidth" type="number" min="1" value="1" />
-                  </div>
-                  <div>
-                    <label for="objHeight">Height</label>
-                    <input id="objHeight" type="number" min="1" value="1" />
-                  </div>
-                  <div class="prop-wide">
-                    <label for="objBackColor">Back Color</label>
-                    <div class="color-field">
-                      <input id="objBackColor" type="text" value="" placeholder="#002952 or silver" />
-                      <input id="objBackColorPicker" type="color" value="#002952" />
-                      <span id="objBackColorSwatch" class="color-swatch" title="Back Color Preview"></span>
-                    </div>
-                  </div>
-                  <div class="prop-wide">
-                    <label for="objBorderColor">Border Color</label>
-                    <div class="color-field">
-                      <input id="objBorderColor" type="text" value="" placeholder="#002952" />
-                      <input id="objBorderColorPicker" type="color" value="#002952" />
-                      <span id="objBorderColorSwatch" class="color-swatch" title="Border Color Preview"></span>
-                    </div>
-                  </div>
-                  <div class="prop-wide">
-                    <label for="objTextColor">Text Color</label>
-                    <div class="color-field">
-                      <input id="objTextColor" type="text" value="" placeholder="white" />
-                      <input id="objTextColorPicker" type="color" value="#ffffff" />
-                      <span id="objTextColorSwatch" class="color-swatch" title="Text Color Preview"></span>
-                    </div>
-                  </div>
-                  <div class="prop-wide font-apply-row">
-                    <div class="font-size-field">
-                      <label for="objFontSize">Font Size</label>
-                      <input id="objFontSize" type="number" min="1" value="10" />
-                    </div>
-                    <button id="applyObjectBtn" type="button" class="secondary">Apply</button>
-                  </div>
-                </div>
-              </details>
-
-              <details class="advanced-box">
-                <summary>Advanced: Show XML code</summary>
-                <label for="xmlEditor">Display XML</label>
-                <textarea id="xmlEditor" rows="10" placeholder="Select a display to load XML..."></textarea>
-              </details>
-
-              <div id="packageResult" class="package-result"></div>
             </div>
 
+            <div class="size-grid">
+              <div>
+                <label for="screenWidth">Width</label>
+                <input id="screenWidth" type="number" min="1" value="1024" />
+              </div>
+              <div>
+                <label for="screenHeight">Height</label>
+                <input id="screenHeight" type="number" min="1" value="768" />
+              </div>
+            </div>
+
+            <div class="actions">
+              <button id="previewBtn" type="button">Preview</button>
+              <button id="addObjectBtn" type="button" class="secondary">Add Button</button>
+              <button id="applySizeBtn" type="button" class="secondary">Apply Size to HMI</button>
+              <button id="buildPackageBtn" type="button">Get Page Import</button>
+              <button id="buildAllPackageBtn" type="button" class="secondary">Get All Import</button>
+            </div>
+          </div>
+
+          <div class="editor-layout">
             <div class="editor-preview">
-              <h3>Preview</h3>
+              <h3>Screen Preview</h3>
               <div id="previewPane" class="preview-pane"></div>
             </div>
+
+            <aside class="workspace-dock">
+              <div class="dock-tabs" id="workspaceDockTabs" role="tablist" aria-label="Workspace tools">
+                <button type="button" class="dock-tab active" data-dock-tab="planner" role="tab" aria-selected="true">Planner</button>
+                <button type="button" class="dock-tab" data-dock-tab="properties" role="tab" aria-selected="false">Properties</button>
+                <button type="button" class="dock-tab" data-dock-tab="xml" role="tab" aria-selected="false">XML/Status</button>
+              </div>
+
+              <section class="dock-panel active" data-dock-panel="planner" role="tabpanel" aria-label="Popup planner">
+                <details class="object-panel popup-planner" id="popupPlannerDetails" open>
+                  <summary>Project Popup Planner</summary>
+
+                  <div class="planner-table-header">
+                    <h4>Project Details Table</h4>
+                    <button id="addPopupPlanRowBtn" type="button" class="secondary">Add Row</button>
+                  </div>
+
+                  <div class="planner-table-wrap">
+                    <table class="planner-table" id="popupPlanTable">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Component Type</th>
+                          <th>Popup Type</th>
+                          <th>Code</th>
+                          <th>Count</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody id="popupPlanBody"></tbody>
+                    </table>
+                  </div>
+
+                  <div class="planner-generate-actions">
+                    <button id="generatePopupsBtn" type="button">Generate Popups</button>
+                  </div>
+                </details>
+              </section>
+
+              <section class="dock-panel" data-dock-panel="properties" role="tabpanel" aria-label="Selected object properties">
+                <details class="object-panel" id="objectPanelDetails" open>
+                  <summary>Selected Object Properties</summary>
+                  <p>Click any object in preview, edit fields, then apply.</p>
+
+                  <div class="prop-grid">
+                    <div>
+                      <label for="objType">Type</label>
+                      <input id="objType" type="text" readonly value="None" />
+                    </div>
+                    <div>
+                      <label for="objName">Name</label>
+                      <input id="objName" type="text" value="" />
+                    </div>
+                    <div>
+                      <label for="objCaption">Caption</label>
+                      <input id="objCaption" type="text" value="" />
+                    </div>
+                    <div>
+                      <label for="objLeft">Left</label>
+                      <input id="objLeft" type="number" min="0" value="0" />
+                    </div>
+                    <div>
+                      <label for="objTop">Top</label>
+                      <input id="objTop" type="number" min="0" value="0" />
+                    </div>
+                    <div>
+                      <label for="objWidth">Width</label>
+                      <input id="objWidth" type="number" min="1" value="1" />
+                    </div>
+                    <div>
+                      <label for="objHeight">Height</label>
+                      <input id="objHeight" type="number" min="1" value="1" />
+                    </div>
+                    <div class="prop-wide">
+                      <label for="objBackColor">Back Color</label>
+                      <div class="color-field">
+                        <input id="objBackColor" type="text" value="" placeholder="#002952 or silver" />
+                        <input id="objBackColorPicker" type="color" value="#002952" />
+                        <span id="objBackColorSwatch" class="color-swatch" title="Back Color Preview"></span>
+                      </div>
+                    </div>
+                    <div class="prop-wide">
+                      <label for="objBorderColor">Border Color</label>
+                      <div class="color-field">
+                        <input id="objBorderColor" type="text" value="" placeholder="#002952" />
+                        <input id="objBorderColorPicker" type="color" value="#002952" />
+                        <span id="objBorderColorSwatch" class="color-swatch" title="Border Color Preview"></span>
+                      </div>
+                    </div>
+                    <div class="prop-wide">
+                      <label for="objTextColor">Text Color</label>
+                      <div class="color-field">
+                        <input id="objTextColor" type="text" value="" placeholder="white" />
+                        <input id="objTextColorPicker" type="color" value="#ffffff" />
+                        <span id="objTextColorSwatch" class="color-swatch" title="Text Color Preview"></span>
+                      </div>
+                    </div>
+                    <div class="prop-wide font-apply-row">
+                      <div class="font-size-field">
+                        <label for="objFontSize">Font Size</label>
+                        <input id="objFontSize" type="number" min="1" value="10" />
+                      </div>
+                      <button id="applyObjectBtn" type="button" class="secondary">Apply</button>
+                    </div>
+                  </div>
+                </details>
+              </section>
+
+              <section class="dock-panel" data-dock-panel="xml" role="tabpanel" aria-label="XML and status">
+                <details class="advanced-box" open>
+                  <summary>Advanced: Show XML code</summary>
+                  <label for="xmlEditor">Display XML</label>
+                  <textarea id="xmlEditor" rows="10" placeholder="Select a display to load XML..."></textarea>
+                </details>
+
+                <div id="packageResult" class="package-result"></div>
+              </section>
+            </aside>
           </div>
         </article>
       </section>

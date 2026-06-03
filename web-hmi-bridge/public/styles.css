@@ -291,6 +291,36 @@ h3 {
   gap: 8px;
 }
 
+.sidebar-screen-fields {
+  margin-bottom: 8px;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.sidebar-screen-fields label {
+  margin-top: 0;
+}
+
+.sidebar-screen-preview-row {
+  grid-column: span 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px dashed #8ea7b3;
+  border-radius: 8px;
+  background: #f7fbfd;
+  font-size: 0.74rem;
+  color: #2c4a58;
+}
+
+.sidebar-screen-preview-row strong {
+  font-family: "IBM Plex Mono", monospace;
+  color: #123444;
+}
+
 .project-create-actions .mode-btn {
   flex: 1 1 0;
 }
@@ -479,11 +509,38 @@ h3 {
 
 .editor-card {
   padding: 12px;
+  display: flex;
+  flex-direction: column;
 }
 
 .editor-card h2 {
-  font-size: 2rem;
+  font-size: 1.45rem;
   margin-bottom: 10px;
+}
+
+.workspace-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(220px, 250px) minmax(0, 1fr);
+  align-items: end;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid #9db7c3;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fafdff 0%, #edf5f9 100%);
+}
+
+.workspace-toolbar .actions {
+  margin-top: 0;
+  justify-content: flex-start;
+}
+
+.workspace-toolbar .actions button {
+  white-space: nowrap;
+}
+
+.workspace-screen label {
+  margin-top: 0;
 }
 
 label {
@@ -564,7 +621,7 @@ button.secondary {
 
 .object-panel,
 .advanced-box {
-  margin-top: 10px;
+  margin-top: 0;
   padding: 9px;
   border: 1px dashed var(--line-soft);
   border-radius: 9px;
@@ -582,6 +639,140 @@ button.secondary {
   margin-top: 0;
   font-size: 0.84rem;
   color: #41616f;
+}
+
+.popup-planner.is-disabled {
+  opacity: 0.65;
+}
+
+.planner-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.planner-template-actions {
+  grid-column: span 2;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.planner-table-header {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.planner-table-header h4 {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #264351;
+}
+
+.planner-table-wrap {
+  margin-top: 6px;
+  border: 1px solid #bfd0d9;
+  border-radius: 8px;
+  overflow: auto;
+  background: #fbfeff;
+}
+
+.planner-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.planner-table th,
+.planner-table td {
+  border-bottom: 1px solid #dbe7ed;
+  padding: 6px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.planner-table th {
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+  color: #335463;
+  background: #f3f8fb;
+}
+
+.planner-table td input,
+.planner-table td select {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 6px;
+  font-size: 0.75rem;
+}
+
+.planner-table td:nth-child(2) select {
+  min-width: 140px;
+}
+
+.planner-table td:nth-child(3) select {
+  min-width: 120px;
+}
+
+.planner-table td:nth-child(4) input {
+  min-width: 210px;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.planner-generate-actions {
+  margin-top: 8px;
+}
+
+.popup-palette {
+  margin-top: 6px;
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.popup-palette-empty {
+  font-size: 0.76rem;
+  color: #4d6875;
+  padding: 8px;
+  border: 1px dashed #aec2cc;
+  border-radius: 8px;
+  background: #f7fbfd;
+}
+
+.popup-draft-item {
+  border: 1px solid #bed0d9;
+  border-radius: 9px;
+  padding: 7px;
+  background: linear-gradient(180deg, #ffffff 0%, #f3f8fb 100%);
+  display: grid;
+  gap: 7px;
+  cursor: grab;
+}
+
+.popup-draft-item.dragging {
+  opacity: 0.55;
+}
+
+.popup-draft-text {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  color: #1f3d4b;
+  word-break: break-word;
+}
+
+.popup-draft-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.popup-draft-actions button {
+  flex: 1 1 0;
+  font-size: 0.72rem;
+  padding: 6px 7px;
 }
 
 .prop-grid {
@@ -650,16 +841,66 @@ button.secondary {
 
 .editor-layout {
   display: grid;
-  grid-template-columns: minmax(420px, 0.95fr) minmax(560px, 1.25fr);
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 380px);
   gap: 12px;
-  height: calc(100% - 52px);
+  height: calc(100% - 126px);
   min-height: 0;
 }
 
-.editor-controls {
+.workspace-dock {
   min-height: 0;
   overflow: auto;
   padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dock-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid #99b3be;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fafdff 0%, #edf5f9 100%);
+  box-shadow: 0 4px 10px #17324314;
+}
+
+.dock-tab {
+  border: 1px solid #7d9aab;
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  line-height: 1.1;
+  background: linear-gradient(180deg, #f6fbff 0%, #e4eef5 100%);
+  color: #1a3a49;
+  box-shadow: none;
+}
+
+.dock-tab.active {
+  border-color: #2e6f93;
+  background: linear-gradient(180deg, #eaf7ff 0%, #d8ebf7 100%);
+  color: #123546;
+  box-shadow: inset 0 0 0 1px #cae6f6;
+}
+
+.dock-panel {
+  display: none;
+}
+
+.dock-panel.active {
+  display: block;
+}
+
+.workspace-dock .object-panel,
+.workspace-dock .advanced-box,
+.workspace-dock .package-result {
+  margin-top: 0;
 }
 
 .editor-preview {
@@ -848,12 +1089,6 @@ li:hover {
   background: linear-gradient(180deg, #f5faff 0%, #eaf3fb 100%);
 }
 
-.display-item.active {
-  background: linear-gradient(180deg, #e9f4fb 0%, #dcecf6 100%);
-  border-color: #78a7c5;
-  box-shadow: inset 3px 0 0 #2e7398;
-}
-
 .folder-item {
   margin-bottom: 10px;
   padding: 4px 0 0;
@@ -968,26 +1203,32 @@ li:hover {
   box-shadow: none;
 }
 
+.display-item.active {
+  background: linear-gradient(180deg, #e9f4fb 0%, #dcecf6 100%);
+  border-color: #78a7c5;
+  box-shadow: inset 3px 0 0 #2e7398;
+}
+
 .exports-card ul::-webkit-scrollbar,
-.editor-controls::-webkit-scrollbar {
+.workspace-dock::-webkit-scrollbar {
   width: 10px;
 }
 
 .exports-card ul::-webkit-scrollbar-track,
-.editor-controls::-webkit-scrollbar-track {
+.workspace-dock::-webkit-scrollbar-track {
   background: #e7f1f6;
   border-radius: 999px;
 }
 
 .exports-card ul::-webkit-scrollbar-thumb,
-.editor-controls::-webkit-scrollbar-thumb {
+.workspace-dock::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, #89aebf 0%, #5d8595 100%);
   border: 2px solid #e7f1f6;
   border-radius: 999px;
 }
 
 .exports-card ul::-webkit-scrollbar-thumb:hover,
-.editor-controls::-webkit-scrollbar-thumb:hover {
+.workspace-dock::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, #6f98ab 0%, #456d7d 100%);
 }
 
@@ -1057,6 +1298,12 @@ li:hover {
   border-color: #94b5c6;
 }
 
+#displaysList .project-row.selected {
+  background: #e2f1fb;
+  border-color: #7ea6be;
+  box-shadow: inset 3px 0 0 #2e7398;
+}
+
 #displaysList .project-children {
   margin: 8px 0 4px 0;
   padding: 0 0 0 10px;
@@ -1100,6 +1347,13 @@ li:hover {
 #displaysList .display-item:hover {
   border-color: #adc4d0;
   background: #f7fbfe;
+}
+
+#displaysList .display-item.active,
+#displaysList .display-item.active:hover {
+  background: linear-gradient(180deg, #e9f4fb 0%, #dcecf6 100%);
+  border-color: #78a7c5;
+  box-shadow: inset 3px 0 0 #2e7398;
 }
 
 #displaysList .display-item strong {
@@ -1150,7 +1404,7 @@ li:hover {
 
 .editor-preview h3 {
   margin-bottom: 6px;
-  font-size: 1.7rem;
+  font-size: 1.15rem;
 }
 
 .preview-header {
@@ -1183,6 +1437,11 @@ li:hover {
   background: #d3d8dd;
   box-shadow: 0 10px 18px #1b33401e;
   transform-origin: center center;
+
+.xml-canvas.popup-drop-ready {
+  border-color: #2b7ab5;
+  box-shadow: 0 0 0 2px #2b7ab53b, 0 4px 10px #00000018;
+}
 }
 
 .xml-object {
@@ -1466,6 +1725,23 @@ li:hover {
   .grid {
     grid-template-columns: 1fr;
     min-height: auto;
+  }
+
+  .workspace-toolbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .workspace-toolbar .actions {
+    justify-content: stretch;
+  }
+
+  .workspace-toolbar .actions button {
+    flex: 1 1 100%;
+  }
+
+  .dock-tabs {
+    grid-template-columns: 1fr;
   }
 
   .editor-layout {

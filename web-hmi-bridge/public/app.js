@@ -23,6 +23,10 @@ const cancelProjectBtn = document.getElementById('cancelProjectBtn');
 const sidebarNamePanel = document.getElementById('sidebarNamePanel');
 const sidebarNameLabel = document.getElementById('sidebarNameLabel');
 const sidebarNameInput = document.getElementById('sidebarNameInput');
+const sidebarScreenFields = document.getElementById('sidebarScreenFields');
+const sidebarPageNoInput = document.getElementById('sidebarPageNoInput');
+const sidebarScreenNameInput = document.getElementById('sidebarScreenNameInput');
+const sidebarScreenPreview = document.getElementById('sidebarScreenPreview');
 const sidebarNameConfirmBtn = document.getElementById('sidebarNameConfirmBtn');
 const sidebarNameCancelBtn = document.getElementById('sidebarNameCancelBtn');
 const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
@@ -39,6 +43,9 @@ const buildPackageBtn = document.getElementById('buildPackageBtn');
 const buildAllPackageBtn = document.getElementById('buildAllPackageBtn');
 const previewPane = document.getElementById('previewPane');
 const packageResult = document.getElementById('packageResult');
+const workspaceDockTabs = document.getElementById('workspaceDockTabs');
+const workspaceDockTabButtons = Array.from(document.querySelectorAll('[data-dock-tab]'));
+const workspaceDockPanels = Array.from(document.querySelectorAll('[data-dock-panel]'));
 
 const objType = document.getElementById('objType');
 const objName = document.getElementById('objName');
@@ -59,10 +66,21 @@ const objBackColorSwatch = document.getElementById('objBackColorSwatch');
 const objBorderColorSwatch = document.getElementById('objBorderColorSwatch');
 const objTextColorSwatch = document.getElementById('objTextColorSwatch');
 const objectPanelDetails = document.getElementById('objectPanelDetails');
+const popupPlannerDetails = document.getElementById('popupPlannerDetails');
+const popupTemplateSelect = document.getElementById('popupTemplateSelect');
+const popupTemplateName = document.getElementById('popupTemplateName');
+const popupTemplateXml = document.getElementById('popupTemplateXml');
+const savePopupTemplateBtn = document.getElementById('savePopupTemplateBtn');
+const deletePopupTemplateBtn = document.getElementById('deletePopupTemplateBtn');
+const addPopupPlanRowBtn = document.getElementById('addPopupPlanRowBtn');
+const popupPlanBody = document.getElementById('popupPlanBody');
+const generatePopupsBtn = document.getElementById('generatePopupsBtn');
+const popupPalette = document.getElementById('popupPalette');
 
 let selectedDisplay = '';
 let selectedFiles = [];
 let selectedObjectIndex = null;
+let activeDockTab = 'planner';
 let usingUploadedList = false;
 let currentDisplayRows = [];
 let currentDefaultRows = [];
@@ -72,6 +90,7 @@ let selectedFolderIsCustom = false;
 let hiddenDisplayNames = new Set();
 let draggedDisplayKey = '';
 let sidebarNameSubmit = null;
+let sidebarNameMode = 'single';
 let folderNames = [];
 let folderAssignments = {};
 let folderCollapsedNames = new Set();
@@ -81,7 +100,10 @@ let historyFuture = [];
 let applyingHistory = false;
 let copiedObjectXml = '';
 let copiedObjectName = '';
+let copiedObjectGroupId = '';
 let copiedPasteCount = 0;
+let plannerSelectedTemplateId = '';
+let generatedPopupDrafts = [];
 
 const TEMPLATE_DISPLAY_NAME = 'Template.xml';
 const DEFAULT_PREVIEW_WIDTH = 1024;
@@ -141,6 +163,72 @@ function createProjectKey(projectId, folderName, screenName) {
   return [projectId, folderName, screenName].map((part) => String(part || '')).join('::');
 }
 
+const POPUP_TYPE_PROFILES = [
+  { id: 'vfd', label: 'VFD', unit: 'Hz', token: 'VFD', min: '0', max: '50', decimalPlaces: '0', numberOfDigits: '4' },
+  { id: 'hz', label: 'Hz', unit: 'Hz', token: 'HZ', min: '0', max: '50', decimalPlaces: '0', numberOfDigits: '4' },
+  { id: 'rpm', label: 'RPM', unit: 'RPM', token: 'RPM', min: '0', max: '3600', decimalPlaces: '0', numberOfDigits: '5' },
+  { id: 'bar', label: 'Bar', unit: 'bar', token: 'BAR', min: '0', max: '10', decimalPlaces: '2', numberOfDigits: '5' },
+  { id: 'degc', label: 'DegC', unit: 'degC', token: 'DEGC', min: '-20', max: '300', decimalPlaces: '1', numberOfDigits: '5' },
+  { id: 'percent', label: 'Percent', unit: '%', token: 'PERCENT', min: '0', max: '100', decimalPlaces: '1', numberOfDigits: '5' }
+];
+
+const COMPONENT_TYPES = [
+  { id: 'component:conveyor', label: 'Conveyor' }
+];
+
+const CONVEYOR_VFD_TEMPLATE_XML = '<group name="MRTC03_Popup" visible="true" wallpaper="false" isReferenceObject="false" left="0" top="0" width="138" height="76"><rectangle name="Popup_Frame" height="45" width="138" left="0" top="31" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/><rectangle name="Popup_Header" height="33" width="138" left="0" top="0" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/><text name="Popup_Title" height="19" width="66" left="36" top="7" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleLeft" fontFamily="Arial" fontSize="13" bold="true" italic="false" underline="false" strikethrough="false" caption="MRTC03"/><numericInputCursorPoint name="Popup_NumericInput" height="28" width="70" left="18" top="39" visible="true" isReferenceObject="false" alignment="middleCenter" audio="true" backStyle="solid" backColor="white" foreColor="black" blink="false" borderStyle="line" borderUsesBackColor="false" borderWidth="1" description="" highlightColor="lime" borderColor="black" patternColor="white" patternStyle="none" touch="true" horizontalMargin="0" verticalMargin="0" enterKeyControlDelay="400" enterKeyHandshakeTime="4" enterKeyHoldTime="250" handshakeReset="nonZeroValue" keyNavigation="true" decimalPoint="implicit" digitsAfterDecimalPoint="0" numberOfDigits="4" decimalPlaces="0" fixedPosition="stripped" fillLeftWith="none" numericPopup="keypad" fontFamily="Arial" fontSize="11" bold="false" italic="false" underline="false" strikethrough="false" rampValue="0" useVariableMinMax="false" captionOnPad="" minValue="0" maxValue="50" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight" RequireElectronicSignature="false" AllowBlankComment="false" RequireReAuthentication="false" RequireCounterSignature="false" AuthorizedGroup="Administrators" ESDomainNameVisible="false" ESDomainNameType="ESDomainNameConstant" ESDomainName="" VariableDomainName="" ESDomainNameDisable="false"><connections><connection name="Value" expression="{[PLC]Z02_FB_MRTC_03.HMI_Manual_Drive_Speed_in_Hz}"/><connection name="Indicator" expression="{[PLC]Z02_FB_MRTC_03.HMI_Manual_Drive_Speed_in_Hz}"/><connection name="Minimum" expression="0"/><connection name="Maximum" expression="50"/></connections></numericInputCursorPoint><text name="Popup_Unit" height="16" width="17" left="104" top="45" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" charHeight="16" charWidth="6" bold="true" italic="false" underline="false" strikethrough="false" caption="Hz"/></group>';
+
+function getPopupTypeProfile(profileId) {
+  const key = String(profileId || '').toLowerCase();
+  return POPUP_TYPE_PROFILES.find((profile) => profile.id === key) || POPUP_TYPE_PROFILES[0];
+}
+
+function toCodeToken(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^A-Za-z0-9_]/g, '')
+    .toUpperCase();
+}
+
+function suggestPopupCode(popupName, popupTypeId) {
+  const profile = getPopupTypeProfile(popupTypeId);
+  const popupToken = toCodeToken(popupName || 'POPUP');
+  const measureToken = toCodeToken(profile?.token || profile?.label || profile?.unit || 'UNIT');
+  return `{[PLC]${popupToken}_IN_${measureToken}}`;
+}
+
+function ensureProjectPopupData(project) {
+  if (!project || typeof project !== 'object') {
+    return;
+  }
+
+  project.popupTemplates = Array.isArray(project.popupTemplates) ? project.popupTemplates : [];
+  project.popupPlanRows = Array.isArray(project.popupPlanRows) ? project.popupPlanRows : [];
+
+  project.popupTemplates = project.popupTemplates
+    .map((template) => ({
+      id: String(template?.id || `popup-template-${Date.now()}-${Math.random().toString(16).slice(2)}`),
+      name: String(template?.name || 'Popup Template').trim() || 'Popup Template',
+      xml: String(template?.xml || '').trim()
+    }))
+    .filter((template) => template.xml);
+
+  project.popupPlanRows = project.popupPlanRows.map((row) => ({
+    id: String(row?.id || `popup-row-${Date.now()}-${Math.random().toString(16).slice(2)}`),
+    popupName: String(row?.popupName || row?.equipment || '').trim(),
+    componentTypeId: String(row?.componentTypeId || row?.popupTypeId || 'component:conveyor'),
+    popupTypeId: String(row?.popupTypeId || row?.measurementTypeId || 'vfd').toLowerCase(),
+    code: String(row?.code || '').trim(),
+    count: Math.max(1, Math.min(200, Number(row?.count) || 1))
+  })).map((row) => {
+    if (!row.code) {
+      row.code = suggestPopupCode(row.popupName, row.popupTypeId);
+    }
+    return row;
+  });
+}
+
 function loadProjectList() {
   const text = localStorage.getItem(PROJECTS_STORAGE_KEY);
   if (!text) {
@@ -165,6 +253,7 @@ function normalizeProjectList() {
     project.id = String(project.id || `project-${Date.now()}`);
     project.name = normalizeProjectName(project.name || 'Untitled Project');
     project.collapsed = Boolean(project.collapsed);
+    ensureProjectPopupData(project);
     project.folders = Array.isArray(project.folders) ? project.folders : [];
     for (const folder of project.folders) {
       folder.name = String(folder.name || 'Folder');
@@ -204,12 +293,14 @@ function setActiveProject(project) {
     activeProjectKey = '';
     localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
     setProjectName('Untitled Project');
+    renderProjectPopupPlanner();
     return;
   }
 
   activeProjectId = project.id;
   localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, activeProjectId);
   setProjectName(project.name);
+  renderProjectPopupPlanner();
 }
 
 function setActiveProjectScreen(project, folderName, screenName) {
@@ -675,6 +766,8 @@ async function createNewProject(rawName) {
       id: `project-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       name: projectName,
       collapsed: false,
+      popupTemplates: [],
+      popupPlanRows: [],
       folders: []
     };
 
@@ -753,13 +846,44 @@ function showSidebarNamePanel(options = {}) {
   }
 
   sidebarNameSubmit = typeof options.onConfirm === 'function' ? options.onConfirm : null;
+  sidebarNameMode = options.mode === 'screen' ? 'screen' : 'single';
   sidebarNameLabel.textContent = options.label || 'Name';
   sidebarNameInput.value = options.value || '';
   sidebarNameInput.placeholder = options.placeholder || 'New item';
   sidebarNameConfirmBtn.textContent = options.confirmText || 'Save';
+
+  if (sidebarNameMode === 'screen' && sidebarScreenFields && sidebarPageNoInput && sidebarScreenNameInput) {
+    const rawNumber = String(options.pageNo || '').replace(/\D+/g, '');
+    const rawName = String(options.screenName || options.value || '').replace(/\.xml$/i, '');
+    sidebarScreenFields.classList.remove('hidden');
+    sidebarNameLabel.classList.add('hidden');
+    sidebarNameInput.classList.add('hidden');
+    sidebarNameInput.readOnly = true;
+    sidebarPageNoInput.value = rawNumber;
+    sidebarScreenNameInput.value = rawName;
+    updateSidebarScreenFormattedName();
+  } else {
+    if (sidebarScreenFields) {
+      sidebarScreenFields.classList.add('hidden');
+    }
+    sidebarNameLabel.classList.remove('hidden');
+    sidebarNameInput.classList.remove('hidden');
+    sidebarNameInput.readOnly = false;
+  }
+
   sidebarNamePanel.classList.remove('hidden');
-  sidebarNameInput.focus();
-  sidebarNameInput.select();
+  if (sidebarNameMode === 'screen' && sidebarPageNoInput && sidebarScreenNameInput) {
+    if (!sidebarPageNoInput.value.trim()) {
+      sidebarPageNoInput.focus();
+      sidebarPageNoInput.select();
+    } else {
+      sidebarScreenNameInput.focus();
+      sidebarScreenNameInput.select();
+    }
+  } else {
+    sidebarNameInput.focus();
+    sidebarNameInput.select();
+  }
 }
 
 function hideSidebarNamePanel() {
@@ -768,7 +892,71 @@ function hideSidebarNamePanel() {
   }
 
   sidebarNameSubmit = null;
+  sidebarNameMode = 'single';
   sidebarNamePanel.classList.add('hidden');
+}
+
+function setWorkspaceDockTab(tabId) {
+  const nextTab = ['planner', 'properties', 'xml'].includes(String(tabId))
+    ? String(tabId)
+    : 'planner';
+  activeDockTab = nextTab;
+
+  for (const button of workspaceDockTabButtons) {
+    const isActive = String(button.dataset.dockTab || '') === nextTab;
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  }
+
+  for (const panel of workspaceDockPanels) {
+    const isActive = String(panel.dataset.dockPanel || '') === nextTab;
+    panel.classList.toggle('active', isActive);
+  }
+}
+
+function initializeWorkspaceDockTabs() {
+  if (!workspaceDockTabs || !workspaceDockTabButtons.length || !workspaceDockPanels.length) {
+    return;
+  }
+
+  for (const button of workspaceDockTabButtons) {
+    button.addEventListener('click', () => {
+      setWorkspaceDockTab(button.dataset.dockTab || 'planner');
+    });
+  }
+
+  setWorkspaceDockTab(activeDockTab);
+}
+
+function sanitizeScreenNamePart(value) {
+  return String(value || '')
+    .replace(/[\\/:*?"<>|]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function formatScreenNameFromParts(pageNo, screenName) {
+  const numberPart = String(pageNo || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
+  const namePart = sanitizeScreenNamePart(screenName);
+  if (numberPart && namePart) {
+    return `${numberPart}_${namePart}`;
+  }
+
+  return numberPart || namePart;
+}
+
+function updateSidebarScreenFormattedName() {
+  if (!sidebarPageNoInput || !sidebarScreenNameInput || !sidebarNameInput) {
+    return;
+  }
+
+  const formatted = formatScreenNameFromParts(sidebarPageNoInput.value, sidebarScreenNameInput.value) || 'New_Screen';
+  sidebarNameInput.value = formatted;
+  if (sidebarScreenPreview) {
+    sidebarScreenPreview.textContent = formatted;
+  }
 }
 
 function updatePackageSelection(files = currentDisplayRows) {
@@ -1451,8 +1639,21 @@ function copySelectedObject() {
     return;
   }
 
+  const popupGroupId = String(node.getAttribute('popupGroupId') || '').trim();
+  if (popupGroupId) {
+    const groupedNodes = nodes.filter((item) => String(item.getAttribute('popupGroupId') || '').trim() === popupGroupId);
+    if (groupedNodes.length) {
+      copiedObjectXml = groupedNodes.map((item) => new XMLSerializer().serializeToString(item)).join('');
+      copiedObjectName = String(node.getAttribute('name') || node.tagName || 'Popup');
+      copiedObjectGroupId = popupGroupId;
+      copiedPasteCount = 0;
+      return;
+    }
+  }
+
   copiedObjectXml = new XMLSerializer().serializeToString(node);
   copiedObjectName = String(node.getAttribute('name') || node.tagName || 'Object');
+  copiedObjectGroupId = '';
   copiedPasteCount = 0;
 }
 
@@ -1477,32 +1678,89 @@ function pasteCopiedObject() {
     return;
   }
 
-  const sourceNode = wrapperDoc.querySelector('wrapper > *');
-  if (!sourceNode) {
+  const sourceNodes = Array.from(wrapperDoc.querySelectorAll('wrapper > *')).filter((item) => item?.tagName);
+  if (!sourceNodes.length) {
     return;
   }
-
-  const newNode = sourceNode.cloneNode(true);
-  const nextName = nextIncrementedName(doc, copiedObjectName, 'Object');
-  newNode.setAttribute('name', nextName);
 
   const displaySettings = doc.querySelector('displaySettings');
   const displayWidth = Number(displaySettings?.getAttribute('width')) || Number(screenWidth.value) || DEFAULT_PREVIEW_WIDTH;
   const displayHeight = Number(displaySettings?.getAttribute('height')) || Number(screenHeight.value) || DEFAULT_PREVIEW_HEIGHT;
-  const nodeWidth = Math.max(1, Number(newNode.getAttribute('width') || 1));
-  const nodeHeight = Math.max(1, Number(newNode.getAttribute('height') || 1));
 
   copiedPasteCount += 1;
   const shift = 12 * copiedPasteCount;
-  const left = Number(newNode.getAttribute('left') || 0);
-  const top = Number(newNode.getAttribute('top') || 0);
-  const nextLeft = clamp(left + shift, 0, Math.max(0, displayWidth - nodeWidth));
-  const nextTop = clamp(top + shift, 0, Math.max(0, displayHeight - nodeHeight));
 
-  newNode.setAttribute('left', String(Math.round(nextLeft)));
-  newNode.setAttribute('top', String(Math.round(nextTop)));
+  if (copiedObjectGroupId && sourceNodes.length > 1) {
+    const geometry = sourceNodes
+      .map((item) => {
+        const left = Number(item.getAttribute('left'));
+        const top = Number(item.getAttribute('top'));
+        const width = Math.max(1, Number(item.getAttribute('width') || 1));
+        const height = Math.max(1, Number(item.getAttribute('height') || 1));
+        if (!Number.isFinite(left) || !Number.isFinite(top)) {
+          return null;
+        }
 
-  root.appendChild(newNode);
+        return { left, top, width, height };
+      })
+      .filter(Boolean);
+
+    const minLeft = geometry.length ? Math.min(...geometry.map((item) => item.left)) : 0;
+    const minTop = geometry.length ? Math.min(...geometry.map((item) => item.top)) : 0;
+    const maxRight = geometry.length
+      ? Math.max(...geometry.map((item) => item.left + item.width))
+      : minLeft + 1;
+    const maxBottom = geometry.length
+      ? Math.max(...geometry.map((item) => item.top + item.height))
+      : minTop + 1;
+    const groupWidth = Math.max(1, maxRight - minLeft);
+    const groupHeight = Math.max(1, maxBottom - minTop);
+    const nextGroupLeft = clamp(minLeft + shift, 0, Math.max(0, displayWidth - groupWidth));
+    const nextGroupTop = clamp(minTop + shift, 0, Math.max(0, displayHeight - groupHeight));
+    const deltaLeft = nextGroupLeft - minLeft;
+    const deltaTop = nextGroupTop - minTop;
+    const nextGroupId = `popup-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    for (const sourceNode of sourceNodes) {
+      const newNode = sourceNode.cloneNode(true);
+      if (newNode.hasAttribute('name')) {
+        const nextName = nextIncrementedName(doc, newNode.getAttribute('name') || copiedObjectName, 'Object');
+        newNode.setAttribute('name', nextName);
+      }
+
+      const left = Number(newNode.getAttribute('left'));
+      const top = Number(newNode.getAttribute('top'));
+      const nodeWidth = Math.max(1, Number(newNode.getAttribute('width') || 1));
+      const nodeHeight = Math.max(1, Number(newNode.getAttribute('height') || 1));
+      if (Number.isFinite(left) && Number.isFinite(top)) {
+        const nextLeft = clamp(left + deltaLeft, 0, Math.max(0, displayWidth - nodeWidth));
+        const nextTop = clamp(top + deltaTop, 0, Math.max(0, displayHeight - nodeHeight));
+        newNode.setAttribute('left', String(Math.round(nextLeft)));
+        newNode.setAttribute('top', String(Math.round(nextTop)));
+        newNode.setAttribute('popupGroupId', nextGroupId);
+      }
+
+      root.appendChild(newNode);
+    }
+  } else {
+    const sourceNode = sourceNodes[0];
+    const newNode = sourceNode.cloneNode(true);
+    const nextName = nextIncrementedName(doc, copiedObjectName, 'Object');
+    newNode.setAttribute('name', nextName);
+
+    const nodeWidth = Math.max(1, Number(newNode.getAttribute('width') || 1));
+    const nodeHeight = Math.max(1, Number(newNode.getAttribute('height') || 1));
+    const left = Number(newNode.getAttribute('left') || 0);
+    const top = Number(newNode.getAttribute('top') || 0);
+    const nextLeft = clamp(left + shift, 0, Math.max(0, displayWidth - nodeWidth));
+    const nextTop = clamp(top + shift, 0, Math.max(0, displayHeight - nodeHeight));
+
+    newNode.setAttribute('left', String(Math.round(nextLeft)));
+    newNode.setAttribute('top', String(Math.round(nextTop)));
+
+    root.appendChild(newNode);
+  }
+
   xmlEditor.value = serializeXmlDoc(doc);
   recordHistory(xmlEditor.value);
 
@@ -1548,6 +1806,8 @@ function nudgeSelectedObject(deltaX, deltaY) {
 
   node.setAttribute('left', String(Math.round(nextLeft)));
   node.setAttribute('top', String(Math.round(nextTop)));
+  const groupId = String(node.getAttribute('popupGroupId') || '');
+  movePopupGroupByDelta(doc, groupId, node, nextLeft - left, nextTop - top, width, height);
   xmlEditor.value = serializeXmlDoc(doc);
   recordHistory(xmlEditor.value);
   populateObjectPanel(doc, selectedObjectIndex);
@@ -1585,7 +1845,28 @@ function deleteSelectedObject() {
   }
 
   const removedIndex = selectedObjectIndex;
-  node.parentNode.removeChild(node);
+  const popupGroupId = String(node.getAttribute('popupGroupId') || '').trim();
+  if (popupGroupId) {
+    let removedAny = false;
+    for (const candidate of nodes) {
+      if (!candidate || !candidate.parentNode) {
+        continue;
+      }
+
+      if (String(candidate.getAttribute('popupGroupId') || '').trim() !== popupGroupId) {
+        continue;
+      }
+
+      candidate.parentNode.removeChild(candidate);
+      removedAny = true;
+    }
+
+    if (!removedAny) {
+      node.parentNode.removeChild(node);
+    }
+  } else {
+    node.parentNode.removeChild(node);
+  }
 
   xmlEditor.value = serializeXmlDoc(doc);
   recordHistory(xmlEditor.value);
@@ -1846,6 +2127,554 @@ function addButtonObject() {
   persistCurrentXmlState();
 }
 
+function getActiveProjectForPopupPlanner() {
+  const project = getActiveProject();
+  if (!project) {
+    return null;
+  }
+
+  ensureProjectPopupData(project);
+  return project;
+}
+
+function parsePopupTemplateObject(rawXml) {
+  const xml = String(rawXml || '').trim();
+  if (!xml) {
+    return null;
+  }
+
+  const parser = new DOMParser();
+  const wrapper = parser.parseFromString(`<wrapper>${xml}</wrapper>`, 'text/xml');
+  if (wrapper.querySelector('parsererror')) {
+    return null;
+  }
+
+  return wrapper.querySelector('wrapper > *');
+}
+
+function normalizePopupTemplateXml(rawXml) {
+  const node = parsePopupTemplateObject(rawXml);
+  if (!node) {
+    return '';
+  }
+
+  const clone = node.cloneNode(true);
+  if (!clone.hasAttribute('left')) {
+    clone.setAttribute('left', '0');
+  }
+  if (!clone.hasAttribute('top')) {
+    clone.setAttribute('top', '0');
+  }
+  if (!clone.hasAttribute('width')) {
+    clone.setAttribute('width', '220');
+  }
+  if (!clone.hasAttribute('height')) {
+    clone.setAttribute('height', '160');
+  }
+
+  return new XMLSerializer().serializeToString(clone);
+}
+
+function getGeneratedPopupDraftById(draftId) {
+  const key = String(draftId || '');
+  return generatedPopupDrafts.find((draft) => draft.id === key) || null;
+}
+
+function resolvePopupTemplateForRow(project, row, templatesById) {
+  const componentType = String(row?.componentTypeId || '');
+  const popupType = String(row?.popupTypeId || '').toLowerCase();
+
+  if (componentType === 'component:conveyor' && popupType === 'vfd') {
+    return {
+      id: 'preset:conveyor:vfd',
+      name: '800_popup (Conveyor VFD)',
+      xml: CONVEYOR_VFD_TEMPLATE_XML
+    };
+  }
+
+  if (componentType.startsWith('template:')) {
+    const templateId = componentType.slice('template:'.length);
+    const template = templatesById.get(templateId);
+    if (template) {
+      return template;
+    }
+  }
+
+  if (componentType === 'component:conveyor') {
+    return {
+      id: 'preset:conveyor:generic',
+      name: 'Conveyor Popup',
+      xml: CONVEYOR_VFD_TEMPLATE_XML
+    };
+  }
+
+  return null;
+}
+
+function buildGeneratedPopupDrafts(project) {
+  const drafts = [];
+  if (!project) {
+    return drafts;
+  }
+
+  const templates = new Map(project.popupTemplates.map((template) => [template.id, template]));
+  for (const row of project.popupPlanRows) {
+    const template = resolvePopupTemplateForRow(project, row, templates);
+    if (!template) {
+      continue;
+    }
+
+    const count = Math.max(1, Math.min(200, Number(row.count) || 1));
+    const popupName = String(row.popupName || '').trim() || 'Popup';
+    const profile = getPopupTypeProfile(row.popupTypeId);
+    const code = String(row.code || '').trim() || suggestPopupCode(popupName, profile.id);
+    for (let i = 1; i <= count; i += 1) {
+      drafts.push({
+        id: `${project.id}::${row.id}::${template.id}::${i}`,
+        projectId: project.id,
+        rowId: row.id,
+        templateId: template.id,
+        templateName: template.name,
+        popupName,
+        popupTypeId: profile.id,
+        popupTypeLabel: profile.label,
+        unit: profile.unit,
+        code,
+        sequence: i,
+        label: `${popupName}${count > 1 ? ` ${i}` : ''} - ${template.name} (${profile.label})`,
+        xml: template.xml
+      });
+    }
+  }
+
+  return drafts;
+}
+
+function copyPopupDraftToClipboardBuffer(draft) {
+  if (!draft) {
+    return;
+  }
+
+  copiedObjectXml = String(draft.xml || '');
+  copiedObjectName = `${draft.popupName || 'Popup'}_${draft.sequence || 1}`;
+  copiedObjectGroupId = '';
+  copiedPasteCount = 0;
+  packageResult.textContent = `Copied popup template: ${draft.label}. Use Ctrl+V to paste into the active screen.`;
+}
+
+function assignPopupGroupId(node, groupId) {
+  if (!node || !groupId) {
+    return;
+  }
+
+  const allNodes = [node, ...Array.from(node.querySelectorAll('*'))];
+  for (const child of allNodes) {
+    if (!child?.tagName) {
+      continue;
+    }
+
+    if (child.hasAttribute('left') && child.hasAttribute('top')) {
+      child.setAttribute('popupGroupId', groupId);
+    }
+  }
+}
+
+function applyPopupDraftAttributes(newNode, draft) {
+  const profile = getPopupTypeProfile(draft.popupTypeId);
+  const popupLabel = `${draft.popupName}${Number(draft.sequence) > 1 ? ` ${draft.sequence}` : ''}`;
+
+  const directCaption = String(newNode.getAttribute('caption') || '').trim();
+  if (directCaption) {
+    newNode.setAttribute('caption', popupLabel);
+  }
+
+  const allNodes = [newNode, ...Array.from(newNode.querySelectorAll('*'))];
+  for (const node of allNodes) {
+    const tag = String(node.tagName || '').toLowerCase();
+    const nodeName = String(node.getAttribute('name') || '').toLowerCase();
+
+    if (node.hasAttribute('caption')) {
+      const currentCaption = String(node.getAttribute('caption') || '').trim();
+      if (nodeName.includes('title') || currentCaption.toLowerCase().startsWith('mrtc')) {
+        node.setAttribute('caption', popupLabel);
+      }
+
+      if (
+        nodeName.includes('unit')
+        || ['hz', 'rpm', 'bar', '%', 'degc', 'deg c', 'c'].includes(currentCaption.toLowerCase())
+      ) {
+        node.setAttribute('caption', profile.unit);
+      }
+    }
+
+    if (tag === 'numericinputcursorpoint') {
+      node.setAttribute('minValue', profile.min);
+      node.setAttribute('maxValue', profile.max);
+      node.setAttribute('decimalPlaces', profile.decimalPlaces);
+      node.setAttribute('digitsAfterDecimalPoint', profile.decimalPlaces);
+      node.setAttribute('numberOfDigits', profile.numberOfDigits);
+
+      const valueConnection = node.querySelector('connections > connection[name="Value"]');
+      const indicatorConnection = node.querySelector('connections > connection[name="Indicator"]');
+      if (valueConnection) {
+        valueConnection.setAttribute('expression', draft.code);
+      }
+      if (indicatorConnection) {
+        indicatorConnection.setAttribute('expression', draft.code);
+      }
+    }
+  }
+}
+
+function insertGeneratedPopupDraft(draft, options = {}) {
+  if (!draft) {
+    return false;
+  }
+
+  const xml = xmlEditor.value.trim();
+  if (!xml) {
+    alert('Open a project screen XML first.');
+    return false;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  if (doc.querySelector('parsererror')) {
+    alert('XML parse error. Fix XML before inserting generated popup.');
+    return false;
+  }
+
+  const root = doc.querySelector('gfx');
+  if (!root) {
+    alert('Could not find gfx root in XML.');
+    return false;
+  }
+
+  const templateNode = parsePopupTemplateObject(draft.xml);
+  if (!templateNode) {
+    alert(`Template XML for ${draft.templateName} is invalid.`);
+    return false;
+  }
+
+  const newNode = templateNode.cloneNode(true);
+  const sourceName = String(newNode.getAttribute('name') || `${draft.templateName}_${draft.sequence}`);
+  newNode.setAttribute('name', nextIncrementedName(doc, sourceName, 'Popup'));
+
+  const displaySettings = doc.querySelector('displaySettings');
+  const displayWidth = Number(displaySettings?.getAttribute('width')) || Number(screenWidth.value) || DEFAULT_PREVIEW_WIDTH;
+  const displayHeight = Number(displaySettings?.getAttribute('height')) || Number(screenHeight.value) || DEFAULT_PREVIEW_HEIGHT;
+
+  const nodeWidth = Math.max(1, Number(newNode.getAttribute('width') || 220));
+  const nodeHeight = Math.max(1, Number(newNode.getAttribute('height') || 160));
+
+  const leftFromDrop = Number(options.left);
+  const topFromDrop = Number(options.top);
+  const nextLeft = Number.isFinite(leftFromDrop)
+    ? clamp(leftFromDrop, 0, Math.max(0, displayWidth - nodeWidth))
+    : Math.max(0, Math.round((displayWidth - nodeWidth) / 2));
+  const nextTop = Number.isFinite(topFromDrop)
+    ? clamp(topFromDrop, 0, Math.max(0, displayHeight - nodeHeight))
+    : Math.max(0, Math.round((displayHeight - nodeHeight) / 2));
+
+  newNode.setAttribute('left', String(Math.round(nextLeft)));
+  newNode.setAttribute('top', String(Math.round(nextTop)));
+  newNode.setAttribute('width', String(Math.round(nodeWidth)));
+  newNode.setAttribute('height', String(Math.round(nodeHeight)));
+
+  const popupGroupId = `popup-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  assignPopupGroupId(newNode, popupGroupId);
+
+  applyPopupDraftAttributes(newNode, draft);
+
+  root.appendChild(newNode);
+  xmlEditor.value = serializeXmlDoc(doc);
+  recordHistory(xmlEditor.value);
+
+  const nodes = getObjectNodes(doc);
+  selectedObjectIndex = nodes.length - 1;
+  populateObjectPanel(doc, selectedObjectIndex);
+  renderPreview();
+  persistCurrentXmlState();
+  return true;
+}
+
+function renderPopupTemplateOptions(project) {
+  if (!popupTemplateSelect) {
+    return;
+  }
+
+  popupTemplateSelect.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = project ? 'Select template...' : 'No active project';
+  popupTemplateSelect.appendChild(placeholder);
+
+  if (!project) {
+    popupTemplateSelect.value = '';
+    return;
+  }
+
+  for (const template of project.popupTemplates) {
+    const option = document.createElement('option');
+    option.value = template.id;
+    option.textContent = template.name;
+    popupTemplateSelect.appendChild(option);
+  }
+
+  if (plannerSelectedTemplateId && project.popupTemplates.some((template) => template.id === plannerSelectedTemplateId)) {
+    popupTemplateSelect.value = plannerSelectedTemplateId;
+    return;
+  }
+
+  plannerSelectedTemplateId = project.popupTemplates[0]?.id || '';
+  popupTemplateSelect.value = plannerSelectedTemplateId;
+}
+
+function renderPopupPlanRows(project) {
+  if (!popupPlanBody) {
+    return;
+  }
+
+  popupPlanBody.innerHTML = '';
+  if (!project) {
+    return;
+  }
+
+  for (const row of project.popupPlanRows) {
+    const tr = document.createElement('tr');
+    let codeInput = null;
+
+    const nameTd = document.createElement('td');
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = row.popupName;
+    nameInput.placeholder = 'MRTC03';
+    nameInput.addEventListener('input', () => {
+      row.popupName = String(nameInput.value || '').trim();
+      row.code = suggestPopupCode(row.popupName, row.popupTypeId);
+      if (codeInput) {
+        codeInput.value = row.code;
+      }
+      saveProjectList();
+      generatedPopupDrafts = buildGeneratedPopupDrafts(project);
+      renderPopupPalette(project);
+    });
+    nameTd.appendChild(nameInput);
+
+    const typeTd = document.createElement('td');
+    const typeSelect = document.createElement('select');
+    for (const component of COMPONENT_TYPES) {
+      const option = document.createElement('option');
+      option.value = component.id;
+      option.textContent = component.label;
+      typeSelect.appendChild(option);
+    }
+
+    if (project.popupTemplates.length) {
+      const divider = document.createElement('option');
+      divider.value = '';
+      divider.textContent = '--- Custom Templates ---';
+      divider.disabled = true;
+      typeSelect.appendChild(divider);
+    }
+
+    for (const template of project.popupTemplates) {
+      const option = document.createElement('option');
+      option.value = `template:${template.id}`;
+      option.textContent = template.name;
+      typeSelect.appendChild(option);
+    }
+
+    typeSelect.value = row.componentTypeId || 'component:conveyor';
+    typeSelect.addEventListener('change', () => {
+      row.componentTypeId = String(typeSelect.value || 'component:conveyor');
+      saveProjectList();
+      generatedPopupDrafts = buildGeneratedPopupDrafts(project);
+      renderPopupPalette(project);
+    });
+    typeTd.appendChild(typeSelect);
+
+    const popupTypeTd = document.createElement('td');
+    const popupTypeSelect = document.createElement('select');
+    for (const profile of POPUP_TYPE_PROFILES) {
+      const option = document.createElement('option');
+      option.value = profile.id;
+      option.textContent = `${profile.label} (${profile.unit})`;
+      popupTypeSelect.appendChild(option);
+    }
+    popupTypeSelect.value = row.popupTypeId || 'vfd';
+    popupTypeSelect.addEventListener('change', () => {
+      row.popupTypeId = String(popupTypeSelect.value || 'vfd');
+      row.code = suggestPopupCode(row.popupName, row.popupTypeId);
+      if (codeInput) {
+        codeInput.value = row.code;
+      }
+      saveProjectList();
+      generatedPopupDrafts = buildGeneratedPopupDrafts(project);
+      renderPopupPalette(project);
+    });
+    popupTypeTd.appendChild(popupTypeSelect);
+
+    const codeTd = document.createElement('td');
+    codeInput = document.createElement('input');
+    codeInput.type = 'text';
+    codeInput.value = row.code || suggestPopupCode(row.popupName, row.popupTypeId);
+    codeInput.placeholder = '{[PLC]TAG}';
+    codeInput.addEventListener('input', () => {
+      row.code = String(codeInput.value || '').trim();
+      saveProjectList();
+      generatedPopupDrafts = buildGeneratedPopupDrafts(project);
+      renderPopupPalette(project);
+    });
+    codeTd.appendChild(codeInput);
+
+    const countTd = document.createElement('td');
+    const countInput = document.createElement('input');
+    countInput.type = 'number';
+    countInput.min = '1';
+    countInput.max = '200';
+    countInput.value = String(row.count || 1);
+    countInput.addEventListener('input', () => {
+      row.count = Math.max(1, Math.min(200, Number(countInput.value) || 1));
+      countInput.value = String(row.count);
+      saveProjectList();
+      generatedPopupDrafts = buildGeneratedPopupDrafts(project);
+      renderPopupPalette(project);
+    });
+    countTd.appendChild(countInput);
+
+    const actionTd = document.createElement('td');
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'tree-action-btn danger';
+    removeBtn.textContent = '×';
+    removeBtn.title = 'Remove row';
+    removeBtn.addEventListener('click', () => {
+      project.popupPlanRows = project.popupPlanRows.filter((item) => item.id !== row.id);
+      saveProjectList();
+      renderProjectPopupPlanner();
+    });
+    actionTd.appendChild(removeBtn);
+
+    tr.appendChild(nameTd);
+    tr.appendChild(typeTd);
+    tr.appendChild(popupTypeTd);
+    tr.appendChild(codeTd);
+    tr.appendChild(countTd);
+    tr.appendChild(actionTd);
+    popupPlanBody.appendChild(tr);
+  }
+}
+
+function renderPopupPalette(project) {
+  if (!popupPalette) {
+    return;
+  }
+
+  popupPalette.innerHTML = '';
+  if (!project || !generatedPopupDrafts.length) {
+    popupPalette.innerHTML = '<div class="popup-palette-empty">Add rows and template mappings to generate popup items.</div>';
+    return;
+  }
+
+  for (const draft of generatedPopupDrafts) {
+    const item = document.createElement('div');
+    item.className = 'popup-draft-item';
+    item.draggable = true;
+
+    const text = document.createElement('div');
+    text.className = 'popup-draft-text';
+    text.textContent = draft.label;
+
+    const actions = document.createElement('div');
+    actions.className = 'popup-draft-actions';
+
+    const insertBtn = document.createElement('button');
+    insertBtn.type = 'button';
+    insertBtn.className = 'secondary';
+    insertBtn.textContent = 'Insert';
+    insertBtn.addEventListener('click', () => {
+      insertGeneratedPopupDraft(draft);
+    });
+
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'secondary';
+    copyBtn.textContent = 'Copy';
+    copyBtn.addEventListener('click', () => {
+      copyPopupDraftToClipboardBuffer(draft);
+    });
+
+    actions.appendChild(insertBtn);
+    actions.appendChild(copyBtn);
+    item.appendChild(text);
+    item.appendChild(actions);
+
+    item.addEventListener('dragstart', (event) => {
+      event.dataTransfer.effectAllowed = 'copy';
+      event.dataTransfer.setData('application/x-popup-draft-id', draft.id);
+      item.classList.add('dragging');
+    });
+
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      previewPane.querySelector('.xml-canvas')?.classList.remove('popup-drop-ready');
+    });
+
+    popupPalette.appendChild(item);
+  }
+}
+
+function applyPlannerTemplateSelection(project) {
+  if (!popupTemplateName || !popupTemplateXml) {
+    return;
+  }
+
+  if (!project || !plannerSelectedTemplateId) {
+    popupTemplateName.value = '';
+    popupTemplateXml.value = '';
+    return;
+  }
+
+  const template = project.popupTemplates.find((item) => item.id === plannerSelectedTemplateId);
+  if (!template) {
+    popupTemplateName.value = '';
+    popupTemplateXml.value = '';
+    return;
+  }
+
+  popupTemplateName.value = template.name;
+  popupTemplateXml.value = template.xml;
+}
+
+function renderProjectPopupPlanner() {
+  const project = getActiveProjectForPopupPlanner();
+  const disabled = !project;
+  const controls = [
+    popupTemplateSelect,
+    popupTemplateName,
+    popupTemplateXml,
+    savePopupTemplateBtn,
+    deletePopupTemplateBtn,
+    addPopupPlanRowBtn,
+    generatePopupsBtn
+  ].filter(Boolean);
+
+  controls.forEach((control) => {
+    control.disabled = disabled;
+  });
+
+  if (popupPlannerDetails) {
+    popupPlannerDetails.classList.toggle('is-disabled', disabled);
+  }
+
+  renderPopupTemplateOptions(project);
+  applyPlannerTemplateSelection(project);
+  renderPopupPlanRows(project);
+  generatedPopupDrafts = buildGeneratedPopupDrafts(project);
+  renderPopupPalette(project);
+}
+
 function setEditorDisplay(name, xml) {
   selectedDisplay = name;
   selectedDefaultTemplate = '';
@@ -1865,6 +2694,7 @@ function setEditorDisplay(name, xml) {
 
   updatePackageSelection(currentDisplayRows);
   renderPreview();
+  renderProjectPopupPlanner();
 }
 
 function setEditorTemplate(name, xml) {
@@ -1886,6 +2716,7 @@ function setEditorTemplate(name, xml) {
 
   updatePackageSelection(currentDisplayRows);
   renderPreview();
+  renderProjectPopupPlanner();
 }
 
 async function readUploadedText(file) {
@@ -2610,6 +3441,7 @@ function renderProjectSidebar() {
 
     const row = document.createElement('div');
     row.className = 'project-row';
+    row.dataset.projectId = project.id;
     if (project.id === activeProjectId) {
       row.classList.add('selected');
     }
@@ -2729,9 +3561,10 @@ function renderProjectSidebar() {
     addScreenBtn.addEventListener('click', async (event) => {
       event.stopPropagation();
       showSidebarNamePanel({
-        label: `Screen name for ${folder.name}`,
-        value: 'New_Screen',
-        placeholder: 'New_Screen',
+        mode: 'screen',
+        label: `Screen ID for ${folder.name}`,
+        pageNo: '',
+        screenName: 'New Screen',
         confirmText: 'Add screen',
         onConfirm: async (rawName) => {
           const screenName = String(rawName || '').trim();
@@ -2915,6 +3748,28 @@ function renderProjectSidebar() {
   }
 }
 
+function updateProjectSidebarSelection() {
+  if (!displaysList) {
+    return;
+  }
+
+  const activeKey = activeProjectKey;
+  const activeProject = activeProjectId;
+
+  for (const projectRow of displaysList.querySelectorAll('.project-row')) {
+    const rowProjectId = String(projectRow.dataset.projectId || '');
+    projectRow.classList.toggle('selected', rowProjectId === activeProject);
+  }
+
+  for (const screenItem of displaysList.querySelectorAll('.display-item')) {
+    const screenProjectId = String(screenItem.dataset.projectId || '');
+    const folderName = String(screenItem.dataset.folderName || '');
+    const screenName = String(screenItem.dataset.screenName || '');
+    const itemKey = createProjectKey(screenProjectId, folderName, screenName);
+    screenItem.classList.toggle('active', itemKey === activeKey);
+  }
+}
+
 function keepCurrentDisplayOrder(nextFiles) {
   if (!Array.isArray(nextFiles) || !nextFiles.length) {
     return [];
@@ -3033,6 +3888,40 @@ function renderPreview() {
   const canvas = document.createElement('div');
   canvas.className = 'xml-canvas';
   canvas.style.background = backColor;
+
+  canvas.addEventListener('dragover', (event) => {
+    if (!event.dataTransfer?.types?.includes('application/x-popup-draft-id')) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    canvas.classList.add('popup-drop-ready');
+  });
+
+  canvas.addEventListener('dragleave', () => {
+    canvas.classList.remove('popup-drop-ready');
+  });
+
+  canvas.addEventListener('drop', (event) => {
+    const draftId = event.dataTransfer?.getData('application/x-popup-draft-id');
+    if (!draftId) {
+      return;
+    }
+
+    event.preventDefault();
+    canvas.classList.remove('popup-drop-ready');
+    const draft = getGeneratedPopupDraftById(draftId);
+    if (!draft) {
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const px = event.clientX - rect.left;
+    const py = event.clientY - rect.top;
+    const left = (px / Math.max(1, rect.width)) * width;
+    const top = (py / Math.max(1, rect.height)) * height;
+    insertGeneratedPopupDraft(draft, { left, top });
+  });
 
   const objectNodes = getObjectNodes(doc);
   const gfxRoot = doc.querySelector('gfx');
@@ -3156,10 +4045,31 @@ function renderPreview() {
           return;
         }
 
+        const previousLeft = Number(node.getAttribute('left') || 0);
+        const previousTop = Number(node.getAttribute('top') || 0);
+        const previousWidth = Math.max(1, Number(node.getAttribute('width') || 1));
+        const previousHeight = Math.max(1, Number(node.getAttribute('height') || 1));
+
         node.setAttribute('left', String(Math.round(nextLeft)));
         node.setAttribute('top', String(Math.round(nextTop)));
         node.setAttribute('width', String(Math.max(1, Math.round(nextWidth))));
         node.setAttribute('height', String(Math.max(1, Math.round(nextHeight))));
+
+        const movedOnly = Math.round(nextWidth) === Math.round(previousWidth)
+          && Math.round(nextHeight) === Math.round(previousHeight);
+        if (movedOnly) {
+          const groupId = String(node.getAttribute('popupGroupId') || '');
+          movePopupGroupByDelta(
+            workingDoc,
+            groupId,
+            node,
+            Math.round(nextLeft) - Math.round(previousLeft),
+            Math.round(nextTop) - Math.round(previousTop),
+            width,
+            height
+          );
+        }
+
         xmlEditor.value = serializeXmlDoc(workingDoc);
         recordHistory(xmlEditor.value);
 
@@ -3444,6 +4354,36 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function movePopupGroupByDelta(doc, groupId, excludeNode, deltaX, deltaY, displayWidth, displayHeight) {
+  if (!groupId || (!deltaX && !deltaY)) {
+    return;
+  }
+
+  const nodes = getObjectNodes(doc);
+  for (const item of nodes) {
+    if (!item || item === excludeNode) {
+      continue;
+    }
+
+    if (String(item.getAttribute('popupGroupId') || '') !== String(groupId)) {
+      continue;
+    }
+
+    const currentLeft = Number(item.getAttribute('left'));
+    const currentTop = Number(item.getAttribute('top'));
+    const itemWidth = Math.max(1, Number(item.getAttribute('width') || 1));
+    const itemHeight = Math.max(1, Number(item.getAttribute('height') || 1));
+    if (!Number.isFinite(currentLeft) || !Number.isFinite(currentTop)) {
+      continue;
+    }
+
+    const nextLeft = clamp(currentLeft + deltaX, 0, Math.max(0, displayWidth - itemWidth));
+    const nextTop = clamp(currentTop + deltaY, 0, Math.max(0, displayHeight - itemHeight));
+    item.setAttribute('left', String(Math.round(nextLeft)));
+    item.setAttribute('top', String(Math.round(nextTop)));
+  }
+}
+
 function getObjectNodes(doc) {
   const root = doc.querySelector('gfx');
   if (!root) {
@@ -3510,6 +4450,7 @@ function populateObjectPanel(doc, index) {
   syncColorControl(objBackColor, objBackColorPicker, objBackColorSwatch);
   syncColorControl(objBorderColor, objBorderColorPicker, objBorderColorSwatch);
   syncColorControl(objTextColor, objTextColorPicker, objTextColorSwatch);
+  setWorkspaceDockTab('properties');
   if (objectPanelDetails) {
     objectPanelDetails.open = true;
   }
@@ -3735,6 +4676,7 @@ function setEditorProjectScreen(project, folderName, screen, xml) {
   if (size.height) screenHeight.value = size.height;
 
   renderPreview();
+  renderProjectPopupPlanner();
 }
 
 async function openProjectScreen(projectId, folderName, screenName) {
@@ -3749,7 +4691,7 @@ async function openProjectScreen(projectId, folderName, screenName) {
   }
 
   setEditorProjectScreen(project, folderName, screen, screen.xml);
-  renderProjectSidebar();
+  updateProjectSidebarSelection();
 }
 
 if (uploadInput) {
@@ -4017,7 +4959,10 @@ if (sidebarNameConfirmBtn) {
       return;
     }
 
-    const shouldClose = await sidebarNameSubmit(sidebarNameInput.value);
+    const inputValue = sidebarNameMode === 'screen'
+      ? (formatScreenNameFromParts(sidebarPageNoInput?.value, sidebarScreenNameInput?.value) || '').trim()
+      : String(sidebarNameInput.value || '').trim();
+    const shouldClose = await sidebarNameSubmit(inputValue);
     if (shouldClose !== false) {
       hideSidebarNamePanel();
     }
@@ -4032,6 +4977,41 @@ if (sidebarNameCancelBtn) {
 
 if (sidebarNameInput) {
   sidebarNameInput.addEventListener('keydown', async (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      sidebarNameConfirmBtn?.click();
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      hideSidebarNamePanel();
+    }
+  });
+}
+
+if (sidebarPageNoInput) {
+  sidebarPageNoInput.addEventListener('input', () => {
+    sidebarPageNoInput.value = String(sidebarPageNoInput.value || '').replace(/\D+/g, '');
+    updateSidebarScreenFormattedName();
+  });
+
+  sidebarPageNoInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      sidebarNameConfirmBtn?.click();
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      hideSidebarNamePanel();
+    }
+  });
+}
+
+if (sidebarScreenNameInput) {
+  sidebarScreenNameInput.addEventListener('input', () => {
+    updateSidebarScreenFormattedName();
+  });
+
+  sidebarScreenNameInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       sidebarNameConfirmBtn?.click();
@@ -4073,6 +5053,133 @@ if (seedDefaultsBtn) {
       console.error(err);
       alert(err.message || 'Could not copy defaults into project pages.');
     }
+  });
+}
+
+if (popupTemplateSelect) {
+  popupTemplateSelect.addEventListener('change', () => {
+    plannerSelectedTemplateId = String(popupTemplateSelect.value || '');
+    const project = getActiveProjectForPopupPlanner();
+    applyPlannerTemplateSelection(project);
+  });
+}
+
+if (savePopupTemplateBtn) {
+  savePopupTemplateBtn.addEventListener('click', () => {
+    const project = getActiveProjectForPopupPlanner();
+    if (!project) {
+      alert('Create or open a project first.');
+      return;
+    }
+
+    const normalizedXml = normalizePopupTemplateXml(popupTemplateXml?.value || '');
+    if (!normalizedXml) {
+      alert('Enter valid popup object XML (single object node).');
+      return;
+    }
+
+    const name = String(popupTemplateName?.value || '').trim() || 'Popup Template';
+    const existing = project.popupTemplates.find((item) => item.id === plannerSelectedTemplateId);
+    if (existing) {
+      existing.name = name;
+      existing.xml = normalizedXml;
+    } else {
+      const nextTemplate = {
+        id: `popup-template-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        name,
+        xml: normalizedXml
+      };
+      project.popupTemplates.push(nextTemplate);
+      plannerSelectedTemplateId = nextTemplate.id;
+    }
+
+    saveProjectList();
+    renderProjectPopupPlanner();
+  });
+}
+
+if (deletePopupTemplateBtn) {
+  deletePopupTemplateBtn.addEventListener('click', () => {
+    const project = getActiveProjectForPopupPlanner();
+    if (!project || !plannerSelectedTemplateId) {
+      return;
+    }
+
+    const target = project.popupTemplates.find((item) => item.id === plannerSelectedTemplateId);
+    if (!target) {
+      return;
+    }
+
+    if (!window.confirm(`Delete popup template ${target.name}?`)) {
+      return;
+    }
+
+    project.popupTemplates = project.popupTemplates.filter((item) => item.id !== plannerSelectedTemplateId);
+    for (const row of project.popupPlanRows) {
+      if (row.popupTypeId === plannerSelectedTemplateId || row.componentTypeId === `template:${plannerSelectedTemplateId}`) {
+        row.popupTypeId = '';
+        row.componentTypeId = 'component:conveyor';
+      }
+    }
+    plannerSelectedTemplateId = project.popupTemplates[0]?.id || '';
+    saveProjectList();
+    renderProjectPopupPlanner();
+  });
+}
+
+if (addPopupPlanRowBtn) {
+  addPopupPlanRowBtn.addEventListener('click', () => {
+    const project = getActiveProjectForPopupPlanner();
+    if (!project) {
+      alert('Create or open a project first.');
+      return;
+    }
+
+    const defaultComponent = 'component:conveyor';
+    const defaultPopupType = 'vfd';
+    const popupName = `Popup_${project.popupPlanRows.length + 1}`;
+    project.popupPlanRows.push({
+      id: `popup-row-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      popupName,
+      componentTypeId: defaultComponent,
+      popupTypeId: defaultPopupType,
+      code: suggestPopupCode(popupName, defaultPopupType),
+      count: 1
+    });
+    saveProjectList();
+    renderProjectPopupPlanner();
+  });
+}
+
+if (generatePopupsBtn) {
+  generatePopupsBtn.addEventListener('click', () => {
+    const project = getActiveProjectForPopupPlanner();
+    generatedPopupDrafts = buildGeneratedPopupDrafts(project);
+    renderPopupPalette(project);
+
+    let placedCount = 0;
+    if (generatedPopupDrafts.length && xmlEditor.value.trim()) {
+      const columns = 4;
+      const stepX = 170;
+      const stepY = 95;
+      const startX = 24;
+      const startY = 24;
+      generatedPopupDrafts.forEach((draft, index) => {
+        const col = index % columns;
+        const row = Math.floor(index / columns);
+        const left = startX + (col * stepX);
+        const top = startY + (row * stepY);
+        if (insertGeneratedPopupDraft(draft, { left, top })) {
+          placedCount += 1;
+        }
+      });
+    }
+
+    packageResult.textContent = generatedPopupDrafts.length
+      ? (placedCount
+        ? `Generated ${generatedPopupDrafts.length} popup item(s) and placed ${placedCount} on the active screen.`
+        : 'Open a project screen first, then click Generate Popups again to place items in preview.')
+      : 'No popup items generated yet. Add plan rows and choose popup types.';
   });
 }
 
@@ -4184,6 +5291,8 @@ socket.on('bridge-status', (status) => {
 });
 
 async function init() {
+  initializeWorkspaceDockTabs();
+
   if (!Number(screenWidth.value) || Number(screenWidth.value) <= 0) {
     screenWidth.value = DEFAULT_PREVIEW_WIDTH;
   }
@@ -4208,6 +5317,7 @@ async function init() {
   const status = await res.json();
   setBridgeCard(status);
   renderProjectSidebar();
+  renderProjectPopupPlanner();
   renderPreview();
 }
 

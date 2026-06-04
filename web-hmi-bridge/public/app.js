@@ -31,6 +31,8 @@ const sidebarNameConfirmBtn = document.getElementById('sidebarNameConfirmBtn');
 const sidebarNameCancelBtn = document.getElementById('sidebarNameCancelBtn');
 const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
 const mainGrid = document.getElementById('mainGrid');
+const editorLayout = document.getElementById('editorLayout');
+const toggleDockBtn = document.getElementById('toggleDockBtn');
 
 const displayName = document.getElementById('displayName');
 const screenSizePreset = document.getElementById('screenSizePreset');
@@ -111,6 +113,7 @@ const TEMPLATE_DISPLAY_NAME = 'Template.xml';
 const DEFAULT_PREVIEW_WIDTH = 1024;
 const DEFAULT_PREVIEW_HEIGHT = 768;
 const SIDEBAR_STORAGE_KEY = 'displayXmlBridge.sidebarCollapsed';
+const DOCK_STORAGE_KEY = 'displayXmlBridge.toolsDockCollapsed';
 const SIDEBAR_MODE_STORAGE_KEY = 'displayXmlBridge.sidebarMode';
 const PROJECT_NAME_STORAGE_KEY = 'displayXmlBridge.projectName';
 const PROJECTS_STORAGE_KEY = 'displayXmlBridge.projects';
@@ -1261,10 +1264,10 @@ function applyCaptionStyles(box, node, captionNode) {
   const hasFixedSpacing = / {2,}|\t/.test(captionText);
   const useMultiline = wrap || hasExplicitBreak;
   box.style.whiteSpace = useMultiline ? 'pre-line' : (hasFixedSpacing ? 'pre' : 'nowrap');
-  box.style.textOverflow = (useMultiline || sizeToFit) ? 'clip' : 'ellipsis';
+  box.style.textOverflow = useMultiline ? 'clip' : 'ellipsis';
   box.style.lineHeight = useMultiline ? '1.08' : '1.12';
 
-  if (sizeToFit || String(node.tagName || '').toLowerCase() === 'text') {
+  if (sizeToFit) {
     box.classList.add('has-caption-overflow');
   } else {
     box.classList.remove('has-caption-overflow');
@@ -2013,6 +2016,20 @@ function setSidebarCollapsed(collapsed) {
   toggleSidebarBtn.setAttribute('aria-label', actionLabel);
   toggleSidebarBtn.setAttribute('title', actionLabel);
   localStorage.setItem(SIDEBAR_STORAGE_KEY, nextCollapsed ? '1' : '0');
+}
+
+function setDockCollapsed(collapsed) {
+  if (!editorLayout || !toggleDockBtn) {
+    return;
+  }
+
+  const nextCollapsed = Boolean(collapsed);
+  editorLayout.classList.toggle('dock-collapsed', nextCollapsed);
+  toggleDockBtn.setAttribute('aria-pressed', nextCollapsed ? 'true' : 'false');
+  const actionLabel = nextCollapsed ? 'Show tools sidebar' : 'Hide tools sidebar';
+  toggleDockBtn.setAttribute('aria-label', actionLabel);
+  toggleDockBtn.setAttribute('title', actionLabel);
+  localStorage.setItem(DOCK_STORAGE_KEY, nextCollapsed ? '1' : '0');
 }
 
 function shortDateTime(iso) {
@@ -2871,7 +2888,7 @@ function renderPopupPalette(project) {
     typeTd.textContent = entry.popupTypeLabel || profile.label;
 
     const countTd = document.createElement('td');
-    countTd.textContent = String(entry.totalForName || 1);
+    countTd.textContent = '1';
 
     const targetTd = document.createElement('td');
     targetTd.textContent = String(entry.targetScreenLabel || 'Active Screen');
@@ -4383,7 +4400,7 @@ function renderPreview() {
 
       const captionNode = Array.from(visualSource.children).find((child) => child.tagName === 'caption')
         || Array.from(el.children).find((child) => child.tagName === 'caption');
-      const imageName = getNodeImageName(el);
+      const imageName = getNodeImageName(visualSource) || getNodeImageName(el);
       if (imageName && !isLineTag) {
         const imageOpts = getNodeImageRenderOptions(el);
         const imageEl = document.createElement('img');
@@ -4670,8 +4687,11 @@ function renderPreview() {
   frame.appendChild(canvas);
   previewPane.appendChild(frame);
 
+  // Fit immediately so preview does not collapse when RAF is throttled.
+  fitCanvasToFrame(frame, canvas, width, height);
   // Refit when the viewport changes size so the full display remains visible.
   requestAnimationFrame(() => fitCanvasToFrame(frame, canvas, width, height));
+  setTimeout(() => fitCanvasToFrame(frame, canvas, width, height), 60);
 }
 
 function readSizeFromXml(xml) {
@@ -4920,6 +4940,19 @@ function getObjectNodes(doc) {
     return [];
   }
 
+  const NON_VISUAL_TAGS = new Set([
+    'caption',
+    'imagesettings',
+    'states',
+    'state',
+    'connections',
+    'connection',
+    'animations',
+    'animation',
+    'parameters',
+    'parameter'
+  ]);
+
   const nodes = [];
   const walk = (parent) => {
     Array.from(parent.children).forEach((child) => {
@@ -4927,10 +4960,17 @@ function getObjectNodes(doc) {
         return;
       }
 
+      const tag = String(child.tagName || '').toLowerCase();
+      if (NON_VISUAL_TAGS.has(tag)) {
+        return;
+      }
+
       if (
-        child.tagName.toLowerCase() !== 'group'
+        tag !== 'group'
         && child.hasAttribute('left')
         && child.hasAttribute('top')
+        && child.hasAttribute('width')
+        && child.hasAttribute('height')
       ) {
         nodes.push(child);
       }
@@ -5465,6 +5505,16 @@ if (toggleSidebarBtn) {
   });
 }
 
+if (toggleDockBtn) {
+  toggleDockBtn.addEventListener('click', () => {
+    const collapsed = !editorLayout.classList.contains('dock-collapsed');
+    setDockCollapsed(collapsed);
+    if (xmlEditor.value.trim()) {
+      renderPreview();
+    }
+  });
+}
+
 if (refreshBtn) {
   refreshBtn.addEventListener('click', () => {
     const refreshPromise = isDefaultMode()
@@ -5884,6 +5934,8 @@ async function init() {
 
   const sidebarCollapsed = localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1';
   setSidebarCollapsed(sidebarCollapsed);
+  const dockCollapsed = localStorage.getItem(DOCK_STORAGE_KEY) === '1';
+  setDockCollapsed(dockCollapsed);
 
   const res = await fetch('/api/bridge/status');
   const status = await res.json();

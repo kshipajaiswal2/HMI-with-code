@@ -108,11 +108,13 @@
           </div>
 
           <div class="editor-workspace">
-            <div class="editor-layout">
+            <div class="editor-layout" id="editorLayout">
               <div class="editor-preview">
                 <h3>Screen Preview</h3>
                 <div id="previewPane" class="preview-pane"></div>
               </div>
+
+              <button id="toggleDockBtn" type="button" class="dock-edge-toggle" aria-label="Hide tools sidebar" title="Hide tools sidebar" aria-pressed="false"></button>
 
               <aside class="workspace-dock">
                 <div class="dock-tabs" id="workspaceDockTabs" role="tablist" aria-label="Workspace tools">

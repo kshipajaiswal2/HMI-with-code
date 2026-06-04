@@ -134,6 +134,10 @@ function sanitizeXmlForFactoryTalk(xml) {
 
     let openTag = openTagMatch[0];
     let inner = block.slice(openTag.length, block.length - closeTag.length);
+    const groupNameMatch = openTag.match(/\bname="([^"]+)"/i);
+    const groupName = String(groupNameMatch?.[1] || '');
+    const suffixMatch = groupName.match(/(\d+)$/);
+    const suffix = suffixMatch ? suffixMatch[1] : '1';
     const widthMatch = openTag.match(/\bwidth="(-?\d+)"/i);
     const heightMatch = openTag.match(/\bheight="(-?\d+)"/i);
     const groupWidth = Number(widthMatch?.[1] || 1);
@@ -159,7 +163,20 @@ function sanitizeXmlForFactoryTalk(xml) {
     const minTop = Math.min(...childPoints.map((entry) => entry.top));
     const appearsAbsolute = minLeft > Math.max(1, groupWidth) || minTop > Math.max(1, groupHeight);
     if (!appearsAbsolute) {
-      return block;
+      inner = inner.replace(/<\s*([A-Za-z_][\w\-]*)\b([^>]*?)\bname="([^"]+)"([^>]*)>/g, (full, tag, leftAttrs, nameValue, rightAttrs) => {
+        const lowerTag = String(tag || '').toLowerCase();
+        const attrsText = `${leftAttrs || ''}${rightAttrs || ''}`;
+        const isVisual = /\b(left|top|width|height)=/i.test(attrsText);
+        if (!isVisual || ['connection', 'connections', 'parameter', 'parameters'].includes(lowerTag)) {
+          return full;
+        }
+
+        const nextName = String(nameValue || '').endsWith(`_${suffix}`)
+          ? String(nameValue || '')
+          : `${String(nameValue || '')}_${suffix}`;
+        return full.replace(/\bname="[^"]+"/i, `name="${nextName}"`);
+      });
+      return `${openTag}${inner}${closeTag}`;
     }
 
     inner = inner
@@ -177,6 +194,20 @@ function sanitizeXmlForFactoryTalk(xml) {
     } else {
       openTag = openTag.replace(/<group\b/i, `<group top="${Math.round(minTop)}"`);
     }
+
+    inner = inner.replace(/<\s*([A-Za-z_][\w\-]*)\b([^>]*?)\bname="([^"]+)"([^>]*)>/g, (full, tag, leftAttrs, nameValue, rightAttrs) => {
+      const lowerTag = String(tag || '').toLowerCase();
+      const attrsText = `${leftAttrs || ''}${rightAttrs || ''}`;
+      const isVisual = /\b(left|top|width|height)=/i.test(attrsText);
+      if (!isVisual || ['connection', 'connections', 'parameter', 'parameters'].includes(lowerTag)) {
+        return full;
+      }
+
+      const nextName = String(nameValue || '').endsWith(`_${suffix}`)
+        ? String(nameValue || '')
+        : `${String(nameValue || '')}_${suffix}`;
+      return full.replace(/\bname="[^"]+"/i, `name="${nextName}"`);
+    });
 
     return `${openTag}${inner}${closeTag}`;
   };

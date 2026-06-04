@@ -6,7 +6,7 @@
     <title>Display XML Bridge</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -15,9 +15,11 @@
         <div class="hero-title">
           <h1>Display XML Bridge</h1>
         </div>
-        <div class="status-card" id="bridgeStatus">
-          <span class="dot"></span>
-          <span>Checking bridge...</span>
+        <div class="hero-meta">
+          <div class="status-card" id="bridgeStatus">
+            <span class="dot"></span>
+            <span>Checking bridge...</span>
+          </div>
         </div>
       </section>
 
@@ -78,6 +80,15 @@
 
             <div class="size-grid">
               <div>
+                <label for="screenSizePreset">Screen Size</label>
+                <select id="screenSizePreset">
+                  <option value="">Custom</option>
+                  <option value="800x600">10 inches (800x600)</option>
+                  <option value="1280x800">12 inches (1280x800)</option>
+                  <option value="1024x768">15 inches (1024x768)</option>
+                </select>
+              </div>
+              <div>
                 <label for="screenWidth">Width</label>
                 <input id="screenWidth" type="number" min="1" value="1024" />
               </div>
@@ -96,54 +107,22 @@
             </div>
           </div>
 
-          <div class="editor-layout">
-            <div class="editor-preview">
-              <h3>Screen Preview</h3>
-              <div id="previewPane" class="preview-pane"></div>
-            </div>
-
-            <aside class="workspace-dock">
-              <div class="dock-tabs" id="workspaceDockTabs" role="tablist" aria-label="Workspace tools">
-                <button type="button" class="dock-tab active" data-dock-tab="planner" role="tab" aria-selected="true">Planner</button>
-                <button type="button" class="dock-tab" data-dock-tab="properties" role="tab" aria-selected="false">Properties</button>
-                <button type="button" class="dock-tab" data-dock-tab="xml" role="tab" aria-selected="false">XML/Status</button>
+          <div class="editor-workspace">
+            <div class="editor-layout">
+              <div class="editor-preview">
+                <h3>Screen Preview</h3>
+                <div id="previewPane" class="preview-pane"></div>
               </div>
 
-              <section class="dock-panel active" data-dock-panel="planner" role="tabpanel" aria-label="Popup planner">
-                <details class="object-panel popup-planner" id="popupPlannerDetails" open>
-                  <summary>Project Popup Planner</summary>
+              <aside class="workspace-dock">
+                <div class="dock-tabs" id="workspaceDockTabs" role="tablist" aria-label="Workspace tools">
+                  <button type="button" class="dock-tab active" data-dock-tab="properties" role="tab" aria-selected="true">Properties</button>
+                  <button type="button" class="dock-tab" data-dock-tab="xml" role="tab" aria-selected="false">XML/Status</button>
+                </div>
 
-                  <div class="planner-table-header">
-                    <h4>Project Details Table</h4>
-                    <button id="addPopupPlanRowBtn" type="button" class="secondary">Add Row</button>
-                  </div>
-
-                  <div class="planner-table-wrap">
-                    <table class="planner-table" id="popupPlanTable">
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>Component Type</th>
-                          <th>Popup Type</th>
-                          <th>Code</th>
-                          <th>Count</th>
-                          <th>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody id="popupPlanBody"></tbody>
-                    </table>
-                  </div>
-
-                  <div class="planner-generate-actions">
-                    <button id="generatePopupsBtn" type="button">Generate Popups</button>
-                  </div>
-                </details>
-              </section>
-
-              <section class="dock-panel" data-dock-panel="properties" role="tabpanel" aria-label="Selected object properties">
+                <section class="dock-panel active" data-dock-panel="properties" role="tabpanel" aria-label="Selected object properties">
                 <details class="object-panel" id="objectPanelDetails" open>
                   <summary>Selected Object Properties</summary>
-                  <p>Click any object in preview, edit fields, then apply.</p>
 
                   <div class="prop-grid">
                     <div>
@@ -209,16 +188,56 @@
                 </details>
               </section>
 
-              <section class="dock-panel" data-dock-panel="xml" role="tabpanel" aria-label="XML and status">
-                <details class="advanced-box" open>
-                  <summary>Advanced: Show XML code</summary>
-                  <label for="xmlEditor">Display XML</label>
-                  <textarea id="xmlEditor" rows="10" placeholder="Select a display to load XML..."></textarea>
-                </details>
+                <section class="dock-panel" data-dock-panel="xml" role="tabpanel" aria-label="XML and status">
+                  <details class="advanced-box" open>
+                    <summary>Advanced: Show XML code</summary>
+                    <label for="xmlEditor">Display XML</label>
+                    <textarea id="xmlEditor" rows="10" placeholder="Select a display to load XML..."></textarea>
+                  </details>
 
-                <div id="packageResult" class="package-result"></div>
-              </section>
-            </aside>
+                  <div id="packageResult" class="package-result"></div>
+                </section>
+              </aside>
+            </div>
+
+            <details class="object-panel popup-planner popup-planner-wide" id="popupPlannerDetails">
+              <summary>Project Popup Planner</summary>
+
+              <div class="planner-table-header">
+                <h4>Project Details Table</h4>
+                <button id="addPopupPlanRowBtn" type="button" class="secondary">Add Row</button>
+              </div>
+
+              <div class="planner-table-wrap">
+                <table class="planner-table" id="popupPlanTable">
+                  <colgroup>
+                    <col class="planner-col-name" />
+                    <col class="planner-col-component" />
+                    <col class="planner-col-popup-type" />
+                    <col class="planner-col-count" />
+                    <col class="planner-col-target-screen" />
+                    <col class="planner-col-generated" />
+                    <col class="planner-col-action" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Component Type</th>
+                      <th>Popup Type</th>
+                      <th>Count</th>
+                      <th>Target Screen</th>
+                      <th>Generated</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="popupPlanBody"></tbody>
+                </table>
+              </div>
+
+              <div class="planner-generate-actions" id="popupGenerateActions">
+                <button id="generatePopupsBtn" type="button">Generate Popups</button>
+              </div>
+            </details>
           </div>
         </article>
       </section>

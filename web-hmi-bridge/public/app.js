@@ -33,6 +33,7 @@ const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
 const mainGrid = document.getElementById('mainGrid');
 
 const displayName = document.getElementById('displayName');
+const screenSizePreset = document.getElementById('screenSizePreset');
 const screenWidth = document.getElementById('screenWidth');
 const screenHeight = document.getElementById('screenHeight');
 const xmlEditor = document.getElementById('xmlEditor');
@@ -75,12 +76,12 @@ const deletePopupTemplateBtn = document.getElementById('deletePopupTemplateBtn')
 const addPopupPlanRowBtn = document.getElementById('addPopupPlanRowBtn');
 const popupPlanBody = document.getElementById('popupPlanBody');
 const generatePopupsBtn = document.getElementById('generatePopupsBtn');
-const popupPalette = document.getElementById('popupPalette');
+const popupGenerateActions = document.getElementById('popupGenerateActions');
 
 let selectedDisplay = '';
 let selectedFiles = [];
 let selectedObjectIndex = null;
-let activeDockTab = 'planner';
+let activeDockTab = 'properties';
 let usingUploadedList = false;
 let currentDisplayRows = [];
 let currentDefaultRows = [];
@@ -103,6 +104,7 @@ let copiedObjectName = '';
 let copiedObjectGroupId = '';
 let copiedPasteCount = 0;
 let plannerSelectedTemplateId = '';
+let plannerTargetScreenKey = '';
 let generatedPopupDrafts = [];
 
 const TEMPLATE_DISPLAY_NAME = 'Template.xml';
@@ -118,6 +120,11 @@ const SIDEBAR_MODE_DEFAULTS = 'defaults';
 const UNGROUPED_FOLDER_NAME = 'Ungrouped';
 const HISTORY_LIMIT = 120;
 const POPUP_GROUP_PREFIX = 'WB_POPUP';
+const SCREEN_SIZE_PRESETS = {
+  '800x600': { width: 800, height: 600 },
+  '1280x800': { width: 1280, height: 800 },
+  '1024x768': { width: 1024, height: 768 }
+};
 let sidebarMode = SIDEBAR_MODE_DISPLAYS;
 let currentProjectName = normalizeProjectName(localStorage.getItem(PROJECT_NAME_STORAGE_KEY) || 'Untitled Project');
 let projectList = loadProjectList();
@@ -128,6 +135,41 @@ let activeProjectKey = '';
 
 function displayKey(name) {
   return String(name || '').toLowerCase();
+}
+
+function findScreenSizePreset(width, height) {
+  const w = Number(width);
+  const h = Number(height);
+  if (!Number.isFinite(w) || !Number.isFinite(h)) {
+    return '';
+  }
+
+  for (const [key, preset] of Object.entries(SCREEN_SIZE_PRESETS)) {
+    if (preset.width === w && preset.height === h) {
+      return key;
+    }
+  }
+
+  return '';
+}
+
+function syncScreenPresetFromInputs() {
+  if (!screenSizePreset) {
+    return;
+  }
+
+  screenSizePreset.value = findScreenSizePreset(screenWidth?.value, screenHeight?.value);
+}
+
+function applyScreenPreset(presetKey) {
+  const preset = SCREEN_SIZE_PRESETS[String(presetKey || '')];
+  if (!preset) {
+    return;
+  }
+
+  screenWidth.value = String(preset.width);
+  screenHeight.value = String(preset.height);
+  syncScreenPresetFromInputs();
 }
 
 function isGlobalObjectFile(file) {
@@ -199,6 +241,38 @@ function suggestPopupCode(popupName, popupTypeId) {
   return `{[PLC]${popupToken}_IN_${measureToken}}`;
 }
 
+function getComponentTypeLabel(componentTypeId, project = null) {
+  const id = String(componentTypeId || 'component:conveyor');
+  const component = COMPONENT_TYPES.find((item) => item.id === id);
+  if (component) {
+    return component.label;
+  }
+
+  if (id.startsWith('template:')) {
+    const templateId = id.slice('template:'.length);
+    const template = project?.popupTemplates?.find((item) => String(item.id) === templateId);
+    if (template?.name) {
+      return template.name;
+    }
+    return 'Custom Template';
+  }
+
+  return id;
+}
+
+function syncPopupPlanRowDerivedValues(row) {
+  if (!row || typeof row !== 'object') {
+    return row;
+  }
+
+  row.popupName = String(row.popupName || '').trim();
+  row.componentTypeId = String(row.componentTypeId || 'component:conveyor');
+  row.popupTypeId = String(row.popupTypeId || 'vfd').toLowerCase();
+  row.count = Math.max(1, Math.min(200, Number(row.count) || 1));
+  row.code = suggestPopupCode(row.popupName, row.popupTypeId);
+  return row;
+}
+
 function ensureProjectPopupData(project) {
   if (!project || typeof project !== 'object') {
     return;
@@ -206,6 +280,7 @@ function ensureProjectPopupData(project) {
 
   project.popupTemplates = Array.isArray(project.popupTemplates) ? project.popupTemplates : [];
   project.popupPlanRows = Array.isArray(project.popupPlanRows) ? project.popupPlanRows : [];
+  project.popupGeneratedRows = Array.isArray(project.popupGeneratedRows) ? project.popupGeneratedRows : [];
 
   project.popupTemplates = project.popupTemplates
     .map((template) => ({
@@ -222,12 +297,22 @@ function ensureProjectPopupData(project) {
     popupTypeId: String(row?.popupTypeId || row?.measurementTypeId || 'vfd').toLowerCase(),
     code: String(row?.code || '').trim(),
     count: Math.max(1, Math.min(200, Number(row?.count) || 1))
-  })).map((row) => {
-    if (!row.code) {
-      row.code = suggestPopupCode(row.popupName, row.popupTypeId);
-    }
-    return row;
-  });
+  })).map((row) => syncPopupPlanRowDerivedValues(row));
+
+  project.popupGeneratedRows = project.popupGeneratedRows.map((entry) => ({
+    id: String(entry?.id || `popup-generated-${Date.now()}-${Math.random().toString(16).slice(2)}`),
+    popupName: String(entry?.popupName || 'Popup').trim() || 'Popup',
+    sequence: Math.max(1, Number(entry?.sequence) || 1),
+    totalForName: Math.max(1, Number(entry?.totalForName) || 1),
+    componentTypeId: String(entry?.componentTypeId || 'component:conveyor'),
+    componentTypeLabel: String(entry?.componentTypeLabel || ''),
+    templateId: String(entry?.templateId || ''),
+    templateName: String(entry?.templateName || 'Popup Template').trim() || 'Popup Template',
+    popupTypeId: String(entry?.popupTypeId || 'vfd').toLowerCase(),
+    popupTypeLabel: String(entry?.popupTypeLabel || '').trim(),
+    code: String(entry?.code || suggestPopupCode(entry?.popupName, entry?.popupTypeId)).trim(),
+    generatedAt: String(entry?.generatedAt || new Date().toISOString())
+  }));
 }
 
 function loadProjectList() {
@@ -898,9 +983,9 @@ function hideSidebarNamePanel() {
 }
 
 function setWorkspaceDockTab(tabId) {
-  const nextTab = ['planner', 'properties', 'xml'].includes(String(tabId))
+  const nextTab = ['properties', 'xml'].includes(String(tabId))
     ? String(tabId)
-    : 'planner';
+    : 'properties';
   activeDockTab = nextTab;
 
   for (const button of workspaceDockTabButtons) {
@@ -922,7 +1007,7 @@ function initializeWorkspaceDockTabs() {
 
   for (const button of workspaceDockTabButtons) {
     button.addEventListener('click', () => {
-      setWorkspaceDockTab(button.dataset.dockTab || 'planner');
+      setWorkspaceDockTab(button.dataset.dockTab || 'properties');
     });
   }
 
@@ -1018,8 +1103,28 @@ async function autoSaveCurrentDisplay() {
     return true;
   }
 
-  const sanitizedXml = sanitizeXmlForFactoryTalk(xmlEditor.value);
-  if (sanitizedXml !== xmlEditor.value) {
+  let workingXml = xmlEditor.value;
+  const requestedWidth = Number(screenWidth.value);
+  const requestedHeight = Number(screenHeight.value);
+
+  if (Number.isFinite(requestedWidth) && requestedWidth > 0 && Number.isFinite(requestedHeight) && requestedHeight > 0) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(workingXml, 'text/xml');
+    const parseError = doc.querySelector('parsererror');
+    const displaySettings = parseError ? null : doc.querySelector('displaySettings');
+    const currentWidth = Number(displaySettings?.getAttribute('width'));
+    const currentHeight = Number(displaySettings?.getAttribute('height'));
+
+    if (displaySettings && (currentWidth !== requestedWidth || currentHeight !== requestedHeight)) {
+      workingXml = resizeDisplayXml(workingXml, requestedWidth, requestedHeight);
+      xmlEditor.value = workingXml;
+      recordHistory(workingXml);
+      renderPreview();
+    }
+  }
+
+  const sanitizedXml = sanitizeXmlForFactoryTalk(workingXml);
+  if (sanitizedXml !== workingXml) {
     xmlEditor.value = sanitizedXml;
   }
 
@@ -1081,8 +1186,10 @@ function fitCanvasToFrame(frame, canvas, width, height) {
   const frameStyles = getComputedStyle(frame);
   const horizontalPadding = parseFloat(frameStyles.paddingLeft || '0') + parseFloat(frameStyles.paddingRight || '0');
   const verticalPadding = parseFloat(frameStyles.paddingTop || '0') + parseFloat(frameStyles.paddingBottom || '0');
-  const availableWidth = Math.max(1, frame.clientWidth - horizontalPadding);
-  const availableHeight = Math.max(1, frame.clientHeight - verticalPadding);
+  // Keep a small inset so border rounding and 1px strokes at edges are not visually clipped.
+  const previewSafeInset = 10;
+  const availableWidth = Math.max(1, frame.clientWidth - horizontalPadding - (previewSafeInset * 2));
+  const availableHeight = Math.max(1, frame.clientHeight - verticalPadding - (previewSafeInset * 2));
 
   // Keep the display fully visible, but avoid upscaling above 1:1 for closer FT parity.
   const scale = Math.min(1, availableWidth / width, availableHeight / height);
@@ -1148,13 +1255,20 @@ function applyCaptionStyles(box, node, captionNode) {
   box.style.textDecoration = [underline ? 'underline' : '', strike ? 'line-through' : ''].filter(Boolean).join(' ') || 'none';
 
   const wrap = (captionNode?.getAttribute('wordWrap') || '').toLowerCase() === 'true';
+  const sizeToFit = (captionNode?.getAttribute('sizeToFit') || node.getAttribute('sizeToFit') || '').toLowerCase() === 'true';
   const captionText = String(box.textContent || '');
   const hasExplicitBreak = /[\r\n]/.test(captionText);
   const hasFixedSpacing = / {2,}|\t/.test(captionText);
   const useMultiline = wrap || hasExplicitBreak;
   box.style.whiteSpace = useMultiline ? 'pre-line' : (hasFixedSpacing ? 'pre' : 'nowrap');
-  box.style.textOverflow = useMultiline ? 'clip' : 'ellipsis';
-  box.style.lineHeight = useMultiline ? '1.05' : '1';
+  box.style.textOverflow = (useMultiline || sizeToFit) ? 'clip' : 'ellipsis';
+  box.style.lineHeight = useMultiline ? '1.08' : '1.12';
+
+  if (sizeToFit || String(node.tagName || '').toLowerCase() === 'text') {
+    box.classList.add('has-caption-overflow');
+  } else {
+    box.classList.remove('has-caption-overflow');
+  }
 
   const { horizontal, vertical } = parseCaptionAlignment(captionNode?.getAttribute('alignment') || node.getAttribute('alignment'));
   box.style.textAlign = horizontal;
@@ -1553,6 +1667,7 @@ function applyHistorySnapshot(snapshot) {
   const size = readSizeFromXml(snapshot);
   if (size.width) screenWidth.value = size.width;
   if (size.height) screenHeight.value = size.height;
+  syncScreenPresetFromInputs();
 
   renderPreview();
   applyingHistory = false;
@@ -1696,6 +1811,7 @@ function pasteCopiedObject() {
     const newGroup = sourceNode.cloneNode(true);
     const nextGroupName = nextIncrementedName(doc, newGroup.getAttribute('name') || copiedObjectName, POPUP_GROUP_PREFIX);
     newGroup.setAttribute('name', nextGroupName);
+    ensureUniquePopupObjectNames(doc, newGroup);
     const groupWidth = Math.max(1, Number(newGroup.getAttribute('width') || 1));
     const groupHeight = Math.max(1, Number(newGroup.getAttribute('height') || 1));
     const groupLeft = Number(newGroup.getAttribute('left') || 0);
@@ -2224,7 +2340,22 @@ function buildGeneratedPopupDrafts(project) {
   }
 
   const templates = new Map(project.popupTemplates.map((template) => [template.id, template]));
+  const totalByPopupName = new Map();
   for (const row of project.popupPlanRows) {
+    syncPopupPlanRowDerivedValues(row);
+    const template = resolvePopupTemplateForRow(project, row, templates);
+    if (!template) {
+      continue;
+    }
+
+    const popupName = String(row.popupName || '').trim() || 'Popup';
+    const count = Math.max(1, Math.min(200, Number(row.count) || 1));
+    totalByPopupName.set(popupName, (totalByPopupName.get(popupName) || 0) + count);
+  }
+
+  const sequenceByPopupName = new Map();
+  for (const row of project.popupPlanRows) {
+    syncPopupPlanRowDerivedValues(row);
     const template = resolvePopupTemplateForRow(project, row, templates);
     if (!template) {
       continue;
@@ -2233,8 +2364,10 @@ function buildGeneratedPopupDrafts(project) {
     const count = Math.max(1, Math.min(200, Number(row.count) || 1));
     const popupName = String(row.popupName || '').trim() || 'Popup';
     const profile = getPopupTypeProfile(row.popupTypeId);
-    const code = String(row.code || '').trim() || suggestPopupCode(popupName, profile.id);
+    const code = suggestPopupCode(popupName, profile.id);
     for (let i = 1; i <= count; i += 1) {
+      const nextSequence = (sequenceByPopupName.get(popupName) || 0) + 1;
+      sequenceByPopupName.set(popupName, nextSequence);
       drafts.push({
         id: `${project.id}::${row.id}::${template.id}::${i}`,
         projectId: project.id,
@@ -2246,8 +2379,9 @@ function buildGeneratedPopupDrafts(project) {
         popupTypeLabel: profile.label,
         unit: profile.unit,
         code,
-        sequence: i,
-        label: `${popupName}${count > 1 ? ` ${i}` : ''} - ${template.name} (${profile.label})`,
+        sequence: nextSequence,
+        totalForName: totalByPopupName.get(popupName) || count,
+        label: `${formatPopupLabel(popupName, nextSequence, totalByPopupName.get(popupName) || count)} - ${template.name} (${profile.label})`,
         xml: template.xml
       });
     }
@@ -2256,21 +2390,95 @@ function buildGeneratedPopupDrafts(project) {
   return drafts;
 }
 
+function createSavedPopupEntry(draft, project) {
+  const sourceRow = project?.popupPlanRows?.find((row) => String(row.id) === String(draft?.rowId));
+  const componentTypeId = String(sourceRow?.componentTypeId || 'component:conveyor');
+  const targetScreenLabel = 'Active Screen';
+  return {
+    id: `popup-generated-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    popupName: String(draft?.popupName || 'Popup').trim() || 'Popup',
+    sequence: Math.max(1, Number(draft?.sequence) || 1),
+    totalForName: Math.max(1, Number(draft?.totalForName) || 1),
+    sourceRowId: String(draft?.rowId || ''),
+    componentTypeId,
+    componentTypeLabel: getComponentTypeLabel(componentTypeId, project),
+    templateId: String(draft?.templateId || ''),
+    templateName: String(draft?.templateName || 'Popup Template').trim() || 'Popup Template',
+    popupTypeId: String(draft?.popupTypeId || 'vfd').toLowerCase(),
+    popupTypeLabel: String(draft?.popupTypeLabel || ''),
+    code: String(draft?.code || suggestPopupCode(draft?.popupName, draft?.popupTypeId)).trim(),
+    targetScreenLabel,
+    generatedAt: new Date().toISOString()
+  };
+}
+
+function resolvePopupTemplateById(project, templateId) {
+  const key = String(templateId || '');
+  if (!key) {
+    return null;
+  }
+
+  if (key === 'preset:conveyor:vfd') {
+    return {
+      id: 'preset:conveyor:vfd',
+      name: '800_popup (Conveyor VFD)',
+      xml: CONVEYOR_VFD_TEMPLATE_XML
+    };
+  }
+
+  if (key === 'preset:conveyor:generic') {
+    return {
+      id: 'preset:conveyor:generic',
+      name: 'Conveyor Popup',
+      xml: CONVEYOR_VFD_TEMPLATE_XML
+    };
+  }
+
+  return project?.popupTemplates?.find((template) => String(template.id) === key) || null;
+}
+
+function clearGeneratedRowsFromPlannerTable() {
+  if (!popupPlanBody) {
+    return;
+  }
+
+  const staleRows = popupPlanBody.querySelectorAll('tr[data-generated-row="true"], tr[data-generated-header="true"]');
+  staleRows.forEach((row) => row.remove());
+}
+
+function renderPopupTargetScreenOptions(project) {
+  if (!project) {
+    plannerTargetScreenKey = '';
+    return;
+  }
+
+  plannerTargetScreenKey = activeProjectKey && String(activeProjectKey).startsWith(`${project.id}::`)
+    ? activeProjectKey
+    : '';
+}
+
 function copyPopupDraftToClipboardBuffer(draft) {
   if (!draft) {
     return;
   }
 
   copiedObjectXml = String(draft.xml || '');
-  copiedObjectName = `${draft.popupName || 'Popup'}_${draft.sequence || 1}`;
+  copiedObjectName = formatPopupLabel(draft.popupName || 'Popup', draft.sequence || 1, draft.totalForName || 1);
   copiedObjectGroupId = '';
   copiedPasteCount = 0;
   packageResult.textContent = `Copied popup template: ${draft.label}. Use Ctrl+V to paste into the active screen.`;
 }
 
+function formatPopupLabel(popupName, sequence, totalForName = 1) {
+  const base = String(popupName || '').trim() || 'Popup';
+  const seq = Math.max(1, Number(sequence) || 1);
+  const total = Math.max(1, Number(totalForName) || 1);
+  return total > 1 ? `${base}_${seq}` : base;
+}
+
 function applyPopupDraftAttributes(newNode, draft) {
   const profile = getPopupTypeProfile(draft.popupTypeId);
-  const popupLabel = `${draft.popupName}${Number(draft.sequence) > 1 ? ` ${draft.sequence}` : ''}`;
+  const popupLabel = formatPopupLabel(draft.popupName, draft.sequence, draft.totalForName);
 
   const directCaption = String(newNode.getAttribute('caption') || '').trim();
   if (directCaption) {
@@ -2315,6 +2523,50 @@ function applyPopupDraftAttributes(newNode, draft) {
   }
 }
 
+function popupNameSuffixFromGroup(groupName) {
+  const raw = String(groupName || '').trim();
+  if (!raw) {
+    return '1';
+  }
+
+  const tailNumber = raw.match(/(\d+)$/);
+  if (tailNumber) {
+    return tailNumber[1];
+  }
+
+  const token = toCodeToken(raw) || '1';
+  return token.slice(-8);
+}
+
+function ensureUniquePopupObjectNames(doc, popupGroup) {
+  if (!doc || !popupGroup || String(popupGroup.tagName || '').toLowerCase() !== 'group') {
+    return;
+  }
+
+  const suffix = popupNameSuffixFromGroup(popupGroup.getAttribute('name'));
+  const allNodes = [popupGroup, ...Array.from(popupGroup.querySelectorAll('*'))];
+  for (const node of allNodes) {
+    if (node === popupGroup || !node?.hasAttribute || !node.hasAttribute('name')) {
+      continue;
+    }
+
+    const tag = String(node.tagName || '').toLowerCase();
+    const isVisual = node.hasAttribute('left') && node.hasAttribute('top');
+    if (!isVisual || tag === 'connection' || tag === 'connections' || tag === 'parameters' || tag === 'parameter') {
+      continue;
+    }
+
+    const currentName = String(node.getAttribute('name') || '').trim();
+    if (!currentName) {
+      continue;
+    }
+
+    const withSuffix = currentName.endsWith(`_${suffix}`) ? currentName : `${currentName}_${suffix}`;
+    const nextName = nextIncrementedName(doc, withSuffix, 'PopupObject');
+    node.setAttribute('name', nextName);
+  }
+}
+
 function insertGeneratedPopupDraft(draft, options = {}) {
   if (!draft) {
     return false;
@@ -2346,9 +2598,11 @@ function insertGeneratedPopupDraft(draft, options = {}) {
   }
 
   const newNode = templateNode.cloneNode(true);
-  const popupLabelToken = toCodeToken(draft.popupName || 'Popup') || 'Popup';
-  const sourceName = String(newNode.getAttribute('name') || `${POPUP_GROUP_PREFIX}_${popupLabelToken}`);
+  const popupLabel = formatPopupLabel(draft.popupName, draft.sequence, draft.totalForName);
+  const popupLabelToken = toCodeToken(popupLabel) || 'POPUP';
+  const sourceName = `${POPUP_GROUP_PREFIX}_${popupLabelToken}`;
   newNode.setAttribute('name', nextIncrementedName(doc, sourceName, POPUP_GROUP_PREFIX));
+  ensureUniquePopupObjectNames(doc, newNode);
 
   const displaySettings = doc.querySelector('displaySettings');
   const displayWidth = Number(displaySettings?.getAttribute('width')) || Number(screenWidth.value) || DEFAULT_PREVIEW_WIDTH;
@@ -2428,8 +2682,9 @@ function renderPopupPlanRows(project) {
   }
 
   for (const row of project.popupPlanRows) {
+    syncPopupPlanRowDerivedValues(row);
     const tr = document.createElement('tr');
-    let codeInput = null;
+    tr.dataset.rowId = row.id;
 
     const nameTd = document.createElement('td');
     const nameInput = document.createElement('input');
@@ -2438,10 +2693,7 @@ function renderPopupPlanRows(project) {
     nameInput.placeholder = 'MRTC03';
     nameInput.addEventListener('input', () => {
       row.popupName = String(nameInput.value || '').trim();
-      row.code = suggestPopupCode(row.popupName, row.popupTypeId);
-      if (codeInput) {
-        codeInput.value = row.code;
-      }
+      syncPopupPlanRowDerivedValues(row);
       saveProjectList();
       generatedPopupDrafts = buildGeneratedPopupDrafts(project);
       renderPopupPalette(project);
@@ -2475,6 +2727,7 @@ function renderPopupPlanRows(project) {
     typeSelect.value = row.componentTypeId || 'component:conveyor';
     typeSelect.addEventListener('change', () => {
       row.componentTypeId = String(typeSelect.value || 'component:conveyor');
+      syncPopupPlanRowDerivedValues(row);
       saveProjectList();
       generatedPopupDrafts = buildGeneratedPopupDrafts(project);
       renderPopupPalette(project);
@@ -2492,28 +2745,12 @@ function renderPopupPlanRows(project) {
     popupTypeSelect.value = row.popupTypeId || 'vfd';
     popupTypeSelect.addEventListener('change', () => {
       row.popupTypeId = String(popupTypeSelect.value || 'vfd');
-      row.code = suggestPopupCode(row.popupName, row.popupTypeId);
-      if (codeInput) {
-        codeInput.value = row.code;
-      }
+      syncPopupPlanRowDerivedValues(row);
       saveProjectList();
       generatedPopupDrafts = buildGeneratedPopupDrafts(project);
       renderPopupPalette(project);
     });
     popupTypeTd.appendChild(popupTypeSelect);
-
-    const codeTd = document.createElement('td');
-    codeInput = document.createElement('input');
-    codeInput.type = 'text';
-    codeInput.value = row.code || suggestPopupCode(row.popupName, row.popupTypeId);
-    codeInput.placeholder = '{[PLC]TAG}';
-    codeInput.addEventListener('input', () => {
-      row.code = String(codeInput.value || '').trim();
-      saveProjectList();
-      generatedPopupDrafts = buildGeneratedPopupDrafts(project);
-      renderPopupPalette(project);
-    });
-    codeTd.appendChild(codeInput);
 
     const countTd = document.createElement('td');
     const countInput = document.createElement('input');
@@ -2523,12 +2760,25 @@ function renderPopupPlanRows(project) {
     countInput.value = String(row.count || 1);
     countInput.addEventListener('input', () => {
       row.count = Math.max(1, Math.min(200, Number(countInput.value) || 1));
+      syncPopupPlanRowDerivedValues(row);
       countInput.value = String(row.count);
       saveProjectList();
       generatedPopupDrafts = buildGeneratedPopupDrafts(project);
       renderPopupPalette(project);
     });
-    countTd.appendChild(countInput);
+    const countWrap = document.createElement('div');
+    countWrap.className = 'planner-count-cell';
+    countWrap.appendChild(countInput);
+    countTd.appendChild(countWrap);
+
+    const targetTd = document.createElement('td');
+    const activeScreenLabel = document.createElement('span');
+    activeScreenLabel.className = 'planner-target-placeholder';
+    activeScreenLabel.textContent = 'Active screen';
+    targetTd.appendChild(activeScreenLabel);
+
+    const generatedTd = document.createElement('td');
+    generatedTd.textContent = '-';
 
     const actionTd = document.createElement('td');
     const removeBtn = document.createElement('button');
@@ -2546,69 +2796,110 @@ function renderPopupPlanRows(project) {
     tr.appendChild(nameTd);
     tr.appendChild(typeTd);
     tr.appendChild(popupTypeTd);
-    tr.appendChild(codeTd);
     tr.appendChild(countTd);
+    tr.appendChild(targetTd);
+    tr.appendChild(generatedTd);
     tr.appendChild(actionTd);
     popupPlanBody.appendChild(tr);
+  }
+
+}
+
+function syncPopupPlanRowsFromTable(project) {
+  if (!project || !popupPlanBody) {
+    return;
+  }
+
+  const rowById = new Map(project.popupPlanRows.map((row) => [row.id, row]));
+  for (const tr of popupPlanBody.querySelectorAll('tr')) {
+    const rowId = String(tr.dataset.rowId || '');
+    const row = rowById.get(rowId);
+    if (!row) {
+      continue;
+    }
+
+    const textInput = tr.querySelector('input[type="text"]');
+    const selects = tr.querySelectorAll('select');
+    const numberInput = tr.querySelector('input[type="number"]');
+
+    row.popupName = String(textInput?.value || row.popupName || '').trim();
+    row.componentTypeId = String(selects[0]?.value || row.componentTypeId || 'component:conveyor');
+    row.popupTypeId = String(selects[1]?.value || row.popupTypeId || 'vfd');
+    row.count = Math.max(1, Math.min(200, Number(numberInput?.value) || row.count || 1));
+    syncPopupPlanRowDerivedValues(row);
   }
 }
 
 function renderPopupPalette(project) {
-  if (!popupPalette) {
+  if (!popupPlanBody) {
     return;
   }
 
-  popupPalette.innerHTML = '';
-  if (!project || !generatedPopupDrafts.length) {
-    popupPalette.innerHTML = '<div class="popup-palette-empty">Add rows and template mappings to generate popup items.</div>';
+  clearGeneratedRowsFromPlannerTable();
+
+  const savedRows = Array.isArray(project?.popupGeneratedRows) ? project.popupGeneratedRows : [];
+  if (!project || !savedRows.length) {
     return;
   }
 
-  for (const draft of generatedPopupDrafts) {
-    const item = document.createElement('div');
-    item.className = 'popup-draft-item';
-    item.draggable = true;
+  const titleTr = document.createElement('tr');
+  titleTr.className = 'planner-generated-inline-title';
+  titleTr.dataset.generatedHeader = 'true';
+  const titleTd = document.createElement('td');
+  titleTd.colSpan = 7;
+  titleTd.textContent = 'Generated Popup History';
+  titleTr.appendChild(titleTd);
+  popupPlanBody.appendChild(titleTr);
 
-    const text = document.createElement('div');
-    text.className = 'popup-draft-text';
-    text.textContent = draft.label;
+  const rows = [...savedRows].reverse();
+  for (const entry of rows) {
+    const tr = document.createElement('tr');
+    tr.className = 'planner-generated-row';
+    tr.dataset.generatedRow = 'true';
+    const profile = getPopupTypeProfile(entry.popupTypeId);
+    const popupLabel = formatPopupLabel(entry.popupName, entry.sequence, entry.totalForName);
 
-    const actions = document.createElement('div');
-    actions.className = 'popup-draft-actions';
+    const nameTd = document.createElement('td');
+    nameTd.textContent = popupLabel;
 
-    const insertBtn = document.createElement('button');
-    insertBtn.type = 'button';
-    insertBtn.className = 'secondary';
-    insertBtn.textContent = 'Insert';
-    insertBtn.addEventListener('click', () => {
-      insertGeneratedPopupDraft(draft);
+    const templateTd = document.createElement('td');
+    templateTd.textContent = entry.componentTypeLabel
+      || getComponentTypeLabel(entry.componentTypeId, project)
+      || 'Conveyor';
+
+    const typeTd = document.createElement('td');
+    typeTd.textContent = entry.popupTypeLabel || profile.label;
+
+    const countTd = document.createElement('td');
+    countTd.textContent = String(entry.totalForName || 1);
+
+    const targetTd = document.createElement('td');
+    targetTd.textContent = String(entry.targetScreenLabel || 'Active Screen');
+
+    const generatedTd = document.createElement('td');
+    generatedTd.textContent = new Date(entry.generatedAt).toLocaleString();
+
+    const actionsTd = document.createElement('td');
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'tree-action-btn danger';
+    deleteBtn.textContent = '×';
+    deleteBtn.title = 'Delete generated entry';
+    deleteBtn.addEventListener('click', () => {
+      project.popupGeneratedRows = project.popupGeneratedRows.filter((item) => String(item.id) !== String(entry.id));
+      saveProjectList();
+      renderPopupPalette(project);
     });
+    actionsTd.appendChild(deleteBtn);
 
-    const copyBtn = document.createElement('button');
-    copyBtn.type = 'button';
-    copyBtn.className = 'secondary';
-    copyBtn.textContent = 'Copy';
-    copyBtn.addEventListener('click', () => {
-      copyPopupDraftToClipboardBuffer(draft);
-    });
-
-    actions.appendChild(insertBtn);
-    actions.appendChild(copyBtn);
-    item.appendChild(text);
-    item.appendChild(actions);
-
-    item.addEventListener('dragstart', (event) => {
-      event.dataTransfer.effectAllowed = 'copy';
-      event.dataTransfer.setData('application/x-popup-draft-id', draft.id);
-      item.classList.add('dragging');
-    });
-
-    item.addEventListener('dragend', () => {
-      item.classList.remove('dragging');
-      previewPane.querySelector('.xml-canvas')?.classList.remove('popup-drop-ready');
-    });
-
-    popupPalette.appendChild(item);
+    tr.appendChild(nameTd);
+    tr.appendChild(templateTd);
+    tr.appendChild(typeTd);
+    tr.appendChild(countTd);
+    tr.appendChild(targetTd);
+    tr.appendChild(generatedTd);
+    tr.appendChild(actionsTd);
+    popupPlanBody.appendChild(tr);
   }
 }
 
@@ -2657,6 +2948,7 @@ function renderProjectPopupPlanner() {
 
   renderPopupTemplateOptions(project);
   applyPlannerTemplateSelection(project);
+  renderPopupTargetScreenOptions(project);
   renderPopupPlanRows(project);
   generatedPopupDrafts = buildGeneratedPopupDrafts(project);
   renderPopupPalette(project);
@@ -2674,6 +2966,7 @@ function setEditorDisplay(name, xml) {
   const size = readSizeFromXml(xml);
   if (size.width) screenWidth.value = size.width;
   if (size.height) screenHeight.value = size.height;
+  syncScreenPresetFromInputs();
 
   if (currentProjectName === 'Untitled Project') {
     setProjectName(baseFileName(name));
@@ -2696,6 +2989,7 @@ function setEditorTemplate(name, xml) {
   const size = readSizeFromXml(xml);
   if (size.width) screenWidth.value = size.width;
   if (size.height) screenHeight.value = size.height;
+  syncScreenPresetFromInputs();
 
   if (currentProjectName === 'Untitled Project') {
     setProjectName(baseFileName(name));
@@ -4922,6 +5216,7 @@ function setEditorProjectScreen(project, folderName, screen, xml) {
   const size = readSizeFromXml(xml);
   if (size.width) screenWidth.value = size.width;
   if (size.height) screenHeight.value = size.height;
+  syncScreenPresetFromInputs();
 
   renderPreview();
   renderProjectPopupPlanner();
@@ -5139,6 +5434,24 @@ if (removeDisplayBtn) {
 }
 
 previewBtn.addEventListener('click', renderPreview);
+
+if (screenSizePreset) {
+  screenSizePreset.addEventListener('change', () => {
+    applyScreenPreset(screenSizePreset.value);
+    if (xmlEditor.value.trim()) {
+      renderPreview();
+    }
+  });
+}
+
+if (screenWidth) {
+  screenWidth.addEventListener('input', syncScreenPresetFromInputs);
+}
+
+if (screenHeight) {
+  screenHeight.addEventListener('input', syncScreenPresetFromInputs);
+}
+
 if (addObjectBtn) {
   addObjectBtn.addEventListener('click', addButtonObject);
 }
@@ -5400,12 +5713,22 @@ if (addPopupPlanRowBtn) {
 }
 
 if (generatePopupsBtn) {
-  generatePopupsBtn.addEventListener('click', () => {
+  generatePopupsBtn.addEventListener('click', async () => {
     const project = getActiveProjectForPopupPlanner();
+    syncPopupPlanRowsFromTable(project);
     generatedPopupDrafts = buildGeneratedPopupDrafts(project);
+
+    if (project && generatedPopupDrafts.length) {
+      const historyRows = generatedPopupDrafts.map((draft) => createSavedPopupEntry(draft, project));
+      project.popupGeneratedRows = [...project.popupGeneratedRows, ...historyRows].slice(-1500);
+    }
+
+    saveProjectList();
     renderPopupPalette(project);
 
     let placedCount = 0;
+    const targetScreenLabel = 'active screen';
+
     if (generatedPopupDrafts.length && xmlEditor.value.trim()) {
       const columns = 4;
       const stepX = 170;
@@ -5425,7 +5748,7 @@ if (generatePopupsBtn) {
 
     packageResult.textContent = generatedPopupDrafts.length
       ? (placedCount
-        ? `Generated ${generatedPopupDrafts.length} popup item(s) and placed ${placedCount} on the active screen.`
+        ? `Generated ${generatedPopupDrafts.length} popup item(s) and placed ${placedCount} on ${targetScreenLabel}.`
         : 'Open a project screen first, then click Generate Popups again to place items in preview.')
       : 'No popup items generated yet. Add plan rows and choose popup types.';
   });
@@ -5547,6 +5870,7 @@ async function init() {
   if (!Number(screenHeight.value) || Number(screenHeight.value) <= 0) {
     screenHeight.value = DEFAULT_PREVIEW_HEIGHT;
   }
+  syncScreenPresetFromInputs();
 
   setProjectName(currentProjectName);
   normalizeProjectList();

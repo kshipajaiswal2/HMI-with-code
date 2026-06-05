@@ -117,12 +117,49 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: nowrap;
 }
 
 .displays-header h2 {
   margin: 0;
+  flex-shrink: 0;
+}
+
+/* Right-side group: New Project button + collapse toggle */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Import Folder — full-width row below the header */
+.import-folder-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border: 1px dashed #5b8fa8;
+  border-radius: 10px;
+  background: transparent;
+  color: #2a5f7a;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.import-folder-btn:hover {
+  background: linear-gradient(180deg, #e8f5ff 0%, #d2e9f8 100%);
+  border-color: #2f6b8a;
+  border-style: solid;
+  color: #163e52;
 }
 
 .sidebar-edge-toggle {
@@ -229,6 +266,7 @@ h3 {
 
 .grid.sidebar-collapsed .displays-header h2,
 .grid.sidebar-collapsed .displays-header .mode-btn.accent,
+.grid.sidebar-collapsed .import-folder-btn,
 .grid.sidebar-collapsed .display-tools,
 .grid.sidebar-collapsed .single-list {
   display: none;
@@ -1156,10 +1194,30 @@ li:hover {
 }
 
 .project-toggle {
-  width: 16px;
-  text-align: center;
-  color: #36596a;
-  font-size: 0.78rem;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 0; /* hide any text fallback */
+}
+
+.project-toggle::before {
+  content: '';
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid #36596a;
+  border-bottom: 2px solid #36596a;
+  transform: rotate(-45deg) translate(-1px, 1px);
+  transition: transform 150ms ease;
+  border-radius: 1px;
+}
+
+.project-item.collapsed .project-toggle::before {
+  transform: rotate(45deg) translate(-2px, -2px);
 }
 
 .project-name {
@@ -1267,10 +1325,30 @@ li:hover {
 }
 
 .folder-toggle {
-  width: 16px;
-  text-align: center;
-  color: #36596a;
-  font-size: 0.78rem;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 0; /* hide any text fallback */
+}
+
+.folder-toggle::before {
+  content: '';
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid #36596a;
+  border-bottom: 2px solid #36596a;
+  transform: rotate(-45deg) translate(-1px, 1px);
+  transition: transform 150ms ease;
+  border-radius: 1px;
+}
+
+.folder-item.collapsed .folder-toggle::before {
+  transform: rotate(45deg) translate(-2px, -2px);
 }
 
 .folder-name {

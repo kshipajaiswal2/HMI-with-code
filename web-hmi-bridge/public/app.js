@@ -6,6 +6,8 @@ const sidebarTitle = document.querySelector('.displays-header h2');
 const exportsCard = document.querySelector('.exports-card');
 const uploadInput = document.getElementById('uploadInput');
 const defaultUploadInput = document.getElementById('defaultUploadInput');
+const uploadFolderInput = document.getElementById('uploadFolderInput');
+const importFolderBtn = document.getElementById('importFolderBtn');
 const addDisplayBtn = document.getElementById('addDisplayBtn');
 const addFolderBtn = document.getElementById('addFolderBtn');
 const removeFolderBtn = document.getElementById('removeFolderBtn');
@@ -828,6 +830,10 @@ function setSidebarMode(mode) {
   if (uploadDisplayBtn) {
     uploadDisplayBtn.classList.toggle('hidden', isDefaultMode());
     uploadDisplayBtn.textContent = 'Upload XML';
+  }
+
+  if (importFolderBtn) {
+    importFolderBtn.classList.toggle('hidden', isDefaultMode());
   }
 
   if (refreshBtn) {
@@ -3124,8 +3130,36 @@ async function readUploadedText(file) {
     return new TextDecoder('utf-16le').decode(bytes.slice(2));
   }
 
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return new TextDecoder('utf-16be').decode(bytes.slice(2));
+  }
+
   if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
     return new TextDecoder('utf-8').decode(bytes.slice(3));
+  }
+
+  // Heuristic fallback for BOM-less UTF-16 exports.
+  if (bytes.length >= 8) {
+    let evenZeroCount = 0;
+    let oddZeroCount = 0;
+    const sample = Math.min(bytes.length, 512);
+    for (let i = 0; i < sample; i++) {
+      if (bytes[i] === 0) {
+        if (i % 2 === 0) {
+          evenZeroCount += 1;
+        } else {
+          oddZeroCount += 1;
+        }
+      }
+    }
+
+    if (oddZeroCount > evenZeroCount * 2) {
+      return new TextDecoder('utf-16le').decode(bytes);
+    }
+
+    if (evenZeroCount > oddZeroCount * 2) {
+      return new TextDecoder('utf-16be').decode(bytes);
+    }
   }
 
   return new TextDecoder('utf-8').decode(bytes);
@@ -3162,10 +3196,11 @@ async function readApiJson(res) {
   }
 }
 
-async function saveDisplayXml(name, xml) {
+async function saveDisplayXml(name, xml, options = {}) {
   const safeXml = sanitizeXmlForFactoryTalk(xml);
+  const forceStandalone = Boolean(options?.forceStandalone);
 
-  if (activeProjectKey) {
+  if (activeProjectKey && !forceStandalone) {
     const record = getProjectScreenByKey(activeProjectKey);
     if (record) {
       record.screen.xml = safeXml;
@@ -3791,7 +3826,7 @@ function renderDisplays(files) {
 
       const toggle = document.createElement('span');
       toggle.className = 'folder-toggle';
-      toggle.textContent = folderCollapsedNames.has(folderName) ? '▸' : '▾';
+      toggle.textContent = '';
 
       const folderLabel = document.createElement('span');
       folderLabel.className = 'folder-name';
@@ -3898,7 +3933,7 @@ function renderDefaultTemplates(files) {
 
     const toggle = document.createElement('span');
     toggle.className = 'project-toggle';
-    toggle.textContent = '▾';
+    toggle.textContent = '';
 
     const label = document.createElement('span');
     label.className = 'project-name';
@@ -3919,7 +3954,6 @@ function renderDefaultTemplates(files) {
 
     row.addEventListener('click', () => {
       const collapsed = section.classList.toggle('collapsed');
-      toggle.textContent = collapsed ? '▸' : '▾';
     });
 
     displaysList.appendChild(section);
@@ -4007,11 +4041,7 @@ function renderDefaultTemplates(files) {
 
     const toggle = document.createElement('span');
     toggle.className = 'folder-toggle';
-    toggle.textContent = '▾';
-
-    const folderLabel = document.createElement('span');
-    folderLabel.className = 'folder-name';
-    folderLabel.textContent = folder.name;
+    toggle.textContent = ''; // direction via CSS .collapsed on folder-item
 
     const folderCount = document.createElement('span');
     folderCount.className = 'folder-count';
@@ -4023,7 +4053,7 @@ function renderDefaultTemplates(files) {
 
     folderRow.addEventListener('click', () => {
       const collapsed = folderLi.classList.toggle('collapsed');
-      toggle.textContent = collapsed ? '▸' : '▾';
+      // direction handled by CSS .collapsed on parent
     });
 
     folderLi.appendChild(folderRow);
@@ -4076,7 +4106,7 @@ function renderProjectSidebar() {
 
     const toggle = document.createElement('span');
     toggle.className = 'project-toggle';
-    toggle.textContent = project.collapsed ? '▸' : '▾';
+    toggle.textContent = ''; // direction via CSS .collapsed on project-item
 
     const label = document.createElement('span');
     label.className = 'project-name';
@@ -4168,7 +4198,7 @@ function renderProjectSidebar() {
 
     const toggle = document.createElement('span');
     toggle.className = 'folder-toggle';
-    toggle.textContent = folder.collapsed ? '▸' : '▾';
+    toggle.textContent = ''; // direction via CSS .collapsed on folder-item
 
     const folderLabel = document.createElement('span');
     folderLabel.className = 'folder-name';
@@ -4484,10 +4514,16 @@ function enforceProjectSidebarLayout() {
   for (const selector of flowSelectors) {
     const nodes = document.querySelectorAll(selector);
     for (const node of nodes) {
+      // Never force display:block on collapsed children — that breaks expand/collapse.
+      const isCollapsedChild =
+        (node.classList.contains('project-children') && node.closest('.project-item.collapsed')) ||
+        (node.classList.contains('folder-children') && node.closest('.folder-item.collapsed'));
       node.style.setProperty('height', 'auto', 'important');
       node.style.setProperty('max-height', 'none', 'important');
       node.style.setProperty('min-height', '0', 'important');
-      node.style.setProperty('display', 'block', 'important');
+      if (!isCollapsedChild) {
+        node.style.setProperty('display', 'block', 'important');
+      }
       node.style.setProperty('position', 'static', 'important');
       node.style.setProperty('overflow', 'visible', 'important');
       node.style.setProperty('transform', 'none', 'important');
@@ -5598,29 +5634,243 @@ async function openProjectScreen(projectId, folderName, screenName) {
   updateProjectSidebarSelection();
 }
 
-if (uploadInput) {
-  uploadInput.addEventListener('change', async () => {
-    const files = Array.from(uploadInput.files || [])
-      .filter((file) => file.name.toLowerCase().endsWith('.xml'));
+function isImportableDisplayFileName(name) {
+  const lower = String(name || '').toLowerCase();
+  return lower.endsWith('.xml') && !lower.startsWith('batchimport_');
+}
 
-    if (!files.length) {
-      alert('Choose one or more display XML files to upload.');
-      return;
+async function processStandaloneDisplayUploads(files, emptyMessage) {
+  const importable = Array.from(files || [])
+    .filter((file) => isImportableDisplayFileName(file?.name));
+
+  if (!importable.length) {
+    throw new Error(emptyMessage || 'No XML files selected.');
+  }
+
+  const uploadedRows = [];
+  const failed = [];
+
+  for (const file of importable) {
+    try {
+      const xml = await readUploadedText(file);
+      const row = validateDisplayXml(file.name, xml);
+      await saveDisplayXml(file.name, xml, { forceStandalone: true });
+      hiddenDisplayNames.delete(displayKey(file.name));
+      uploadedRows.push(row);
+    } catch (err) {
+      console.error(err);
+      failed.push(`${file.name}: ${err?.message || 'Invalid XML'}`);
+    }
+  }
+
+  if (!uploadedRows.length) {
+    throw new Error(failed.length
+      ? `No files uploaded. First error: ${failed[0]}`
+      : 'No files uploaded.');
+  }
+
+  usingUploadedList = true;
+  renderDisplays(uploadedRows.sort((a, b) => a.lastModified.localeCompare(b.lastModified)));
+  await loadDisplay(uploadedRows[0].name);
+
+  if (failed.length) {
+    alert(`Uploaded ${uploadedRows.length} file(s). Skipped ${failed.length} file(s).\nFirst issue: ${failed[0]}`);
+  }
+}
+
+function deriveFolderProjectName(files, fallbackName = '') {
+  const preferred = normalizeProjectName(fallbackName || '');
+  if (preferred && preferred !== 'Untitled Project') {
+    return preferred;
+  }
+
+  for (const file of Array.from(files || [])) {
+    const relativePath = String(file?.webkitRelativePath || file?.relativePath || '').trim();
+    if (!relativePath) {
+      continue;
     }
 
-    try {
-      const uploadedRows = [];
-      for (const file of files) {
-        const xml = await readUploadedText(file);
-        const row = validateDisplayXml(file.name, xml);
-        await saveDisplayXml(file.name, xml);
-        hiddenDisplayNames.delete(displayKey(file.name));
-        uploadedRows.push(row);
-      }
+    const first = relativePath.split(/[\\/]+/).filter(Boolean)[0];
+    if (first) {
+      return normalizeProjectName(first);
+    }
+  }
 
-      usingUploadedList = true;
-      renderDisplays(uploadedRows.sort((a, b) => a.lastModified.localeCompare(b.lastModified)));
-      await loadDisplay(uploadedRows[0].name);
+  return normalizeProjectName('Imported Project');
+}
+
+function uniqueProjectName(baseName) {
+  const cleanBase = normalizeProjectName(baseName || 'Imported Project');
+  const existing = new Set((projectList || []).map((project) => displayKey(project?.name)));
+  if (!existing.has(displayKey(cleanBase))) {
+    return cleanBase;
+  }
+
+  let counter = 2;
+  while (existing.has(displayKey(`${cleanBase} ${counter}`))) {
+    counter += 1;
+  }
+
+  return `${cleanBase} ${counter}`;
+}
+
+function folderNameFromRelativePath(relativePath) {
+  const parts = String(relativePath || '').split(/[\\/]+/).filter(Boolean);
+  if (parts.length <= 2) {
+    return 'Ungrouped';
+  }
+
+  const folderParts = parts.slice(1, -1).map((part) => normalizeFolderName(part)).filter(Boolean);
+  if (!folderParts.length) {
+    return 'Ungrouped';
+  }
+
+  return folderParts.join(' / ');
+}
+
+async function processProjectFolderImport(files, options = {}) {
+  const fileList = Array.from(files || []).filter((file) => isImportableDisplayFileName(file?.name));
+  if (!fileList.length) {
+    throw new Error(options.emptyMessage || 'No XML display files found in the selected folder.');
+  }
+
+  const project = {
+    id: `project-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name: uniqueProjectName(deriveFolderProjectName(fileList, options.projectName || '')),
+    collapsed: false,
+    popupTemplates: [],
+    popupPlanRows: [],
+    folders: []
+  };
+
+  const importedScreens = [];
+  const failed = [];
+
+  for (const file of fileList) {
+    try {
+      const xml = await readUploadedText(file);
+      validateDisplayXml(file.name, xml);
+      await saveDisplayXml(file.name, xml, { forceStandalone: true });
+
+      const relativePath = String(file.webkitRelativePath || file.relativePath || file.name || '');
+      const folderName = folderNameFromRelativePath(relativePath);
+      const folder = ensureProjectFolder(project, folderName);
+      const screenName = uniqueScreenName(folder, file.name);
+      const screen = screenMetaFromXml(screenName, xml);
+      folder.screens.push(screen);
+      hiddenDisplayNames.delete(displayKey(screenName));
+      importedScreens.push({ folderName: folder.name, screen });
+    } catch (err) {
+      console.error(err);
+      failed.push(`${file.name}: ${err?.message || 'Invalid XML'}`);
+    }
+  }
+
+  project.folders = project.folders
+    .filter((folder) => Array.isArray(folder.screens) && folder.screens.length)
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
+
+  if (!importedScreens.length || !project.folders.length) {
+    throw new Error(failed.length
+      ? `No files imported. First error: ${failed[0]}`
+      : 'No files imported.');
+  }
+
+  projectList = [...projectList, project];
+  saveProjectList();
+  setActiveProject(project);
+  setSidebarCollapsed(false);
+  usingUploadedList = false;
+  renderProjectSidebar();
+
+  const firstFolder = project.folders[0];
+  const firstScreen = firstFolder?.screens?.[0];
+  if (firstFolder && firstScreen) {
+    setEditorProjectScreen(project, firstFolder.name, firstScreen, firstScreen.xml);
+  }
+
+  packageResult.textContent = `Imported ${importedScreens.length} screen(s) into project ${project.name}${failed.length ? ` (${failed.length} skipped)` : ''}.`;
+
+  if (failed.length) {
+    alert(`Imported ${importedScreens.length} file(s) into project ${project.name}. Skipped ${failed.length} file(s).\nFirst issue: ${failed[0]}`);
+  }
+}
+
+async function collectXmlFilesFromDirectoryHandle(directoryHandle) {
+  const collected = [];
+
+  const walk = async (dirHandle, parentPath = '') => {
+    // DirectoryHandle is async iterable in Chromium-based browsers.
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind === 'file') {
+        const file = await entry.getFile();
+        if (isImportableDisplayFileName(file.name)) {
+          file.relativePath = parentPath ? `${parentPath}/${file.name}` : file.name;
+          collected.push(file);
+        }
+      } else if (entry.kind === 'directory') {
+        const nextPath = parentPath ? `${parentPath}/${entry.name}` : entry.name;
+        await walk(entry, nextPath);
+      }
+    }
+  };
+
+  await walk(directoryHandle);
+  return collected;
+}
+
+if (importFolderBtn) {
+  importFolderBtn.addEventListener('click', async () => {
+    // Prefer modern directory picker when available; fallback to hidden file input.
+    if (typeof window.showDirectoryPicker === 'function') {
+      try {
+        const directoryHandle = await window.showDirectoryPicker();
+        const files = await collectXmlFilesFromDirectoryHandle(directoryHandle);
+        await processProjectFolderImport(files, {
+          projectName: directoryHandle?.name || '',
+          emptyMessage: 'No XML display files found in the selected folder.'
+        });
+        return;
+      } catch (err) {
+        if (err?.name === 'AbortError') {
+          return;
+        }
+        console.error(err);
+      }
+    }
+
+    if (uploadFolderInput) {
+      uploadFolderInput.value = '';
+      uploadFolderInput.click();
+    } else if (uploadInput) {
+      uploadInput.value = '';
+      uploadInput.click();
+    }
+  });
+}
+
+if (uploadFolderInput) {
+  uploadFolderInput.addEventListener('change', async () => {
+    try {
+      await processProjectFolderImport(Array.from(uploadFolderInput.files || []), {
+        emptyMessage: 'No XML display files found in the selected folder.'
+      });
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not import XML files from the selected folder.');
+    } finally {
+      uploadFolderInput.value = '';
+    }
+  });
+}
+
+if (uploadInput) {
+  uploadInput.addEventListener('change', async () => {
+    try {
+      await processStandaloneDisplayUploads(
+        Array.from(uploadInput.files || []),
+        'Choose one or more display XML files to upload.'
+      );
     } catch (err) {
       console.error(err);
       alert(err.message || 'Could not upload the selected XML files.');

@@ -52,7 +52,19 @@ for (const dir of [FTIO_DIR, FACTORYTALK_EXPORT_DIR, REIMPORT_DIR, PACKAGE_DIR, 
 }
 
 app.use(express.json({ limit: '2mb' }));
-app.use(express.static(path.join(ROOT, 'public')));
+app.use(express.static(path.join(ROOT, 'public'), {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res, filePath) => {
+    const ext = path.extname(String(filePath || '')).toLowerCase();
+    if (ext === '.js' || ext === '.css' || ext === '.html') {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+    }
+  }
+}));
 
 function fileRow(dirPath, name) {
   const full = path.join(dirPath, name);

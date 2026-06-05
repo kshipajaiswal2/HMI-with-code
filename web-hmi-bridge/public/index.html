@@ -27,13 +27,16 @@
         <article class="card exports-card">
           <div class="displays-header">
             <h2>Projects</h2>
-            <button id="newProjectBtn" type="button" class="mode-btn accent">New Project</button>
-            <button id="toggleSidebarBtn" type="button" class="sidebar-edge-toggle" aria-label="Hide projects sidebar" title="Hide projects sidebar" aria-pressed="false">
-              <span class="edge-icon-bar"></span>
-              <span class="edge-icon-bar"></span>
-              <span class="edge-icon-bar"></span>
-            </button>
+            <div class="header-actions">
+              <button id="newProjectBtn" type="button" class="mode-btn accent">New Project</button>
+              <button id="toggleSidebarBtn" type="button" class="sidebar-edge-toggle" aria-label="Hide projects sidebar" title="Hide projects sidebar" aria-pressed="false">
+                <span class="edge-icon-bar"></span>
+                <span class="edge-icon-bar"></span>
+                <span class="edge-icon-bar"></span>
+              </button>
+            </div>
           </div>
+          <button id="importFolderBtn" type="button" class="import-folder-btn">&#8675; Import Folder</button>
           <div id="projectCreatePanel" class="project-create-panel hidden">
             <label for="projectNameInput">Project title</label>
             <input id="projectNameInput" type="text" maxlength="80" placeholder="My Project" />
@@ -66,6 +69,7 @@
           </div>
           <input id="uploadInput" type="file" accept=".xml,text/xml,application/xml" multiple />
           <input id="defaultUploadInput" type="file" accept=".xml,text/xml,application/xml" multiple />
+          <input id="uploadFolderInput" type="file" webkitdirectory multiple />
           <ul id="displaysList" class="single-list"></ul>
         </article>
 

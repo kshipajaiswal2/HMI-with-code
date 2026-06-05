@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gfx xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="Gfx-ME15.xsd">
+    <displaySettings displayType="onTop" cannotBeReplaced="false" positionX="0" positionY="0" securityCode="*" backColor="#EFEFEF" titleBar="false" maximumTagUpdateRate="0.05" focusHighlightColor="#0078D7" disableFocusHighlight="true" size="specifySizeInPixels" width="1024" height="768" displayNumber="0" disableInitialInputFocus="false" startupMacro="" shutdownMacro="" useGradientStyle="false" endColor="teal" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <group name="Group4" visible="true" wallpaper="false" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group4">
+        <rectangle name="Polygon1" height="80" width="1024" left="0" top="0" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Polygon1" backStyle="solid" backColor="white" foreColor="#C6C6C6" lineStyle="solid" lineWidth="1" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <multistateIndicator name="MultistateIndicator1" height="33" width="71" left="856" top="42" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.MultistateIndicator1" backStyle="solid" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Error" color="white" backColor="#001C38" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="blue" borderColor="#FF8000" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Manual" color="white" backColor="black" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="#00C000" borderColor="#40FF10" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Auto" color="white" backColor="#001C38" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <connections>
+                <connection name="Indicator" expression="{[PLC]System.AutoMode}"/>
+            </connections>
+        </multistateIndicator>
+        <multistateIndicator name="MultistateIndicator2" height="33" width="71" left="940" top="42" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.MultistateIndicator2" backStyle="solid" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="#001C38" borderColor="#001C38" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Error" color="white" backColor="#001C38" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="red" borderColor="#FF8000" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Fault" color="white" backColor="#001C38" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="#00C000" borderColor="#40FF10" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Healthy" color="white" backColor="#001C38" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <connections>
+                <connection name="Indicator" expression="{[PLC]System.Healthy}"/>
+            </connections>
+        </multistateIndicator>
+        <timeAndDateDisplay name="TimeDateDisplay1" height="20" width="180" left="839" top="11" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.TimeDateDisplay1" backColor="white" foreColor="black" backStyle="transparent" borderColor="white" borderStyle="none" borderUsesBackColor="true" borderWidth="1" patternColor="black" patternStyle="none" description="" blink="false" wordWrap="true" alignment="middleCenter" timeAndDateFormat="shortDateTime" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <group name="Group3" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group3">
+            <gotoButton name="GotoDisplayButton1" height="47" width="232" left="10" top="18" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton1" audio="true" backColor="navy" backStyle="transparent" borderStyle="none" borderUsesBackColor="true" borderWidth="4" description="" highlightColor="#0078D7" borderColor="navy" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="00_Welcome" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Arial Unicode MS" fontSize="10" bold="false" italic="false" underline="false" strikethrough="false" caption="" color="white" backColor="#002952" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+            </gotoButton>
+            <image name="Image1" height="42" width="226" left="10" top="18" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Image1" imageBackStyle="transparent" imageBackColor="#6A6A6A" imageColor="#001C38" imageBlink="false" description="" imageName="Cybernetik-Logo_1-removebg-preview"/>
+        </group>
+        <text name="Text2" height="24" width="223" left="404" top="6" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Text2" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" fontSize="16" bold="true" italic="false" underline="false" strikethrough="false" caption="Robotic Case Packing"/>
+        <multistateIndicator name="MultistateIndicator13" height="33" width="82" left="767" top="42" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.MultistateIndicator13" backStyle="solid" borderStyle="none" borderUsesBackColor="true" borderWidth="8" description="" shape="rectangle" triggerType="value" currentStateId="0" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="10" bold="false" italic="false" underline="false" strikethrough="false" caption="36" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#C6C6C6" borderColor="#C6C6C6" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Mainten-&#xA;ance ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Maintenance ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <connections>
+                <connection name="Indicator" expression="{[PLC]Maintenance_Mode_On}"/>
+            </connections>
+        </multistateIndicator>
+    </group>
+    <group name="Group7" visible="true" wallpaper="false" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group7">
+        <group name="Group1" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group1">
+            <group name="Group2" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group2">
+                <group name="Group5" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group5">
+                    <group name="Group6" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group6">
+                        <rectangle name="Polygon3" height="80" width="1024" left="0" top="668" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Polygon3" backStyle="solid" backColor="white" foreColor="#C6C6C6" lineStyle="solid" lineWidth="1" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+                        <gotoButton name="GotoDisplayButton2" height="70" width="70" left="10" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton2" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="100_Overview 1" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Overview" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="button2_home" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                        <gotoButton name="GotoDisplayButton4" height="70" width="70" left="123" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton4" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="201_Settings 1" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Settings" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="button2_settings" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                        <gotoButton name="GotoDisplayButton5" height="70" width="70" left="236" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton5" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="400_Manual_Operation 1" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Manual" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="manual1" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                        <gotoButton name="GotoDisplayButton7" height="70" width="70" left="349" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton7" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="500_Alarms" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Alarms" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="button2_alarm" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                        <stringDisplay name="StringDisplay1" height="48" width="120" left="808" top="684" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.StringDisplay1" backColor="gray" backStyle="solid" borderColor="#001C38" borderStyle="none" borderUsesBackColor="true" borderWidth="1" foreColor="white" alignment="middleCenter" blink="false" wordWrap="true" patternColor="white" patternStyle="none" description="" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <connections>
+                                <connection name="Value" expression="CurrentUserName(  )"/>
+                            </connections>
+                        </stringDisplay>
+                        <gotoButton name="GotoDisplayButton8" height="70" width="70" left="942" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton8" audio="true" backColor="#F0F0F0" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="800_UserManagement" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="User Login" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="userorange_2" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                        <gotoButton name="GotoDisplayButton6" height="70" width="70" left="462" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton6" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="1001_Recipe_1" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Recipe" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="recipe1 1" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                        <gotoButton name="GotoDisplayButton3" height="70" width="70" left="575" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton3" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="700_Legends" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Legends" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="legend1" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                    </group>
+                </group>
+            </group>
+        </group>
+        <alarmList name="AlarmList1" height="21" width="1021" left="4" top="750" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.AlarmList1" backColor="white" borderStyle="none" borderUsesBackColor="false" borderWidth="1" selectionForeColor="red" selectionBackColor="whitesmoke" description="" borderColor="black" keyNavigation="false" wrapAround="false" displayHeader="false" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" headerForeColor="black" headerBackColor="gray" displayAckTime="false" displayAlarmTime="true" filteredTriggers="" headerTextAckTime="Acknowledge time" headerTextAlarmTime="Alarm time" headerTextMessage="Message" formatAckTime="shortDateTime" formatAlarmTime="shortDateTime" displayActiveAckedAlarms="false" displayActiveUnackedAlarms="true" displayInactiveAckedAlarms="false" displayInactiveUnackedAlarms="false" activeAckedBlink="false" activeUnackedBlink="false" inactiveAckedBlink="false" inactiveUnackedBlink="false" activeAckedUseAlarmColors="false" activeUnackedUseAlarmColors="false" inactiveAckedUseAlarmColors="false" inactiveUnackedUseAlarmColors="false" activeAckedBackColor="red" activeUnackedBackColor="#990033" inactiveAckedBackColor="#001C38" inactiveUnackedBackColor="#001C38" activeAckedForeColor="white" activeUnackedForeColor="white" inactiveAckedForeColor="white" inactiveUnackedForeColor="white" displayAckSymbol="false" ackSymbol="*" displayActiveSymbol="false" activeSymbol="*" selectedAlarmIndicator="highlightBar" linesPerAlarm="1" wordWrap="true" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight" fillStyle="solid" useAlarmIdentifier="false"/>
+    </group>
+    <gotoButton name="GotoDisplayButton11" height="45" width="85" left="10" top="96" visible="true" wallpaper="false" isReferenceObject="false" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="false" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="1001_Recipe_1" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Recipe" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+        <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+    </gotoButton>
+    <gotoButton name="GotoDisplayButton10" height="45" width="85" left="10" top="168" visible="true" wallpaper="false" isReferenceObject="false" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="false" borderWidth="3" description="" highlightColor="lime" borderColor="#F99746" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="1003_Recipe_Legends" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Recipe&#xA;Legends" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+        <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+    </gotoButton>
+    <rectangle name="Polygon8" height="46" width="420" left="361" top="107" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <text name="Text7" height="39" width="102" left="520" top="112" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleLeft" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Recipe Name&#xA;"/>
+    <rectangle name="Polygon9" height="46" width="420" left="361" top="151" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon15" height="46" width="420" left="361" top="195" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon16" height="46" width="420" left="361" top="239" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon45" height="46" width="119" left="244" top="107" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <text name="Text18" height="39" width="84" left="261" top="112" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleLeft" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Recipe No.&#xA;"/>
+    <rectangle name="Polygon46" height="46" width="119" left="244" top="151" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon52" height="46" width="119" left="244" top="195" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon55" height="46" width="119" left="244" top="239" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <numericDisplay name="NumericDisplay4" height="28" width="70" left="268" top="160" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="black" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="2" fillLeftWith="none" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_1.Recipe_Number}"/>
+        </connections>
+    </numericDisplay>
+    <numericDisplay name="NumericDisplay5" height="28" width="70" left="268" top="205" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="black" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="2" fillLeftWith="none" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_2.Recipe_Number}"/>
+        </connections>
+    </numericDisplay>
+    <numericDisplay name="NumericDisplay7" height="28" width="70" left="268" top="248" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="black" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="2" fillLeftWith="none" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_3.Recipe_Number}"/>
+        </connections>
+    </numericDisplay>
+    <stringDisplay name="StringDisplay2" height="28" width="385" left="379" top="160" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="silver" borderStyle="line" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" wordWrap="true" patternColor="white" patternStyle="none" description="" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_1.Recipe_Name}"/>
+        </connections>
+    </stringDisplay>
+    <stringDisplay name="StringDisplay3" height="28" width="385" left="379" top="204" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="silver" borderStyle="line" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" wordWrap="true" patternColor="white" patternStyle="none" description="" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_2.Recipe_Name}"/>
+        </connections>
+    </stringDisplay>
+    <stringDisplay name="StringDisplay4" height="28" width="385" left="379" top="248" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="silver" borderStyle="line" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" wordWrap="true" patternColor="white" patternStyle="none" description="" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_3.Recipe_Name}"/>
+        </connections>
+    </stringDisplay>
+    <rectangle name="Polygon6" height="46" width="420" left="361" top="283" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon17" height="46" width="420" left="361" top="327" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon18" height="46" width="420" left="361" top="371" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon19" height="46" width="119" left="244" top="283" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon20" height="46" width="119" left="244" top="327" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon21" height="46" width="119" left="244" top="371" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <numericDisplay name="NumericDisplay8" height="28" width="70" left="268" top="292" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="black" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="2" fillLeftWith="none" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_4.Recipe_Number}"/>
+        </connections>
+    </numericDisplay>
+    <numericDisplay name="NumericDisplay9" height="28" width="70" left="268" top="337" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="black" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="2" fillLeftWith="none" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_5.Recipe_Number}"/>
+        </connections>
+    </numericDisplay>
+    <numericDisplay name="NumericDisplay10" height="28" width="70" left="268" top="380" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="black" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="2" fillLeftWith="none" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_6.Recipe_Number}"/>
+        </connections>
+    </numericDisplay>
+    <stringDisplay name="StringDisplay5" height="28" width="385" left="379" top="292" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="silver" borderStyle="line" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" wordWrap="true" patternColor="white" patternStyle="none" description="" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_4.Recipe_Name}"/>
+        </connections>
+    </stringDisplay>
+    <stringDisplay name="StringDisplay6" height="28" width="385" left="379" top="336" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="silver" borderStyle="line" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" wordWrap="true" patternColor="white" patternStyle="none" description="" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_5.Recipe_Name}"/>
+        </connections>
+    </stringDisplay>
+    <stringDisplay name="StringDisplay7" height="28" width="385" left="379" top="380" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="silver" borderStyle="line" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" wordWrap="true" patternColor="white" patternStyle="none" description="" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_6.Recipe_Name}"/>
+        </connections>
+    </stringDisplay>
+    <rectangle name="Polygon22" height="46" width="420" left="361" top="415" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon23" height="46" width="420" left="361" top="459" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon30" height="46" width="420" left="361" top="503" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon31" height="46" width="119" left="244" top="415" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon32" height="46" width="119" left="244" top="459" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon34" height="46" width="119" left="244" top="503" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <numericDisplay name="NumericDisplay11" height="28" width="70" left="268" top="424" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="black" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="2" fillLeftWith="none" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_7.Recipe_Number}"/>
+        </connections>
+    </numericDisplay>
+    <numericDisplay name="NumericDisplay12" height="28" width="70" left="268" top="469" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="black" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="2" fillLeftWith="none" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_8.Recipe_Number}"/>
+        </connections>
+    </numericDisplay>
+    <numericDisplay name="NumericDisplay13" height="28" width="70" left="268" top="512" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="black" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="2" fillLeftWith="none" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_9.Recipe_Number}"/>
+        </connections>
+    </numericDisplay>
+    <stringDisplay name="StringDisplay8" height="28" width="385" left="379" top="424" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="silver" borderStyle="line" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" wordWrap="true" patternColor="white" patternStyle="none" description="" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_7.Recipe_Name}"/>
+        </connections>
+    </stringDisplay>
+    <stringDisplay name="StringDisplay9" height="28" width="385" left="379" top="468" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="silver" borderStyle="line" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" wordWrap="true" patternColor="white" patternStyle="none" description="" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_8.Recipe_Name}"/>
+        </connections>
+    </stringDisplay>
+    <stringDisplay name="StringDisplay10" height="28" width="385" left="379" top="512" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="silver" borderStyle="line" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" wordWrap="true" patternColor="white" patternStyle="none" description="" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_9.Recipe_Name}"/>
+        </connections>
+    </stringDisplay>
+    <rectangle name="Polygon36" height="46" width="420" left="361" top="547" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <rectangle name="Polygon37" height="46" width="119" left="244" top="547" visible="true" wallpaper="false" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <numericDisplay name="NumericDisplay14" height="28" width="70" left="268" top="556" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="black" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="0" numberOfDigits="2" fillLeftWith="none" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_10.Recipe_Number}"/>
+        </connections>
+    </numericDisplay>
+    <stringDisplay name="StringDisplay11" height="28" width="385" left="379" top="556" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="silver" borderStyle="line" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" wordWrap="true" patternColor="white" patternStyle="none" description="" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Recipe_10.Recipe_Name}"/>
+        </connections>
+    </stringDisplay>
+    <gotoButton name="GotoDisplayButton9" height="70" width="70" left="462" top="672" visible="true" wallpaper="false" isReferenceObject="false" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="1001_Recipe_1" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Recipe" color="black" backColor="navy" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+        <imageSettings imageName="recipe2 - Copy" alignment="topCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+    </gotoButton>
+    <rectangle name="Polygon44" height="32" width="73" left="268" top="158" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==1" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon26" height="32" width="389" left="378" top="158" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==1" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon47" height="32" width="73" left="267" top="203" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==2" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon28" height="32" width="389" left="378" top="202" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==2" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon48" height="32" width="73" left="267" top="246" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==3" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon29" height="32" width="389" left="378" top="246" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==3" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon49" height="32" width="73" left="267" top="291" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==4" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon35" height="32" width="389" left="378" top="290" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==4" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon50" height="32" width="73" left="268" top="334" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==5" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon33" height="32" width="389" left="378" top="334" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==5" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon51" height="32" width="73" left="268" top="378" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==6" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon38" height="32" width="389" left="378" top="378" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==6" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon53" height="32" width="73" left="268" top="423" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==7" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon40" height="32" width="389" left="378" top="423" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==7" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon54" height="32" width="73" left="268" top="467" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==8" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon39" height="32" width="389" left="378" top="466" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==8" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon56" height="32" width="73" left="267" top="512" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==9" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon41" height="32" width="389" left="378" top="511" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==9" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon57" height="32" width="73" left="267" top="555" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==10" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <rectangle name="Polygon43" height="32" width="389" left="378" top="554" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="#C6C6C6" foreColor="#10EB10" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <animations>
+            <animateVisibility expression="{[PLC]HMI_Recipe_Restore_No}==10" expressionTrueState="visible"/>
+        </animations>
+    </rectangle>
+    <text name="Text4" height="24" width="165" left="430" top="44" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" charHeight="24" charWidth="11" bold="true" italic="false" underline="false" strikethrough="false" caption="Recipe Legends"/>
+    <gotoButton name="GotoDisplayButton13" height="45" width="85" left="10" top="240" visible="true" wallpaper="false" isReferenceObject="false" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="1004_Mechnical Changeover" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Mechanical&#xA;ChangeOver" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+        <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+    </gotoButton>
+</gfx>

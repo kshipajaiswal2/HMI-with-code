@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gfx xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="Gfx-ME15.xsd">
+    <displaySettings displayType="onTop" cannotBeReplaced="false" positionX="0" positionY="0" securityCode="*" backColor="#EFEFEF" titleBar="false" maximumTagUpdateRate="0.05" focusHighlightColor="#0078D7" disableFocusHighlight="true" size="specifySizeInPixels" width="1024" height="768" displayNumber="0" disableInitialInputFocus="false" startupMacro="" shutdownMacro="" useGradientStyle="false" endColor="teal" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <group name="Group4" visible="true" wallpaper="false" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group4">
+        <rectangle name="Polygon1" height="80" width="1024" left="0" top="0" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Polygon1" backStyle="solid" backColor="white" foreColor="#C6C6C6" lineStyle="solid" lineWidth="1" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <multistateIndicator name="MultistateIndicator1" height="33" width="71" left="856" top="42" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.MultistateIndicator1" backStyle="solid" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Error" color="white" backColor="#001C38" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="blue" borderColor="#FF8000" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Manual" color="white" backColor="black" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="#00C000" borderColor="#40FF10" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Auto" color="white" backColor="#001C38" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <connections>
+                <connection name="Indicator" expression="{[PLC]System.AutoMode}"/>
+            </connections>
+        </multistateIndicator>
+        <multistateIndicator name="MultistateIndicator2" height="33" width="71" left="940" top="42" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.MultistateIndicator2" backStyle="solid" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="#001C38" borderColor="#001C38" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Error" color="white" backColor="#001C38" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="red" borderColor="#FF8000" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Fault" color="white" backColor="#001C38" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="#00C000" borderColor="#40FF10" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" caption="Healthy" color="white" backColor="#001C38" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <connections>
+                <connection name="Indicator" expression="{[PLC]System.Healthy}"/>
+            </connections>
+        </multistateIndicator>
+        <timeAndDateDisplay name="TimeDateDisplay1" height="20" width="180" left="839" top="11" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.TimeDateDisplay1" backColor="white" foreColor="black" backStyle="transparent" borderColor="white" borderStyle="none" borderUsesBackColor="true" borderWidth="1" patternColor="black" patternStyle="none" description="" blink="false" wordWrap="true" alignment="middleCenter" timeAndDateFormat="shortDateTime" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+        <group name="Group3" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group3">
+            <gotoButton name="GotoDisplayButton1" height="47" width="232" left="10" top="18" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton1" audio="true" backColor="navy" backStyle="transparent" borderStyle="none" borderUsesBackColor="true" borderWidth="4" description="" highlightColor="#0078D7" borderColor="navy" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="00_Welcome" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Arial Unicode MS" fontSize="10" bold="false" italic="false" underline="false" strikethrough="false" caption="" color="white" backColor="#002952" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+            </gotoButton>
+            <image name="Image1" height="42" width="226" left="10" top="18" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Image1" imageBackStyle="transparent" imageBackColor="#6A6A6A" imageColor="#001C38" imageBlink="false" description="" imageName="Cybernetik-Logo_1-removebg-preview"/>
+        </group>
+        <text name="Text2" height="24" width="223" left="404" top="6" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Text2" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" fontSize="16" bold="true" italic="false" underline="false" strikethrough="false" caption="Robotic Case Packing"/>
+        <multistateIndicator name="MultistateIndicator13" height="33" width="82" left="767" top="42" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.MultistateIndicator13" backStyle="solid" borderStyle="none" borderUsesBackColor="true" borderWidth="8" description="" shape="rectangle" triggerType="value" currentStateId="0" captionOnBorder="false" setLastStateId="2">
+            <states>
+                <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="10" bold="false" italic="false" underline="false" strikethrough="false" caption="36" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="0" value="0" backColor="#C6C6C6" borderColor="#C6C6C6" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Mainten-&#xA;ance ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+                <state stateId="1" value="1" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                    <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Maintenance ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                    <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+                </state>
+            </states>
+            <connections>
+                <connection name="Indicator" expression="{[PLC]Maintenance_Mode_On}"/>
+            </connections>
+        </multistateIndicator>
+    </group>
+    <group name="Group7" visible="true" wallpaper="false" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group7">
+        <group name="Group1" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group1">
+            <group name="Group2" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group2">
+                <group name="Group5" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group5">
+                    <group name="Group6" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Group6">
+                        <rectangle name="Polygon3" height="80" width="1024" left="0" top="668" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.Polygon3" backStyle="solid" backColor="white" foreColor="#C6C6C6" lineStyle="solid" lineWidth="1" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+                        <gotoButton name="GotoDisplayButton2" height="70" width="70" left="10" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton2" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="100_Overview 1" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Overview" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="button2_home" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                        <gotoButton name="GotoDisplayButton4" height="70" width="70" left="123" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton4" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="201_Settings 1" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Settings" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="button2_settings" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                        <gotoButton name="GotoDisplayButton5" height="70" width="70" left="236" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton5" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="400_Manual_Operation 1" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Manual" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="manual1" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                        <gotoButton name="GotoDisplayButton7" height="70" width="70" left="349" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton7" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="500_Alarms" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Alarms" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="button2_alarm" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                        <stringDisplay name="StringDisplay1" height="48" width="120" left="808" top="684" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.StringDisplay1" backColor="gray" backStyle="solid" borderColor="#001C38" borderStyle="none" borderUsesBackColor="true" borderWidth="1" foreColor="white" alignment="middleCenter" blink="false" wordWrap="true" patternColor="white" patternStyle="none" description="" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <connections>
+                                <connection name="Value" expression="CurrentUserName(  )"/>
+                            </connections>
+                        </stringDisplay>
+                        <gotoButton name="GotoDisplayButton8" height="70" width="70" left="942" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton8" audio="true" backColor="#F0F0F0" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="800_UserManagement" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="User Login" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="userorange_2" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                        <gotoButton name="GotoDisplayButton6" height="70" width="70" left="462" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton6" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="1001_Recipe_1" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Recipe" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="recipe1 1" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                        <gotoButton name="GotoDisplayButton3" height="70" width="70" left="575" top="672" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.GotoDisplayButton3" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="700_Legends" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                            <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Legends" color="black" backColor="#002952" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+                            <imageSettings imageName="legend1" alignment="topCenter" backStyle="transparent" color="white" backColor="#002952" scaled="false" blink="false"/>
+                        </gotoButton>
+                    </group>
+                </group>
+            </group>
+        </group>
+        <alarmList name="AlarmList1" height="21" width="1021" left="4" top="750" visible="true" isReferenceObject="true" linkSize="true" linkConnections="true" linkAnimations="linkWithExpression" linkBaseObject="Template_1.AlarmList1" backColor="white" borderStyle="none" borderUsesBackColor="false" borderWidth="1" selectionForeColor="red" selectionBackColor="whitesmoke" description="" borderColor="black" keyNavigation="false" wrapAround="false" displayHeader="false" fontFamily="Arial" fontSize="12" bold="true" italic="false" underline="false" strikethrough="false" headerForeColor="black" headerBackColor="gray" displayAckTime="false" displayAlarmTime="true" filteredTriggers="" headerTextAckTime="Acknowledge time" headerTextAlarmTime="Alarm time" headerTextMessage="Message" formatAckTime="shortDateTime" formatAlarmTime="shortDateTime" displayActiveAckedAlarms="false" displayActiveUnackedAlarms="true" displayInactiveAckedAlarms="false" displayInactiveUnackedAlarms="false" activeAckedBlink="false" activeUnackedBlink="false" inactiveAckedBlink="false" inactiveUnackedBlink="false" activeAckedUseAlarmColors="false" activeUnackedUseAlarmColors="false" inactiveAckedUseAlarmColors="false" inactiveUnackedUseAlarmColors="false" activeAckedBackColor="red" activeUnackedBackColor="#990033" inactiveAckedBackColor="#001C38" inactiveUnackedBackColor="#001C38" activeAckedForeColor="white" activeUnackedForeColor="white" inactiveAckedForeColor="white" inactiveUnackedForeColor="white" displayAckSymbol="false" ackSymbol="*" displayActiveSymbol="false" activeSymbol="*" selectedAlarmIndicator="highlightBar" linesPerAlarm="1" wordWrap="true" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight" fillStyle="solid" useAlarmIdentifier="false"/>
+    </group>
+    <listIndicator name="ListIndicator1" height="528" width="886" left="69" top="128" visible="true" wallpaper="false" isReferenceObject="false" backColor="#C6C6C6" borderStyle="raisedInset" borderUsesBackColor="false" borderWidth="2" selectionForeColor="black" selectionBackColor="#10EB10" description="" borderColor="#C6C6C6" patternColor="white" patternStyle="none" blink="false" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight" fillStyle="gradient" triggerType="value" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" captionTruncate="word" setLastStateId="21">
+        <states>
+            <state stateId="0" value="1">
+                <caption caption="Step 01 - Waiting For Home" color="black" backColor="navy" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="1" value="10">
+                <caption caption="Step 10 - Wait For System Start Command" color="black" backColor="navy" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="2" value="20">
+                <caption caption="Step 20 - Rejection Station Pusher Cyl Reverse Command, Wait For Reverse FB" color="black" backColor="navy" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="3" value="30">
+                <caption caption="Step 30 - CRC02 Stopper 01 Up Command" color="black" backColor="navy" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="4" value="40">
+                <caption caption="Step 40 - CRC02 Stopper 02 Down Command" color="black" backColor="navy" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="5" value="50">
+                <caption caption="Step 50 - Check For Box present on CRC02 Entry Carton Present Sensor 01" color="black" backColor="navy" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="6" value="60">
+                <caption caption="Step 60 - Send Receiving Start Command To Empty Box Loading Station." color="black" backColor="navy" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="7" value="70">
+                <caption caption="Step 70 - Check For Box Present on CRC02 Entry Carton Present Sensor 01" color="black" backColor="navy" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="8" value="80">
+                <caption caption="Step 80 - Receiving Complete Command To Empty Box Loading Station." color="black" backColor="navy" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="9" value="90">
+                <caption caption="Step 90 - Check For CRC02 Stopper01 Carton Present Sensor 01 FB on &amp; CRC02 Stopper 02 Carton Present Sensor 01 Off" color="black" backColor="navy" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="10" value="100">
+                <caption caption="Step 100 - CRC02 Stopper 01 Down Command" color="black" backColor="#001C38" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="11" value="110">
+                <caption caption="Step 110 - CRC02 Stopper 02 Up Command" color="black" backColor="#001C38" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="12" value="120">
+                <caption caption="Step 120 - Check For CRC02 Stopper01 Carton Present Sensor 01 FB off &amp; CRC02 Stopper 02 Carton Present Sensor 01 On" color="black" backColor="#001C38" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="13" value="130">
+                <caption caption="Step 130 - CRC02 Stopper 01 Up Command" color="black" backColor="#001C38" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="14" value="140">
+                <caption caption="Step 140 - Check Box Rejection Status (If Rejected)" color="black" backColor="#001C38" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="15" value="150">
+                <caption caption="Step 150 - Rejection Station Pusher Cyl Forward Command, Wait For Forward FB" color="black" backColor="#001C38" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="16" value="160">
+                <caption caption="Step 160 - Rejection Station Pusher Cyl Reverse Command, Wait For Reverse FB" color="black" backColor="#001C38" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="17" value="170">
+                <caption caption="Step 170 - Check Receiving Start Command From Customer Outfeed System" color="black" backColor="#001C38" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="18" value="180">
+                <caption caption="Step 180 - CRC02 Stopper 02 Down Command" color="black" backColor="#001C38" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="19" value="190">
+                <caption caption="Step 190 - Check For CRC02 Stopper 02 Carton Present Sensor 01 off" color="black" backColor="#001C38" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+            <state stateId="20" value="200">
+                <caption caption="Step 200 - Cycle Complete" color="black" backColor="#001C38" backStyle="transparent" alignment="left" blink="false"/>
+            </state>
+        </states>
+        <connections>
+            <connection name="Indicator" expression="{[PLC]R1040_Filled_Box_Rejection_Station.Step}"/>
+        </connections>
+    </listIndicator>
+    <text name="Text3" height="19" width="217" left="344" top="95" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" fontSize="13" bold="true" italic="false" underline="false" strikethrough="false" caption="Filled Box Rejection Station"/>
+    <numericInputEnable name="NumericInputEnable8" height="28" width="70" left="610" top="89" visible="true" wallpaper="false" isReferenceObject="false" audio="true" backColor="#C6C6C6" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" highlightColor="lime" borderColor="black" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" enterKeyControlDelay="400" enterKeyHandshakeTime="4" enterKeyHoldTime="250" handshakeReset="nonZeroValue" keyNavigation="true" decimalPoint="implicit" numericPopup="keypad" rampValue="0" useVariableMinMax="false" takeFocusOnPress="false" minValue="0" maxValue="300" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight" RequireElectronicSignature="false" AllowBlankComment="false" RequireReAuthentication="false" RequireCounterSignature="false" AuthorizedGroup="Windows Administrators" ESDomainNameVisible="false" ESDomainNameType="ESDomainNameConstant" ESDomainName="" VariableDomainName="" ESDomainNameDisable="false">
+        <caption fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="/*N:3 {[PLC]R1040_Filled_Box_Rejection_Station.Step} NOFILL DP:0*/" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+        <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+        <connections>
+            <connection name="Value" expression="{[PLC]R1040_Filled_Box_Rejection_Station.Step}"/>
+        </connections>
+    </numericInputEnable>
+    <gotoButton name="GotoDisplayButton12" height="70" width="70" left="694" top="672" visible="true" wallpaper="false" isReferenceObject="false" audio="true" backColor="gainsboro" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="3" description="" highlightColor="lime" borderColor="#E0E0E0" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="600_Sequence" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Sequence" color="black" backColor="navy" backStyle="transparent" alignment="bottomCenter" wordWrap="true" blink="false"/>
+        <imageSettings imageName="machinesequence2" alignment="topCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+    </gotoButton>
+    <text name="Text4" height="24" width="102" left="461" top="44" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" charHeight="24" charWidth="11" bold="true" italic="false" underline="false" strikethrough="false" caption="Sequence"/>
+</gfx>

@@ -114,6 +114,85 @@ function sanitizeXmlForFactoryTalk(xml) {
     return source;
   }
 
+  const stripTagAttrs = (input, tagName, attrs) => {
+    const attrPattern = attrs.join('|');
+    const openTagPattern = new RegExp(`<\\s*${tagName}\\b[^>]*>`, 'gi');
+    const attrStripPattern = new RegExp(`\\s+(${attrPattern})\\s*=\\s*("[^"]*"|'[^']*')`, 'gi');
+    return String(input || '').replace(openTagPattern, (tag) => tag.replace(attrStripPattern, ''));
+  };
+
+  const stripParametersFromNonReferenceGroups = (input) => {
+    const text = String(input || '');
+    const tagPattern = /<\/?([A-Za-z_][\w:.-]*)([^>]*)>/g;
+    const stack = [];
+    const removalRanges = [];
+    let match = tagPattern.exec(text);
+
+    while (match) {
+      const fullTag = match[0];
+      const tagName = String(match[1] || '').toLowerCase();
+      const attrs = String(match[2] || '');
+      const isClosing = fullTag.startsWith('</');
+      const isSelfClosing = /\/\s*>$/.test(fullTag);
+      const tagStart = match.index;
+      const tagEnd = tagPattern.lastIndex;
+
+      if (isClosing) {
+        if (tagName === 'parameters') {
+          const top = stack[stack.length - 1];
+          if (top && top.tagName === 'parameters') {
+            stack.pop();
+            if (top.remove) {
+              removalRanges.push([top.startIndex, tagEnd]);
+            }
+          }
+        } else if (tagName === 'group') {
+          while (stack.length) {
+            const top = stack.pop();
+            if (top.tagName === 'group') {
+              break;
+            }
+          }
+        }
+
+        match = tagPattern.exec(text);
+        continue;
+      }
+
+      if (tagName === 'group' && !isSelfClosing) {
+        const isReferenceObject = /\bisReferenceObject\s*=\s*("true"|'true')/i.test(attrs);
+        stack.push({ tagName: 'group', isNonReference: !isReferenceObject });
+        match = tagPattern.exec(text);
+        continue;
+      }
+
+      if (tagName === 'parameters') {
+        const parent = stack[stack.length - 1];
+        const remove = Boolean(parent && parent.tagName === 'group' && parent.isNonReference);
+        if (isSelfClosing) {
+          if (remove) {
+            removalRanges.push([tagStart, tagEnd]);
+          }
+        } else {
+          stack.push({ tagName: 'parameters', startIndex: tagStart, remove });
+        }
+      }
+
+      match = tagPattern.exec(text);
+    }
+
+    if (!removalRanges.length) {
+      return text;
+    }
+
+    let output = text;
+    removalRanges.sort((a, b) => b[0] - a[0]);
+    for (const [start, end] of removalRanges) {
+      output = output.slice(0, start) + output.slice(end);
+    }
+    return output;
+  };
+
   let sanitized = source
     .replace(/\s+popupGroupId="[^"]*"/gi, '')
     .replace(/\s+popupGroupId='[^']*'/gi, '');
@@ -217,9 +296,55 @@ function sanitizeXmlForFactoryTalk(xml) {
     (block) => normalizePopupGroupBlock(block)
   );
 
+  sanitized = sanitized.replace(/<rectangle\b[^>]*>/gi, (tag) => {
+    let next = tag;
+
+    const borderWidthMatch = next.match(/\bborderWidth=("[^"]*"|'[^']*')/i);
+    if (borderWidthMatch && !/\blineWidth=("[^"]*"|'[^']*')/i.test(next)) {
+      next = next.replace(/<rectangle\b/i, `<rectangle lineWidth=${borderWidthMatch[1]}`);
+    }
+
+    const borderColorMatch = next.match(/\bborderColor=("[^"]*"|'[^']*')/i);
+    if (borderColorMatch && !/\bforeColor=("[^"]*"|'[^']*')/i.test(next)) {
+      next = next.replace(/<rectangle\b/i, `<rectangle foreColor=${borderColorMatch[1]}`);
+    }
+
+    const borderStyleMatch = next.match(/\bborderStyle=("[^"]*"|'[^']*')/i);
+    if (borderStyleMatch && !/\blineStyle=("[^"]*"|'[^']*')/i.test(next)) {
+      const raw = String(borderStyleMatch[1]).slice(1, -1).trim().toLowerCase();
+      const mapped = raw === 'line' ? 'solid' : raw;
+      if (mapped) {
+        next = next.replace(/<rectangle\b/i, `<rectangle lineStyle="${mapped}"`);
+      }
+    }
+
+    next = next
+      .replace(/\s+borderWidth=("[^"]*"|'[^']*')/gi, '')
+      .replace(/\s+borderColor=("[^"]*"|'[^']*')/gi, '')
+      .replace(/\s+borderStyle=("[^"]*"|'[^']*')/gi, '')
+      .replace(/\s+borderUsesBackColor=("[^"]*"|'[^']*')/gi, '')
+      .replace(/\s+(fontFamily|fontSize|bold|italic|underline|strikethrough|charHeight|charWidth|alignment|wordWrap|sizeToFit|caption)=("[^"]*"|'[^']*')/gi, '');
+
+    return next;
+  });
+
+  sanitized = sanitized.replace(/<multistateIndicator\b[^>]*>/gi, (tag) => tag
+    .replace(/\s+(fontSize|lineWidth)=("[^"]*"|'[^']*')/gi, ''));
+
+  sanitized = sanitized.replace(/<(states|state|imageSettings|connections|connection)\b[^>]*>/gi, (tag) => tag
+    .replace(/\s+(left|top|width|height|fontSize|borderWidth|lineWidth)=("[^"]*"|'[^']*')/gi, ''));
+
+  sanitized = sanitized.replace(/<caption\b[^>]*>/gi, (tag) => tag
+    .replace(/\s+(left|top|width|height|borderWidth|lineWidth)=("[^"]*"|'[^']*')/gi, ''));
+
+  // Explicit pass for connection tags to avoid schema-invalid carryover from legacy exports.
+  sanitized = stripTagAttrs(sanitized, 'connections?', ['left', 'top', 'width', 'height', 'fontSize', 'borderWidth', 'lineWidth']);
+
   sanitized = sanitized
     .replace(/(<\s*numericInputCursorPoint\b[^>]*?)\s+caption=("[^"]*"|'[^']*')/gi, '$1')
     .replace(/<\s*numericInputCursorPoint\b([^>]*)>([\s\S]*?)<\s*caption\b[^>]*\/?>(?:<\s*\/\s*caption\s*>)?/gi, '<numericInputCursorPoint$1>$2');
+
+  sanitized = stripParametersFromNonReferenceGroups(sanitized);
 
   return sanitized;
 }
@@ -393,6 +518,22 @@ function markDisplayDeleted(name) {
   const deleted = readDeletedDisplays();
   deleted.add(safeName);
   writeDeletedDisplays(deleted);
+}
+
+function syncDeletedDisplayState(name) {
+  const safeName = safeDisplayFileName(name);
+  if (!safeName) {
+    return;
+  }
+
+  const editedPath = path.join(REIMPORT_DIR, safeName);
+  const exportPath = path.join(FACTORYTALK_EXPORT_DIR, safeName);
+  if (fs.existsSync(editedPath) || fs.existsSync(exportPath)) {
+    clearDeletedDisplay(safeName);
+    return;
+  }
+
+  markDisplayDeleted(safeName);
 }
 
 function clearDeletedDisplay(name) {
@@ -809,8 +950,8 @@ function buildDisplayBatchFiles(targetDir, copied, notesIntroLines = []) {
     'This means the display already existed - delete it first, then reimport.'
   ];
   const notesText = `${notesLines.join('\r\n')}\r\n`;
-  fs.writeFileSync(path.join(targetDir, notesName), notesText, 'utf8');
-  fs.writeFileSync(path.join(targetDir, notesCompatName), notesText, 'utf8');
+  writeUtf16LeWithBom(path.join(targetDir, notesName), notesText);
+  writeUtf16LeWithBom(path.join(targetDir, notesCompatName), notesText);
 
   const displayNames = copied.map((name) => name.replace(/\.xml$/i, ''));
   const deleteText = [
@@ -819,7 +960,7 @@ function buildDisplayBatchFiles(targetDir, copied, notesIntroLines = []) {
     '',
     'After deleting, run Batch Import with BatchImport.xml from this folder.'
   ].join('\r\n') + '\r\n';
-  fs.writeFileSync(path.join(targetDir, deleteListName), deleteText, 'utf8');
+  writeUtf16LeWithBom(path.join(targetDir, deleteListName), deleteText);
 
   return {
     batchPath,
@@ -951,7 +1092,7 @@ app.delete('/api/displays/:name', (req, res) => {
     return res.status(404).json({ error: 'XML file not found' });
   }
 
-  markDisplayDeleted(safeName);
+  syncDeletedDisplayState(safeName);
 
   return res.json({ ok: true, removed: safeName, paths: removed });
 });
@@ -983,7 +1124,9 @@ app.post('/api/default-pages/seed', (req, res) => {
     }
 
     const toPath = path.join(REIMPORT_DIR, name);
-    fs.copyFileSync(fromPath, toPath);
+    const sourceXml = readTextAuto(fromPath);
+    const safeXml = sanitizeXmlForFactoryTalk(sourceXml);
+    fs.writeFileSync(toPath, safeXml, 'utf8');
     clearDeletedDisplay(name);
     copied.push(name);
   }

@@ -1,20 +1,20 @@
 :root {
-  --bg-top: #f3efe6;
-  --bg-mid: #ded6c6;
-  --bg-bottom: #cbc2b2;
+  --bg-top: #edf3fa;
+  --bg-mid: #dce7f3;
+  --bg-bottom: #c9d9ea;
   --ink: #1b2428;
   --ink-soft: #44535b;
   --line: #5d737e;
   --line-soft: #a3b2b9;
-  --surface: #fffdf8;
-  --surface-2: #f4f0e7;
-  --surface-3: #ece5d9;
+  --surface: #fbfdff;
+  --surface-2: #f1f6fc;
+  --surface-3: #e7eef7;
   --accent: #de7a00;
   --accent-deep: #9f4f00;
   --accent-cool: #0f6a72;
   --success: #198f53;
   --panel-border: #6d7b81;
-  --panel-soft-border: #c8c1b2;
+  --panel-soft-border: #bfd0df;
   --panel-shadow: 0 16px 30px #181d1f1a;
   --hover-lift: translateY(-1px);
 }
@@ -31,7 +31,7 @@ body {
   color: var(--ink);
   background:
     radial-gradient(860px 460px at 8% -10%, #ffffff 0%, transparent 56%),
-    radial-gradient(980px 560px at 104% 2%, #d9d2c4 0%, transparent 60%),
+    radial-gradient(980px 560px at 104% 2%, #d7e4f2 0%, transparent 60%),
     linear-gradient(155deg, var(--bg-top) 0%, var(--bg-mid) 52%, var(--bg-bottom) 100%);
 }
 
@@ -512,9 +512,10 @@ h3 {
 }
 
 .exports-card ul {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   height: auto;
+  max-height: calc(100vh - 280px);
   border: 1px solid #89a8b3;
   border-radius: 16px;
   background:
@@ -1384,8 +1385,10 @@ li:hover {
   border: 1px solid #7d919b;
   border-radius: 14px;
   background: linear-gradient(180deg, #fffefb 0%, #f4eee5 100%);
-  padding: 10px;
-  height: calc(100% - 96px);
+  padding: 8px;
+  height: auto;
+  min-height: 84px;
+  max-height: calc(100vh - 300px);
   overflow: auto;
 }
 
@@ -4267,16 +4270,790 @@ select {
 
 /* Keep popup planner clear of right tools panel */
 .editor-layout + .popup-planner-wide {
-  margin-right: 0;
-}
-
-.editor-layout:not(.dock-collapsed) + .popup-planner-wide {
-  margin-right: 386px;
+  margin-right: 0 !important;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 1180px) {
   .editor-layout + .popup-planner-wide,
   .editor-layout:not(.dock-collapsed) + .popup-planner-wide {
-    margin-right: 0;
+    margin-right: 0 !important;
   }
+}
+
+/* Projects sidebar surface refresh: improve background under the Projects header */
+.exports-card {
+  background:
+    linear-gradient(180deg, #edf3fa 0%, #e5eef8 100%) !important;
+  border-color: #b8cadc !important;
+  box-shadow: 0 8px 18px #12365312, inset 0 1px 0 #ffffffde !important;
+}
+
+.exports-card .displays-header {
+  background: linear-gradient(180deg, #f8fbff 0%, #edf3fa 100%) !important;
+  border: 1px solid #afc2d5 !important;
+  border-radius: 14px !important;
+  padding: 11px 12px !important;
+  box-shadow: inset 0 1px 0 #ffffff, 0 4px 12px #11345214 !important;
+}
+
+.exports-card .displays-header h2 {
+  color: #17324b !important;
+  text-shadow: none;
+  letter-spacing: 0.2px;
+}
+
+#displaysList.single-list {
+  background:
+    linear-gradient(180deg, #fbfdff 0%, #f0f6fd 100%),
+    repeating-linear-gradient(0deg, #ffffff8f 0 1px, transparent 1px 24px) !important;
+  border: 1px solid #b4c7da !important;
+  border-radius: 14px !important;
+  padding: 12px !important;
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    inset 0 0 0 1px #ffffffcc,
+    0 8px 18px #12365312 !important;
+}
+
+#displaysList.single-list:empty {
+  background:
+    linear-gradient(180deg, #fdfeff 0%, #f3f8fd 100%),
+    repeating-linear-gradient(0deg, #ffffffbf 0 1px, transparent 1px 24px) !important;
+}
+
+#displaysList.single-list > li {
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 16px 14px !important;
+  border-radius: 12px !important;
+  border: 1px solid #c5d6e6 !important;
+  background: linear-gradient(180deg, #fdfefe 0%, #edf4fb 100%) !important;
+  color: #274560 !important;
+  line-height: 1.4;
+  box-shadow: inset 0 1px 0 #ffffff;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* Final hard override: remove any warm tint from Projects area */
+.exports-card {
+  background: #f7faff !important;
+  border-color: #b8cada !important;
+  box-shadow: none !important;
+}
+
+.exports-card .displays-header {
+  background: #fafdff !important;
+  border-color: #b8cada !important;
+  box-shadow: none !important;
+  margin-bottom: 0 !important;
+}
+
+#displaysList.single-list,
+#displaysList.single-list:empty {
+  background: #ffffff !important;
+  border-color: #c2d3e4 !important;
+  box-shadow: none !important;
+  margin-top: 0 !important;
+}
+
+/* Polished final Projects panel */
+.exports-card {
+  background: linear-gradient(180deg, #f8fbff 0%, #edf4fb 100%) !important;
+  border: 1px solid #c2d2e2 !important;
+  box-shadow: 0 10px 24px rgba(16, 44, 70, 0.08), inset 0 1px 0 #ffffff !important;
+  align-self: stretch !important;
+  height: 100%;
+}
+
+.exports-card .displays-header {
+  background: linear-gradient(180deg, #ffffff 0%, #f2f7fc 100%) !important;
+  border: 1px solid #d0deea !important;
+  box-shadow: inset 0 1px 0 #ffffff, 0 2px 6px rgba(17, 45, 70, 0.05) !important;
+  margin-bottom: 10px !important;
+}
+
+.exports-card .displays-header h2 {
+  color: #16334d !important;
+}
+
+#displaysList.single-list,
+#displaysList.single-list:empty {
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%) !important;
+  border: 1px solid #d1dfeb !important;
+  box-shadow: inset 0 1px 0 #ffffff, 0 1px 0 #ffffff !important;
+}
+
+#displaysList.single-list > li {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfe 100%) !important;
+  border-color: #d7e3ee !important;
+  color: #23425e !important;
+}
+
+/* Projects header polish: align with primary UI language */
+.exports-card .displays-header {
+  display: grid !important;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px !important;
+  border-radius: 14px !important;
+  background: linear-gradient(180deg, #ffffff 0%, #eef5fc 100%) !important;
+  border: 1px solid #c7d8e8 !important;
+  box-shadow: inset 0 1px 0 #ffffff, 0 6px 14px rgba(16, 49, 78, 0.06) !important;
+}
+
+.exports-card .displays-header h2 {
+  margin: 0 !important;
+  padding: 6px 10px !important;
+  border-left: 3px solid #0f6a72 !important;
+  border-radius: 9px !important;
+  background: linear-gradient(90deg, #eaf3fb 0%, #f5f9fe 100%) !important;
+  color: #173a57 !important;
+  font-size: 1.02rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em !important;
+}
+
+#newProjectBtn.mode-btn.accent {
+  min-height: 34px;
+  padding: 0 15px !important;
+  border-radius: 11px !important;
+  border: 1px solid #1d5f96 !important;
+  background: linear-gradient(180deg, #3c86c6 0%, #2a6ea9 100%) !important;
+  color: #f4f9ff !important;
+  font-size: 0.84rem !important;
+  font-weight: 700 !important;
+  line-height: 1;
+  box-shadow: 0 7px 14px rgba(20, 62, 99, 0.2), inset 0 1px 0 #7fb0da !important;
+}
+
+#newProjectBtn.mode-btn.accent:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(180deg, #4a91cf 0%, #2f72ad 100%) !important;
+  border-color: #1b588b !important;
+}
+
+#newProjectBtn.mode-btn.accent:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px #2f72ad33, 0 8px 16px rgba(20, 62, 99, 0.22) !important;
+}
+
+#toggleSidebarBtn.sidebar-edge-toggle {
+  width: 30px !important;
+  height: 30px !important;
+  border-radius: 999px !important;
+  border: 1px solid #87a8c3 !important;
+  background: linear-gradient(180deg, #fafdff 0%, #dfeaf5 100%) !important;
+  box-shadow: 0 4px 10px rgba(18, 53, 84, 0.12), inset 0 1px 0 #ffffff !important;
+}
+
+#toggleSidebarBtn.sidebar-edge-toggle::before {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid #2e648b !important;
+  border-bottom: 2px solid #2e648b !important;
+}
+
+#toggleSidebarBtn.sidebar-edge-toggle:hover {
+  transform: translateY(-1px);
+  border-color: #6f97b8 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #e9f2fa 100%) !important;
+}
+
+#toggleSidebarBtn.sidebar-edge-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px #2f72ad2f, 0 7px 14px rgba(19, 55, 86, 0.18) !important;
+}
+
+/* Systematic project tree polish */
+#displaysList.single-list {
+  padding: 10px !important;
+  border-radius: 14px !important;
+}
+
+#displaysList .project-item {
+  margin: 0 0 10px !important;
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, #f9fcff 0%, #f2f7fd 100%) !important;
+  border: 1px solid #d5e1ec !important;
+  overflow: hidden;
+}
+
+#displaysList .project-row {
+  display: grid !important;
+  grid-template-columns: 14px minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 38px;
+  padding: 8px 10px !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f2f7fc 100%) !important;
+  border: 1px solid #d2deea !important;
+  border-radius: 10px !important;
+}
+
+#displaysList .project-name {
+  font-size: 0.9rem !important;
+  font-weight: 700 !important;
+  color: #163a56 !important;
+}
+
+#displaysList .project-count,
+#displaysList .folder-count {
+  min-width: 1.7rem;
+  text-align: center;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #e9f1f9;
+  border: 1px solid #c6d7e7;
+  color: #2d4f6a !important;
+  font-size: 0.69rem !important;
+  font-weight: 700 !important;
+}
+
+#displaysList .project-children {
+  margin: 8px 0 8px 0 !important;
+  padding: 0 0 0 12px !important;
+  border-left: 2px solid #d4e1ed !important;
+}
+
+#displaysList .folder-item {
+  margin: 0 0 8px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+#displaysList .folder-row {
+  display: grid !important;
+  grid-template-columns: 14px minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 35px;
+  padding: 7px 9px !important;
+  border-radius: 10px !important;
+  border: 1px solid #d4e0ec !important;
+  background: linear-gradient(180deg, #fcfeff 0%, #f3f8fd 100%) !important;
+}
+
+#displaysList .folder-name {
+  font-size: 0.84rem !important;
+  font-weight: 700 !important;
+  color: #1f425e !important;
+}
+
+#displaysList .folder-children {
+  margin: 6px 0 0 0 !important;
+  padding: 0 0 0 10px !important;
+  border-left: 1px solid #d9e4ef !important;
+}
+
+#displaysList .display-item {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "row actions"
+    "meta actions";
+  column-gap: 8px;
+  row-gap: 2px;
+  margin: 0 0 7px !important;
+  padding: 9px 10px !important;
+  border-radius: 11px !important;
+  border: 1px solid #d5e2ee !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f6fafe 100%) !important;
+}
+
+#displaysList .display-item .list-row {
+  grid-area: row;
+  padding: 0 !important;
+}
+
+#displaysList .display-item > div:nth-child(2) {
+  grid-area: meta;
+  margin-top: 1px;
+  font-size: 0.72rem !important;
+  line-height: 1.35 !important;
+  color: #49657a !important;
+  font-variant-numeric: tabular-nums;
+  white-space: pre-line !important;
+}
+
+#displaysList .display-item > .tree-actions {
+  grid-area: actions;
+  align-self: center;
+  margin: 0 !important;
+}
+
+#displaysList .display-item strong {
+  font-size: 0.84rem !important;
+  color: #173a57 !important;
+}
+
+#displaysList .display-item.active,
+#displaysList .display-item.active:hover,
+#displaysList .project-row.selected,
+#displaysList .folder-row.selected {
+  border-color: #7ea6c6 !important;
+  box-shadow: inset 3px 0 0 #2f739d, 0 3px 8px rgba(36, 82, 118, 0.1) !important;
+  background: linear-gradient(180deg, #eaf4fc 0%, #deedf8 100%) !important;
+}
+
+#displaysList .tree-action-btn {
+  width: 23px !important;
+  height: 23px !important;
+  border-radius: 999px !important;
+}
+
+/* Tree layout corrections: prevent clipped actions and enforce left-aligned hierarchy */
+#displaysList.single-list {
+  scrollbar-gutter: stable;
+  padding-right: 16px !important;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none !important;
+  height: 100%;
+  overflow-y: scroll !important;
+  overflow-x: hidden !important;
+}
+
+#displaysList.single-list > li {
+  display: block !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+#displaysList .project-item,
+#displaysList .folder-item,
+#displaysList .display-item {
+  margin-right: 2px;
+}
+
+#displaysList .project-row,
+#displaysList .folder-row,
+#displaysList .display-item {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#displaysList .project-row,
+#displaysList .folder-row {
+  padding-right: 12px !important;
+}
+
+#displaysList .display-item {
+  padding-right: 12px !important;
+}
+
+#displaysList .tree-actions {
+  margin-left: 0 !important;
+  justify-self: end;
+  align-self: center;
+}
+
+#displaysList .display-item > div:nth-child(2) {
+  text-align: left !important;
+}
+
+/* Collapsed sidebar rail: keep only one clean toggle control */
+.grid.sidebar-collapsed .exports-card {
+  padding: 6px 4px !important;
+  background: linear-gradient(180deg, #edf4fb 0%, #e2ecf6 100%) !important;
+  border: 1px solid #bfd0df !important;
+  box-shadow: inset 0 1px 0 #ffffff, 0 6px 14px rgba(20, 48, 74, 0.08) !important;
+}
+
+.grid.sidebar-collapsed .exports-card .displays-header {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.grid.sidebar-collapsed #toggleSidebarBtn.sidebar-edge-toggle {
+  width: 30px !important;
+  height: 30px !important;
+  margin: 4px 0 !important;
+  border: 1px solid #8aa9c2 !important;
+  border-radius: 999px !important;
+  background: linear-gradient(180deg, #fdfefe 0%, #e5eef7 100%) !important;
+  box-shadow: 0 3px 8px rgba(22, 58, 88, 0.14) !important;
+}
+
+.grid.sidebar-collapsed #toggleSidebarBtn.sidebar-edge-toggle::before {
+  width: 8px !important;
+  height: 8px !important;
+  border-right: 2px solid #2e6a95 !important;
+  border-bottom: 2px solid #2e6a95 !important;
+  transform: rotate(-45deg) !important;
+}
+
+.grid.sidebar-collapsed #toggleSidebarBtn.sidebar-edge-toggle:hover {
+  transform: translateY(-1px);
+  border-color: #739ab8 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #eaf2fa 100%) !important;
+}
+
+.grid.sidebar-collapsed #toggleSidebarBtn.sidebar-edge-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px #2f72ad30, 0 6px 12px rgba(18, 54, 85, 0.18) !important;
+}
+
+/* Final tree cleanup: stronger structure, less visual noise */
+#displaysList.single-list {
+  padding: 10px 12px 10px 10px !important;
+  border-radius: 14px !important;
+}
+
+#displaysList .project-item {
+  margin: 0 0 10px !important;
+  padding: 6px !important;
+  border: 1px solid #cfdeea !important;
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, #f8fbff 0%, #f2f7fc 100%) !important;
+  box-shadow: none !important;
+}
+
+#displaysList .project-row,
+#displaysList .folder-row {
+  min-height: 36px !important;
+  border-radius: 10px !important;
+  border: 1px solid #cfddea !important;
+  background: linear-gradient(180deg, #fdfefe 0%, #f2f7fc 100%) !important;
+}
+
+#displaysList .project-children {
+  margin: 6px 0 6px !important;
+  padding: 0 0 0 10px !important;
+  border-left: 1px solid #d4e1ed !important;
+}
+
+#displaysList .folder-children {
+  margin: 5px 0 0 !important;
+  padding: 0 0 0 9px !important;
+  border-left: 1px solid #dbe5ef !important;
+}
+
+#displaysList .display-item {
+  grid-template-columns: minmax(0, 1fr) 24px !important;
+  row-gap: 4px !important;
+  padding: 8px 10px !important;
+  margin: 0 0 8px !important;
+  border-radius: 11px !important;
+  border: 1px solid #d3e0ec !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+
+#displaysList .display-item .list-row {
+  align-items: baseline !important;
+}
+
+#displaysList .display-item strong {
+  font-size: 0.87rem !important;
+  line-height: 1.2 !important;
+  color: #173a57 !important;
+}
+
+#displaysList .display-item .screen-meta {
+  grid-area: meta;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+#displaysList .display-item .screen-meta-main {
+  color: #4a667a;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  white-space: normal;
+}
+
+#displaysList .display-item .screen-meta-time {
+  color: #577288;
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+
+#displaysList .display-item > .tree-actions {
+  align-self: center !important;
+  justify-self: end !important;
+}
+
+#displaysList .tree-action-btn {
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 0.76rem !important;
+}
+
+/* Sidebar final pass: single-source clean structure */
+.exports-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100% !important;
+  overflow: hidden;
+}
+
+#displaysList.single-list {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  padding: 8px !important;
+  border: 1px solid #cad9e7 !important;
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, #f9fcff 0%, #f2f7fc 100%) !important;
+  box-shadow: inset 0 1px 0 #ffffff !important;
+}
+
+#displaysList.single-list > li {
+  list-style: none !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+#displaysList .project-item {
+  margin: 0 0 8px !important;
+  padding: 0 !important;
+  border: 1px solid #cddbea !important;
+  border-radius: 10px !important;
+  background: #f5f9fd !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+#displaysList .project-row,
+#displaysList .folder-row {
+  display: grid !important;
+  grid-template-columns: 14px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 10px !important;
+  border: 0 !important;
+  border-bottom: 1px solid #d8e4ef !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#displaysList .project-row {
+  background: linear-gradient(180deg, #edf4fb 0%, #e6eef8 100%) !important;
+}
+
+#displaysList .folder-row {
+  background: linear-gradient(180deg, #f7fbff 0%, #f1f6fb 100%) !important;
+}
+
+#displaysList .project-name,
+#displaysList .folder-name {
+  font-size: 0.86rem !important;
+  line-height: 1.2;
+  color: #183d59 !important;
+  font-weight: 700 !important;
+}
+
+#displaysList .project-count,
+#displaysList .folder-count {
+  min-width: 1.6rem;
+  padding: 1px 6px;
+  border: 1px solid #b9cde1 !important;
+  border-radius: 999px;
+  background: #eaf2fb !important;
+  color: #2f5674 !important;
+}
+
+#displaysList .project-children {
+  margin: 0 !important;
+  padding: 6px 0 6px 8px !important;
+  border-left: 1px solid #d7e3ee !important;
+  background: #f8fbfe !important;
+}
+
+#displaysList .folder-item {
+  margin: 0 0 6px !important;
+  padding: 0 !important;
+  border: 1px solid #d7e2ed !important;
+  border-radius: 9px !important;
+  background: #fbfdff !important;
+  overflow: hidden;
+}
+
+#displaysList .folder-children {
+  margin: 0 !important;
+  padding: 6px 6px 2px 8px !important;
+  border-left: 1px solid #dfe8f1 !important;
+  background: #fcfeff !important;
+}
+
+#displaysList .display-item {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "row actions"
+    "meta actions";
+  row-gap: 3px;
+  column-gap: 8px;
+  margin: 0 0 6px !important;
+  padding: 8px 10px !important;
+  border: 1px solid #d4e0ec !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+
+#displaysList .display-item .list-row {
+  grid-area: row;
+  padding: 0 !important;
+}
+
+#displaysList .display-item strong {
+  font-size: 0.85rem !important;
+  line-height: 1.2 !important;
+  color: #1a3f5b !important;
+}
+
+#displaysList .display-item .screen-meta {
+  grid-area: meta;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+#displaysList .display-item .screen-meta-main,
+#displaysList .display-item .screen-meta-time {
+  font-variant-numeric: tabular-nums;
+}
+
+#displaysList .display-item .screen-meta-main {
+  color: #506d82;
+  font-size: 0.71rem;
+  line-height: 1.25;
+}
+
+#displaysList .display-item .screen-meta-time {
+  color: #5e7a8f;
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+
+#displaysList .display-item > .tree-actions {
+  grid-area: actions;
+  align-self: center !important;
+  justify-self: end !important;
+  margin: 0 !important;
+}
+
+#displaysList .tree-action-btn {
+  width: 24px !important;
+  height: 24px !important;
+  border: 1px solid #9db8ce !important;
+  background: linear-gradient(180deg, #f8fcff 0%, #e8f1f9 100%) !important;
+  color: #355f7f !important;
+}
+
+#displaysList .tree-action-btn.danger {
+  border-color: #93b2ca !important;
+  background: linear-gradient(180deg, #f8fcff 0%, #e8f1f9 100%) !important;
+  color: #355f7f !important;
+}
+
+#displaysList .display-item.active,
+#displaysList .display-item.active:hover,
+#displaysList .project-row.selected,
+#displaysList .folder-row.selected {
+  background: #e2f0fb !important;
+  border-color: #7aa3c5 !important;
+  box-shadow: inset 3px 0 0 #2f739d !important;
+}
+
+/* Sidebar scroll lock-in: keep the project tree as the owning scroll container. */
+.shell,
+.grid,
+.exports-card {
+  min-height: 0;
+}
+
+.grid {
+  align-items: stretch;
+}
+
+.exports-card {
+  height: 100%;
+}
+
+#displaysList.single-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior-y: contain !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable both-edges;
+  padding-right: 6px !important;
+}
+
+#displaysList.single-list::-webkit-scrollbar {
+  width: 12px;
+}
+
+#displaysList.single-list::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: linear-gradient(180deg, #eef4fa 0%, #dfe9f3 100%);
+}
+
+#displaysList.single-list::-webkit-scrollbar-thumb {
+  border: 2px solid #e9f1f8;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #8aaec8 0%, #5b86ab 100%);
+}
+
+#displaysList.single-list::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #769fbd 0%, #4a789f 100%);
+}
+
+/* Sidebar flow fix: tree rows must size to content so the list gets a real scrollHeight. */
+#displaysList.single-list > li,
+#displaysList .project-item,
+#displaysList .project-children,
+#displaysList .folder-item,
+#displaysList .folder-children,
+#displaysList .display-item {
+  height: auto !important;
+  max-height: none !important;
+}
+
+#displaysList .project-item,
+#displaysList .folder-item,
+#displaysList .display-item {
+  flex: 0 0 auto !important;
+}
+
+#displaysList .project-item,
+#displaysList .folder-item {
+  overflow: visible !important;
 }

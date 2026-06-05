@@ -843,6 +843,10 @@ function setSidebarMode(mode) {
 async function createNewProject(rawName) {
   const projectName = normalizeProjectName(rawName);
 
+  if (projectList.some((project) => displayKey(project.name) === displayKey(projectName))) {
+    throw new Error(`Project ${projectName} already exists. Choose a different name.`);
+  }
+
   try {
     const defaultsResponse = await fetch('/api/default-pages');
     if (!defaultsResponse.ok) {
@@ -888,7 +892,7 @@ async function createNewProject(rawName) {
       });
     }
 
-    projectList = [...projectList.filter((item) => displayKey(item.name) !== displayKey(project.name)), project];
+    projectList = [...projectList, project];
     saveProjectList();
     setActiveProject(project);
     setSidebarCollapsed(false);
@@ -1099,6 +1103,66 @@ function getAllEditedPackageFiles(files = currentDisplayRows) {
   return [...new Set(files
     .filter((file) => isEditableSource(file))
     .map((file) => file.name))];
+}
+
+function getAllActiveProjectScreenFiles(project) {
+  if (!project || !Array.isArray(project.folders)) {
+    return [];
+  }
+
+  const names = [];
+  for (const folder of project.folders) {
+    for (const screen of folder?.screens || []) {
+      const name = String(screen?.name || '').trim();
+      if (!name || !/\.xml$/i.test(name)) {
+        continue;
+      }
+      names.push(name);
+    }
+  }
+
+  return [...new Set(names)];
+}
+
+async function syncActiveProjectScreensToEditedFiles(project) {
+  if (!project || !Array.isArray(project.folders)) {
+    return [];
+  }
+
+  const syncedNames = [];
+  for (const folder of project.folders) {
+    for (const screen of folder?.screens || []) {
+      const name = String(screen?.name || '').trim();
+      const xml = String(screen?.xml || '');
+      if (!name || !/\.xml$/i.test(name) || !xml.trim()) {
+        continue;
+      }
+
+      const safeXml = sanitizeXmlForFactoryTalk(xml);
+      const res = await fetch(`/api/displays/${encodeURIComponent(name)}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ xml: safeXml })
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) {
+        throw new Error(data.error || `Failed to sync ${name} for package`);
+      }
+
+      const meta = readSizeFromXml(safeXml);
+      upsertCurrentDisplayRow({
+        name,
+        source: 'edited',
+        sizeBytes: new Blob([safeXml]).size,
+        lastModified: new Date().toISOString(),
+        width: meta.width,
+        height: meta.height
+      });
+      syncedNames.push(name);
+    }
+  }
+
+  return [...new Set(syncedNames)];
 }
 
 async function autoSaveCurrentDisplay() {
@@ -1991,6 +2055,14 @@ function deleteSelectedObject() {
   xmlEditor.value = serializeXmlDoc(doc);
   recordHistory(xmlEditor.value);
 
+  const activeProject = getActiveProjectForPopupPlanner();
+  if (popupGroupName && activeProject) {
+    if (removeGeneratedPopupHistoryForGroup(activeProject, popupGroupName, activeProjectKey)) {
+      saveProjectList();
+      renderProjectPopupPlanner();
+    }
+  }
+
   const remaining = getObjectNodes(doc);
   if (!remaining.length) {
     selectedObjectIndex = null;
@@ -2407,10 +2479,10 @@ function buildGeneratedPopupDrafts(project) {
   return drafts;
 }
 
-function createSavedPopupEntry(draft, project) {
+function createSavedPopupEntry(draft, project, options = {}) {
   const sourceRow = project?.popupPlanRows?.find((row) => String(row.id) === String(draft?.rowId));
   const componentTypeId = String(sourceRow?.componentTypeId || 'component:conveyor');
-  const targetScreenLabel = 'Active Screen';
+  const targetScreenLabel = String(options.targetScreenLabel || activeProjectScreen || selectedDisplay || 'Active Screen');
   return {
     id: `popup-generated-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     popupName: String(draft?.popupName || 'Popup').trim() || 'Popup',
@@ -2424,9 +2496,34 @@ function createSavedPopupEntry(draft, project) {
     popupTypeId: String(draft?.popupTypeId || 'vfd').toLowerCase(),
     popupTypeLabel: String(draft?.popupTypeLabel || ''),
     code: String(draft?.code || suggestPopupCode(draft?.popupName, draft?.popupTypeId)).trim(),
+    popupGroupName: String(options.popupGroupName || ''),
+    targetScreenKey: String(options.targetScreenKey || activeProjectKey || ''),
     targetScreenLabel,
     generatedAt: new Date().toISOString()
   };
+}
+
+function removeGeneratedPopupHistoryForGroup(project, popupGroupName, targetScreenKey = activeProjectKey) {
+  if (!project || !popupGroupName) {
+    return false;
+  }
+
+  const groupKey = String(popupGroupName || '');
+  const screenKey = String(targetScreenKey || '');
+  const beforeCount = Array.isArray(project.popupGeneratedRows) ? project.popupGeneratedRows.length : 0;
+  project.popupGeneratedRows = (project.popupGeneratedRows || []).filter((entry) => {
+    if (String(entry?.popupGroupName || '') !== groupKey) {
+      return true;
+    }
+
+    if (!screenKey) {
+      return false;
+    }
+
+    return String(entry?.targetScreenKey || '') !== screenKey;
+  });
+
+  return project.popupGeneratedRows.length !== beforeCount;
 }
 
 function resolvePopupTemplateById(project, templateId) {
@@ -2586,32 +2683,32 @@ function ensureUniquePopupObjectNames(doc, popupGroup) {
 
 function insertGeneratedPopupDraft(draft, options = {}) {
   if (!draft) {
-    return false;
+    return null;
   }
 
   const xml = xmlEditor.value.trim();
   if (!xml) {
     alert('Open a project screen XML first.');
-    return false;
+    return null;
   }
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, 'text/xml');
   if (doc.querySelector('parsererror')) {
     alert('XML parse error. Fix XML before inserting generated popup.');
-    return false;
+    return null;
   }
 
   const root = doc.querySelector('gfx');
   if (!root) {
     alert('Could not find gfx root in XML.');
-    return false;
+    return null;
   }
 
   const templateNode = parsePopupTemplateObject(draft.xml);
   if (!templateNode) {
     alert(`Template XML for ${draft.templateName} is invalid.`);
-    return false;
+    return null;
   }
 
   const newNode = templateNode.cloneNode(true);
@@ -2653,7 +2750,11 @@ function insertGeneratedPopupDraft(draft, options = {}) {
   populateObjectPanel(doc, selectedObjectIndex);
   renderPreview();
   persistCurrentXmlState();
-  return true;
+  return {
+    popupGroupName: String(newNode.getAttribute('name') || ''),
+    targetScreenKey: String(activeProjectKey || ''),
+    targetScreenLabel: String(activeProjectScreen || selectedDisplay || 'Active Screen')
+  };
 }
 
 function renderPopupTemplateOptions(project) {
@@ -3160,6 +3261,108 @@ function sanitizeXmlForFactoryTalk(xml) {
       });
     });
 
+    const rectangles = doc.querySelectorAll('rectangle');
+    rectangles.forEach((node) => {
+      const borderWidth = node.getAttribute('borderWidth');
+      if (borderWidth) {
+        if (!node.hasAttribute('lineWidth')) {
+          node.setAttribute('lineWidth', borderWidth);
+        }
+        node.removeAttribute('borderWidth');
+        changed = true;
+      }
+
+      const borderColor = node.getAttribute('borderColor');
+      if (borderColor) {
+        if (!node.hasAttribute('foreColor')) {
+          node.setAttribute('foreColor', borderColor);
+        }
+        node.removeAttribute('borderColor');
+        changed = true;
+      }
+
+      const borderStyle = node.getAttribute('borderStyle');
+      if (borderStyle) {
+        if (!node.hasAttribute('lineStyle')) {
+          const mapped = String(borderStyle).trim().toLowerCase() === 'line' ? 'solid' : String(borderStyle).trim();
+          if (mapped) {
+            node.setAttribute('lineStyle', mapped);
+          }
+        }
+        node.removeAttribute('borderStyle');
+        changed = true;
+      }
+
+      if (node.hasAttribute('borderUsesBackColor')) {
+        node.removeAttribute('borderUsesBackColor');
+        changed = true;
+      }
+
+      const unsupportedRectangleAttrs = [
+        'fontFamily',
+        'fontSize',
+        'bold',
+        'italic',
+        'underline',
+        'strikethrough',
+        'charHeight',
+        'charWidth',
+        'alignment',
+        'wordWrap',
+        'sizeToFit',
+        'caption'
+      ];
+      unsupportedRectangleAttrs.forEach((attr) => {
+        if (node.hasAttribute(attr)) {
+          node.removeAttribute(attr);
+          changed = true;
+        }
+      });
+    });
+
+    const multistateIndicators = doc.querySelectorAll('multistateIndicator');
+    multistateIndicators.forEach((node) => {
+      ['fontSize', 'lineWidth'].forEach((attr) => {
+        if (node.hasAttribute(attr)) {
+          node.removeAttribute(attr);
+          changed = true;
+        }
+      });
+    });
+
+    const nonVisualCleanup = [
+      { tag: 'states', attrs: ['left', 'top', 'width', 'height', 'fontSize', 'borderWidth', 'lineWidth'] },
+      { tag: 'state', attrs: ['left', 'top', 'width', 'height', 'fontSize', 'borderWidth', 'lineWidth'] },
+      { tag: 'connections', attrs: ['left', 'top', 'width', 'height', 'fontSize', 'borderWidth', 'lineWidth'] },
+      { tag: 'connection', attrs: ['left', 'top', 'width', 'height', 'fontSize', 'borderWidth', 'lineWidth'] },
+      { tag: 'imageSettings', attrs: ['left', 'top', 'width', 'height', 'fontSize', 'borderWidth', 'lineWidth'] },
+      { tag: 'caption', attrs: ['left', 'top', 'width', 'height', 'borderWidth', 'lineWidth'] }
+    ];
+    nonVisualCleanup.forEach(({ tag, attrs }) => {
+      doc.querySelectorAll(tag).forEach((node) => {
+        attrs.forEach((attr) => {
+          if (node.hasAttribute(attr)) {
+            node.removeAttribute(attr);
+            changed = true;
+          }
+        });
+      });
+    });
+
+    const parameterBlocks = doc.querySelectorAll('parameters');
+    parameterBlocks.forEach((node) => {
+      const parent = node.parentElement;
+      if (!parent) {
+        return;
+      }
+
+      const isReferenceObject = String(parent.getAttribute('isReferenceObject') || '').toLowerCase() === 'true';
+      if (!isReferenceObject) {
+        parent.removeChild(node);
+        changed = true;
+      }
+    });
+
     const popupGroups = Array.from(doc.querySelectorAll('group')).filter((group) => isPopupGroupName(group.getAttribute('name')));
     popupGroups.forEach((group) => {
       const descendants = Array.from(group.querySelectorAll('*'))
@@ -3307,9 +3510,10 @@ async function seedDefaultTemplates(files) {
 
 function updateCurrentDisplayRow(name, xml) {
   const meta = readSizeFromXml(xml);
-  currentDisplayRows = currentDisplayRows.map((file) => file.name === name
+  currentDisplayRows = currentDisplayRows.map((file) => displayKey(file.name) === displayKey(name)
     ? {
         ...file,
+        source: 'edited',
         sizeBytes: new Blob([xml]).size,
         lastModified: new Date().toISOString(),
         width: meta.width,
@@ -3469,7 +3673,9 @@ function renderDisplays(files) {
 
   if (!visibleFiles.length) {
     displaysList.innerHTML = '<li>No display XML files loaded yet.</li>';
-    removeDisplayBtn.disabled = true;
+    if (removeDisplayBtn) {
+      removeDisplayBtn.disabled = true;
+    }
     return;
   }
 
@@ -3498,7 +3704,9 @@ function renderDisplays(files) {
     selectedFolderIsCustom = false;
   }
 
-  removeDisplayBtn.disabled = !selectedDisplay;
+  if (removeDisplayBtn) {
+    removeDisplayBtn.disabled = !selectedDisplay;
+  }
   if (removeFolderBtn) {
     removeFolderBtn.disabled = !selectedFolderName;
   }
@@ -3666,7 +3874,9 @@ function renderDefaultTemplates(files) {
     selectedDefaultTemplate = '';
   }
 
-  removeDisplayBtn.disabled = !selectedDefaultTemplate;
+  if (removeDisplayBtn) {
+    removeDisplayBtn.disabled = !selectedDefaultTemplate;
+  }
   if (!files.length) {
     displaysList.innerHTML = '<li>No default template XML files found in ftio/default-pages.</li>';
     return;
@@ -3838,10 +4048,12 @@ function renderDefaultTemplates(files) {
 
 function renderProjectSidebar() {
   displaysList.innerHTML = '';
+  enforceProjectSidebarLayout();
 
   normalizeProjectList();
   if (!projectList.length) {
     displaysList.innerHTML = '<li>No projects yet. Click New Project to create one.</li>';
+    enforceProjectSidebarLayout();
     if (sidebarTitle) {
       sidebarTitle.textContent = 'Projects';
     }
@@ -4028,8 +4240,18 @@ function renderProjectSidebar() {
       row.appendChild(name);
 
       const meta = document.createElement('div');
+      meta.className = 'screen-meta';
       const sizeLabel = screen.width && screen.height ? `${screen.width}x${screen.height}` : 'size unknown';
-      meta.textContent = `project screen · ${sizeLabel} · ${kb(screen.sizeBytes)}\n${shortDateTime(screen.lastModified)}`;
+      const metaMain = document.createElement('div');
+      metaMain.className = 'screen-meta-main';
+      metaMain.textContent = `project screen · ${sizeLabel} · ${kb(screen.sizeBytes)}`;
+
+      const metaTime = document.createElement('div');
+      metaTime.className = 'screen-meta-time';
+      metaTime.textContent = shortDateTime(screen.lastModified);
+
+      meta.appendChild(metaMain);
+      meta.appendChild(metaTime);
 
       const actions = document.createElement('div');
       actions.className = 'tree-actions';
@@ -4162,6 +4384,8 @@ function renderProjectSidebar() {
   if (sidebarTitle) {
     sidebarTitle.textContent = 'Projects';
   }
+
+  enforceProjectSidebarLayout();
 }
 
 function updateProjectSidebarSelection() {
@@ -4183,6 +4407,96 @@ function updateProjectSidebarSelection() {
     const screenName = String(screenItem.dataset.screenName || '');
     const itemKey = createProjectKey(screenProjectId, folderName, screenName);
     screenItem.classList.toggle('active', itemKey === activeKey);
+  }
+}
+
+function ensureProjectSidebarWheelScroll() {
+  if (!displaysList) {
+    return;
+  }
+
+  const onSidebarWheel = (event) => {
+    if (!displaysList) {
+      return;
+    }
+
+    const canScroll = displaysList.scrollHeight > displaysList.clientHeight;
+    if (!canScroll) {
+      return;
+    }
+
+    const delta = Number(event.deltaY) || 0;
+    if (!delta) {
+      return;
+    }
+
+    const maxScrollTop = Math.max(0, displaysList.scrollHeight - displaysList.clientHeight);
+    const nextScrollTop = Math.min(maxScrollTop, Math.max(0, displaysList.scrollTop + delta));
+
+    if (nextScrollTop !== displaysList.scrollTop) {
+      event.preventDefault();
+      displaysList.scrollTop = nextScrollTop;
+    }
+  };
+
+  if (displaysList.dataset.wheelScrollBound !== '1') {
+    displaysList.dataset.wheelScrollBound = '1';
+    displaysList.addEventListener('wheel', onSidebarWheel, { passive: false });
+  }
+
+  if (exportsCard && exportsCard.dataset.wheelScrollBound !== '1') {
+    exportsCard.dataset.wheelScrollBound = '1';
+    exportsCard.addEventListener('wheel', onSidebarWheel, { passive: false });
+  }
+}
+
+function enforceProjectSidebarLayout() {
+  if (!exportsCard || !displaysList) {
+    return;
+  }
+
+  // Force a stable scroll container even if older CSS rules conflict.
+  exportsCard.style.setProperty('display', 'flex', 'important');
+  exportsCard.style.setProperty('flex-direction', 'column', 'important');
+  exportsCard.style.setProperty('min-height', '0', 'important');
+  exportsCard.style.setProperty('height', '100%', 'important');
+  exportsCard.style.setProperty('overflow', 'hidden', 'important');
+
+  displaysList.style.setProperty('flex', '1 1 0', 'important');
+  displaysList.style.setProperty('min-height', '0', 'important');
+  displaysList.style.setProperty('height', '100%', 'important');
+  displaysList.style.setProperty('max-height', 'none', 'important');
+  displaysList.style.setProperty('overflow-y', 'auto', 'important');
+  displaysList.style.setProperty('overflow-x', 'hidden', 'important');
+  displaysList.style.setProperty('overscroll-behavior', 'contain', 'important');
+  displaysList.style.setProperty('pointer-events', 'auto', 'important');
+
+  // Keep project tree rows in normal document flow so scrollHeight reflects full content.
+  const flowSelectors = [
+    '#displaysList.single-list > li',
+    '#displaysList .project-item',
+    '#displaysList .project-children',
+    '#displaysList .folder-item',
+    '#displaysList .folder-children',
+    '#displaysList .display-item'
+  ];
+
+  for (const selector of flowSelectors) {
+    const nodes = document.querySelectorAll(selector);
+    for (const node of nodes) {
+      node.style.setProperty('height', 'auto', 'important');
+      node.style.setProperty('max-height', 'none', 'important');
+      node.style.setProperty('min-height', '0', 'important');
+      node.style.setProperty('display', 'block', 'important');
+      node.style.setProperty('position', 'static', 'important');
+      node.style.setProperty('overflow', 'visible', 'important');
+      node.style.setProperty('transform', 'none', 'important');
+      node.style.setProperty('flex', '0 0 auto', 'important');
+    }
+  }
+
+  for (const node of document.querySelectorAll('#displaysList .display-item')) {
+    node.style.setProperty('display', 'grid', 'important');
   }
 }
 
@@ -4754,9 +5068,15 @@ function resizeDisplayXml(xml, nextWidth, nextHeight) {
   const scaleX = nextWidth / currentWidth;
   const scaleY = nextHeight / currentHeight;
   const strokeScale = (scaleX + scaleY) / 2;
+  const nonVisualTags = new Set(['caption', 'imagesettings', 'states', 'state', 'connections', 'connection', 'animations', 'animation', 'parameters', 'parameter']);
 
   Array.from(doc.querySelectorAll('gfx *')).forEach((node) => {
     if (!node?.tagName || node.tagName === 'displaySettings') {
+      return;
+    }
+
+    const tag = String(node.tagName || '').toLowerCase();
+    if (nonVisualTags.has(tag)) {
       return;
     }
 
@@ -4774,9 +5094,10 @@ function resizeDisplayXml(xml, nextWidth, nextHeight) {
         return;
       }
 
-      scaleNumericAttribute(child, 'fontSize', strokeScale, 1);
-      scaleNumericAttribute(child, 'borderWidth', strokeScale, 1);
-      scaleNumericAttribute(child, 'lineWidth', strokeScale, 1);
+      const childTag = String(child.tagName || '').toLowerCase();
+      if (childTag === 'caption') {
+        scaleNumericAttribute(child, 'fontSize', strokeScale, 1);
+      }
     });
   });
 
@@ -5768,15 +6089,8 @@ if (generatePopupsBtn) {
     syncPopupPlanRowsFromTable(project);
     generatedPopupDrafts = buildGeneratedPopupDrafts(project);
 
-    if (project && generatedPopupDrafts.length) {
-      const historyRows = generatedPopupDrafts.map((draft) => createSavedPopupEntry(draft, project));
-      project.popupGeneratedRows = [...project.popupGeneratedRows, ...historyRows].slice(-1500);
-    }
-
-    saveProjectList();
-    renderPopupPalette(project);
-
     let placedCount = 0;
+    const historyRows = [];
     const targetScreenLabel = 'active screen';
 
     if (generatedPopupDrafts.length && xmlEditor.value.trim()) {
@@ -5790,11 +6104,22 @@ if (generatePopupsBtn) {
         const row = Math.floor(index / columns);
         const left = startX + (col * stepX);
         const top = startY + (row * stepY);
-        if (insertGeneratedPopupDraft(draft, { left, top })) {
+        const inserted = insertGeneratedPopupDraft(draft, { left, top });
+        if (inserted) {
           placedCount += 1;
+          if (project) {
+            historyRows.push(createSavedPopupEntry(draft, project, inserted));
+          }
         }
       });
     }
+
+    if (project && historyRows.length) {
+      project.popupGeneratedRows = [...project.popupGeneratedRows, ...historyRows].slice(-1500);
+    }
+
+    saveProjectList();
+    renderPopupPalette(project);
 
     packageResult.textContent = generatedPopupDrafts.length
       ? (placedCount
@@ -5880,7 +6205,7 @@ buildPackageBtn.addEventListener('click', async () => {
     await buildImportPackage(selectedFiles, 'selected page');
   } catch (err) {
     console.error(err);
-    alert('Could not save package ZIP. Please try again.');
+    alert(err?.message || 'Could not build the package. Please try again.');
   }
 });
 
@@ -5889,6 +6214,25 @@ if (buildAllPackageBtn) {
     try {
       const saved = await autoSaveCurrentDisplay();
       if (!saved) {
+        return;
+      }
+
+      const activeProject = getActiveProject();
+      if (activeProject) {
+        const projectFiles = getAllActiveProjectScreenFiles(activeProject);
+        if (!projectFiles.length) {
+          alert('No screens found in the active project.');
+          return;
+        }
+
+        const syncedFiles = await syncActiveProjectScreensToEditedFiles(activeProject);
+        if (!syncedFiles.length) {
+          alert('No project screens were ready to package.');
+          return;
+        }
+
+        await refreshDisplays();
+        await buildImportPackage(syncedFiles, 'all project screens');
         return;
       }
 
@@ -5901,7 +6245,7 @@ if (buildAllPackageBtn) {
       await buildImportPackage(allFiles, 'all edited files');
     } catch (err) {
       console.error(err);
-      alert('Could not save package ZIP. Please try again.');
+      alert(err?.message || 'Could not build the all-import package. Please try again.');
     }
   });
 }
@@ -5940,12 +6284,15 @@ async function init() {
   const res = await fetch('/api/bridge/status');
   const status = await res.json();
   setBridgeCard(status);
+  enforceProjectSidebarLayout();
+  ensureProjectSidebarWheelScroll();
   renderProjectSidebar();
   renderProjectPopupPlanner();
   renderPreview();
 }
 
 window.addEventListener('resize', () => {
+  enforceProjectSidebarLayout();
   if (xmlEditor.value.trim()) {
     renderPreview();
   }

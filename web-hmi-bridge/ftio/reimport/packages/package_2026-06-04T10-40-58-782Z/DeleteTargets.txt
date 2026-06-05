@@ -1,0 +1,6 @@
+Delete these displays first if FactoryTalk import is merging instead of replacing:
+- 101_Production_Data
+- IO_List
+- Template
+
+After deleting, run Batch Import with BatchImport.xml from this folder.

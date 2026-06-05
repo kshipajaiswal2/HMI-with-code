@@ -10,6 +10,7 @@ FactoryTalk View ME engineering workspace with two main parts:
 - Generates reusable HMI engineering outputs (`device_map`, `alarms_seed`, `screen_spec`, `global_object_params`).
 - Supports offline-first HMI preparation (no live PLC needed during most build work).
 - Provides a web editor for display XML preview and edits.
+- Supports importing a full XML folder directly into a new project tree in the web bridge.
 - Builds FactoryTalk import packages, including foldered display import paths.
 - Supports default template libraries used when creating new projects in the web bridge.
 
@@ -62,6 +63,21 @@ Optional environment variables:
 - `PORT` (default `5050`)
 - `FT_EXPORT_DIR` (default `..\Export import`)
 - `FT_IMAGE_DIR` (default `..\hmi\MyPlantHMI\Images`)
+
+### 3) Import a Full XML Folder (Project Tree)
+
+From the bridge UI:
+
+1. Click `Import Folder`.
+2. Select a folder that contains display XML files.
+3. The bridge creates a new project and maps files into folders based on relative paths.
+4. The first imported screen is loaded automatically in the editor.
+
+Notes:
+
+- Files named like `BatchImport_*.xml` are skipped during folder import.
+- Nested folders are preserved in the project sidebar.
+- If a project with the same name exists, a unique name is created automatically.
 
 ## Default Template Workflow (New Project)
 
@@ -141,6 +157,7 @@ Reusable naming options:
 - If import reports merge/update conflicts, delete targets first using `DeleteTargets.txt`, then re-import.
 - If you changed default templates, refresh the bridge and recreate the project.
 - If folder grouping looks wrong, check `web-hmi-bridge/ftio/display-folders.json`.
+- If `Import Folder` appears to do nothing, restart the bridge server and hard refresh browser (`Ctrl+Shift+R`) to ensure latest frontend code is loaded.
 
 ## Notes
 

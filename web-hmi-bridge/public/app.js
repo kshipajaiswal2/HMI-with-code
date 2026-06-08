@@ -1,4 +1,4 @@
-const socket = io();
+﻿const socket = io();
 
 const bridgeStatus = document.getElementById('bridgeStatus');
 const displaysList = document.getElementById('displaysList');
@@ -340,7 +340,7 @@ const CONVEYOR_SPEED_TEMPLATE_XML = `<group name="Group4" visible="true" wallpap
         </connections>
     </maintainedButton>
 </group>`;
-const PNEUMATIC_FORWARD_REVERSE_TEMPLATE_XML = '<group name="PV18_Popup" visible="true" wallpaper="false" isReferenceObject="false" left="0" top="0" width="250" height="122"><rectangle name="Popup_Frame" height="122" width="250" left="0" top="0" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/><text name="Popup_Title" height="38" width="236" left="8" top="4" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" fontSize="13" bold="true" italic="false" underline="false" strikethrough="false" caption="[d] PV18 Matrix Station&#xA;LH Side Cylinder"/><multistateIndicator name="Popup_D1" height="24" width="24" left="12" top="52" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" shape="circle" triggerType="value" currentStateId="0" captionOnBorder="false" setLastStateId="2"><states><state stateId="0" value="0" backColor="#C6C6C6" borderColor="#E8E8E8" patternColor="white" patternStyle="none" blink="false"/><state stateId="1" value="1" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false"/></states><connections><connection name="Indicator" expression="{[PLC]PV18.Pos01PositionFB}"/></connections></multistateIndicator><text name="Popup_D1_Label" height="20" width="86" left="40" top="54" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleLeft" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="d1   RIO:17:I.2"/><momentaryButton name="Popup_Forward" height="40" width="95" left="140" top="48" visible="true" isReferenceObject="false" audio="true" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="2" buttonAction="normallyOpen" description="" holdTime="250" highlightColor="lime" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" currentStateId="0" captionOnBorder="false"><states><state stateId="0" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false"><caption fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="Forward" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/></state></states><connections><connection name="Value" expression="{[PLC]PV18.HMI_Pos01CMD}"/><connection name="Indicator" expression="{[PLC]PV18.HMI_Pos01CMD}"/></connections></momentaryButton><multistateIndicator name="Popup_D2" height="24" width="24" left="12" top="88" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" shape="circle" triggerType="value" currentStateId="0" captionOnBorder="false" setLastStateId="2"><states><state stateId="0" value="0" backColor="#C6C6C6" borderColor="#E8E8E8" patternColor="white" patternStyle="none" blink="false"/><state stateId="1" value="1" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false"/></states><connections><connection name="Indicator" expression="{[PLC]PV18.Pos02PositionFB}"/></connections></multistateIndicator><text name="Popup_D2_Label" height="20" width="86" left="40" top="90" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleLeft" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="d2   RIO:17:I.3"/><momentaryButton name="Popup_Reverse" height="40" width="95" left="140" top="84" visible="true" isReferenceObject="false" audio="true" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="2" buttonAction="normallyOpen" description="" holdTime="250" highlightColor="lime" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" currentStateId="0" captionOnBorder="false"><states><state stateId="0" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false"><caption fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="Reverse" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/></state></states><connections><connection name="Value" expression="{[PLC]PV18.HMI_Pos02CMD}"/><connection name="Indicator" expression="{[PLC]PV18.HMI_Pos02CMD}"/></connections></momentaryButton></group>';
+const PNEUMATIC_FORWARD_REVERSE_TEMPLATE_XML = '<group name="PV18_Popup" visible="true" wallpaper="false" isReferenceObject="false" left="0" top="0" width="250" height="122"><rectangle name="Popup_Frame" height="122" width="250" left="0" top="0" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/><text name="Popup_Title" height="38" width="236" left="8" top="4" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" fontSize="13" bold="true" italic="false" underline="false" strikethrough="false" caption="[d] PV18 Matrix Station&#xA;LH Side Cylinder"/><multistateIndicator name="Popup_D1" height="24" width="24" left="12" top="52" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" shape="circle" triggerType="value" currentStateId="0" captionOnBorder="false" setLastStateId="2"><states><state stateId="0" value="0" backColor="#C6C6C6" borderColor="#E8E8E8" patternColor="white" patternStyle="none" blink="false"/><state stateId="1" value="1" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false"/></states><connections><connection name="Indicator" expression="{[PLC]PV18.Pos01PositionFB}"/></connections></multistateIndicator><text name="Popup_D1_Label" height="20" width="96" left="40" top="54" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleLeft" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="d1   RIO:17:I.2"/><momentaryButton name="Popup_Forward" height="40" width="95" left="140" top="48" visible="true" isReferenceObject="false" audio="true" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="2" buttonAction="normallyOpen" description="" holdTime="250" highlightColor="lime" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" currentStateId="0" captionOnBorder="false"><states><state stateId="0" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false"><caption fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="Forward" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/></state></states><connections><connection name="Value" expression="{[PLC]PV18.HMI_Pos01CMD}"/><connection name="Indicator" expression="{[PLC]PV18.HMI_Pos01CMD}"/></connections></momentaryButton><multistateIndicator name="Popup_D2" height="24" width="24" left="12" top="88" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" shape="circle" triggerType="value" currentStateId="0" captionOnBorder="false" setLastStateId="2"><states><state stateId="0" value="0" backColor="#C6C6C6" borderColor="#E8E8E8" patternColor="white" patternStyle="none" blink="false"/><state stateId="1" value="1" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false"/></states><connections><connection name="Indicator" expression="{[PLC]PV18.Pos02PositionFB}"/></connections></multistateIndicator><text name="Popup_D2_Label" height="20" width="96" left="40" top="90" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleLeft" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="d2   RIO:17:I.3"/><momentaryButton name="Popup_Reverse" height="40" width="95" left="140" top="84" visible="true" isReferenceObject="false" audio="true" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="2" buttonAction="normallyOpen" description="" holdTime="250" highlightColor="lime" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" currentStateId="0" captionOnBorder="false"><states><state stateId="0" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false"><caption fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="Reverse" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/></state></states><connections><connection name="Value" expression="{[PLC]PV18.HMI_Pos02CMD}"/><connection name="Indicator" expression="{[PLC]PV18.HMI_Pos02CMD}"/></connections></momentaryButton></group>';
 
 function getPopupTypeProfile(profileId) {
   const key = String(profileId || '').toLowerCase();
@@ -2720,6 +2720,22 @@ function resolvePopupTemplateById(project, templateId) {
     };
   }
 
+  if (key === 'preset:conveyor:speed') {
+    return {
+      id: 'preset:conveyor:speed',
+      name: 'Conveyor Speed Popup',
+      xml: CONVEYOR_SPEED_TEMPLATE_XML
+    };
+  }
+
+  if (key === 'preset:pneumatic:forward_reverse') {
+    return {
+      id: 'preset:pneumatic:forward_reverse',
+      name: 'Pneumatic Forward/Reverse Popup',
+      xml: PNEUMATIC_FORWARD_REVERSE_TEMPLATE_XML
+    };
+  }
+
   return project?.popupTemplates?.find((template) => String(template.id) === key) || null;
 }
 
@@ -2765,6 +2781,7 @@ function formatPopupLabel(popupName, sequence, totalForName = 1) {
 function applyPopupDraftAttributes(newNode, draft) {
   const profile = getPopupTypeProfile(draft.popupTypeId);
   const popupLabel = formatPopupLabel(draft.popupName, draft.sequence, draft.totalForName);
+  const shouldOverrideTitle = profile.id === 'vfd' || profile.id === 'speed';
 
   const directCaption = String(newNode.getAttribute('caption') || '').trim();
   if (directCaption) {
@@ -2778,7 +2795,7 @@ function applyPopupDraftAttributes(newNode, draft) {
 
     if (node.hasAttribute('caption')) {
       const currentCaption = String(node.getAttribute('caption') || '').trim();
-      if (nodeName.includes('title') || currentCaption.toLowerCase().startsWith('mrtc')) {
+      if ((shouldOverrideTitle && nodeName.includes('title')) || currentCaption.toLowerCase().startsWith('mrtc')) {
         node.setAttribute('caption', popupLabel);
       }
 
@@ -3927,7 +3944,7 @@ function renderDisplays(files) {
 
   const appendFileRow = (file, options = {}) => {
     const isGlobalObject = Boolean(options.isGlobalObject);
-    const namePrefix = isGlobalObject ? 'â—† ' : '';
+    const namePrefix = isGlobalObject ? 'Ã¢â€”â€  ' : '';
     const appendTo = options.appendTo || displaysList;
 
     const li = document.createElement('li');
@@ -3947,8 +3964,8 @@ function renderDisplays(files) {
 
     const meta = document.createElement('div');
     const sizeLabel = file.width && file.height ? `${file.width}x${file.height}` : 'size unknown';
-    const sourceLabel = isGlobalObject ? `${file.source} Â· global object` : file.source;
-    meta.textContent = `${sourceLabel} Â· ${sizeLabel} Â· ${kb(file.sizeBytes)}\n${shortDateTime(file.lastModified)}`;
+    const sourceLabel = isGlobalObject ? `${file.source} Ã‚Â· global object` : file.source;
+    meta.textContent = `${sourceLabel} Ã‚Â· ${sizeLabel} Ã‚Â· ${kb(file.sizeBytes)}\n${shortDateTime(file.lastModified)}`;
 
     li.appendChild(row);
     li.appendChild(meta);
@@ -4133,7 +4150,7 @@ function renderDefaultTemplates(files) {
   const appendDefaultFileRow = (file, options = {}) => {
     const isGlobalObject = Boolean(options.isGlobalObject);
     const appendTo = options.appendTo || displaysList;
-    const namePrefix = isGlobalObject ? 'â—† ' : '';
+    const namePrefix = isGlobalObject ? 'Ã¢â€”â€  ' : '';
 
     const li = document.createElement('li');
     li.className = `display-item${isGlobalObject ? ' global-object-item' : ''}`;
@@ -4444,7 +4461,7 @@ function renderProjectSidebar() {
       const sizeLabel = screen.width && screen.height ? `${screen.width}x${screen.height}` : 'size unknown';
       const metaMain = document.createElement('div');
       metaMain.className = 'screen-meta-main';
-      metaMain.textContent = `project screen Â· ${sizeLabel} Â· ${kb(screen.sizeBytes)}`;
+      metaMain.textContent = `project screen Ã‚Â· ${sizeLabel} Ã‚Â· ${kb(screen.sizeBytes)}`;
 
       const metaTime = document.createElement('div');
       metaTime.className = 'screen-meta-time';
@@ -4684,7 +4701,7 @@ function enforceProjectSidebarLayout() {
   for (const selector of flowSelectors) {
     const nodes = document.querySelectorAll(selector);
     for (const node of nodes) {
-      // Never force display:block on collapsed children â€” that breaks expand/collapse.
+      // Never force display:block on collapsed children Ã¢â‚¬â€ that breaks expand/collapse.
       const isCollapsedChild =
         (node.classList.contains('project-children') && node.closest('.project-item.collapsed')) ||
         (node.classList.contains('folder-children') && node.closest('.folder-item.collapsed'));
@@ -5652,7 +5669,7 @@ function syncColorControl(textEl, pickerEl, swatchEl) {
 
 function serializeXmlDoc(doc) {
   let xml = new XMLSerializer().serializeToString(doc);
-  // XMLSerializer adds xmlns="" to elements with no namespace â€” remove them
+  // XMLSerializer adds xmlns="" to elements with no namespace Ã¢â‚¬â€ remove them
   // or FactoryTalk's XML parser will reject the file.
   xml = xml.replace(/ xmlns=""/g, '');
   if (xml.startsWith('<?xml')) {
@@ -6846,4 +6863,5 @@ init().catch((err) => {
   console.error(err);
   bridgeStatus.querySelector('span:last-child').textContent = 'Bridge unavailable';
 });
+
 

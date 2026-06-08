@@ -213,18 +213,134 @@ function createProjectKey(projectId, folderName, screenName) {
 
 const POPUP_TYPE_PROFILES = [
   { id: 'vfd', label: 'VFD', unit: 'Hz', token: 'VFD', min: '0', max: '50', decimalPlaces: '0', numberOfDigits: '4' },
-  { id: 'hz', label: 'Hz', unit: 'Hz', token: 'HZ', min: '0', max: '50', decimalPlaces: '0', numberOfDigits: '4' },
-  { id: 'rpm', label: 'RPM', unit: 'RPM', token: 'RPM', min: '0', max: '3600', decimalPlaces: '0', numberOfDigits: '5' },
-  { id: 'bar', label: 'Bar', unit: 'bar', token: 'BAR', min: '0', max: '10', decimalPlaces: '2', numberOfDigits: '5' },
-  { id: 'degc', label: 'DegC', unit: 'degC', token: 'DEGC', min: '-20', max: '300', decimalPlaces: '1', numberOfDigits: '5' },
-  { id: 'percent', label: 'Percent', unit: '%', token: 'PERCENT', min: '0', max: '100', decimalPlaces: '1', numberOfDigits: '5' }
+  { id: 'forward_reverse', label: 'Forward and Reverse', unit: '', token: 'FORWARD_REVERSE', min: '0', max: '1', decimalPlaces: '0', numberOfDigits: '1' },
+  { id: 'speed', label: 'Speed', unit: 'Hz', token: 'SPEED', min: '0', max: '100', decimalPlaces: '0', numberOfDigits: '3' },
+  { id: 'updown', label: 'Up and Down', unit: '', token: 'UP_DOWN', min: '0', max: '1', decimalPlaces: '0', numberOfDigits: '1' }
 ];
 
 const COMPONENT_TYPES = [
-  { id: 'component:conveyor', label: 'Conveyor' }
+  { id: 'component:conveyor', label: 'Conveyor' },
+  { id: 'component:pneumatic', label: 'Pneumatic' },
+  { id: 'component:motor', label: 'Motor' },
+  { id: 'component:servo', label: 'Servo' }
 ];
 
 const CONVEYOR_VFD_TEMPLATE_XML = '<group name="MRTC03_Popup" visible="true" wallpaper="false" isReferenceObject="false" left="0" top="0" width="138" height="76"><rectangle name="Popup_Frame" height="45" width="138" left="0" top="31" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/><rectangle name="Popup_Header" height="33" width="138" left="0" top="0" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/><text name="Popup_Title" height="19" width="66" left="36" top="7" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleLeft" fontFamily="Arial" fontSize="13" bold="true" italic="false" underline="false" strikethrough="false" caption="MRTC03"/><numericInputCursorPoint name="Popup_NumericInput" height="28" width="70" left="18" top="39" visible="true" isReferenceObject="false" alignment="middleCenter" audio="true" backStyle="solid" backColor="white" foreColor="black" blink="false" borderStyle="line" borderUsesBackColor="false" borderWidth="1" description="" highlightColor="lime" borderColor="black" patternColor="white" patternStyle="none" touch="true" horizontalMargin="0" verticalMargin="0" enterKeyControlDelay="400" enterKeyHandshakeTime="4" enterKeyHoldTime="250" handshakeReset="nonZeroValue" keyNavigation="true" decimalPoint="implicit" digitsAfterDecimalPoint="0" numberOfDigits="4" decimalPlaces="0" fixedPosition="stripped" fillLeftWith="none" numericPopup="keypad" fontFamily="Arial" fontSize="11" bold="false" italic="false" underline="false" strikethrough="false" rampValue="0" useVariableMinMax="false" captionOnPad="" minValue="0" maxValue="50" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight" RequireElectronicSignature="false" AllowBlankComment="false" RequireReAuthentication="false" RequireCounterSignature="false" AuthorizedGroup="Administrators" ESDomainNameVisible="false" ESDomainNameType="ESDomainNameConstant" ESDomainName="" VariableDomainName="" ESDomainNameDisable="false"><connections><connection name="Value" expression="{[PLC]Z02_FB_MRTC_03.HMI_Manual_Drive_Speed_in_Hz}"/><connection name="Indicator" expression="{[PLC]Z02_FB_MRTC_03.HMI_Manual_Drive_Speed_in_Hz}"/><connection name="Minimum" expression="0"/><connection name="Maximum" expression="50"/></connections></numericInputCursorPoint><text name="Popup_Unit" height="16" width="17" left="104" top="45" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" charHeight="16" charWidth="6" bold="true" italic="false" underline="false" strikethrough="false" caption="Hz"/></group>';
+
+const CONVEYOR_SPEED_TEMPLATE_XML = `<group name="Group4" visible="true" wallpaper="false" isReferenceObject="false">
+    <rectangle name="Polygon4" height="259" width="250" left="762" top="105" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+    <text name="Text40" height="19" width="73" left="850" top="114" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" fontSize="13" bold="true" italic="false" underline="false" strikethrough="false" caption="[a] BIC01"/>
+    <text name="Text41" height="18" width="103" left="772" top="160" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="MPCB Healthy"/>
+    <multistateIndicator name="MultistateIndicator15" height="24" width="24" left="937" top="157" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="none" borderUsesBackColor="true" borderWidth="8" description="" shape="circle" triggerType="value" currentStateId="0" captionOnBorder="false" setLastStateId="2">
+        <states>
+            <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Arial Unicode MS" fontSize="10" bold="false" italic="false" underline="false" strikethrough="false" caption="Error" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+            </state>
+            <state stateId="0" value="1" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Arial Unicode MS" fontSize="10" bold="false" italic="false" underline="false" strikethrough="false" caption="" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+            </state>
+            <state stateId="1" value="0" backColor="#F83D3D" borderColor="#F83D3D" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Arial Unicode MS" fontSize="10" bold="false" italic="false" underline="false" strikethrough="false" caption="" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+            </state>
+        </states>
+        <connections>
+            <connection name="Indicator" expression="{[PLC]RIO01_DI[020]}"/>
+        </connections>
+    </multistateIndicator>
+    <multistateIndicator name="MultistateIndicator18" height="24" width="24" left="937" top="196" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="none" borderUsesBackColor="true" borderWidth="8" description="" shape="circle" triggerType="value" currentStateId="0" captionOnBorder="false" setLastStateId="2">
+        <states>
+            <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Arial Unicode MS" fontSize="10" bold="false" italic="false" underline="false" strikethrough="false" caption="Error" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+            </state>
+            <state stateId="0" value="1" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Arial Unicode MS" fontSize="10" bold="false" italic="false" underline="false" strikethrough="false" caption="" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+            </state>
+            <state stateId="1" value="0" backColor="#F83D3D" borderColor="#F83D3D" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Arial Unicode MS" fontSize="10" bold="false" italic="false" underline="false" strikethrough="false" caption="" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+            </state>
+        </states>
+        <connections>
+            <connection name="Indicator" expression="{[PLC]Drive01_BIC01.In_Disconnector_FB}"/>
+        </connections>
+    </multistateIndicator>
+    <text name="Text23" height="18" width="148" left="772" top="199" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="Disconnector Healthy"/>
+    <numericDisplay name="NumericDisplay9" height="28" width="70" left="883" top="272" visible="true" isReferenceObject="false" backColor="#C6C6C6" backStyle="solid" borderColor="navy" borderStyle="raisedInset" borderUsesBackColor="true" borderWidth="1" foreColor="black" alignment="middleCenter" blink="false" patternColor="white" patternStyle="none" description="" decimalPlaces="2" numberOfDigits="6" fillLeftWith="none" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+        <connections>
+            <connection name="Value" expression="{[PLC]Drive01_BIC01.Out_Running_Frequency}"/>
+        </connections>
+    </numericDisplay>
+    <text name="Text26" height="18" width="95" left="772" top="238" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" charHeight="18" charWidth="7" bold="false" italic="false" underline="false" strikethrough="false" caption="Actual Speed"/>
+    <text name="Text27" height="18" width="19" left="960" top="238" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" charHeight="18" charWidth="7" bold="false" italic="false" underline="false" strikethrough="false" caption="Hz"/>
+    <numericInputEnable name="NumericInputEnable6" height="28" width="70" left="883" top="233" visible="true" isReferenceObject="false" audio="true" backColor="white" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="1" description="" highlightColor="lime" borderColor="black" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" enterKeyControlDelay="400" enterKeyHandshakeTime="4" enterKeyHoldTime="250" handshakeReset="nonZeroValue" keyNavigation="true" decimalPoint="implicit" numericPopup="keypad" rampValue="0" useVariableMinMax="false" takeFocusOnPress="false" minValue="0" maxValue="50" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight" RequireElectronicSignature="false" AllowBlankComment="false" RequireReAuthentication="false" RequireCounterSignature="false" AuthorizedGroup="Windows Administrators" ESDomainNameVisible="false" ESDomainNameType="ESDomainNameConstant" ESDomainName="" VariableDomainName="" ESDomainNameDisable="false">
+        <caption fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="/*N:5 {[PLC]Drive01_BIC01.HMI_Manual_Drive_Speed_in_Hz} NOFILL DP:0*/" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+        <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+        <connections>
+            <connection name="Value" expression="{[PLC]Drive01_BIC01.HMI_Manual_Drive_Speed_in_Hz}"/>
+            <connection name="Minimum" expression="0"/>
+            <connection name="Maximum" expression="50"/>
+        </connections>
+    </numericInputEnable>
+    <text name="Text33" height="18" width="102" left="772" top="277" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" charHeight="18" charWidth="7" bold="false" italic="false" underline="false" strikethrough="false" caption="Manual Speed"/>
+    <text name="Text48" height="18" width="19" left="960" top="277" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" charHeight="18" charWidth="7" bold="false" italic="false" underline="false" strikethrough="false" caption="Hz"/>
+    <multistateIndicator name="MultistateIndicator14" height="24" width="24" left="771" top="112" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="none" borderUsesBackColor="true" borderWidth="8" description="" shape="circle" triggerType="value" currentStateId="0" captionOnBorder="false" setLastStateId="5">
+        <states>
+            <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Arial" fontSize="10" bold="false" italic="false" underline="false" strikethrough="false" caption="Error" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+            </state>
+            <state stateId="0" value="0" backColor="red" borderColor="#F83D3D" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Tahoma" fontSize="13" bold="true" italic="false" underline="false" strikethrough="false" caption="" color="#3F3F3F" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+            </state>
+            <state stateId="1" value="1" backColor="#00F0FF" borderColor="blue" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Tahoma" fontSize="13" bold="true" italic="false" underline="false" strikethrough="false" caption="" color="#3F3F3F" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+            </state>
+            <state stateId="2" value="2" backColor="blue" borderColor="#00F0FF" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Tahoma" fontSize="13" bold="true" italic="false" underline="false" strikethrough="false" caption="" color="#3F3F3F" backColor="#001C38" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+            </state>
+            <state stateId="3" value="3" backColor="#71FF71" borderColor="green" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Tahoma" fontSize="13" bold="true" italic="false" underline="false" strikethrough="false" caption="" color="#3F3F3F" backColor="#001C38" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+            </state>
+            <state stateId="4" value="4" backColor="green" borderColor="#71FF71" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Tahoma" fontSize="13" bold="true" italic="false" underline="false" strikethrough="false" caption="" color="#3F3F3F" backColor="#001C38" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="#001C38" scaled="false" blink="false"/>
+            </state>
+        </states>
+        <connections>
+            <connection name="Indicator" expression="{[PLC]Drive01_BIC01.Out_Drive_Status}"/>
+        </connections>
+    </multistateIndicator>
+    <maintainedButton name="MaintainedPushButton4" height="40" width="95" left="840" top="314" visible="true" isReferenceObject="false" audio="true" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="2" description="" highlightColor="lime" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" nextStateBasedOn="currentState" currentStateId="1" captionOnBorder="false" RequireElectronicSignature="false" AllowBlankComment="false" RequireReAuthentication="false" RequireCounterSignature="false" AuthorizedGroup="Administrators" ESDomainNameVisible="false" ESDomainNameType="ESDomainNameConstant" ESDomainName="" VariableDomainName="" ESDomainNameDisable="false">
+        <states>
+            <state stateId="Error" backColor="navy" borderColor="navy" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Arial Unicode MS" fontSize="10" bold="false" italic="false" underline="false" strikethrough="false" caption="" color="white" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+            </state>
+            <state stateId="0" value="0" backColor="#EFEFEF" borderColor="#3F3F3F" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="Stop" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+            </state>
+            <state stateId="1" value="1" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
+                <caption fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="Start" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/>
+                <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
+            </state>
+        </states>
+        <connections>
+            <connection name="Value" expression="{[PLC]Drive01_BIC01.HMI_Manual_FWD_Start}"/>
+            <connection name="Indicator" expression="{[PLC]Drive01_BIC01.HMI_Manual_FWD_Start}"/>
+        </connections>
+    </maintainedButton>
+</group>`;
+const PNEUMATIC_FORWARD_REVERSE_TEMPLATE_XML = '<group name="PV18_Popup" visible="true" wallpaper="false" isReferenceObject="false" left="0" top="0" width="250" height="122"><rectangle name="Popup_Frame" height="122" width="250" left="0" top="0" visible="true" isReferenceObject="false" backStyle="gradient" backColor="#C6C6C6" foreColor="#C6C6C6" lineStyle="solid" lineWidth="2" patternStyle="none" patternColor="#E0E0E0" endColor="#E8E8E8" gradientStop="95" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/><text name="Popup_Title" height="38" width="236" left="8" top="4" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" fontSize="13" bold="true" italic="false" underline="false" strikethrough="false" caption="[d] PV18 Matrix Station&#xA;LH Side Cylinder"/><multistateIndicator name="Popup_D1" height="24" width="24" left="12" top="52" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" shape="circle" triggerType="value" currentStateId="0" captionOnBorder="false" setLastStateId="2"><states><state stateId="0" value="0" backColor="#C6C6C6" borderColor="#E8E8E8" patternColor="white" patternStyle="none" blink="false"/><state stateId="1" value="1" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false"/></states><connections><connection name="Indicator" expression="{[PLC]PV18.Pos01PositionFB}"/></connections></multistateIndicator><text name="Popup_D1_Label" height="20" width="86" left="40" top="54" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleLeft" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="d1   RIO:17:I.2"/><momentaryButton name="Popup_Forward" height="40" width="95" left="140" top="48" visible="true" isReferenceObject="false" audio="true" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="2" buttonAction="normallyOpen" description="" holdTime="250" highlightColor="lime" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" currentStateId="0" captionOnBorder="false"><states><state stateId="0" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false"><caption fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="Forward" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/></state></states><connections><connection name="Value" expression="{[PLC]PV18.HMI_Pos01CMD}"/><connection name="Indicator" expression="{[PLC]PV18.HMI_Pos01CMD}"/></connections></momentaryButton><multistateIndicator name="Popup_D2" height="24" width="24" left="12" top="88" visible="true" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" shape="circle" triggerType="value" currentStateId="0" captionOnBorder="false" setLastStateId="2"><states><state stateId="0" value="0" backColor="#C6C6C6" borderColor="#E8E8E8" patternColor="white" patternStyle="none" blink="false"/><state stateId="1" value="1" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false"/></states><connections><connection name="Indicator" expression="{[PLC]PV18.Pos02PositionFB}"/></connections></multistateIndicator><text name="Popup_D2_Label" height="20" width="86" left="40" top="90" visible="true" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleLeft" fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="d2   RIO:17:I.3"/><momentaryButton name="Popup_Reverse" height="40" width="95" left="140" top="84" visible="true" isReferenceObject="false" audio="true" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="2" buttonAction="normallyOpen" description="" holdTime="250" highlightColor="lime" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" currentStateId="0" captionOnBorder="false"><states><state stateId="0" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false"><caption fontFamily="Arial" fontSize="12" bold="false" italic="false" underline="false" strikethrough="false" caption="Reverse" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="true" blink="false"/></state></states><connections><connection name="Value" expression="{[PLC]PV18.HMI_Pos02CMD}"/><connection name="Indicator" expression="{[PLC]PV18.HMI_Pos02CMD}"/></connections></momentaryButton></group>';
 
 function getPopupTypeProfile(profileId) {
   const key = String(profileId || '').toLowerCase();
@@ -2063,7 +2179,15 @@ function deleteSelectedObject() {
 
   const activeProject = getActiveProjectForPopupPlanner();
   if (popupGroupName && activeProject) {
-    if (removeGeneratedPopupHistoryForGroup(activeProject, popupGroupName, activeProjectKey)) {
+    let removedHistory = removeGeneratedPopupHistoryForGroup(activeProject, popupGroupName, activeProjectKey);
+    if (!removedHistory) {
+      const beforeCount = Array.isArray(activeProject.popupGeneratedRows) ? activeProject.popupGeneratedRows.length : 0;
+      activeProject.popupGeneratedRows = (activeProject.popupGeneratedRows || [])
+        .filter((entry) => String(entry?.popupGroupName || '') !== String(popupGroupName));
+      removedHistory = activeProject.popupGeneratedRows.length !== beforeCount;
+    }
+
+    if (removedHistory) {
       saveProjectList();
       renderProjectPopupPlanner();
     }
@@ -2409,6 +2533,22 @@ function resolvePopupTemplateForRow(project, row, templatesById) {
     };
   }
 
+  if (componentType === 'component:conveyor' && popupType === 'speed') {
+    return {
+      id: 'preset:conveyor:speed',
+      name: 'Conveyor Speed Popup',
+      xml: CONVEYOR_SPEED_TEMPLATE_XML
+    };
+  }
+
+  if (componentType === 'component:pneumatic' && popupType === 'forward_reverse') {
+    return {
+      id: 'preset:pneumatic:forward_reverse',
+      name: 'Pneumatic Forward/Reverse Popup',
+      xml: PNEUMATIC_FORWARD_REVERSE_TEMPLATE_XML
+    };
+  }
+
   if (componentType.startsWith('template:')) {
     const templateId = componentType.slice('template:'.length);
     const template = templatesById.get(templateId);
@@ -2417,10 +2557,15 @@ function resolvePopupTemplateForRow(project, row, templatesById) {
     }
   }
 
-  if (componentType === 'component:conveyor') {
+  if (
+    componentType === 'component:conveyor'
+    || componentType === 'component:pneumatic'
+    || componentType === 'component:motor'
+    || componentType === 'component:servo'
+  ) {
     return {
       id: 'preset:conveyor:generic',
-      name: 'Conveyor Popup',
+      name: 'Component Popup',
       xml: CONVEYOR_VFD_TEMPLATE_XML
     };
   }
@@ -2488,7 +2633,14 @@ function buildGeneratedPopupDrafts(project) {
 function createSavedPopupEntry(draft, project, options = {}) {
   const sourceRow = project?.popupPlanRows?.find((row) => String(row.id) === String(draft?.rowId));
   const componentTypeId = String(sourceRow?.componentTypeId || 'component:conveyor');
-  const targetScreenLabel = String(options.targetScreenLabel || activeProjectScreen || selectedDisplay || 'Active Screen');
+  const screenRecord = getProjectScreenByKey(String(options.targetScreenKey || activeProjectKey || ''));
+  const targetScreenLabel = String(
+    options.targetScreenLabel
+    || screenRecord?.screen?.name
+    || activeProjectScreen
+    || selectedDisplay
+    || 'Unknown Screen'
+  );
   return {
     id: `popup-generated-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     popupName: String(draft?.popupName || 'Popup').trim() || 'Popup',
@@ -2507,6 +2659,20 @@ function createSavedPopupEntry(draft, project, options = {}) {
     targetScreenLabel,
     generatedAt: new Date().toISOString()
   };
+}
+
+function resolveHistoryTargetScreenLabel(entry) {
+  const byKey = getProjectScreenByKey(String(entry?.targetScreenKey || ''));
+  if (byKey?.screen?.name) {
+    return String(byKey.screen.name);
+  }
+
+  const stored = String(entry?.targetScreenLabel || '').trim();
+  if (stored && stored.toLowerCase() !== 'active screen') {
+    return stored;
+  }
+
+  return activeProjectScreen || selectedDisplay || 'Unknown Screen';
 }
 
 function removeGeneratedPopupHistoryForGroup(project, popupGroupName, targetScreenKey = activeProjectKey) {
@@ -2863,7 +3029,7 @@ function renderPopupPlanRows(project) {
     for (const profile of POPUP_TYPE_PROFILES) {
       const option = document.createElement('option');
       option.value = profile.id;
-      option.textContent = `${profile.label} (${profile.unit})`;
+      option.textContent = profile.unit ? `${profile.label} (${profile.unit})` : profile.label;
       popupTypeSelect.appendChild(option);
     }
     popupTypeSelect.value = row.popupTypeId || 'vfd';
@@ -2898,7 +3064,7 @@ function renderPopupPlanRows(project) {
     const targetTd = document.createElement('td');
     const activeScreenLabel = document.createElement('span');
     activeScreenLabel.className = 'planner-target-placeholder';
-    activeScreenLabel.textContent = 'Active screen';
+    activeScreenLabel.textContent = activeProjectScreen || selectedDisplay || 'No screen selected';
     targetTd.appendChild(activeScreenLabel);
 
     const generatedTd = document.createElement('td');
@@ -2908,7 +3074,7 @@ function renderPopupPlanRows(project) {
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'tree-action-btn danger';
-    removeBtn.textContent = '×';
+    removeBtn.textContent = 'X';
     removeBtn.title = 'Remove row';
     removeBtn.addEventListener('click', () => {
       project.popupPlanRows = project.popupPlanRows.filter((item) => item.id !== row.id);
@@ -2998,7 +3164,7 @@ function renderPopupPalette(project) {
     countTd.textContent = '1';
 
     const targetTd = document.createElement('td');
-    targetTd.textContent = String(entry.targetScreenLabel || 'Active Screen');
+    targetTd.textContent = resolveHistoryTargetScreenLabel(entry);
 
     const generatedTd = document.createElement('td');
     generatedTd.textContent = new Date(entry.generatedAt).toLocaleString();
@@ -3007,12 +3173,16 @@ function renderPopupPalette(project) {
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'tree-action-btn danger';
-    deleteBtn.textContent = '×';
+    deleteBtn.textContent = 'X';
     deleteBtn.title = 'Delete generated entry';
     deleteBtn.addEventListener('click', () => {
+      if (entry?.popupGroupName) {
+        removePopupGroupFromCurrentXml(String(entry.popupGroupName));
+      }
+
       project.popupGeneratedRows = project.popupGeneratedRows.filter((item) => String(item.id) !== String(entry.id));
       saveProjectList();
-      renderPopupPalette(project);
+      renderProjectPopupPlanner();
     });
     actionsTd.appendChild(deleteBtn);
 
@@ -3757,7 +3927,7 @@ function renderDisplays(files) {
 
   const appendFileRow = (file, options = {}) => {
     const isGlobalObject = Boolean(options.isGlobalObject);
-    const namePrefix = isGlobalObject ? '◆ ' : '';
+    const namePrefix = isGlobalObject ? 'â—† ' : '';
     const appendTo = options.appendTo || displaysList;
 
     const li = document.createElement('li');
@@ -3777,8 +3947,8 @@ function renderDisplays(files) {
 
     const meta = document.createElement('div');
     const sizeLabel = file.width && file.height ? `${file.width}x${file.height}` : 'size unknown';
-    const sourceLabel = isGlobalObject ? `${file.source} · global object` : file.source;
-    meta.textContent = `${sourceLabel} · ${sizeLabel} · ${kb(file.sizeBytes)}\n${shortDateTime(file.lastModified)}`;
+    const sourceLabel = isGlobalObject ? `${file.source} Â· global object` : file.source;
+    meta.textContent = `${sourceLabel} Â· ${sizeLabel} Â· ${kb(file.sizeBytes)}\n${shortDateTime(file.lastModified)}`;
 
     li.appendChild(row);
     li.appendChild(meta);
@@ -3963,7 +4133,7 @@ function renderDefaultTemplates(files) {
   const appendDefaultFileRow = (file, options = {}) => {
     const isGlobalObject = Boolean(options.isGlobalObject);
     const appendTo = options.appendTo || displaysList;
-    const namePrefix = isGlobalObject ? '◆ ' : '';
+    const namePrefix = isGlobalObject ? 'â—† ' : '';
 
     const li = document.createElement('li');
     li.className = `display-item${isGlobalObject ? ' global-object-item' : ''}`;
@@ -4154,7 +4324,7 @@ function renderProjectSidebar() {
     const removeProjectBtn = document.createElement('button');
     removeProjectBtn.type = 'button';
     removeProjectBtn.className = 'tree-action-btn danger';
-    removeProjectBtn.textContent = '×';
+    removeProjectBtn.textContent = 'X';
     removeProjectBtn.title = 'Remove project';
     removeProjectBtn.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -4274,7 +4444,7 @@ function renderProjectSidebar() {
       const sizeLabel = screen.width && screen.height ? `${screen.width}x${screen.height}` : 'size unknown';
       const metaMain = document.createElement('div');
       metaMain.className = 'screen-meta-main';
-      metaMain.textContent = `project screen · ${sizeLabel} · ${kb(screen.sizeBytes)}`;
+      metaMain.textContent = `project screen Â· ${sizeLabel} Â· ${kb(screen.sizeBytes)}`;
 
       const metaTime = document.createElement('div');
       metaTime.className = 'screen-meta-time';
@@ -4289,7 +4459,7 @@ function renderProjectSidebar() {
       const removeScreenBtn = document.createElement('button');
       removeScreenBtn.type = 'button';
       removeScreenBtn.className = 'tree-action-btn danger';
-      removeScreenBtn.textContent = '×';
+      removeScreenBtn.textContent = 'X';
       removeScreenBtn.title = 'Remove screen';
       removeScreenBtn.addEventListener('click', async (event) => {
         event.stopPropagation();
@@ -4514,7 +4684,7 @@ function enforceProjectSidebarLayout() {
   for (const selector of flowSelectors) {
     const nodes = document.querySelectorAll(selector);
     for (const node of nodes) {
-      // Never force display:block on collapsed children — that breaks expand/collapse.
+      // Never force display:block on collapsed children â€” that breaks expand/collapse.
       const isCollapsedChild =
         (node.classList.contains('project-children') && node.closest('.project-item.collapsed')) ||
         (node.classList.contains('folder-children') && node.closest('.folder-item.collapsed'));
@@ -5269,6 +5439,62 @@ function getPopupGroupNodes(doc, groupName) {
   return getObjectNodes(doc).filter((item) => getPopupGroupNameForNode(item) === key);
 }
 
+function removePopupGroupFromCurrentXml(popupGroupName) {
+  const groupKey = String(popupGroupName || '');
+  if (!groupKey || !xmlEditor?.value?.trim()) {
+    return false;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlEditor.value, 'text/xml');
+  if (doc.querySelector('parsererror')) {
+    return false;
+  }
+
+  let removedCount = 0;
+  for (const candidate of getPopupGroupNodes(doc, groupKey)) {
+    if (!candidate || !candidate.parentNode) {
+      continue;
+    }
+
+    candidate.parentNode.removeChild(candidate);
+    removedCount += 1;
+  }
+
+  // Some templates are inserted as a single object instead of a <group>,
+  // so also remove nodes whose own name matches the saved popup group name.
+  const namedNodes = Array.from(doc.querySelectorAll('[name]'))
+    .filter((node) => String(node.getAttribute('name') || '') === groupKey);
+  for (const node of namedNodes) {
+    if (!node || !node.parentNode) {
+      continue;
+    }
+
+    node.parentNode.removeChild(node);
+    removedCount += 1;
+  }
+
+  if (!removedCount) {
+    return false;
+  }
+
+  xmlEditor.value = serializeXmlDoc(doc);
+  recordHistory(xmlEditor.value);
+
+  const remaining = getObjectNodes(doc);
+  if (!remaining.length) {
+    selectedObjectIndex = null;
+    clearObjectPanel();
+  } else if (selectedObjectIndex !== null) {
+    selectedObjectIndex = Math.max(0, Math.min(selectedObjectIndex, remaining.length - 1));
+    populateObjectPanel(doc, selectedObjectIndex);
+  }
+
+  renderPreview();
+  persistCurrentXmlState();
+  return true;
+}
+
 function shiftPositionedNodesInTree(rootNode, deltaX, deltaY, displayWidth, displayHeight) {
   const allNodes = [rootNode, ...Array.from(rootNode.querySelectorAll('*'))];
   for (const node of allNodes) {
@@ -5426,7 +5652,7 @@ function syncColorControl(textEl, pickerEl, swatchEl) {
 
 function serializeXmlDoc(doc) {
   let xml = new XMLSerializer().serializeToString(doc);
-  // XMLSerializer adds xmlns="" to elements with no namespace — remove them
+  // XMLSerializer adds xmlns="" to elements with no namespace â€” remove them
   // or FactoryTalk's XML parser will reject the file.
   xml = xml.replace(/ xmlns=""/g, '');
   if (xml.startsWith('<?xml')) {
@@ -6341,7 +6567,7 @@ if (generatePopupsBtn) {
 
     let placedCount = 0;
     const historyRows = [];
-    const targetScreenLabel = 'active screen';
+    const targetScreenLabel = activeProjectScreen || selectedDisplay || 'current screen';
 
     if (generatedPopupDrafts.length && xmlEditor.value.trim()) {
       const columns = 4;
@@ -6620,3 +6846,4 @@ init().catch((err) => {
   console.error(err);
   bridgeStatus.querySelector('span:last-child').textContent = 'Bridge unavailable';
 });
+

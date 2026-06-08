@@ -3944,7 +3944,7 @@ function renderDisplays(files) {
 
   const appendFileRow = (file, options = {}) => {
     const isGlobalObject = Boolean(options.isGlobalObject);
-    const namePrefix = isGlobalObject ? 'Ã¢â€”â€  ' : '';
+    const namePrefix = isGlobalObject ? '* ' : '';
     const appendTo = options.appendTo || displaysList;
 
     const li = document.createElement('li');
@@ -3964,8 +3964,8 @@ function renderDisplays(files) {
 
     const meta = document.createElement('div');
     const sizeLabel = file.width && file.height ? `${file.width}x${file.height}` : 'size unknown';
-    const sourceLabel = isGlobalObject ? `${file.source} Ã‚Â· global object` : file.source;
-    meta.textContent = `${sourceLabel} Ã‚Â· ${sizeLabel} Ã‚Â· ${kb(file.sizeBytes)}\n${shortDateTime(file.lastModified)}`;
+    const sourceLabel = isGlobalObject ? `${file.source} | global object` : file.source;
+    meta.textContent = `${sourceLabel} | ${sizeLabel} | ${kb(file.sizeBytes)}\n${shortDateTime(file.lastModified)}`;
 
     li.appendChild(row);
     li.appendChild(meta);
@@ -4150,7 +4150,7 @@ function renderDefaultTemplates(files) {
   const appendDefaultFileRow = (file, options = {}) => {
     const isGlobalObject = Boolean(options.isGlobalObject);
     const appendTo = options.appendTo || displaysList;
-    const namePrefix = isGlobalObject ? 'Ã¢â€”â€  ' : '';
+    const namePrefix = isGlobalObject ? '* ' : '';
 
     const li = document.createElement('li');
     li.className = `display-item${isGlobalObject ? ' global-object-item' : ''}`;
@@ -4461,7 +4461,7 @@ function renderProjectSidebar() {
       const sizeLabel = screen.width && screen.height ? `${screen.width}x${screen.height}` : 'size unknown';
       const metaMain = document.createElement('div');
       metaMain.className = 'screen-meta-main';
-      metaMain.textContent = `project screen Ã‚Â· ${sizeLabel} Ã‚Â· ${kb(screen.sizeBytes)}`;
+      metaMain.textContent = `project screen | ${sizeLabel} | ${kb(screen.sizeBytes)}`;
 
       const metaTime = document.createElement('div');
       metaTime.className = 'screen-meta-time';
@@ -4701,7 +4701,7 @@ function enforceProjectSidebarLayout() {
   for (const selector of flowSelectors) {
     const nodes = document.querySelectorAll(selector);
     for (const node of nodes) {
-      // Never force display:block on collapsed children Ã¢â‚¬â€ that breaks expand/collapse.
+      // Never force display:block on collapsed children - that breaks expand/collapse.
       const isCollapsedChild =
         (node.classList.contains('project-children') && node.closest('.project-item.collapsed')) ||
         (node.classList.contains('folder-children') && node.closest('.folder-item.collapsed'));
@@ -5669,7 +5669,7 @@ function syncColorControl(textEl, pickerEl, swatchEl) {
 
 function serializeXmlDoc(doc) {
   let xml = new XMLSerializer().serializeToString(doc);
-  // XMLSerializer adds xmlns="" to elements with no namespace Ã¢â‚¬â€ remove them
+  // XMLSerializer adds xmlns="" to elements with no namespace - remove them
   // or FactoryTalk's XML parser will reject the file.
   xml = xml.replace(/ xmlns=""/g, '');
   if (xml.startsWith('<?xml')) {

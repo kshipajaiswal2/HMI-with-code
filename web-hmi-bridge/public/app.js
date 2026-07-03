@@ -8,15 +8,6 @@ const uploadInput = document.getElementById('uploadInput');
 const defaultUploadInput = document.getElementById('defaultUploadInput');
 const uploadFolderInput = document.getElementById('uploadFolderInput');
 const importFolderBtn = document.getElementById('importFolderBtn');
-const addDisplayBtn = document.getElementById('addDisplayBtn');
-const addFolderBtn = document.getElementById('addFolderBtn');
-const removeFolderBtn = document.getElementById('removeFolderBtn');
-const uploadDisplayBtn = document.getElementById('uploadDisplayBtn');
-const removeDisplayBtn = document.getElementById('removeDisplayBtn');
-const refreshBtn = document.getElementById('refreshBtn');
-const showDisplaysBtn = document.getElementById('showDisplaysBtn');
-const showDefaultsBtn = document.getElementById('showDefaultsBtn');
-const seedDefaultsBtn = document.getElementById('seedDefaultsBtn');
 const newProjectBtn = document.getElementById('newProjectBtn');
 const projectCreatePanel = document.getElementById('projectCreatePanel');
 const projectNameInput = document.getElementById('projectNameInput');
@@ -72,15 +63,12 @@ const objBorderColorSwatch = document.getElementById('objBorderColorSwatch');
 const objTextColorSwatch = document.getElementById('objTextColorSwatch');
 const objectPanelDetails = document.getElementById('objectPanelDetails');
 const popupPlannerDetails = document.getElementById('popupPlannerDetails');
-const popupTemplateSelect = document.getElementById('popupTemplateSelect');
-const popupTemplateName = document.getElementById('popupTemplateName');
-const popupTemplateXml = document.getElementById('popupTemplateXml');
-const savePopupTemplateBtn = document.getElementById('savePopupTemplateBtn');
-const deletePopupTemplateBtn = document.getElementById('deletePopupTemplateBtn');
 const addPopupPlanRowBtn = document.getElementById('addPopupPlanRowBtn');
 const popupPlanBody = document.getElementById('popupPlanBody');
 const generatePopupsBtn = document.getElementById('generatePopupsBtn');
 const popupGenerateActions = document.getElementById('popupGenerateActions');
+
+let previewResizeObserver = null;
 
 let selectedDisplay = '';
 let selectedFiles = [];
@@ -456,6 +444,7 @@ function persistProjectList() {
 
 function normalizeProjectList() {
   projectList = Array.isArray(projectList) ? projectList : [];
+  let removedLegacyScreens = false;
   for (const project of projectList) {
     project.id = String(project.id || `project-${Date.now()}`);
     project.name = normalizeProjectName(project.name || 'Untitled Project');
@@ -466,6 +455,11 @@ function normalizeProjectList() {
       folder.name = String(folder.name || 'Folder');
       folder.collapsed = Boolean(folder.collapsed);
       folder.screens = Array.isArray(folder.screens) ? folder.screens : [];
+      const beforeCount = folder.screens.length;
+      folder.screens = folder.screens.filter((screen) => displayKey(screen?.name) !== displayKey('IO_List.xml'));
+      if (folder.screens.length !== beforeCount) {
+        removedLegacyScreens = true;
+      }
       for (const screen of folder.screens) {
         screen.name = String(screen.name || 'Screen.xml');
         screen.xml = String(screen.xml || '');
@@ -476,6 +470,20 @@ function normalizeProjectList() {
         screen.height = Number.isFinite(Number(screen.height)) ? Number(screen.height) : meta.height;
       }
     }
+  }
+
+  if (removedLegacyScreens) {
+    if (activeProjectKey && displayKey(getProjectScreenByKey(activeProjectKey)?.screen?.name || '') === displayKey('IO_List.xml')) {
+      selectedDisplay = '';
+      selectedFiles = [];
+      displayName.value = 'None';
+      xmlEditor.value = '';
+      activeProjectKey = '';
+      activeProjectScreen = '';
+      activeProjectFolder = '';
+      renderPreview();
+    }
+    persistProjectList();
   }
 }
 
@@ -915,51 +923,13 @@ function setSidebarMode(mode) {
     exportsCard.classList.toggle('default-mode', isDefaultMode());
   }
 
-  if (showDisplaysBtn) {
-    showDisplaysBtn.classList.toggle('active', !isDefaultMode());
-  }
-  if (showDefaultsBtn) {
-    showDefaultsBtn.classList.toggle('active', isDefaultMode());
-  }
-
   if (sidebarTitle) {
     sidebarTitle.textContent = 'Projects';
-  }
-
-  if (addDisplayBtn) {
-    addDisplayBtn.classList.toggle('hidden', isDefaultMode());
-  }
-
-  if (addFolderBtn) {
-    addFolderBtn.classList.toggle('hidden', isDefaultMode());
-  }
-
-  if (removeFolderBtn) {
-    removeFolderBtn.classList.toggle('hidden', isDefaultMode());
-    removeFolderBtn.disabled = true;
-  }
-
-  if (seedDefaultsBtn) {
-    seedDefaultsBtn.classList.toggle('hidden', !isDefaultMode());
-  }
-
-  if (uploadDisplayBtn) {
-    uploadDisplayBtn.classList.toggle('hidden', isDefaultMode());
-    uploadDisplayBtn.textContent = 'Upload XML';
   }
 
   if (importFolderBtn) {
     importFolderBtn.classList.toggle('hidden', isDefaultMode());
   }
-
-  if (refreshBtn) {
-    refreshBtn.textContent = isDefaultMode() ? 'Refresh' : 'Saved List';
-  }
-
-  if (removeDisplayBtn) {
-    removeDisplayBtn.title = isDefaultMode() ? 'Remove selected default template' : 'Remove selected screen';
-  }
-
 }
 
 async function createNewProject(rawName) {
@@ -967,6 +937,13 @@ async function createNewProject(rawName) {
 
   if (projectList.some((project) => displayKey(project.name) === displayKey(projectName))) {
     throw new Error(`Project ${projectName} already exists. Choose a different name.`);
+  }
+
+  if (activeProjectKey && xmlEditor.value.trim()) {
+    const saved = await autoSaveCurrentDisplay();
+    if (!saved) {
+      return;
+    }
   }
 
   try {
@@ -1026,7 +1003,11 @@ async function createNewProject(rawName) {
       setEditorProjectScreen(project, firstFolder.name, firstScreen, firstScreen.xml);
     }
 
-    packageResult.textContent = `Project ready: ${projectName}.`;
+    hideProjectCreatePanel();
+    if (packageResult) {
+      packageResult.textContent = `Project ready: ${projectName}.`;
+      setWorkspaceDockTab('xml');
+    }
   } catch (err) {
     console.error(err);
     alert(err.message || 'Could not create new project.');
@@ -1287,8 +1268,14 @@ async function syncActiveProjectScreensToEditedFiles(project) {
   return [...new Set(syncedNames)];
 }
 
+function getTargetDisplayName() {
+  const activeProjectRecord = activeProjectKey ? getProjectScreenByKey(activeProjectKey) : null;
+  return selectedDisplay || String(activeProjectRecord?.screen?.name || '');
+}
+
 async function autoSaveCurrentDisplay() {
-  if (!selectedDisplay || !xmlEditor.value.trim()) {
+  const targetDisplayName = getTargetDisplayName();
+  if (!targetDisplayName || !xmlEditor.value.trim()) {
     return true;
   }
 
@@ -1318,8 +1305,8 @@ async function autoSaveCurrentDisplay() {
   }
 
   try {
-    await saveDisplayXml(selectedDisplay, sanitizedXml);
-    updateCurrentDisplayRow(selectedDisplay, sanitizedXml);
+    await saveDisplayXml(targetDisplayName, sanitizedXml);
+    updateCurrentDisplayRow(targetDisplayName, sanitizedXml);
     return true;
   } catch (_err) {
     alert('Could not auto-save the current display. Please try again.');
@@ -1371,24 +1358,49 @@ async function buildImportPackage(files, packageLabel) {
   alert(`Import package generated and saved as ${saveOutcome.fileName}.`);
 }
 
+function disconnectPreviewResizeObserver() {
+  if (previewResizeObserver) {
+    previewResizeObserver.disconnect();
+    previewResizeObserver = null;
+  }
+}
+
 function fitCanvasToFrame(frame, canvas, width, height) {
   const frameStyles = getComputedStyle(frame);
   const horizontalPadding = parseFloat(frameStyles.paddingLeft || '0') + parseFloat(frameStyles.paddingRight || '0');
   const verticalPadding = parseFloat(frameStyles.paddingTop || '0') + parseFloat(frameStyles.paddingBottom || '0');
-  // Keep a small inset so border rounding and 1px strokes at edges are not visually clipped.
   const previewSafeInset = 10;
   const availableWidth = Math.max(1, frame.clientWidth - horizontalPadding - (previewSafeInset * 2));
   const availableHeight = Math.max(1, frame.clientHeight - verticalPadding - (previewSafeInset * 2));
 
-  // Keep the display fully visible, but avoid upscaling above 1:1 for closer FT parity.
-  const scale = Math.min(1, availableWidth / width, availableHeight / height);
+  const scale = Math.min(availableWidth / width, availableHeight / height);
   const finalScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
 
-  canvas.style.width = `${width * finalScale}px`;
-  canvas.style.height = `${height * finalScale}px`;
+  let wrap = canvas.parentElement;
+  if (!wrap || !wrap.classList.contains('preview-canvas-wrap')) {
+    wrap = document.createElement('div');
+    wrap.className = 'preview-canvas-wrap';
+    if (canvas.parentElement) {
+      canvas.parentElement.replaceChild(wrap, canvas);
+    }
+    wrap.appendChild(canvas);
+  }
+
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  canvas.style.transform = `scale(${finalScale})`;
+  canvas.style.transformOrigin = 'top left';
+  wrap.style.width = `${Math.round(width * finalScale)}px`;
+  wrap.style.height = `${Math.round(height * finalScale)}px`;
+  canvas.dataset.previewScale = String(finalScale);
 }
 
 function getCanvasScale(canvas, width, height) {
+  const uniform = Number(canvas.dataset.previewScale);
+  if (Number.isFinite(uniform) && uniform > 0) {
+    return { scaleX: uniform, scaleY: uniform };
+  }
+
   const contentWidth = Math.max(1, canvas.clientWidth || 0);
   const contentHeight = Math.max(1, canvas.clientHeight || 0);
   return {
@@ -2257,7 +2269,8 @@ function uniqueObjectName(doc, prefix) {
 }
 
 function persistCurrentXmlState() {
-  if (!selectedDisplay) {
+  const targetDisplayName = getTargetDisplayName();
+  if (!targetDisplayName || !xmlEditor.value.trim()) {
     return;
   }
 
@@ -2266,9 +2279,9 @@ function persistCurrentXmlState() {
     xmlEditor.value = sanitizedXml;
   }
 
-  saveDisplayXml(selectedDisplay, sanitizedXml)
+  saveDisplayXml(targetDisplayName, sanitizedXml)
     .then(() => {
-      updateCurrentDisplayRow(selectedDisplay, sanitizedXml);
+      updateCurrentDisplayRow(targetDisplayName, sanitizedXml);
       if (usingUploadedList) {
         renderDisplays(currentDisplayRows);
       } else {
@@ -2537,7 +2550,7 @@ function resolvePopupTemplateForRow(project, row, templatesById) {
     return {
       id: 'preset:conveyor:speed',
       name: 'Conveyor Speed Popup',
-      xml: CONVEYOR_SPEED_TEMPLATE_XML
+      xml: CONVEYOR_VFD_TEMPLATE_XML
     };
   }
 
@@ -2947,35 +2960,16 @@ function insertGeneratedPopupDraft(draft, options = {}) {
 }
 
 function renderPopupTemplateOptions(project) {
-  if (!popupTemplateSelect) {
-    return;
-  }
-
-  popupTemplateSelect.innerHTML = '';
-  const placeholder = document.createElement('option');
-  placeholder.value = '';
-  placeholder.textContent = project ? 'Select template...' : 'No active project';
-  popupTemplateSelect.appendChild(placeholder);
-
   if (!project) {
-    popupTemplateSelect.value = '';
+    plannerSelectedTemplateId = '';
     return;
-  }
-
-  for (const template of project.popupTemplates) {
-    const option = document.createElement('option');
-    option.value = template.id;
-    option.textContent = template.name;
-    popupTemplateSelect.appendChild(option);
   }
 
   if (plannerSelectedTemplateId && project.popupTemplates.some((template) => template.id === plannerSelectedTemplateId)) {
-    popupTemplateSelect.value = plannerSelectedTemplateId;
     return;
   }
 
   plannerSelectedTemplateId = project.popupTemplates[0]?.id || '';
-  popupTemplateSelect.value = plannerSelectedTemplateId;
 }
 
 function renderPopupPlanRows(project) {
@@ -3002,8 +2996,7 @@ function renderPopupPlanRows(project) {
       row.popupName = String(nameInput.value || '').trim();
       syncPopupPlanRowDerivedValues(row);
       saveProjectList();
-      generatedPopupDrafts = buildGeneratedPopupDrafts(project);
-      renderPopupPalette(project);
+      refreshPopupPlannerDraftViews(project);
     });
     nameTd.appendChild(nameInput);
 
@@ -3036,8 +3029,7 @@ function renderPopupPlanRows(project) {
       row.componentTypeId = String(typeSelect.value || 'component:conveyor');
       syncPopupPlanRowDerivedValues(row);
       saveProjectList();
-      generatedPopupDrafts = buildGeneratedPopupDrafts(project);
-      renderPopupPalette(project);
+      refreshPopupPlannerDraftViews(project);
     });
     typeTd.appendChild(typeSelect);
 
@@ -3054,8 +3046,7 @@ function renderPopupPlanRows(project) {
       row.popupTypeId = String(popupTypeSelect.value || 'vfd');
       syncPopupPlanRowDerivedValues(row);
       saveProjectList();
-      generatedPopupDrafts = buildGeneratedPopupDrafts(project);
-      renderPopupPalette(project);
+      refreshPopupPlannerDraftViews(project);
     });
     popupTypeTd.appendChild(popupTypeSelect);
 
@@ -3070,8 +3061,7 @@ function renderPopupPlanRows(project) {
       syncPopupPlanRowDerivedValues(row);
       countInput.value = String(row.count);
       saveProjectList();
-      generatedPopupDrafts = buildGeneratedPopupDrafts(project);
-      renderPopupPalette(project);
+      refreshPopupPlannerDraftViews(project);
     });
     const countWrap = document.createElement('div');
     countWrap.className = 'planner-count-cell';
@@ -3085,7 +3075,11 @@ function renderPopupPlanRows(project) {
     targetTd.appendChild(activeScreenLabel);
 
     const generatedTd = document.createElement('td');
-    generatedTd.textContent = '-';
+    const rowDraftCount = generatedPopupDrafts.filter((draft) => draft.rowId === row.id).length;
+    generatedTd.textContent = rowDraftCount ? String(rowDraftCount) : '-';
+    generatedTd.title = rowDraftCount
+      ? `${rowDraftCount} popup(s) ready — drag from palette or click Generate`
+      : String(row.code || '');
 
     const actionTd = document.createElement('td');
     const removeBtn = document.createElement('button');
@@ -3135,6 +3129,11 @@ function syncPopupPlanRowsFromTable(project) {
     row.count = Math.max(1, Math.min(200, Number(numberInput?.value) || row.count || 1));
     syncPopupPlanRowDerivedValues(row);
   }
+}
+
+function refreshPopupPlannerDraftViews(project) {
+  generatedPopupDrafts = buildGeneratedPopupDrafts(project);
+  renderPopupPalette(project);
 }
 
 function renderPopupPalette(project) {
@@ -3215,36 +3214,15 @@ function renderPopupPalette(project) {
 }
 
 function applyPlannerTemplateSelection(project) {
-  if (!popupTemplateName || !popupTemplateXml) {
-    return;
-  }
-
   if (!project || !plannerSelectedTemplateId) {
-    popupTemplateName.value = '';
-    popupTemplateXml.value = '';
     return;
   }
-
-  const template = project.popupTemplates.find((item) => item.id === plannerSelectedTemplateId);
-  if (!template) {
-    popupTemplateName.value = '';
-    popupTemplateXml.value = '';
-    return;
-  }
-
-  popupTemplateName.value = template.name;
-  popupTemplateXml.value = template.xml;
 }
 
 function renderProjectPopupPlanner() {
   const project = getActiveProjectForPopupPlanner();
   const disabled = !project;
   const controls = [
-    popupTemplateSelect,
-    popupTemplateName,
-    popupTemplateXml,
-    savePopupTemplateBtn,
-    deletePopupTemplateBtn,
     addPopupPlanRowBtn,
     generatePopupsBtn
   ].filter(Boolean);
@@ -3260,8 +3238,8 @@ function renderProjectPopupPlanner() {
   renderPopupTemplateOptions(project);
   applyPlannerTemplateSelection(project);
   renderPopupTargetScreenOptions(project);
-  renderPopupPlanRows(project);
   generatedPopupDrafts = buildGeneratedPopupDrafts(project);
+  renderPopupPlanRows(project);
   renderPopupPalette(project);
 }
 
@@ -3390,13 +3368,7 @@ async function saveDisplayXml(name, xml, options = {}) {
   if (activeProjectKey && !forceStandalone) {
     const record = getProjectScreenByKey(activeProjectKey);
     if (record) {
-      record.screen.xml = safeXml;
       const meta = screenMetaFromXml(record.screen.name, safeXml);
-      record.screen.width = meta.width;
-      record.screen.height = meta.height;
-      record.screen.sizeBytes = meta.sizeBytes;
-      record.screen.lastModified = meta.lastModified;
-
       const res = await fetch(`/api/displays/${encodeURIComponent(record.screen.name)}/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3406,6 +3378,12 @@ async function saveDisplayXml(name, xml, options = {}) {
       if (!res.ok) {
         throw new Error(data.error || `Failed to save ${record.screen.name}`);
       }
+
+      record.screen.xml = safeXml;
+      record.screen.width = meta.width;
+      record.screen.height = meta.height;
+      record.screen.sizeBytes = meta.sizeBytes;
+      record.screen.lastModified = meta.lastModified;
 
       upsertCurrentDisplayRow({
         name: record.screen.name,
@@ -3895,9 +3873,6 @@ function renderDisplays(files) {
 
   if (!visibleFiles.length) {
     displaysList.innerHTML = '<li>No display XML files loaded yet.</li>';
-    if (removeDisplayBtn) {
-      removeDisplayBtn.disabled = true;
-    }
     return;
   }
 
@@ -3924,13 +3899,6 @@ function renderDisplays(files) {
   if (!hasSelectedFolder) {
     selectedFolderName = '';
     selectedFolderIsCustom = false;
-  }
-
-  if (removeDisplayBtn) {
-    removeDisplayBtn.disabled = !selectedDisplay;
-  }
-  if (removeFolderBtn) {
-    removeFolderBtn.disabled = !selectedFolderName;
   }
 
   const customFolderSet = new Set(folderNames.map((name) => name.toLowerCase()));
@@ -4096,9 +4064,6 @@ function renderDefaultTemplates(files) {
     selectedDefaultTemplate = '';
   }
 
-  if (removeDisplayBtn) {
-    removeDisplayBtn.disabled = !selectedDefaultTemplate;
-  }
   if (!files.length) {
     displaysList.innerHTML = '<li>No default template XML files found in ftio/default-pages.</li>';
     return;
@@ -4828,11 +4793,7 @@ function renderPreview() {
   const backColor = resolveDisplayBackgroundColor(displaySettings?.getAttribute('backColor'));
 
   previewPane.innerHTML = '';
-
-  const header = document.createElement('div');
-  header.className = 'preview-header';
-  header.textContent = `${name} (${width} x ${height})`;
-  previewPane.appendChild(header);
+  disconnectPreviewResizeObserver();
 
   const frame = document.createElement('div');
   frame.className = 'preview-frame';
@@ -4855,7 +4816,7 @@ function renderPreview() {
     canvas.classList.remove('popup-drop-ready');
   });
 
-  canvas.addEventListener('drop', (event) => {
+  canvas.addEventListener('drop', async (event) => {
     const draftId = event.dataTransfer?.getData('application/x-popup-draft-id');
     if (!draftId) {
       return;
@@ -4873,7 +4834,10 @@ function renderPreview() {
     const py = event.clientY - rect.top;
     const left = (px / Math.max(1, rect.width)) * width;
     const top = (py / Math.max(1, rect.height)) * height;
-    insertGeneratedPopupDraft(draft, { left, top });
+    const inserted = insertGeneratedPopupDraft(draft, { left, top });
+    if (inserted) {
+      await autoSaveCurrentDisplay();
+    }
   });
 
   const objectNodes = getObjectNodes(doc);
@@ -4935,6 +4899,11 @@ function renderPreview() {
 
       applyBorderStyles(box, el, visualSource);
 
+      if (tag === 'group') {
+        box.classList.add('xml-group-object');
+        appendGroupPreviewChildren(el, box, w, h);
+      }
+
       const captionNode = Array.from(visualSource.children).find((child) => child.tagName === 'caption')
         || Array.from(el.children).find((child) => child.tagName === 'caption');
       const imageName = getNodeImageName(visualSource) || getNodeImageName(el);
@@ -4972,7 +4941,7 @@ function renderPreview() {
       }
 
       const caption = previewTextForNode(el, captionNode);
-      if (caption) {
+      if (caption && tag !== 'group') {
         const captionEl = document.createElement('span');
         captionEl.className = 'xml-object-caption';
         captionEl.textContent = caption;
@@ -5221,14 +5190,21 @@ function renderPreview() {
     renderPreview();
   });
 
-  frame.appendChild(canvas);
+  const wrap = document.createElement('div');
+  wrap.className = 'preview-canvas-wrap';
+  wrap.appendChild(canvas);
+  frame.appendChild(wrap);
   previewPane.appendChild(frame);
 
-  // Fit immediately so preview does not collapse when RAF is throttled.
-  fitCanvasToFrame(frame, canvas, width, height);
-  // Refit when the viewport changes size so the full display remains visible.
-  requestAnimationFrame(() => fitCanvasToFrame(frame, canvas, width, height));
-  setTimeout(() => fitCanvasToFrame(frame, canvas, width, height), 60);
+  const refitPreview = () => fitCanvasToFrame(frame, canvas, width, height);
+  refitPreview();
+  requestAnimationFrame(refitPreview);
+  setTimeout(refitPreview, 60);
+
+  if (typeof ResizeObserver !== 'undefined') {
+    previewResizeObserver = new ResizeObserver(() => refitPreview());
+    previewResizeObserver.observe(frame);
+  }
 }
 
 function readSizeFromXml(xml) {
@@ -5248,8 +5224,11 @@ function replaceDisplaySize(xml, width, height) {
 }
 
 function scaleNumericAttribute(node, attributeName, scale, minValue = 0) {
-  const raw = node.getAttribute(attributeName);
-  const value = Number(raw);
+  if (!node?.hasAttribute?.(attributeName)) {
+    return;
+  }
+
+  const value = Number(node.getAttribute(attributeName));
   if (!Number.isFinite(value)) {
     return;
   }
@@ -5534,6 +5513,88 @@ function shiftPositionedNodesInTree(rootNode, deltaX, deltaY, displayWidth, disp
   }
 }
 
+function appendGroupPreviewChildren(groupNode, container, groupWidth, groupHeight) {
+  const gw = Math.max(1, groupWidth);
+  const gh = Math.max(1, groupHeight);
+
+  const renderChild = (node, parentEl) => {
+    if (!node?.tagName) {
+      return;
+    }
+
+    const tag = String(node.tagName || '').toLowerCase();
+    if (tag === 'displaysettings' || tag === 'caption' || tag === 'imagesettings' || tag === 'states'
+      || tag === 'state' || tag === 'connections' || tag === 'connection' || tag === 'animations'
+      || tag === 'animation' || tag === 'parameters' || tag === 'parameter') {
+      return;
+    }
+
+    if (tag === 'group') {
+      Array.from(node.children).forEach((child) => renderChild(child, parentEl));
+      return;
+    }
+
+    const isLineTag = tag === 'line';
+    const hasBox = node.hasAttribute('left') && node.hasAttribute('top')
+      && node.hasAttribute('width') && node.hasAttribute('height');
+
+    if (!hasBox && !isLineTag) {
+      Array.from(node.children).forEach((child) => renderChild(child, parentEl));
+      return;
+    }
+
+    const activeStateNode = getActiveStateNode(node);
+    const visualSource = activeStateNode || node;
+    const childBox = document.createElement('div');
+    childBox.className = 'xml-group-child';
+
+    if (isLineTag) {
+      const points = parseLinePoints(node);
+      const dx = points.x2 - points.x1;
+      const dy = points.y2 - points.y1;
+      const length = Math.max(1, Math.sqrt((dx * dx) + (dy * dy)));
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      const thickness = Math.max(1, Number(node.getAttribute('lineWidth')) || 1);
+
+      childBox.classList.add('xml-line-object');
+      childBox.style.left = `${(points.x1 / gw) * 100}%`;
+      childBox.style.top = `${(points.y1 / gh) * 100}%`;
+      childBox.style.width = `${(length / gw) * 100}%`;
+      childBox.style.height = `${(thickness / gh) * 100}%`;
+      childBox.style.transform = `rotate(${angle}deg)`;
+      childBox.style.transformOrigin = '0 50%';
+      childBox.style.padding = '0';
+      childBox.style.background = node.getAttribute('foreColor') || node.getAttribute('backColor') || '#000000';
+    } else {
+      const cl = Number(node.getAttribute('left') || 0);
+      const ct = Number(node.getAttribute('top') || 0);
+      const cw = Math.max(1, Number(node.getAttribute('width') || 1));
+      const ch = Math.max(1, Number(node.getAttribute('height') || 1));
+      childBox.style.left = `${(cl / gw) * 100}%`;
+      childBox.style.top = `${(ct / gh) * 100}%`;
+      childBox.style.width = `${(cw / gw) * 100}%`;
+      childBox.style.height = `${(ch / gh) * 100}%`;
+      applyFillStyles(childBox, visualSource);
+      applyBorderStyles(childBox, node, visualSource);
+    }
+
+    const captionNode = Array.from(visualSource.children).find((child) => child.tagName === 'caption')
+      || Array.from(node.children).find((child) => child.tagName === 'caption');
+    const caption = previewTextForNode(node, captionNode);
+    if (caption) {
+      const captionEl = document.createElement('span');
+      captionEl.className = 'xml-object-caption';
+      captionEl.textContent = caption;
+      childBox.appendChild(captionEl);
+      applyCaptionStyles(childBox, node, captionNode);
+    }
+
+    parentEl.appendChild(childBox);
+  };
+
+  Array.from(groupNode.children).forEach((child) => renderChild(child, container));
+}
+
 function getObjectNodes(doc) {
   const root = doc.querySelector('gfx');
   if (!root) {
@@ -5565,9 +5626,19 @@ function getObjectNodes(doc) {
         return;
       }
 
-      if (
-        tag !== 'group'
+      const isPositionedGroup = tag === 'group'
         && child.hasAttribute('left')
+        && child.hasAttribute('top')
+        && child.hasAttribute('width')
+        && child.hasAttribute('height');
+
+      if (isPositionedGroup) {
+        nodes.push(child);
+        return;
+      }
+
+      if (
+        child.hasAttribute('left')
         && child.hasAttribute('top')
         && child.hasAttribute('width')
         && child.hasAttribute('height')
@@ -5873,6 +5944,19 @@ async function openProjectScreen(projectId, folderName, screenName) {
     throw new Error('Screen not found');
   }
 
+  const nextKey = createProjectKey(projectId, folderName, screenName);
+  if (activeProjectKey === nextKey) {
+    updateProjectSidebarSelection();
+    return;
+  }
+
+  if (activeProjectKey && xmlEditor.value.trim()) {
+    const saved = await autoSaveCurrentDisplay();
+    if (!saved) {
+      return;
+    }
+  }
+
   setEditorProjectScreen(project, folderName, screen, screen.xml);
   updateProjectSidebarSelection();
 }
@@ -6150,143 +6234,6 @@ if (defaultUploadInput) {
   });
 }
 
-if (addDisplayBtn) {
-  addDisplayBtn.addEventListener('click', () => {
-    createDisplayFromTemplate().catch((err) => {
-      console.error(err);
-      alert(err.message || `Could not create a new page from ${TEMPLATE_DISPLAY_NAME}.`);
-    });
-  });
-}
-
-if (addFolderBtn) {
-  addFolderBtn.addEventListener('click', async () => {
-    const rawName = window.prompt('New folder name', 'New_Folder');
-    if (rawName === null) {
-      return;
-    }
-
-    const folderName = normalizeFolderName(rawName);
-    if (!folderName) {
-      alert('Enter a valid folder name.');
-      return;
-    }
-
-    if (!folderNames.some((name) => name.toLowerCase() === folderName.toLowerCase())) {
-      folderNames = [...folderNames, folderName];
-    }
-
-    selectedFolderName = folderName;
-    selectedFolderIsCustom = true;
-
-    try {
-      await saveDisplayFolders();
-      renderDisplays(currentDisplayRows);
-    } catch (err) {
-      console.error(err);
-      alert('Could not save the folder.');
-    }
-  });
-}
-
-if (removeFolderBtn) {
-  removeFolderBtn.addEventListener('click', async () => {
-    if (!selectedFolderName) {
-      alert('Select a folder first.');
-      return;
-    }
-
-    const folderName = selectedFolderName;
-    const displayFiles = currentDisplayRows.filter((file) => !isGlobalObjectFile(file));
-    const autoFolderMap = buildAutoDisplayFolderMap(displayFiles);
-    const filesInFolder = displayFiles.filter((file) =>
-      String(resolveDisplayFolderName(file.name, autoFolderMap)).toLowerCase() === folderName.toLowerCase());
-
-    const confirmed = confirm(
-      `Delete folder ${folderName} and permanently delete ${filesInFolder.length} screen(s)? This cannot be undone.`
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      const failed = [];
-      const deletedKeys = new Set();
-      for (const file of filesInFolder) {
-        try {
-          await deleteDisplayXml(file.name, file.source);
-          deletedKeys.add(displayKey(file.name));
-        } catch (_err) {
-          failed.push(file.name);
-        }
-      }
-
-      // Remove the custom folder label itself if it was user-created.
-      if (selectedFolderIsCustom) {
-        folderNames = folderNames.filter((name) => name.toLowerCase() !== folderName.toLowerCase());
-      }
-
-      for (const key of Object.keys(folderAssignments)) {
-        const assignedFolder = String(folderAssignments[key] || '').toLowerCase();
-        if (assignedFolder === folderName.toLowerCase() || deletedKeys.has(key)) {
-          delete folderAssignments[key];
-        }
-      }
-
-      folderCollapsedNames.delete(folderName);
-      if (selectedDisplay && deletedKeys.has(displayKey(selectedDisplay))) {
-        clearSelectedDisplay();
-      }
-
-      selectedFolderName = '';
-      selectedFolderIsCustom = false;
-      await saveDisplayFolders();
-
-      if (failed.length) {
-        alert(`Folder deleted partially. Could not delete: ${failed.join(', ')}`);
-      }
-
-      usingUploadedList = false;
-      await refreshDisplays();
-    } catch (err) {
-      console.error(err);
-      alert('Could not remove folder.');
-    }
-  });
-}
-
-if (uploadDisplayBtn) {
-  uploadDisplayBtn.addEventListener('click', () => {
-    if (isDefaultMode()) {
-      defaultUploadInput.click();
-      return;
-    }
-
-    uploadInput.click();
-  });
-}
-
-if (removeDisplayBtn) {
-  removeDisplayBtn.addEventListener('click', async () => {
-    const targetName = isDefaultMode() ? selectedDefaultTemplate : selectedDisplay;
-    if (!targetName) {
-      alert(isDefaultMode() ? 'Select a default template first.' : 'Select a display first.');
-      return;
-    }
-
-    try {
-      if (isDefaultMode()) {
-        await removeDefaultTemplateByName(targetName);
-      } else {
-        await removeDisplayByName(targetName);
-      }
-    } catch (err) {
-      console.error(err);
-      alert(err.message || 'Could not remove XML file');
-    }
-  });
-}
-
 previewBtn.addEventListener('click', renderPreview);
 
 if (screenSizePreset) {
@@ -6309,7 +6256,7 @@ if (screenHeight) {
 if (addObjectBtn) {
   addObjectBtn.addEventListener('click', addButtonObject);
 }
-if (toggleSidebarBtn) {
+if (toggleSidebarBtn && mainGrid) {
   toggleSidebarBtn.addEventListener('click', () => {
     const collapsed = !mainGrid.classList.contains('sidebar-collapsed');
     setSidebarCollapsed(collapsed);
@@ -6319,40 +6266,13 @@ if (toggleSidebarBtn) {
   });
 }
 
-if (toggleDockBtn) {
+if (toggleDockBtn && editorLayout) {
   toggleDockBtn.addEventListener('click', () => {
     const collapsed = !editorLayout.classList.contains('dock-collapsed');
     setDockCollapsed(collapsed);
     if (xmlEditor.value.trim()) {
       renderPreview();
     }
-  });
-}
-
-if (refreshBtn) {
-  refreshBtn.addEventListener('click', () => {
-    const refreshPromise = isDefaultMode()
-      ? refreshDefaultTemplates()
-      : (usingUploadedList = false, refreshDisplays());
-
-    refreshPromise.catch((err) => {
-      console.error(err);
-      alert(isDefaultMode() ? 'Could not refresh default templates' : 'Could not refresh display list');
-    });
-  });
-}
-
-if (showDisplaysBtn) {
-  showDisplaysBtn.addEventListener('click', () => {
-    setSidebarMode(SIDEBAR_MODE_DISPLAYS);
-    refreshDisplays().catch(() => {});
-  });
-}
-
-if (showDefaultsBtn) {
-  showDefaultsBtn.addEventListener('click', () => {
-    setSidebarMode(SIDEBAR_MODE_DEFAULTS);
-    refreshDefaultTemplates().catch(() => {});
   });
 }
 
@@ -6461,97 +6381,6 @@ if (projectNameInput) {
   });
 }
 
-if (seedDefaultsBtn) {
-  seedDefaultsBtn.addEventListener('click', async () => {
-    try {
-      const files = currentDefaultRows.map((file) => file.name);
-      if (!files.length) {
-        alert('Upload default templates first.');
-        return;
-      }
-
-      const data = await seedDefaultTemplates(files);
-      alert(`Copied ${data.copied.length} default template page(s) into project edited pages.`);
-      setSidebarMode(SIDEBAR_MODE_DISPLAYS);
-      await refreshDisplays();
-    } catch (err) {
-      console.error(err);
-      alert(err.message || 'Could not copy defaults into project pages.');
-    }
-  });
-}
-
-if (popupTemplateSelect) {
-  popupTemplateSelect.addEventListener('change', () => {
-    plannerSelectedTemplateId = String(popupTemplateSelect.value || '');
-    const project = getActiveProjectForPopupPlanner();
-    applyPlannerTemplateSelection(project);
-  });
-}
-
-if (savePopupTemplateBtn) {
-  savePopupTemplateBtn.addEventListener('click', () => {
-    const project = getActiveProjectForPopupPlanner();
-    if (!project) {
-      alert('Create or open a project first.');
-      return;
-    }
-
-    const normalizedXml = normalizePopupTemplateXml(popupTemplateXml?.value || '');
-    if (!normalizedXml) {
-      alert('Enter valid popup object XML (single object node).');
-      return;
-    }
-
-    const name = String(popupTemplateName?.value || '').trim() || 'Popup Template';
-    const existing = project.popupTemplates.find((item) => item.id === plannerSelectedTemplateId);
-    if (existing) {
-      existing.name = name;
-      existing.xml = normalizedXml;
-    } else {
-      const nextTemplate = {
-        id: `popup-template-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        name,
-        xml: normalizedXml
-      };
-      project.popupTemplates.push(nextTemplate);
-      plannerSelectedTemplateId = nextTemplate.id;
-    }
-
-    saveProjectList();
-    renderProjectPopupPlanner();
-  });
-}
-
-if (deletePopupTemplateBtn) {
-  deletePopupTemplateBtn.addEventListener('click', () => {
-    const project = getActiveProjectForPopupPlanner();
-    if (!project || !plannerSelectedTemplateId) {
-      return;
-    }
-
-    const target = project.popupTemplates.find((item) => item.id === plannerSelectedTemplateId);
-    if (!target) {
-      return;
-    }
-
-    if (!window.confirm(`Delete popup template ${target.name}?`)) {
-      return;
-    }
-
-    project.popupTemplates = project.popupTemplates.filter((item) => item.id !== plannerSelectedTemplateId);
-    for (const row of project.popupPlanRows) {
-      if (row.popupTypeId === plannerSelectedTemplateId || row.componentTypeId === `template:${plannerSelectedTemplateId}`) {
-        row.popupTypeId = '';
-        row.componentTypeId = 'component:conveyor';
-      }
-    }
-    plannerSelectedTemplateId = project.popupTemplates[0]?.id || '';
-    saveProjectList();
-    renderProjectPopupPlanner();
-  });
-}
-
 if (addPopupPlanRowBtn) {
   addPopupPlanRowBtn.addEventListener('click', () => {
     const project = getActiveProjectForPopupPlanner();
@@ -6611,14 +6440,24 @@ if (generatePopupsBtn) {
       project.popupGeneratedRows = [...project.popupGeneratedRows, ...historyRows].slice(-1500);
     }
 
-    saveProjectList();
-    renderPopupPalette(project);
+    if (placedCount > 0) {
+      const saved = await autoSaveCurrentDisplay();
+      if (!saved) {
+        return;
+      }
+    }
 
-    packageResult.textContent = generatedPopupDrafts.length
-      ? (placedCount
-        ? `Generated ${generatedPopupDrafts.length} popup item(s) and placed ${placedCount} on ${targetScreenLabel}.`
-        : 'Open a project screen first, then click Generate Popups again to place items in preview.')
-      : 'No popup items generated yet. Add plan rows and choose popup types.';
+    saveProjectList();
+    refreshPopupPlannerDraftViews(project);
+
+    if (packageResult) {
+      packageResult.textContent = generatedPopupDrafts.length
+        ? (placedCount
+          ? `Generated ${generatedPopupDrafts.length} popup item(s) and placed ${placedCount} on ${targetScreenLabel}.`
+          : 'Open a project screen first, then click Generate Popups again to place items in preview.')
+        : 'No popup items generated yet. Add plan rows and choose popup types.';
+      setWorkspaceDockTab('xml');
+    }
   });
 }
 
@@ -6639,13 +6478,14 @@ applySizeBtn.addEventListener('click', async () => {
   recordHistory(xmlEditor.value);
   renderPreview();
 
-  if (!selectedDisplay) {
+  const targetDisplayName = getTargetDisplayName();
+  if (!targetDisplayName) {
     return;
   }
 
   try {
-    await saveDisplayXml(selectedDisplay, xmlEditor.value);
-    updateCurrentDisplayRow(selectedDisplay, xmlEditor.value);
+    await saveDisplayXml(targetDisplayName, xmlEditor.value);
+    updateCurrentDisplayRow(targetDisplayName, xmlEditor.value);
     if (usingUploadedList) {
       renderDisplays(currentDisplayRows);
     } else {

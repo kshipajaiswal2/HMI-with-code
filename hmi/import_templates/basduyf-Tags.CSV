@@ -1,0 +1,389 @@
+﻿;Tag Type, Tag Name, Tag Description, Read Only, Data Source, Security Code, Alarmed, Native Type, Value Type, Min Analog, Max Analog, Initial Analog, Scale, Offset, DeadBand, Units, Off Label Digital, On Label Digital, Initial Digital, Length String, Initial String, Retentive, Address, System Source Name, System Source Index, RIO Address, Element Size Block, Number Elements Block, Initial Block
+;###002 - THIS LINE CONTAINS VERSION INFORMATION. DO NOT REMOVE!!!
+
+;Folders Section (Must define folders before tags)
+"F","PLC_DI_Discr",,"F"
+"F","PLC_DI_NO",,"F"
+"F","PLC_DI_Tags",,"F"
+"F","PLC_DO_Discr",,"F"
+"F","PLC_DO_No",,"F"
+"F","PLC_DO_Tags",,"F"
+"F","Safety_DI_Discr",,"F"
+"F","Safety_DI_No",,"F"
+"F","Safety_DI_Tags",,"F"
+"F","Safety_DO_Discr",,"F"
+"F","Safety_DO_No",,"F"
+"F","Safety_DO_Tags",,"F"
+"F","Temp_Tags",,"F"
+
+;Tag Section
+"S","PLC_DI_Discr\Data_00","DI01 System Start PB","F","M","*","F",,,,,,,,,,,,,82,"DI01 System Start PB",0,
+"S","PLC_DI_Discr\Data_01","DI02 System Stop PB","F","M","*","F",,,,,,,,,,,,,82,"DI02 System Stop PB",0,
+"S","PLC_DI_Discr\Data_02","DI03 System Reset PB","F","M","*","F",,,,,,,,,,,,,82,"DI03 System Reset PB",0,
+"S","PLC_DI_Discr\Data_03","DI04 Safety Reset PB","F","M","*","F",,,,,,,,,,,,,82,"DI04 Safety Reset PB",0,
+"S","PLC_DI_Discr\Data_04","DI05 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI05 Spare DI",0,
+"S","PLC_DI_Discr\Data_05","DI06 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI06 Spare DI",0,
+"S","PLC_DI_Discr\Data_06","DI07 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI07 Spare DI",0,
+"S","PLC_DI_Discr\Data_07","DI08 Chopper Air Pressure  Switch","F","M","*","F",,,,,,,,,,,,,82,"DI08 Chopper Air Pressure  Switch",0,
+"S","PLC_DI_Discr\Data_08","DI09 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI09 Spare DI",0,
+"S","PLC_DI_Discr\Data_09","DI10 Chopper-1 Start PB","F","M","*","F",,,,,,,,,,,,,82,"DI10 Chopper-1 Start PB",0,
+"S","PLC_DI_Discr\Data_10","DI11 Chopper-1 Stop PB","F","M","*","F",,,,,,,,,,,,,82,"DI11 Chopper-1 Stop PB",0,
+"S","PLC_DI_Discr\Data_11","DI12 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI12 Spare DI",0,
+"S","PLC_DI_Discr\Data_12","DI13 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI13 Spare DI",0,
+"S","PLC_DI_Discr\Data_13","DI14 Chopper-2 Start PB","F","M","*","F",,,,,,,,,,,,,82,"DI14 Chopper-2 Start PB",0,
+"S","PLC_DI_Discr\Data_14","DI15 Chopper-2 Stop PB","F","M","*","F",,,,,,,,,,,,,82,"DI15 Chopper-2 Stop PB",0,
+"S","PLC_DI_Discr\Data_15","DI16 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI16 Spare DI",0,
+"S","PLC_DI_Discr\Data_16","DI17 Chopper-1 PU Cylinder-1 Fwd FB","F","M","*","F",,,,,,,,,,,,,82,"DI17 Chopper-1 PU Cylinder-1 Fwd FB",0,
+"S","PLC_DI_Discr\Data_17","DI18 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI18 Spare DI",0,
+"S","PLC_DI_Discr\Data_18","DI19 Chopper-1 PU Cylinder-2 Fwd FB","F","M","*","F",,,,,,,,,,,,,82,"DI19 Chopper-1 PU Cylinder-2 Fwd FB",0,
+"S","PLC_DI_Discr\Data_19","DI20 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI20 Spare DI",0,
+"S","PLC_DI_Discr\Data_20","DI21 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI21 Spare DI",0,
+"S","PLC_DI_Discr\Data_21","DI22 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI22 Spare DI",0,
+"S","PLC_DI_Discr\Data_22","DI23 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI23 Spare DI",0,
+"S","PLC_DI_Discr\Data_23","DI24 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI24 Spare DI",0,
+"S","PLC_DI_Discr\Data_24","DI25 Chopper-2 PU Cylinder-1 Fwd FB","F","M","*","F",,,,,,,,,,,,,82,"DI25 Chopper-2 PU Cylinder-1 Fwd FB",0,
+"S","PLC_DI_Discr\Data_25","DI26 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI26 Spare DI",0,
+"S","PLC_DI_Discr\Data_26","DI27 Chopper-2 PU Cylinder-2 Fwd FB","F","M","*","F",,,,,,,,,,,,,82,"DI27 Chopper-2 PU Cylinder-2 Fwd FB",0,
+"S","PLC_DI_Discr\Data_27","DI28 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI28 Spare DI",0,
+"S","PLC_DI_Discr\Data_28","DI29 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI29 Spare DI",0,
+"S","PLC_DI_Discr\Data_29","DI30 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI30 Spare DI",0,
+"S","PLC_DI_Discr\Data_30","DI31 Safety Door 01 Open Request PB","F","M","*","F",,,,,,,,,,,,,82,"DI31 Safety Door 01 Open Request PB",0,
+"S","PLC_DI_Discr\Data_31","DI32 Safety Door 01 Close Request PB","F","M","*","F",,,,,,,,,,,,,82,"DI32 Safety Door 01 Close Request PB",0,
+"S","PLC_DI_Discr\Data_32","DI33 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI33 Spare DI",0,
+"S","PLC_DI_Discr\Data_33","DI34 Spreader Start PB","F","M","*","F",,,,,,,,,,,,,82,"DI34 Spreader Start PB",0,
+"S","PLC_DI_Discr\Data_34","DI35 Spreader Stop PB","F","M","*","F",,,,,,,,,,,,,82,"DI35 Spreader Stop PB",0,
+"S","PLC_DI_Discr\Data_35","DI36 Safety Door 02 Open Request PB","F","M","*","F",,,,,,,,,,,,,82,"DI36 Safety Door 02 Open Request PB",0,
+"S","PLC_DI_Discr\Data_36","DI37 Safety Door 02 Close Request PB","F","M","*","F",,,,,,,,,,,,,82,"DI37 Safety Door 02 Close Request PB",0,
+"S","PLC_DI_Discr\Data_37","DI38 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI38 Spare DI",0,
+"S","PLC_DI_Discr\Data_38","DI39 Applicator Start PB","F","M","*","F",,,,,,,,,,,,,82,"DI39 Applicator Start PB",0,
+"S","PLC_DI_Discr\Data_39","DI40 Applicator Stop PB","F","M","*","F",,,,,,,,,,,,,82,"DI40 Applicator Stop PB",0,
+"S","PLC_DI_Discr\Data_40","DI41 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI41 Spare DI",0,
+"S","PLC_DI_Discr\Data_41","DI42 Chopper Motor-1 MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI42 Chopper Motor-1 MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_42","DI43 Chopper Motor-2 MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI43 Chopper Motor-2 MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_43","DI44 Anti-Static Coating Roller MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI44 Anti-Static Coating Roller MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_44","DI45 Spreader Motor-2 MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI45 Spreader Motor-2 MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_45","DI46 Feeders-1 MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI46 Feeders-1 MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_46","DI47 Feeders-2 MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI47 Feeders-2 MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_47","DI48 Feeders-3 MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI48 Feeders-3 MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_48","DI49 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI49 Spare DI",0,
+"S","PLC_DI_Discr\Data_49","DI50 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI50 Spare DI",0,
+"S","PLC_DI_Discr\Data_50","DI51 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI51 Spare DI",0,
+"S","PLC_DI_Discr\Data_51","DI52 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI52 Spare DI",0,
+"S","PLC_DI_Discr\Data_52","DI53 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI53 Spare DI",0,
+"S","PLC_DI_Discr\Data_53","DI54 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI54 Spare DI",0,
+"S","PLC_DI_Discr\Data_54","DI55 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI55 Spare DI",0,
+"S","PLC_DI_Discr\Data_55","DI56 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI56 Spare DI",0,
+"S","PLC_DI_Discr\List_01","PLC Input List 01","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 01",0,
+"S","PLC_DI_Discr\List_02","PLC Input List 02","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 02",0,
+"S","PLC_DI_Discr\List_03","PLC Input List 03","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 03",0,
+"S","PLC_DI_Discr\List_04","PLC Input List 04","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 04",0,
+"S","PLC_DI_Discr\List_05","PLC Input List 05","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 05",0,
+"S","PLC_DI_Discr\List_06","PLC Input List 06","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 06",0,
+"S","PLC_DI_Discr\List_07","PLC Input List 07","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 07",0,
+"S","PLC_DI_NO\Data_00","Z1:3:I.0","F","M","*","F",,,,,,,,,,,,,82,"Z1:3:I.0",0,
+"S","PLC_DI_NO\Data_01","Z1:3:I.1","F","M","*","F",,,,,,,,,,,,,82,"Z1:3:I.1",0,
+"S","PLC_DI_NO\Data_02","Z1:3:I.2","F","M","*","F",,,,,,,,,,,,,82,"Z1:3:I.2",0,
+"S","PLC_DI_NO\Data_03","Z1:3:I.3","F","M","*","F",,,,,,,,,,,,,82,"Z1:3:I.3",0,
+"S","PLC_DI_NO\Data_04","Z1:3:I.4","F","M","*","F",,,,,,,,,,,,,82,"Z1:3:I.4",0,
+"S","PLC_DI_NO\Data_05","Z1:3:I.5","F","M","*","F",,,,,,,,,,,,,82,"Z1:3:I.5",0,
+"S","PLC_DI_NO\Data_06","Z1:3:I.6","F","M","*","F",,,,,,,,,,,,,82,"Z1:3:I.6",0,
+"S","PLC_DI_NO\Data_07","Z1:3:I.7","F","M","*","F",,,,,,,,,,,,,82,"Z1:3:I.7",0,
+"S","PLC_DI_NO\Data_08","Z1:4:I.0","F","M","*","F",,,,,,,,,,,,,82,"Z1:4:I.0",0,
+"S","PLC_DI_NO\Data_09","Z1:4:I.1","F","M","*","F",,,,,,,,,,,,,82,"Z1:4:I.1",0,
+"S","PLC_DI_NO\Data_10","Z1:4:I.2","F","M","*","F",,,,,,,,,,,,,82,"Z1:4:I.2",0,
+"S","PLC_DI_NO\Data_11","Z1:4:I.3","F","M","*","F",,,,,,,,,,,,,82,"Z1:4:I.3",0,
+"S","PLC_DI_NO\Data_12","Z1:4:I.4","F","M","*","F",,,,,,,,,,,,,82,"Z1:4:I.4",0,
+"S","PLC_DI_NO\Data_13","Z1:4:I.5","F","M","*","F",,,,,,,,,,,,,82,"Z1:4:I.5",0,
+"S","PLC_DI_NO\Data_14","Z1:4:I.6","F","M","*","F",,,,,,,,,,,,,82,"Z1:4:I.6",0,
+"S","PLC_DI_NO\Data_15","Z1:4:I.7","F","M","*","F",,,,,,,,,,,,,82,"Z1:4:I.7",0,
+"S","PLC_DI_NO\Data_16","Z1:5:I.0","F","M","*","F",,,,,,,,,,,,,82,"Z1:5:I.0",0,
+"S","PLC_DI_NO\Data_17","Z1:5:I.1","F","M","*","F",,,,,,,,,,,,,82,"Z1:5:I.1",0,
+"S","PLC_DI_NO\Data_18","Z1:5:I.2","F","M","*","F",,,,,,,,,,,,,82,"Z1:5:I.2",0,
+"S","PLC_DI_NO\Data_19","Z1:5:I.3","F","M","*","F",,,,,,,,,,,,,82,"Z1:5:I.3",0,
+"S","PLC_DI_NO\Data_20","Z1:5:I.4","F","M","*","F",,,,,,,,,,,,,82,"Z1:5:I.4",0,
+"S","PLC_DI_NO\Data_21","Z1:5:I.5","F","M","*","F",,,,,,,,,,,,,82,"Z1:5:I.5",0,
+"S","PLC_DI_NO\Data_22","Z1:5:I.6","F","M","*","F",,,,,,,,,,,,,82,"Z1:5:I.6",0,
+"S","PLC_DI_NO\Data_23","Z1:5:I.7","F","M","*","F",,,,,,,,,,,,,82,"Z1:5:I.7",0,
+"S","PLC_DI_NO\Data_24","Z1:6:I.0","F","M","*","F",,,,,,,,,,,,,82,"Z1:6:I.0",0,
+"S","PLC_DI_NO\Data_25","Z1:6:I.1","F","M","*","F",,,,,,,,,,,,,82,"Z1:6:I.1",0,
+"S","PLC_DI_NO\Data_26","Z1:6:I.2","F","M","*","F",,,,,,,,,,,,,82,"Z1:6:I.2",0,
+"S","PLC_DI_NO\Data_27","Z1:6:I.3","F","M","*","F",,,,,,,,,,,,,82,"Z1:6:I.3",0,
+"S","PLC_DI_NO\Data_28","Z1:6:I.4","F","M","*","F",,,,,,,,,,,,,82,"Z1:6:I.4",0,
+"S","PLC_DI_NO\Data_29","Z1:6:I.5","F","M","*","F",,,,,,,,,,,,,82,"Z1:6:I.5",0,
+"S","PLC_DI_NO\Data_30","Z1:6:I.6","F","M","*","F",,,,,,,,,,,,,82,"Z1:6:I.6",0,
+"S","PLC_DI_NO\Data_31","Z1:6:I.7","F","M","*","F",,,,,,,,,,,,,82,"Z1:6:I.7",0,
+"S","PLC_DI_NO\Data_32","Z1:7:I.0","F","M","*","F",,,,,,,,,,,,,82,"Z1:7:I.0",0,
+"S","PLC_DI_NO\Data_33","Z1:7:I.1","F","M","*","F",,,,,,,,,,,,,82,"Z1:7:I.1",0,
+"S","PLC_DI_NO\Data_34","Z1:7:I.2","F","M","*","F",,,,,,,,,,,,,82,"Z1:7:I.2",0,
+"S","PLC_DI_NO\Data_35","Z1:7:I.3","F","M","*","F",,,,,,,,,,,,,82,"Z1:7:I.3",0,
+"S","PLC_DI_NO\Data_36","Z1:7:I.4","F","M","*","F",,,,,,,,,,,,,82,"Z1:7:I.4",0,
+"S","PLC_DI_NO\Data_37","Z1:7:I.5","F","M","*","F",,,,,,,,,,,,,82,"Z1:7:I.5",0,
+"S","PLC_DI_NO\Data_38","Z1:7:I.6","F","M","*","F",,,,,,,,,,,,,82,"Z1:7:I.6",0,
+"S","PLC_DI_NO\Data_39","Z1:7:I.7","F","M","*","F",,,,,,,,,,,,,82,"Z1:7:I.7",0,
+"S","PLC_DI_NO\Data_40","Z1:8:I.0","F","M","*","F",,,,,,,,,,,,,82,"Z1:8:I.0",0,
+"S","PLC_DI_NO\Data_41","Z1:8:I.1","F","M","*","F",,,,,,,,,,,,,82,"Z1:8:I.1",0,
+"S","PLC_DI_NO\Data_42","Z1:8:I.2","F","M","*","F",,,,,,,,,,,,,82,"Z1:8:I.2",0,
+"S","PLC_DI_NO\Data_43","Z1:8:I.3","F","M","*","F",,,,,,,,,,,,,82,"Z1:8:I.3",0,
+"S","PLC_DI_NO\Data_44","Z1:8:I.4","F","M","*","F",,,,,,,,,,,,,82,"Z1:8:I.4",0,
+"S","PLC_DI_NO\Data_45","Z1:8:I.5","F","M","*","F",,,,,,,,,,,,,82,"Z1:8:I.5",0,
+"S","PLC_DI_NO\Data_46","Z1:8:I.6","F","M","*","F",,,,,,,,,,,,,82,"Z1:8:I.6",0,
+"S","PLC_DI_NO\Data_47","Z1:8:I.7","F","M","*","F",,,,,,,,,,,,,82,"Z1:8:I.7",0,
+"S","PLC_DI_NO\Data_48","Z1:9:I.0","F","M","*","F",,,,,,,,,,,,,82,"Z1:9:I.0",0,
+"S","PLC_DI_NO\Data_49","Z1:9:I.1","F","M","*","F",,,,,,,,,,,,,82,"Z1:9:I.1",0,
+"S","PLC_DI_NO\Data_50","Z1:9:I.2","F","M","*","F",,,,,,,,,,,,,82,"Z1:9:I.2",0,
+"S","PLC_DI_NO\Data_51","Z1:9:I.3","F","M","*","F",,,,,,,,,,,,,82,"Z1:9:I.3",0,
+"S","PLC_DI_NO\Data_52","Z1:9:I.4","F","M","*","F",,,,,,,,,,,,,82,"Z1:9:I.4",0,
+"S","PLC_DI_NO\Data_53","Z1:9:I.5","F","M","*","F",,,,,,,,,,,,,82,"Z1:9:I.5",0,
+"S","PLC_DI_NO\Data_54","Z1:9:I.6","F","M","*","F",,,,,,,,,,,,,82,"Z1:9:I.6",0,
+"S","PLC_DI_NO\Data_55","Z1:9:I.7","F","M","*","F",,,,,,,,,,,,,82,"Z1:9:I.7",0,
+"S","PLC_DI_NO\List_01","PLC Input List 01","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 01",0,
+"S","PLC_DI_NO\List_02","PLC Input List 02","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 02",0,
+"S","PLC_DI_NO\List_03","PLC Input List 03","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 03",0,
+"S","PLC_DI_NO\List_04","PLC Input List 04","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 04",0,
+"S","PLC_DI_NO\List_05","PLC Input List 05","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 05",0,
+"S","PLC_DI_NO\List_06","PLC Input List 06","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 06",0,
+"S","PLC_DI_NO\List_07","PLC Input List 07","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 07",0,
+"D","PLC_DI_Tags\Data_00","DI01 System Start PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[01]"
+"D","PLC_DI_Tags\Data_01","DI02 System Stop PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[02]"
+"D","PLC_DI_Tags\Data_02","DI03 System Reset PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[03]"
+"D","PLC_DI_Tags\Data_03","DI04 Safety Reset PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[04]"
+"D","PLC_DI_Tags\Data_04","DI05 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[05]"
+"D","PLC_DI_Tags\Data_05","DI06 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[06]"
+"D","PLC_DI_Tags\Data_06","DI07 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[07]"
+"D","PLC_DI_Tags\Data_07","DI08 Chopper Air Pressure  Switch","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[08]"
+"D","PLC_DI_Tags\Data_08","DI09 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[09]"
+"D","PLC_DI_Tags\Data_09","DI10 Chopper-1 Start PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[10]"
+"D","PLC_DI_Tags\Data_10","DI11 Chopper-1 Stop PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[11]"
+"D","PLC_DI_Tags\Data_11","DI12 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[12]"
+"D","PLC_DI_Tags\Data_12","DI13 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[13]"
+"D","PLC_DI_Tags\Data_13","DI14 Chopper-2 Start PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[14]"
+"D","PLC_DI_Tags\Data_14","DI15 Chopper-2 Stop PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[15]"
+"D","PLC_DI_Tags\Data_15","DI16 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[16]"
+"D","PLC_DI_Tags\Data_16","DI17 Chopper-1 PU Cylinder-1 Fwd FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[17]"
+"D","PLC_DI_Tags\Data_17","DI18 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[18]"
+"D","PLC_DI_Tags\Data_18","DI19 Chopper-1 PU Cylinder-2 Fwd FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[19]"
+"D","PLC_DI_Tags\Data_19","DI20 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[20]"
+"D","PLC_DI_Tags\Data_20","DI21 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[21]"
+"D","PLC_DI_Tags\Data_21","DI22 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[22]"
+"D","PLC_DI_Tags\Data_22","DI23 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[23]"
+"D","PLC_DI_Tags\Data_23","DI24 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[24]"
+"D","PLC_DI_Tags\Data_24","DI25 Chopper-2 PU Cylinder-1 Fwd FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[25]"
+"D","PLC_DI_Tags\Data_25","DI26 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[26]"
+"D","PLC_DI_Tags\Data_26","DI27 Chopper-2 PU Cylinder-2 Fwd FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[27]"
+"D","PLC_DI_Tags\Data_27","DI28 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[28]"
+"D","PLC_DI_Tags\Data_28","DI29 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[29]"
+"D","PLC_DI_Tags\Data_29","DI30 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[30]"
+"D","PLC_DI_Tags\Data_30","DI31 Safety Door 01 OpenRequest PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[31]"
+"D","PLC_DI_Tags\Data_31","DI32 Safety Door 01 CloseRequest PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[32]"
+"D","PLC_DI_Tags\Data_32","DI33 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[33]"
+"D","PLC_DI_Tags\Data_33","DI34 Spreader Start PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[34]"
+"D","PLC_DI_Tags\Data_34","DI35 Spreader Stop PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[35]"
+"D","PLC_DI_Tags\Data_35","DI36 Safety Door 02 OpenRequest PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[36]"
+"D","PLC_DI_Tags\Data_36","DI37 Safety Door 02 CloseRequest PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[37]"
+"D","PLC_DI_Tags\Data_37","DI38 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[38]"
+"D","PLC_DI_Tags\Data_38","DI39 Applicator Start PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[39]"
+"D","PLC_DI_Tags\Data_39","DI40 Applicator Stop PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[40]"
+"D","PLC_DI_Tags\Data_40","DI41 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[41]"
+"D","PLC_DI_Tags\Data_41","DI42 Chopper Motor-1 MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[42]"
+"D","PLC_DI_Tags\Data_42","DI43 Chopper Motor-2 MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[43]"
+"D","PLC_DI_Tags\Data_43","DI44 Anti-Static Coating Roller MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[44]"
+"D","PLC_DI_Tags\Data_44","DI45 Spreader Motor-2 MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[45]"
+"D","PLC_DI_Tags\Data_45","DI46 Feeders-1 MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[46]"
+"D","PLC_DI_Tags\Data_46","DI47 Feeders-2 MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[47]"
+"D","PLC_DI_Tags\Data_47","DI48 Feeders-3 MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[48]"
+"D","PLC_DI_Tags\Data_48","DI49 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[49]"
+"D","PLC_DI_Tags\Data_49","DI50 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[50]"
+"D","PLC_DI_Tags\Data_50","DI51 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[51]"
+"D","PLC_DI_Tags\Data_51","DI52 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[52]"
+"D","PLC_DI_Tags\Data_52","DI53 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[53]"
+"D","PLC_DI_Tags\Data_53","DI54 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[54]"
+"D","PLC_DI_Tags\Data_54","DI55 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[55]"
+"D","PLC_DI_Tags\Data_55","DI56 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DI[56]"
+"S","PLC_DO_Discr\Data_00","DO01 Chopper Tower Lamp Red","F","M","*","F",,,,,,,,,,,,,82,"DO01 Chopper Tower Lamp Red",0,
+"S","PLC_DO_Discr\Data_01","DO02 Chopper Tower Lamp Amber","F","M","*","F",,,,,,,,,,,,,82,"DO02 Chopper Tower Lamp Amber",0,
+"S","PLC_DO_Discr\Data_02","DO03 Chopper Tower Lamp Green","F","M","*","F",,,,,,,,,,,,,82,"DO03 Chopper Tower Lamp Green",0,
+"S","PLC_DO_Discr\Data_03","DO04 Chopper Tower Lamp Buzzer","F","M","*","F",,,,,,,,,,,,,82,"DO04 Chopper Tower Lamp Buzzer",0,
+"S","PLC_DO_Discr\Data_04","DO05 Chopper System Start PB Green Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO05 Chopper System Start PB Green Lamp",0,
+"S","PLC_DO_Discr\Data_05","DO06 Chopper System Reset PB Blue Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO06 Chopper System Reset PB Blue Lamp",0,
+"S","PLC_DO_Discr\Data_06","DO07 Chopper System Safety Reset PB Yellow Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO07 Chopper System Safety Reset PB Yellow Lamp",0,
+"S","PLC_DO_Discr\Data_07","DO08 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO08 Spare DO",0,
+"S","PLC_DO_Discr\Data_08","DO09 Chopper-1 Start PB Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO09 Chopper-1 Start PB Lamp",0,
+"S","PLC_DO_Discr\Data_09","DO10 Chopper-1 PU Cylinder-1 Fwd SOV","F","M","*","F",,,,,,,,,,,,,82,"DO10 Chopper-1 PU Cylinder-1 Fwd SOV",0,
+"S","PLC_DO_Discr\Data_10","DO11 Chopper-1 PU Cylinder-1 Rev SOV","F","M","*","F",,,,,,,,,,,,,82,"DO11 Chopper-1 PU Cylinder-1 Rev SOV",0,
+"S","PLC_DO_Discr\Data_11","DO12 Chopper-1 PU Cylinder-2 Fwd SOV","F","M","*","F",,,,,,,,,,,,,82,"DO12 Chopper-1 PU Cylinder-2 Fwd SOV",0,
+"S","PLC_DO_Discr\Data_12","DO13 Chopper-1 PU Cylinder-2 Rev SOV","F","M","*","F",,,,,,,,,,,,,82,"DO13 Chopper-1 PU Cylinder-2 Rev SOV",0,
+"S","PLC_DO_Discr\Data_13","DO14 Chopper-1 Pressure Roller Cylinder Fwd SOV","F","M","*","F",,,,,,,,,,,,,82,"DO14 Chopper-1 Pressure Roller Cylinder Fwd SOV",0,
+"S","PLC_DO_Discr\Data_14","DO15 Chopper-1 Pressure Roller Cylinder Rev SOV","F","M","*","F",,,,,,,,,,,,,82,"DO15 Chopper-1 Pressure Roller Cylinder Rev SOV",0,
+"S","PLC_DO_Discr\Data_15","DO16 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO16 Spare DO",0,
+"S","PLC_DO_Discr\Data_16","DO17 Chopper-2 Start PB Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO17 Chopper-2 Start PB Lamp",0,
+"S","PLC_DO_Discr\Data_17","DO18 Chopper-2 PU Cylinder-1 Fwd SOV","F","M","*","F",,,,,,,,,,,,,82,"DO18 Chopper-2 PU Cylinder-1 Fwd SOV",0,
+"S","PLC_DO_Discr\Data_18","DO19 Chopper-2 PU Cylinder-1 Rev SOV","F","M","*","F",,,,,,,,,,,,,82,"DO19 Chopper-2 PU Cylinder-1 Rev SOV",0,
+"S","PLC_DO_Discr\Data_19","DO20 Chopper-2 PU Cylinder-2 Fwd SOV","F","M","*","F",,,,,,,,,,,,,82,"DO20 Chopper-2 PU Cylinder-2 Fwd SOV",0,
+"S","PLC_DO_Discr\Data_20","DO21 Chopper-2 PU Cylinder-2 Rev SOV","F","M","*","F",,,,,,,,,,,,,82,"DO21 Chopper-2 PU Cylinder-2 Rev SOV",0,
+"S","PLC_DO_Discr\Data_21","DO22 Chopper-2 Pressure Roller Cylinder Fwd SOV","F","M","*","F",,,,,,,,,,,,,82,"DO22 Chopper-2 Pressure Roller Cylinder Fwd SOV",0,
+"S","PLC_DO_Discr\Data_22","DO23 Chopper-2 Pressure Roller Cylinder Rev SOV","F","M","*","F",,,,,,,,,,,,,82,"DO23 Chopper-2 Pressure Roller Cylinder Rev SOV",0,
+"S","PLC_DO_Discr\Data_23","DO24 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO24 Spare DO",0,
+"S","PLC_DO_Discr\Data_24","DO25 Spreader Start PB Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO25 Spreader Start PB Lamp",0,
+"S","PLC_DO_Discr\Data_25","DO26 Applicator Start PB Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO26 Applicator Start PB Lamp",0,
+"S","PLC_DO_Discr\Data_26","DO27 Feeders-1 Enable","F","M","*","F",,,,,,,,,,,,,82,"DO27 Feeders-1 Enable",0,
+"S","PLC_DO_Discr\Data_27","DO28 Feeders-2 Enable","F","M","*","F",,,,,,,,,,,,,82,"DO28 Feeders-2 Enable",0,
+"S","PLC_DO_Discr\Data_28","DO29 Feeders-3 Enable","F","M","*","F",,,,,,,,,,,,,82,"DO29 Feeders-3 Enable",0,
+"S","PLC_DO_Discr\Data_29","DO30 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO30 Spare DO",0,
+"S","PLC_DO_Discr\Data_30","DO31 Safety Door 01 OpenRequest Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO31 Safety Door 01 OpenRequest Lamp",0,
+"S","PLC_DO_Discr\Data_31","DO32 Safety Door 01 CloseRequest Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO32 Safety Door 01 CloseRequest Lamp",0,
+"S","PLC_DO_Discr\Data_32","DO33 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO33 Spare DO",0,
+"S","PLC_DO_Discr\Data_33","DO34 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO34 Spare DO",0,
+"S","PLC_DO_Discr\Data_34","DO35 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO35 Spare DO",0,
+"S","PLC_DO_Discr\Data_35","DO36 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO36 Spare DO",0,
+"S","PLC_DO_Discr\Data_36","DO37 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO37 Spare DO",0,
+"S","PLC_DO_Discr\Data_37","DO38 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO38 Spare DO",0,
+"S","PLC_DO_Discr\Data_38","DO39 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO39 Spare DO",0,
+"S","PLC_DO_Discr\Data_39","DO40 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO40 Spare DO",0,
+"S","PLC_DO_Discr\List_01","PLC Output List 01","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 01",0,
+"S","PLC_DO_Discr\List_02","PLC Output List 02","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 02",0,
+"S","PLC_DO_Discr\List_03","PLC Output List 03","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 03",0,
+"S","PLC_DO_Discr\List_04","PLC Output List 04","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 04",0,
+"S","PLC_DO_Discr\List_05","PLC Output List 05","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 05",0,
+"S","PLC_DO_No\Data_00","Z1:10:O.0","F","M","*","F",,,,,,,,,,,,,82," Z1:10:O.0",0,
+"S","PLC_DO_No\Data_01","Z1:10:O.1","F","M","*","F",,,,,,,,,,,,,82," Z1:10:O.1",0,
+"S","PLC_DO_No\Data_02","Z1:10:O.2","F","M","*","F",,,,,,,,,,,,,82," Z1:10:O.2",0,
+"S","PLC_DO_No\Data_03","Z1:10:O.3","F","M","*","F",,,,,,,,,,,,,82," Z1:10:O.3",0,
+"S","PLC_DO_No\Data_04","Z1:10:O.4","F","M","*","F",,,,,,,,,,,,,82," Z1:10:O.4",0,
+"S","PLC_DO_No\Data_05","Z1:10:O.5","F","M","*","F",,,,,,,,,,,,,82," Z1:10:O.5",0,
+"S","PLC_DO_No\Data_06","Z1:10:O.6","F","M","*","F",,,,,,,,,,,,,82,"Z1:10:O.6",0,
+"S","PLC_DO_No\Data_07","Z1:10:O.7","F","M","*","F",,,,,,,,,,,,,82," Z1:10:O.7",0,
+"S","PLC_DO_No\Data_08","Z1:11:O.0","F","M","*","F",,,,,,,,,,,,,82," Z1:11:O.0",0,
+"S","PLC_DO_No\Data_09","Z1:11:O.1","F","M","*","F",,,,,,,,,,,,,82," Z1:11:O.1",0,
+"S","PLC_DO_No\Data_10","Z1:11:O.2","F","M","*","F",,,,,,,,,,,,,82," Z1:11:O.2",0,
+"S","PLC_DO_No\Data_11","Z1:11:O.3","F","M","*","F",,,,,,,,,,,,,82," Z1:11:O.3",0,
+"S","PLC_DO_No\Data_12","Z1:11:O.4","F","M","*","F",,,,,,,,,,,,,82," Z1:11:O.4",0,
+"S","PLC_DO_No\Data_13","Z1:11:O.5","F","M","*","F",,,,,,,,,,,,,82," Z1:11:O.5",0,
+"S","PLC_DO_No\Data_14","Z1:11:O.6","F","M","*","F",,,,,,,,,,,,,82," Z1:11:O.6",0,
+"S","PLC_DO_No\Data_15","Z1:11:O.7","F","M","*","F",,,,,,,,,,,,,82," Z1:11:O.7",0,
+"S","PLC_DO_No\Data_16","Z1:12:O.0","F","M","*","F",,,,,,,,,,,,,82," Z1:12:O.0",0,
+"S","PLC_DO_No\Data_17","Z1:12:O.1","F","M","*","F",,,,,,,,,,,,,82," Z1:12:O.1",0,
+"S","PLC_DO_No\Data_18","Z1:12:O.2","F","M","*","F",,,,,,,,,,,,,82," Z1:12:O.2",0,
+"S","PLC_DO_No\Data_19","Z1:12:O.3","F","M","*","F",,,,,,,,,,,,,82," Z1:12:O.3",0,
+"S","PLC_DO_No\Data_20","Z1:12:O.4","F","M","*","F",,,,,,,,,,,,,82," Z1:12:O.4",0,
+"S","PLC_DO_No\Data_21","Z1:12:O.5","F","M","*","F",,,,,,,,,,,,,82," Z1:12:O.5",0,
+"S","PLC_DO_No\Data_22","Z1:12:O.6","F","M","*","F",,,,,,,,,,,,,82," Z1:12:O.6",0,
+"S","PLC_DO_No\Data_23","Z1:12:O.7","F","M","*","F",,,,,,,,,,,,,82," Z1:12:O.7",0,
+"S","PLC_DO_No\Data_24","Z1:13:O.0","F","M","*","F",,,,,,,,,,,,,82," Z1:13:O.0",0,
+"S","PLC_DO_No\Data_25","Z1:13:O.1","F","M","*","F",,,,,,,,,,,,,82," Z1:13:O.1",0,
+"S","PLC_DO_No\Data_26","Z1:13:O.2","F","M","*","F",,,,,,,,,,,,,82," Z1:13:O.2",0,
+"S","PLC_DO_No\Data_27","Z1:13:O.3","F","M","*","F",,,,,,,,,,,,,82," Z1:13:O.3",0,
+"S","PLC_DO_No\Data_28","Z1:13:O.4","F","M","*","F",,,,,,,,,,,,,82," Z1:13:O.4",0,
+"S","PLC_DO_No\Data_29","Z1:13:O.5","F","M","*","F",,,,,,,,,,,,,82," Z1:13:O.5",0,
+"S","PLC_DO_No\Data_30","Z1:13:O.6","F","M","*","F",,,,,,,,,,,,,82," Z1:13:O.6",0,
+"S","PLC_DO_No\Data_31","Z1:13:O.7","F","M","*","F",,,,,,,,,,,,,82," Z1:13:O.7",0,
+"S","PLC_DO_No\Data_32","Z1:14:O.0","F","M","*","F",,,,,,,,,,,,,82," Z1:14:O.0",0,
+"S","PLC_DO_No\Data_33","Z1:14:O.1","F","M","*","F",,,,,,,,,,,,,82," Z1:14:O.1",0,
+"S","PLC_DO_No\Data_34","Z1:14:O.2","F","M","*","F",,,,,,,,,,,,,82," Z1:14:O.2",0,
+"S","PLC_DO_No\Data_35","Z1:14:O.3","F","M","*","F",,,,,,,,,,,,,82," Z1:14:O.3",0,
+"S","PLC_DO_No\Data_36","Z1:14:O.4","F","M","*","F",,,,,,,,,,,,,82," Z1:14:O.4",0,
+"S","PLC_DO_No\Data_37","Z1:14:O.5","F","M","*","F",,,,,,,,,,,,,82," Z1:14:O.5",0,
+"S","PLC_DO_No\Data_38","Z1:14:O.6","F","M","*","F",,,,,,,,,,,,,82," Z1:14:O.6",0,
+"S","PLC_DO_No\Data_39","Z1:14:O.7","F","M","*","F",,,,,,,,,,,,,82," Z1:14:O.7",0,
+"S","PLC_DO_No\List_01","PLC Output List 01","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 01",0,
+"S","PLC_DO_No\List_02","PLC Output List 02","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 02",0,
+"S","PLC_DO_No\List_03","PLC Output List 03","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 03",0,
+"S","PLC_DO_No\List_04","PLC Output List 04","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 04",0,
+"S","PLC_DO_No\List_05","PLC Output List 05","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 05",0,
+"D","PLC_DO_Tags\Data_00","DO01 Chopper Tower Lamp Red","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[01]"
+"D","PLC_DO_Tags\Data_01","DO02 Chopper Tower Lamp Amber","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[02]"
+"D","PLC_DO_Tags\Data_02","DO03 Chopper Tower Lamp Green","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[03]"
+"D","PLC_DO_Tags\Data_03","DO04 Chopper Tower Lamp Buzzer","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[04]"
+"D","PLC_DO_Tags\Data_04","DO05 Chopper System Start PB Green Lamp","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[05]"
+"D","PLC_DO_Tags\Data_05","DO06 Chopper System Reset PB Blue Lamp","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[06]"
+"D","PLC_DO_Tags\Data_06","DO07 Chopper System Safety Reset PB Yellow Lamp","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[07]"
+"D","PLC_DO_Tags\Data_07","DO08 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[08]"
+"D","PLC_DO_Tags\Data_08","DO09 Chopper-1 Start PB Lamp","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[09]"
+"D","PLC_DO_Tags\Data_09","DO10 Chopper-1 PU Cylinder-1 Fwd SOV","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[10]"
+"D","PLC_DO_Tags\Data_10","DO11 Chopper-1 PU Cylinder-1 Rev SOV","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[11]"
+"D","PLC_DO_Tags\Data_11","DO12 Chopper-1 PU Cylinder-2 Fwd SOV","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[12]"
+"D","PLC_DO_Tags\Data_12","DO13 Chopper-1 PU Cylinder-2 Rev SOV","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[13]"
+"D","PLC_DO_Tags\Data_13","DO14 Chopper-1 Pressure Roller Cylinder Fwd SOV","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[14]"
+"D","PLC_DO_Tags\Data_14","DO15 Chopper-1 Pressure Roller Cylinder Rev SOV","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[15]"
+"D","PLC_DO_Tags\Data_15","DO16 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[16]"
+"D","PLC_DO_Tags\Data_16","DO17 Chopper-2 Start PB Lamp","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[17]"
+"D","PLC_DO_Tags\Data_17","DO18 Chopper-2 PU Cylinder-1 Fwd SOV","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[18]"
+"D","PLC_DO_Tags\Data_18","DO19 Chopper-2 PU Cylinder-1 Rev SOV","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[19]"
+"D","PLC_DO_Tags\Data_19","DO20 Chopper-2 PU Cylinder-2 Fwd SOV","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[20]"
+"D","PLC_DO_Tags\Data_20","DO21 Chopper-2 PU Cylinder-2 Rev SOV","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[21]"
+"D","PLC_DO_Tags\Data_21","DO22 Chopper-2 Pressure Roller Cylinder Fwd SOV","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[22]"
+"D","PLC_DO_Tags\Data_22","DO23 Chopper-2 Pressure Roller Cylinder Rev SOV","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[23]"
+"D","PLC_DO_Tags\Data_23","DO24 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[24]"
+"D","PLC_DO_Tags\Data_24","DO25 Spreader Start PB Lamp","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[25]"
+"D","PLC_DO_Tags\Data_25","DO26 Applicator Start PB Lamp","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[26]"
+"D","PLC_DO_Tags\Data_26","DO27 Feeders-1 Enable","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[27]"
+"D","PLC_DO_Tags\Data_27","DO28 Feeders-2 Enable","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[28]"
+"D","PLC_DO_Tags\Data_28","DO29 Feeders-3 Enable","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[29]"
+"D","PLC_DO_Tags\Data_29","DO30 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[30]"
+"D","PLC_DO_Tags\Data_30","DO31 Safety Door 01 OpenRequest Lamp","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[31]"
+"D","PLC_DO_Tags\Data_31","DO32 Safety Door 01 CloseRequest Lamp","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[32]"
+"D","PLC_DO_Tags\Data_32","DO33 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[33]"
+"D","PLC_DO_Tags\Data_33","DO34 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[34]"
+"D","PLC_DO_Tags\Data_34","DO35 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[35]"
+"D","PLC_DO_Tags\Data_35","DO36 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[36]"
+"D","PLC_DO_Tags\Data_36","DO37 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[37]"
+"D","PLC_DO_Tags\Data_37","DO38 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[38]"
+"D","PLC_DO_Tags\Data_38","DO39 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[39]"
+"D","PLC_DO_Tags\Data_39","DO40 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_DO[40]"
+"S","Safety_DI_Discr\Data_00","SDI01 Chopper-1 E-Stop 1/1","F","M","*","F",,,,,,,,,,,,,82,"SDI01 Chopper-1 E-Stop 1/1",0,
+"S","Safety_DI_Discr\Data_01","SDI02 Chopper-1 E-Stop 1/2","F","M","*","F",,,,,,,,,,,,,82,"SDI02 Chopper-1 E-Stop 1/2",0,
+"S","Safety_DI_Discr\Data_02","SDI03 Chopper-2 E-Stop 1/1","F","M","*","F",,,,,,,,,,,,,82,"SDI03 Chopper-2 E-Stop 1/1",0,
+"S","Safety_DI_Discr\Data_03","SDI04 Chopper-2 E-Stop 1/2","F","M","*","F",,,,,,,,,,,,,82,"SDI04 Chopper-2 E-Stop 1/2",0,
+"S","Safety_DI_Discr\Data_04","SDI05 Spreader E-Stop 1/1","F","M","*","F",,,,,,,,,,,,,82,"SDI05 Spreader E-Stop 1/1",0,
+"S","Safety_DI_Discr\Data_05","SDI06 Spreader  E-Stop 1/2","F","M","*","F",,,,,,,,,,,,,82,"SDI06 Spreader  E-Stop 1/2",0,
+"S","Safety_DI_Discr\Data_06","SDI07 Applicator E-Stop 1/1","F","M","*","F",,,,,,,,,,,,,82,"SDI07 Applicator E-Stop 1/1",0,
+"S","Safety_DI_Discr\Data_07","SDI08 Applicator E-Stop 1/2","F","M","*","F",,,,,,,,,,,,,82,"SDI08 Applicator E-Stop 1/2",0,
+"S","Safety_DI_Discr\Safety_List_01","Safety Input List 01","F","M","*","F",,,,,,,,,,,,,82,"Safety Input List 01",0,
+"S","Safety_DI_No\Data_00","RC:I:1.0","F","M","*","F",,,,,,,,,,,,,82,"RC:I:1.0",0,
+"S","Safety_DI_No\Data_01","RC:I:1.1","F","M","*","F",,,,,,,,,,,,,82,"RC:I:1.1",0,
+"S","Safety_DI_No\Data_02","RC:I:1.2","F","M","*","F",,,,,,,,,,,,,82,"RC:I:1.2",0,
+"S","Safety_DI_No\Data_03","RC:I:1.3","F","M","*","F",,,,,,,,,,,,,82,"RC:I:1.3",0,
+"S","Safety_DI_No\Data_04","RC:I:1.4","F","M","*","F",,,,,,,,,,,,,82,"RC:I:1.4",0,
+"S","Safety_DI_No\Data_05","RC:I:1.5","F","M","*","F",,,,,,,,,,,,,82,"RC:I:1.5",0,
+"S","Safety_DI_No\Data_06","RC:I:1.6","F","M","*","F",,,,,,,,,,,,,82,"RC:I:1.6",0,
+"S","Safety_DI_No\Data_07","RC:I:1.7","F","M","*","F",,,,,,,,,,,,,82,"RC:I:1.7",0,
+"S","Safety_DI_No\Safety_List_01","Safety Input List 01","F","M","*","F",,,,,,,,,,,,,82,"Safety Input List 01",0,
+"D","Safety_DI_Tags\Data_00","SDI01 Chopper-1 E-Stop 1/1","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDI[01]"
+"D","Safety_DI_Tags\Data_01","SDI02 Chopper-1 E-Stop 1/2","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDI[02]"
+"D","Safety_DI_Tags\Data_02","SDI03 Chopper-2 E-Stop 1/1","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDI[03]"
+"D","Safety_DI_Tags\Data_03","SDI04 Chopper-2 E-Stop 1/2","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDI[04]"
+"D","Safety_DI_Tags\Data_04","SDI05 Spreader E-Stop 1/1","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDI[05]"
+"D","Safety_DI_Tags\Data_05","SDI06 Spreader  E-Stop 1/2","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDI[06]"
+"D","Safety_DI_Tags\Data_06","SDI07 Applicator E-Stop 1/1","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDI[07]"
+"D","Safety_DI_Tags\Data_07","SDI08 Applicator E-Stop 1/2","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDI[08]"
+"S","Safety_DO_Discr\Data_00","SDO01 Chopper Safety Healhy 1/1","F","M","*","F",,,,,,,,,,,,,82,"SDO01 Chopper Safety Healhy 1/1",0,
+"S","Safety_DO_Discr\Data_01","SDO02 Chopper Safety Healhy 1/2","F","M","*","F",,,,,,,,,,,,,82,"SDO02 Chopper Safety Healhy 1/2",0,
+"S","Safety_DO_Discr\Data_02","SDO03 Spare","F","M","*","F",,,,,,,,,,,,,82,"SDO03 Spare ",0,
+"S","Safety_DO_Discr\Data_03","SDO04 Spare","F","M","*","F",,,,,,,,,,,,,82,"SDO04 Spare ",0,
+"S","Safety_DO_Discr\Data_04","SDO05 Spare","F","M","*","F",,,,,,,,,,,,,82,"SDO05 Spare ",0,
+"S","Safety_DO_Discr\Data_05","SDO06 Spare","F","M","*","F",,,,,,,,,,,,,82,"SDO06 Spare ",0,
+"S","Safety_DO_Discr\Data_06","SDO07 Air Relief Valve1/1","F","M","*","F",,,,,,,,,,,,,82,"SDO07 Air Relief Valve1/1",0,
+"S","Safety_DO_Discr\Data_07","SDO08 Air Relief Valve1/2","F","M","*","F",,,,,,,,,,,,,82,"SDO08 Air Relief Valve1/2",0,
+"S","Safety_DO_Discr\Safety_List_01","Safety Output List 01","F","M","*","F",,,,,,,,,,,,,82,"Safety Output List 01",0,
+"S","Safety_DO_No\Data_00","RC:O:2.0","F","M","*","F",,,,,,,,,,,,,82,"RC:O:2.0",0,
+"S","Safety_DO_No\Data_01","RC:O:2.1","F","M","*","F",,,,,,,,,,,,,82,"RC:O:2.1",0,
+"S","Safety_DO_No\Data_02","RC:O:2.2","F","M","*","F",,,,,,,,,,,,,82,"RC:O:2.2",0,
+"S","Safety_DO_No\Data_03","RC:O:2.3","F","M","*","F",,,,,,,,,,,,,82,"RC:O:2.3",0,
+"S","Safety_DO_No\Data_04","RC:O:2.4","F","M","*","F",,,,,,,,,,,,,82,"RC:O:2.4",0,
+"S","Safety_DO_No\Data_05","RC:O:2.5","F","M","*","F",,,,,,,,,,,,,82,"RC:O:2.5",0,
+"S","Safety_DO_No\Data_06","RC:O:2.6","F","M","*","F",,,,,,,,,,,,,82,"RC:O:2.6",0,
+"S","Safety_DO_No\Data_07","RC:O:2.7","F","M","*","F",,,,,,,,,,,,,82,"RC:O:2.7",0,
+"S","Safety_DO_No\Safety_List_01","Safety Output List 01","F","M","*","F",,,,,,,,,,,,,82,"Safety Output List 01",0,
+"D","Safety_DO_Tags\Data_00","SDO01_Chopper Safety Healhy 1/1","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDO[01]"
+"D","Safety_DO_Tags\Data_01","SDO02_Chopper Safety Healhy 1/2","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDO[02]"
+"D","Safety_DO_Tags\Data_02","SDO03_Spare","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDO[03]"
+"D","Safety_DO_Tags\Data_03","SDO04_Spare","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDO[04]"
+"D","Safety_DO_Tags\Data_04","SDO05_Spare","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDO[05]"
+"D","Safety_DO_Tags\Data_05","SDO06_Spare","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDO[06]"
+"D","Safety_DO_Tags\Data_06","SDO07_Air Relief Valve1/1","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDO[07]"
+"D","Safety_DO_Tags\Data_07","SDO08_Air Relief Valve1/2","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[PLC]RIO01_SDO[08]"
+"A","Temp_Tags\Alarms","","F","M","*","F","D","L",0,100,0,1,0,0,,,,,,,0,
+"A","Temp_Tags\IO_LIST","","F","M","*","F","D","L",0,100,0,1,0,0,,,,,,,0,
+"A","Temp_Tags\Manual_Screen","","F","M","*","F","D","L",0,100,0,1,0,0,,,,,,,0,
+"A","Temp_Tags\Mimic_System","","F","M","*","F","D","L",0,100,0,1,0,0,,,,,,,0,
+"A","Temp_Tags\Safety_IO_LIST","","F","M","*","F","D","L",0,100,0,1,0,0,,,,,,,0,
+"A","Temp_Tags\Setting","","F","M","*","F","D","L",0,100,0,1,0,0,,,,,,,0,

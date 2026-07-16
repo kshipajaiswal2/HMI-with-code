@@ -7,6 +7,9 @@ const exportsCard = document.querySelector('.exports-card');
 const uploadInput = document.getElementById('uploadInput');
 const defaultUploadInput = document.getElementById('defaultUploadInput');
 const uploadFolderInput = document.getElementById('uploadFolderInput');
+const projectTagsCsvInput = document.getElementById('projectTagsCsvInput');
+const projectParametersCsvInput = document.getElementById('projectParametersCsvInput');
+const projectIoListInput = document.getElementById('projectIoListInput');
 const importFolderBtn = document.getElementById('importFolderBtn');
 const newProjectBtn = document.getElementById('newProjectBtn');
 const projectCreatePanel = document.getElementById('projectCreatePanel');
@@ -124,10 +127,99 @@ let projectList = loadProjectList();
 let activeProjectId = localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY) || '';
 let activeProjectFolder = '';
 let activeProjectScreen = '';
+let activeProjectCsvKey = '';
+let activeIoListFileKey = '';
+let pendingCsvUpload = null;
+let pendingIoListUpload = null;
 let activeProjectKey = '';
+let currentPreviewIoProject = null;
 
 function displayKey(name) {
   return String(name || '').toLowerCase();
+}
+
+const IO_LIST_SCREEN_FILE = '303_IO_List.xml';
+const CYCLE_TIME_SCREEN_FILE = '304_Cycle_Time.xml';
+
+const EXCLUDED_PROJECT_SCREENS = new Set([
+  displayKey('IO_List.xml'),
+  displayKey('303_IO_Card.xml'),
+  displayKey('301_PLC_IO_List.xml'),
+  displayKey('402_IO_List.xml'),
+  displayKey('105_Cycle_Time.xml'),
+  displayKey('402_Cycletime.xml')
+]);
+
+function isExcludedProjectScreen(name) {
+  return EXCLUDED_PROJECT_SCREENS.has(displayKey(name));
+}
+
+function getScreenNumberPrefix(screenName) {
+  const match = String(screenName || '').match(/^(\d+)/);
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+}
+
+function getFolderNumberPrefix(folderName) {
+  const match = String(folderName || '').match(/^(\d+)/);
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+}
+
+function sortFolderScreens(screens) {
+  const list = Array.isArray(screens) ? [...screens] : [];
+  list.sort((a, b) => {
+    const numDiff = getScreenNumberPrefix(a?.name) - getScreenNumberPrefix(b?.name);
+    if (numDiff !== 0) {
+      return numDiff;
+    }
+    return String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { numeric: true, sensitivity: 'base' });
+  });
+  return list;
+}
+
+function sortProjectFolders(folders) {
+  const list = Array.isArray(folders) ? [...folders] : [];
+  list.sort((a, b) => {
+    const numDiff = getFolderNumberPrefix(a?.name) - getFolderNumberPrefix(b?.name);
+    if (numDiff !== 0) {
+      return numDiff;
+    }
+    return String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { numeric: true, sensitivity: 'base' });
+  });
+  for (const folder of list) {
+    folder.screens = sortFolderScreens(folder.screens);
+  }
+  return list;
+}
+
+function folderScreensOrderKey(folder) {
+  return `${folder?.name || ''}::${(folder?.screens || []).map((screen) => screen?.name || '').join('|')}`;
+}
+
+function projectFoldersOrderKey(folders) {
+  return (folders || []).map((folder) => folderScreensOrderKey(folder)).join('||');
+}
+
+function findOrCreateManualOperationFolder(project) {
+  let folder = (project.folders || []).find((item) => (item.screens || []).some((screen) => {
+    const page = String(screen.name || '').match(/^(\d{3})/);
+    return page && Number(page[1]) >= 300 && Number(page[1]) < 400;
+  }));
+
+  if (!folder) {
+    folder = (project.folders || []).find((item) => displayKey(item.name).includes('manual'));
+  }
+
+  if (!folder) {
+    folder = {
+      name: '300_Manual_Operation',
+      collapsed: false,
+      screens: []
+    };
+    project.folders = Array.isArray(project.folders) ? project.folders : [];
+    project.folders.push(folder);
+  }
+
+  return folder;
 }
 
 function findScreenSizePreset(width, height) {
@@ -197,6 +289,1620 @@ function isDefaultMode() {
 
 function createProjectKey(projectId, folderName, screenName) {
   return [projectId, folderName, screenName].map((part) => String(part || '')).join('::');
+}
+
+function createProjectCsvKey(projectId, kind, fileId) {
+  return [projectId, kind, fileId].map((part) => String(part || '')).join('::');
+}
+
+function parseProjectCsvKey(key) {
+  const parts = String(key || '').split('::');
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  return {
+    projectId: parts[0],
+    kind: parts[1],
+    fileId: parts[2]
+  };
+}
+
+function getProjectCsvFiles(project, kind) {
+  if (!project) {
+    return [];
+  }
+
+  ensureProjectCsvData(project);
+  return kind === 'parameters' ? project.parametersFiles : project.tagsFiles;
+}
+
+function getProjectCsvByKey(key) {
+  const parsed = parseProjectCsvKey(key);
+  if (!parsed) {
+    return null;
+  }
+
+  const project = getProjectById(parsed.projectId);
+  if (!project) {
+    return null;
+  }
+
+  const files = getProjectCsvFiles(project, parsed.kind);
+  const file = files.find((item) => String(item.id) === String(parsed.fileId));
+  if (!file) {
+    return null;
+  }
+
+  return { project, kind: parsed.kind, file };
+}
+
+function ensureProjectCsvData(project) {
+  if (!project || typeof project !== 'object') {
+    return;
+  }
+
+  project.tagsFiles = Array.isArray(project.tagsFiles) ? project.tagsFiles : [];
+  project.parametersFiles = Array.isArray(project.parametersFiles) ? project.parametersFiles : [];
+  project.ioListFiles = Array.isArray(project.ioListFiles) ? project.ioListFiles : [];
+  project.tagsCollapsed = Boolean(project.tagsCollapsed);
+  project.parametersCollapsed = Boolean(project.parametersCollapsed);
+  project.ioListCollapsed = Boolean(project.ioListCollapsed);
+  project.ioListPreviewPage = Math.max(1, Number(project.ioListPreviewPage) || 1);
+  project.ioListPreviewZone = String(project.ioListPreviewZone || '');
+  if (project.ioTagsParsed === undefined) {
+    project.ioTagsParsed = null;
+  }
+  if (project.ioListMeta === undefined) {
+    project.ioListMeta = null;
+  }
+  if (project.ioListPreviewParameterFile === undefined) {
+    project.ioListPreviewParameterFile = '';
+  }
+  if (project.ioListSheets === undefined) {
+    project.ioListSheets = Array.isArray(project.ioListMeta?.sourceSheets)
+      ? project.ioListMeta.sourceSheets
+      : [];
+  }
+
+  for (const list of [project.tagsFiles, project.parametersFiles, project.ioListFiles]) {
+    for (const file of list) {
+      file.id = String(file.id || `csv-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+      file.name = String(file.name || 'data.csv');
+      file.content = String(file.content || '');
+      file.lastModified = String(file.lastModified || new Date().toISOString());
+      file.sizeBytes = Number.isFinite(Number(file.sizeBytes))
+        ? Number(file.sizeBytes)
+        : new Blob([file.content]).size;
+    }
+  }
+}
+
+function saveActiveProjectCsvFromEditor() {
+  if (!activeProjectCsvKey) {
+    return true;
+  }
+
+  const record = getProjectCsvByKey(activeProjectCsvKey);
+  if (!record) {
+    activeProjectCsvKey = '';
+    return true;
+  }
+
+  record.file.content = xmlEditor.value;
+  record.file.sizeBytes = new Blob([record.file.content]).size;
+  record.file.lastModified = new Date().toISOString();
+  if (record.kind === 'tags') {
+    record.project.ioTagsParsed = null;
+  }
+  saveProjectList();
+  renderProjectSidebar();
+  return true;
+}
+
+async function importProjectCsvFiles(projectId, kind, fileList) {
+  const project = getProjectById(projectId);
+  if (!project || !fileList?.length) {
+    return;
+  }
+
+  ensureProjectCsvData(project);
+  const target = getProjectCsvFiles(project, kind);
+
+  for (const sourceFile of fileList) {
+    const content = await readUploadedText(sourceFile);
+    let name = baseFileName(sourceFile.name) || (kind === 'parameters' ? 'Parameters.par' : 'data.csv');
+    const lowerName = name.toLowerCase();
+    if (kind === 'parameters') {
+      if (!lowerName.endsWith('.par') && !lowerName.endsWith('.csv')) {
+        name = `${name}.par`;
+      }
+    } else if (!lowerName.endsWith('.csv')) {
+      name = `${name}.csv`;
+    }
+
+    const existingIndex = target.findIndex((item) => displayKey(item.name) === displayKey(name));
+    const entry = {
+      id: `csv-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name,
+      content,
+      sizeBytes: new Blob([content]).size,
+      lastModified: new Date().toISOString()
+    };
+
+    if (existingIndex >= 0) {
+      target[existingIndex] = {
+        ...target[existingIndex],
+        ...entry,
+        id: target[existingIndex].id
+      };
+    } else {
+      target.push(entry);
+    }
+  }
+
+  if (kind === 'tags') {
+    project.ioTagsParsed = null;
+  }
+
+  saveProjectList();
+  renderProjectSidebar();
+}
+
+function removeProjectCsvFile(projectId, kind, fileId) {
+  const project = getProjectById(projectId);
+  if (!project) {
+    return;
+  }
+
+  const target = getProjectCsvFiles(project, kind);
+  const nextFiles = target.filter((item) => String(item.id) !== String(fileId));
+  if (kind === 'parameters') {
+    project.parametersFiles = nextFiles;
+  } else {
+    project.tagsFiles = nextFiles;
+    project.ioTagsParsed = null;
+  }
+
+  if (activeProjectCsvKey === createProjectCsvKey(projectId, kind, fileId)) {
+    activeProjectCsvKey = '';
+    displayName.value = 'None';
+    xmlEditor.value = '';
+    resetHistory('');
+    previewPane.innerHTML = '';
+  }
+
+  saveProjectList();
+  renderProjectSidebar();
+}
+
+function openProjectCsvFile(project, kind, file) {
+  if (!project || !file) {
+    return;
+  }
+
+  const nextKey = createProjectCsvKey(project.id, kind, file.id);
+  if (activeProjectCsvKey === nextKey) {
+    updateProjectSidebarSelection();
+    return;
+  }
+
+  saveActiveProjectCsvFromEditor();
+  saveActiveProjectIoListFromEditor();
+
+  activeProjectKey = '';
+  activeProjectFolder = '';
+  activeProjectScreen = '';
+  selectedDisplay = '';
+  selectedDefaultTemplate = '';
+  selectedFiles = [];
+  activeProjectCsvKey = nextKey;
+  activeIoListFileKey = '';
+
+  setActiveProject(project);
+  const sectionLabel = kind === 'parameters' ? 'Parameters' : 'Tags';
+  displayName.value = `${project.name} / ${sectionLabel} / ${file.name}`;
+  xmlEditor.value = file.content;
+  resetHistory(file.content);
+  selectedObjectIndex = null;
+  clearObjectPanel();
+  previewPane.innerHTML = '';
+  setWorkspaceDockTab('xml');
+  updateProjectSidebarSelection();
+
+  if (kind === 'parameters' && /\.par$/i.test(String(file.name || ''))) {
+    project.ioListPreviewParameterFile = String(file.name || '').replace(/\.par$/i, '');
+    renderParameterFilePreview(project, file);
+  } else if (kind === 'tags') {
+    renderTagsCsvPreview(project, file);
+  }
+}
+
+function getProjectParameterFile(project, fileName) {
+  if (!project) {
+    return null;
+  }
+  ensureProjectCsvData(project);
+  const targetKey = displayKey(String(fileName || '').replace(/\.par$/i, ''));
+  return (project.parametersFiles || []).find((file) => {
+    const base = displayKey(String(file.name || '').replace(/\.par$/i, ''));
+    return base === targetKey;
+  }) || null;
+}
+
+function getActiveParameterFile(project) {
+  if (!project) {
+    return null;
+  }
+
+  const preferredName = String(project.ioListPreviewParameterFile || 'PLC DI List 01').trim();
+  const preferred = getProjectParameterFile(project, preferredName);
+  if (preferred?.content?.trim()) {
+    return preferred;
+  }
+
+  return (project.parametersFiles || []).find((file) => /\.par$/i.test(file.name) && String(file.content || '').trim())
+    || null;
+}
+
+function getActiveParameterBindings(project) {
+  if (!project || !globalThis.IoTags) {
+    return null;
+  }
+
+  const file = getActiveParameterFile(project);
+  if (!file?.content) {
+    return null;
+  }
+
+  return globalThis.IoTags.parseParameterFile(file.content).bindings;
+}
+
+function renderParameterFilePreview(project, file) {
+  if (!previewPane || !project || !file || !globalThis.IoTags) {
+    return;
+  }
+
+  const parsed = globalThis.IoTags.parseParameterFile(file.content);
+  const tagsParsed = getProjectIoTagsParsed(project);
+  const rows = globalThis.IoTags.formatParameterPreviewNotes(parsed.bindings, tagsParsed);
+
+  const frame = document.createElement('div');
+  frame.className = 'preview-frame parameter-preview-frame';
+
+  const heading = document.createElement('h4');
+  heading.className = 'parameter-preview-title';
+  heading.textContent = `Parameter preview: ${file.name}`;
+  frame.appendChild(heading);
+
+  const intro = document.createElement('p');
+  intro.className = 'parameter-preview-intro';
+  intro.textContent = 'FactoryTalk parameter bindings (#slot → tag) with live preview values from your Tags CSV / IO list.';
+  frame.appendChild(intro);
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'parameter-preview-toolbar';
+
+  const exportBtn = document.createElement('button');
+  exportBtn.type = 'button';
+  exportBtn.className = 'parameter-export-btn';
+  exportBtn.textContent = 'Export .par';
+  exportBtn.title = `Download ${file.name} for FactoryTalk import`;
+  exportBtn.addEventListener('click', () => {
+    try {
+      exportProjectParameterFile(project, file);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not export parameter file.');
+    }
+  });
+  toolbar.appendChild(exportBtn);
+
+  const exportAllBtn = document.createElement('button');
+  exportAllBtn.type = 'button';
+  exportAllBtn.className = 'parameter-export-btn secondary';
+  exportAllBtn.textContent = 'Export All';
+  exportAllBtn.title = 'Download all parameter files in this project';
+  exportAllBtn.addEventListener('click', async () => {
+    try {
+      await exportAllProjectParameterFiles(project);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not export parameter files.');
+    }
+  });
+  toolbar.appendChild(exportAllBtn);
+  frame.appendChild(toolbar);
+
+  const table = document.createElement('table');
+  table.className = 'parameter-preview-table';
+  table.innerHTML = '<thead><tr><th>Slot</th><th>Tag binding</th><th>Preview value</th></tr></thead>';
+  const tbody = document.createElement('tbody');
+
+  for (const row of rows) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><code>${row.slot}</code></td><td><code>${row.tag}</code></td><td>${row.value}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  table.appendChild(tbody);
+  frame.appendChild(table);
+  previewPane.innerHTML = '';
+  previewPane.appendChild(frame);
+}
+
+function renderTagsCsvPreview(project, file) {
+  if (!previewPane || !project || !file) {
+    return;
+  }
+
+  const parsed = globalThis.IoTags?.parseIoListText?.(file.content) || { folders: [], tags: [] };
+  const tagCount = parsed.tags?.length ?? 0;
+  const folderCount = parsed.folders?.length ?? 0;
+
+  const frame = document.createElement('div');
+  frame.className = 'preview-frame parameter-preview-frame';
+
+  const heading = document.createElement('h4');
+  heading.className = 'parameter-preview-title';
+  heading.textContent = `Tags CSV: ${file.name}`;
+  frame.appendChild(heading);
+
+  const intro = document.createElement('p');
+  intro.className = 'parameter-preview-intro';
+  intro.textContent = tagCount
+    ? `${folderCount} folders, ${tagCount} tags — FactoryTalk import format. Download and import in FactoryTalk Tag Browser.`
+    : 'FactoryTalk Tags CSV file. Download and import in FactoryTalk Tag Browser.';
+  frame.appendChild(intro);
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'parameter-preview-toolbar';
+
+  const exportBtn = document.createElement('button');
+  exportBtn.type = 'button';
+  exportBtn.className = 'parameter-export-btn';
+  exportBtn.textContent = 'Download Tags.CSV';
+  exportBtn.title = `Download ${file.name} for FactoryTalk tag import`;
+  exportBtn.addEventListener('click', () => {
+    try {
+      exportProjectTagsCsvFile(project, file);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not export Tags CSV.');
+    }
+  });
+  toolbar.appendChild(exportBtn);
+  frame.appendChild(toolbar);
+
+  previewPane.innerHTML = '';
+  previewPane.appendChild(frame);
+}
+
+function downloadTextFile(content, fileName, mimeType = 'text/plain;charset=utf-8') {
+  const blob = new Blob([String(content || '')], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportProjectParameterFile(project, file) {
+  if (!project || !file) {
+    return;
+  }
+
+  if (activeProjectCsvKey === createProjectCsvKey(project.id, 'parameters', file.id)) {
+    saveActiveProjectCsvFromEditor();
+    file = (project.parametersFiles || []).find((item) => String(item.id) === String(file.id)) || file;
+  }
+
+  const fileName = /\.par$/i.test(String(file.name || ''))
+    ? String(file.name)
+    : `${String(file.name || 'Parameters')}.par`;
+
+  if (!String(file.content || '').trim()) {
+    throw new Error(`${fileName} is empty.`);
+  }
+
+  downloadTextFile(file.content, fileName);
+}
+
+function exportProjectTagsCsvFile(project, file) {
+  if (!project || !file) {
+    return;
+  }
+
+  if (activeProjectCsvKey === createProjectCsvKey(project.id, 'tags', file.id)) {
+    saveActiveProjectCsvFromEditor();
+    file = (project.tagsFiles || []).find((item) => String(item.id) === String(file.id)) || file;
+  }
+
+  let fileName = String(file.name || `${project.name}-Tags.CSV`).trim();
+  if (!/\.csv$/i.test(fileName)) {
+    fileName = `${fileName}.CSV`;
+  } else if (!fileName.endsWith('.CSV')) {
+    fileName = fileName.replace(/\.csv$/i, '.CSV');
+  }
+
+  if (!String(file.content || '').trim()) {
+    throw new Error(`${fileName} is empty. Upload the Master Sheet under IO List first.`);
+  }
+
+  downloadTextFile(file.content, fileName);
+}
+
+async function exportAllProjectTagsCsvFiles(project) {
+  if (!project) {
+    return;
+  }
+
+  ensureProjectCsvData(project);
+  if (activeProjectCsvKey?.includes('::tags::')) {
+    saveActiveProjectCsvFromEditor();
+  }
+
+  const files = (project.tagsFiles || []).filter((file) => String(file.content || '').trim());
+  if (!files.length) {
+    throw new Error('No Tags CSV to export. Upload the Master Sheet under IO List → + first.');
+  }
+
+  for (let index = 0; index < files.length; index += 1) {
+    exportProjectTagsCsvFile(project, files[index]);
+    if (index < files.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
+}
+
+async function exportAllProjectParameterFiles(project) {
+  if (!project) {
+    return;
+  }
+
+  ensureProjectCsvData(project);
+  if (activeProjectCsvKey?.includes('::parameters::')) {
+    saveActiveProjectCsvFromEditor();
+  }
+
+  const files = (project.parametersFiles || []).filter((file) => String(file.content || '').trim());
+  if (!files.length) {
+    throw new Error('No parameter files to export. Add files under Parameters first.');
+  }
+
+  for (let index = 0; index < files.length; index += 1) {
+    exportProjectParameterFile(project, files[index]);
+    if (index < files.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
+}
+
+async function fetchDefaultParameterTemplate(page = 1) {
+  const pageSuffix = String(Math.max(1, Number(page) || 1)).padStart(2, '0');
+  const response = await fetch(`/templates/PLC%20DI%20List%20${pageSuffix}.par`);
+  if (!response.ok) {
+    throw new Error(`Could not load the PLC DI List ${pageSuffix}.par reference template.`);
+  }
+  return response.text();
+}
+
+function nextProjectParameterFileName(project, prefix = 'PLC DI List') {
+  ensureProjectCsvData(project);
+  const existing = new Set((project.parametersFiles || []).map((file) => displayKey(file.name)));
+  for (let page = 1; page <= 99; page += 1) {
+    const suffix = String(page).padStart(2, '0');
+    const candidate = `${prefix} ${suffix}.par`;
+    if (!existing.has(displayKey(candidate))) {
+      return candidate;
+    }
+  }
+  return `${prefix} ${Date.now()}.par`;
+}
+
+async function addProjectParameterFile(projectId) {
+  const project = getProjectById(projectId);
+  if (!project) {
+    throw new Error('Project not found.');
+  }
+
+  ensureProjectCsvData(project);
+  let fileName = nextProjectParameterFileName(project);
+  let content = '';
+
+  const pageMatch = fileName.match(/(\d{2})\.par$/i);
+  const page = pageMatch ? Math.max(1, Number(pageMatch[1]) || 1) : 1;
+
+  try {
+    content = await fetchDefaultParameterTemplate(page);
+    const pageSuffix = String(page).padStart(2, '0');
+    fileName = `PLC DI List ${pageSuffix}.par`;
+  } catch (templateErr) {
+    if (globalThis.IoTags?.buildDefaultParameterFile) {
+      const built = globalThis.IoTags.buildDefaultParameterFile({ page });
+      fileName = built.name;
+      content = built.content;
+    } else {
+      throw templateErr;
+    }
+  }
+
+  const existingIndex = project.parametersFiles.findIndex((item) => displayKey(item.name) === displayKey(fileName));
+  const entry = {
+    id: `csv-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name: fileName,
+    content,
+    sizeBytes: new Blob([content]).size,
+    lastModified: new Date().toISOString()
+  };
+
+  if (existingIndex >= 0) {
+    project.parametersFiles[existingIndex] = {
+      ...project.parametersFiles[existingIndex],
+      ...entry,
+      id: project.parametersFiles[existingIndex].id
+    };
+  } else {
+    project.parametersFiles.push(entry);
+  }
+
+  if (!project.ioListPreviewParameterFile) {
+    project.ioListPreviewParameterFile = fileName.replace(/\.par$/i, '');
+  }
+
+  project.parametersCollapsed = false;
+  saveProjectList();
+  renderProjectSidebar();
+  openProjectCsvFile(project, 'parameters', entry);
+  return entry;
+}
+
+function upsertGeneratedParameterFiles(project, parsed, zone = 'Packing') {
+  if (!project || !parsed || !globalThis.IoTags) {
+    return [];
+  }
+
+  ensureProjectCsvData(project);
+  const builtFiles = globalThis.IoTags.buildIoListParameterFiles(parsed, { zone, maxPages: 6 });
+  const upserted = [];
+
+  for (const built of builtFiles) {
+    const existingIndex = project.parametersFiles.findIndex((item) => displayKey(item.name) === displayKey(built.name));
+    const entry = {
+      id: `csv-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name: built.name,
+      content: built.content,
+      sizeBytes: new Blob([built.content]).size,
+      lastModified: new Date().toISOString()
+    };
+
+    if (existingIndex >= 0) {
+      project.parametersFiles[existingIndex] = {
+        ...project.parametersFiles[existingIndex],
+        ...entry,
+        id: project.parametersFiles[existingIndex].id
+      };
+      upserted.push(project.parametersFiles[existingIndex]);
+    } else {
+      project.parametersFiles.push(entry);
+      upserted.push(entry);
+    }
+  }
+
+  if (!project.ioListPreviewParameterFile && upserted[0]) {
+    project.ioListPreviewParameterFile = String(upserted[0].name || '').replace(/\.par$/i, '');
+  }
+
+  return upserted;
+}
+
+function queueProjectCsvUpload(projectId, kind) {
+  pendingCsvUpload = { projectId, kind };
+  const input = kind === 'parameters' ? projectParametersCsvInput : projectTagsCsvInput;
+  if (!input) {
+    return;
+  }
+
+  input.value = '';
+  input.click();
+}
+
+function getProjectGeneratedTagsFile(project) {
+  if (!project) {
+    return null;
+  }
+
+  ensureProjectCsvData(project);
+  const generatedName = `${project.name}-Tags.CSV`;
+  return project.tagsFiles.find((file) => displayKey(file.name) === displayKey(generatedName)) || null;
+}
+
+function getProjectPrimaryTagsFile(project) {
+  if (!project) {
+    return null;
+  }
+
+  ensureProjectCsvData(project);
+  const generated = getProjectGeneratedTagsFile(project);
+  if (generated?.content?.trim()) {
+    return generated;
+  }
+
+  const tagsCandidates = project.tagsFiles.filter((file) => /tags\.csv$/i.test(file.name));
+  if (project.ioListMeta || project.ioListFiles?.length) {
+    const populated = tagsCandidates.filter((file) => String(file.content || '').trim());
+    if (populated.length) {
+      return populated.sort((a, b) => (Number(b.sizeBytes) || 0) - (Number(a.sizeBytes) || 0))[0];
+    }
+  }
+
+  return tagsCandidates[0] || project.tagsFiles[0] || null;
+}
+
+function findProjectScreenByFileName(project, screenFileName) {
+  const targetKey = displayKey(screenFileName);
+  for (const folder of project?.folders || []) {
+    const screen = (folder.screens || []).find((item) => displayKey(item.name) === targetKey);
+    if (screen) {
+      return { folder, screen };
+    }
+  }
+
+  return null;
+}
+
+function isIoListPreviewScreenName(screenName) {
+  const key = displayKey(screenName);
+  return key === displayKey(IO_LIST_SCREEN_FILE) || key === displayKey('410_PLC IO List.xml');
+}
+
+function isIoListPreviewScreenActive() {
+  if (activeProjectKey) {
+    const record = getProjectScreenByKey(activeProjectKey);
+    if (record?.screen?.name) {
+      return isIoListPreviewScreenName(record.screen.name);
+    }
+  }
+
+  return isIoListPreviewScreenName(displayName.value.split('/').pop()?.trim() || '');
+}
+
+function getIoPreviewStatus(project) {
+  if (!project) {
+    return { ready: false, reason: 'Select the project that received the IO list upload.' };
+  }
+  if (!globalThis.IoTags) {
+    return { ready: false, reason: 'IO preview support failed to load. Hard refresh the page (Ctrl+Shift+R).' };
+  }
+
+  const tagsFile = getProjectPrimaryTagsFile(project);
+  if (!tagsFile?.content?.trim()) {
+    return { ready: false, reason: 'No Tags CSV found. Upload the Master Sheet under IO List → +.' };
+  }
+
+  const previewMap = getProjectIoPreviewMap(project);
+  const sample = previewMap.get(101);
+  if (!sample) {
+    return {
+      ready: false,
+      reason: 'Tags CSV is loaded but IO preview mapping is empty. Re-upload the Master Sheet Excel file.'
+    };
+  }
+
+  return { ready: true, sample, tagsFile };
+}
+
+function adaptIoListTemplateXml(xml) {
+  return String(xml || '')
+    .replace(/display="402_IO_List"/g, 'display="303_IO_List"')
+    .replace(/display="102_Cycletime"/g, 'display="304_Cycle_Time"')
+    .replace(/display="402_Cycletime"/g, 'display="304_Cycle_Time"');
+}
+
+function adaptCycleTimeTemplateXml(xml) {
+  return String(xml || '')
+    .replace(/display="402_IO_List"/g, 'display="303_IO_List"')
+    .replace(/display="102_Cycletime"/g, 'display="304_Cycle_Time"')
+    .replace(/display="402_Cycletime"/g, 'display="304_Cycle_Time"');
+}
+
+function isCycleTimeScreenName(screenName) {
+  const key = displayKey(screenName);
+  return key === displayKey(CYCLE_TIME_SCREEN_FILE)
+    || key === displayKey('105_Cycle_Time.xml')
+    || key === displayKey('402_Cycletime.xml');
+}
+
+function ioListScreenUsesCurrentTemplate(xml) {
+  return String(xml || '').includes('name="Group17"');
+}
+
+function cycleTimeScreenUsesCurrentTemplate(xml) {
+  return String(xml || '').includes('name="Group18"');
+}
+
+async function syncProjectCycleTimeScreenFromTemplate(project, match) {
+  if (!match?.screen) {
+    return false;
+  }
+
+  try {
+    const template = await loadDefaultTemplateXml(CYCLE_TIME_SCREEN_FILE);
+    const adapted = adaptCycleTimeTemplateXml(template.xml);
+    match.screen.xml = adapted;
+    match.screen.sizeBytes = new Blob([adapted]).size;
+    match.screen.lastModified = new Date().toISOString();
+    const meta = readSizeFromXml(adapted);
+    match.screen.width = meta.width;
+    match.screen.height = meta.height;
+    saveProjectList();
+    return true;
+  } catch (err) {
+    console.warn('Could not refresh cycle time template', err);
+    return false;
+  }
+}
+
+async function syncProjectIoListScreenFromTemplate(project, match) {
+  if (!match?.screen) {
+    return false;
+  }
+
+  try {
+    const template = await loadDefaultTemplateXml(IO_LIST_SCREEN_FILE);
+    const adapted = adaptIoListTemplateXml(template.xml);
+    match.screen.xml = adapted;
+    match.screen.sizeBytes = new Blob([adapted]).size;
+    match.screen.lastModified = new Date().toISOString();
+    const meta = readSizeFromXml(adapted);
+    match.screen.width = meta.width;
+    match.screen.height = meta.height;
+    saveProjectList();
+    return true;
+  } catch (err) {
+    console.warn('Could not refresh IO list template', err);
+    return false;
+  }
+}
+
+async function ensureProjectIoListScreen(project) {
+  const existing = findProjectScreenByFileName(project, IO_LIST_SCREEN_FILE);
+  if (existing) {
+    return existing;
+  }
+
+  const legacy = findProjectScreenByFileName(project, '402_IO_List.xml');
+  if (legacy) {
+    legacy.screen.name = IO_LIST_SCREEN_FILE;
+    legacy.screen.xml = String(legacy.screen.xml || '').replace(/display="402_IO_List"/g, 'display="303_IO_List"');
+    saveProjectList();
+    renderProjectSidebar();
+    return legacy;
+  }
+
+  const template = await loadDefaultTemplateXml(IO_LIST_SCREEN_FILE);
+  const folder = findOrCreateManualOperationFolder(project);
+
+  const screen = screenMetaFromXml(IO_LIST_SCREEN_FILE, adaptIoListTemplateXml(template.xml));
+  folder.screens = Array.isArray(folder.screens) ? folder.screens : [];
+  folder.screens.push(screen);
+  saveProjectList();
+  renderProjectSidebar();
+  return { folder, screen };
+}
+
+async function openProjectIoListPreviewScreen(project) {
+  let match = findProjectScreenByFileName(project, IO_LIST_SCREEN_FILE);
+  if (!match) {
+    match = await ensureProjectIoListScreen(project);
+  }
+  if (!match) {
+    return false;
+  }
+
+  if (!ioListScreenUsesCurrentTemplate(match.screen.xml)) {
+    await syncProjectIoListScreenFromTemplate(project, match);
+  }
+
+  await openProjectScreen(project.id, match.folder.name, match.screen.name, { skipSave: true });
+  return true;
+}
+
+function attachIoListMeta(parsed, project) {
+  const next = parsed && typeof parsed === 'object'
+    ? parsed
+    : { folders: [], tags: [] };
+  if (project?.ioListMeta && !next.meta) {
+    next.meta = project.ioListMeta;
+  }
+  return next;
+}
+
+function getProjectIoTagsParsed(project) {
+  if (!project) {
+    return { folders: [], tags: [] };
+  }
+
+  ensureProjectCsvData(project);
+  if (project.ioTagsParsed?.tags?.length || project.ioTagsParsed?.folders?.length) {
+    return attachIoListMeta(project.ioTagsParsed, project);
+  }
+
+  const tagsFile = getProjectPrimaryTagsFile(project);
+  if (!tagsFile?.content || !globalThis.IoTags) {
+    return attachIoListMeta({ folders: [], tags: [] }, project);
+  }
+
+  try {
+    project.ioTagsParsed = globalThis.IoTags.parseIoListText(tagsFile.content);
+  } catch (_err) {
+    project.ioTagsParsed = { folders: [], tags: [] };
+  }
+
+  return attachIoListMeta(project.ioTagsParsed, project);
+}
+
+function projectHasIoTagsContent(project) {
+  const tagsFile = getProjectPrimaryTagsFile(project);
+  return Boolean(tagsFile?.content?.trim());
+}
+
+function getPreviewIoProject() {
+  const candidates = [];
+  const seen = new Set();
+
+  const pushCandidate = (project) => {
+    if (!project || seen.has(project.id)) {
+      return;
+    }
+    seen.add(project.id);
+    candidates.push(project);
+  };
+
+  pushCandidate(getActiveProject());
+
+  if (activeProjectCsvKey) {
+    const parsed = parseProjectCsvKey(activeProjectCsvKey);
+    pushCandidate(getProjectById(parsed?.projectId));
+  }
+
+  if (activeProjectKey) {
+    const record = getProjectScreenByKey(activeProjectKey);
+    pushCandidate(record?.project);
+  }
+
+  for (const project of candidates) {
+    if (projectHasIoTagsContent(project)) {
+      return project;
+    }
+  }
+
+  return candidates[0] || null;
+}
+
+function createProjectIoListKey(projectId, fileId) {
+  return `${projectId}::io-list::${fileId}`;
+}
+
+function parseProjectIoListKey(key) {
+  const parts = String(key || '').split('::io-list::');
+  if (parts.length !== 2) {
+    return null;
+  }
+  return { projectId: parts[0], fileId: parts[1] };
+}
+
+function getProjectIoListFileByKey(key) {
+  const parsed = parseProjectIoListKey(key);
+  if (!parsed) {
+    return null;
+  }
+  const project = getProjectById(parsed.projectId);
+  if (!project) {
+    return null;
+  }
+  const file = (project.ioListFiles || []).find((item) => String(item.id) === String(parsed.fileId));
+  if (!file) {
+    return null;
+  }
+  return { project, file };
+}
+
+function getProjectIoListSheets(project) {
+  ensureProjectCsvData(project);
+  if (project.ioListSheets?.length) {
+    return project.ioListSheets;
+  }
+  if (project.ioListMeta?.sourceSheets?.length) {
+    project.ioListSheets = project.ioListMeta.sourceSheets;
+    return project.ioListSheets;
+  }
+  return [];
+}
+
+function collectIoListEditorRows() {
+  if (!previewPane) {
+    return [];
+  }
+
+  const byTag = new Map();
+  for (const input of previewPane.querySelectorAll('[data-io-tag-name]')) {
+    const tagName = String(input.dataset.ioTagName || '').trim();
+    if (!tagName) {
+      continue;
+    }
+    const field = String(input.dataset.ioField || 'description');
+    const row = byTag.get(tagName) || { tagName, description: '', address: '' };
+    row[field] = String(input.value || '');
+    byTag.set(tagName, row);
+  }
+
+  return [...byTag.values()];
+}
+
+function getIoListZoneSheet(project, zone) {
+  const sheets = getProjectIoListSheets(project);
+  const target = String(zone || '').trim();
+  if (!target) {
+    return sheets[0] || null;
+  }
+  return sheets.find((sheet) => displayKey(sheet.zone) === displayKey(target)) || sheets[0] || null;
+}
+
+function getIoListSheetPlcDiItems(sheet) {
+  return (sheet?.diInputs || []).filter((item) => !item.isSafety);
+}
+
+function getIoListSheetPageCount(sheet) {
+  return Math.max(1, Math.ceil(getIoListSheetPlcDiItems(sheet).length / 8));
+}
+
+function resolveIoListEditorZone(project, zones, fallbackZone = '') {
+  const list = Array.isArray(zones) ? zones.filter(Boolean) : [];
+  let zone = String(project?.ioListPreviewZone || fallbackZone || '').trim();
+  if (zone && list.some((item) => displayKey(item) === displayKey(zone))) {
+    return zone;
+  }
+  if (list.includes('Packing')) {
+    return 'Packing';
+  }
+  return list[0] || zone || 'IO';
+}
+
+function mergeVisibleIoListSheetEdits(project) {
+  if (!previewPane || !project?.ioListSheets?.length) {
+    return;
+  }
+
+  for (const rowEl of previewPane.querySelectorAll('[data-io-di-index]')) {
+    const diIndex = Number(rowEl.dataset.ioDiIndex);
+    const zone = String(rowEl.closest('[data-io-sheet-zone]')?.dataset.ioSheetZone || '').trim();
+    const sheet = getIoListZoneSheet(project, zone);
+    if (!sheet || !Number.isFinite(diIndex) || !sheet.diInputs[diIndex]) {
+      continue;
+    }
+    sheet.diInputs[diIndex].address = String(rowEl.querySelector('[data-io-field="address"]')?.value || '').trim();
+    sheet.diInputs[diIndex].description = String(rowEl.querySelector('[data-io-field="description"]')?.value || '').trim();
+    sheet.diInputs[diIndex].plcTag = String(rowEl.querySelector('[data-io-field="plcTag"]')?.value || '').trim();
+  }
+
+  for (const rowEl of previewPane.querySelectorAll('[data-io-do-index]')) {
+    const doIndex = Number(rowEl.dataset.ioDoIndex);
+    const zone = String(rowEl.closest('[data-io-sheet-zone]')?.dataset.ioSheetZone || '').trim();
+    const sheet = getIoListZoneSheet(project, zone);
+    if (!sheet || !Number.isFinite(doIndex) || !sheet.doOutputs[doIndex]) {
+      continue;
+    }
+    sheet.doOutputs[doIndex].address = String(rowEl.querySelector('[data-io-field="address"]')?.value || '').trim();
+    sheet.doOutputs[doIndex].description = String(rowEl.querySelector('[data-io-field="description"]')?.value || '').trim();
+    sheet.doOutputs[doIndex].plcTag = String(rowEl.querySelector('[data-io-field="plcTag"]')?.value || '').trim();
+  }
+}
+
+function collectIoListSheetEditsFromTable() {
+  return null;
+}
+
+function getIoListEditableRows(project, file) {
+  if (!project || !globalThis.IoTags) {
+    return { mode: 'empty', rows: [], sheets: [] };
+  }
+
+  const sheets = getProjectIoListSheets(project);
+  if (sheets.length) {
+    return { mode: 'sheets', rows: [], sheets };
+  }
+
+  const summaryText = String(file?.content || '').trim();
+  const rows = globalThis.IoTags.parseIoListSummaryText(summaryText);
+  if (rows.length) {
+    return { mode: 'summary', rows, sheets: [] };
+  }
+
+  const parsed = getProjectIoTagsParsed(project);
+  if (parsed?.tags?.length) {
+    return {
+      mode: 'summary',
+      rows: globalThis.IoTags.parseIoListSummaryText(
+        globalThis.IoTags.formatMasterSheetSummary(parsed, file?.name || '')
+      ),
+      sheets: []
+    };
+  }
+
+  return { mode: 'empty', rows: [], sheets: [] };
+}
+
+function applyIoListProjectChanges(project, file, editorState) {
+  if (!project || !file || !globalThis.IoTags) {
+    throw new Error('IO list data is not available.');
+  }
+
+  mergeVisibleIoListSheetEdits(project);
+
+  let parsed;
+  if (getProjectIoListSheets(project).length) {
+    parsed = globalThis.IoTags.rebuildParsedFromMasterSheets(getProjectIoListSheets(project));
+  } else {
+    const rows = collectIoListEditorRows();
+    if (!rows.length) {
+      throw new Error('No IO list rows to save.');
+    }
+    parsed = globalThis.IoTags.applyIoListSummaryEdits(getProjectIoTagsParsed(project), rows);
+  }
+
+  project.ioListMeta = parsed.meta || null;
+  if (parsed.meta?.sourceSheets?.length) {
+    project.ioListSheets = parsed.meta.sourceSheets;
+  }
+  project.ioTagsParsed = parsed;
+
+  upsertGeneratedTagsCsv(
+    project,
+    globalThis.IoTags.serializeFactoryTalkTagsCsv(parsed),
+    `${project.name}-Tags`
+  );
+  upsertGeneratedParameterFiles(project, parsed, project.ioListPreviewZone || '');
+
+  file.content = globalThis.IoTags.formatMasterSheetSummary(parsed, file.name);
+  file.sizeBytes = new Blob([file.content]).size;
+  file.lastModified = new Date().toISOString();
+  xmlEditor.value = file.content;
+  resetHistory(file.content);
+
+  saveProjectList();
+  renderProjectSidebar();
+  renderIoListEditorPreview(project, file);
+  if (isIoListPreviewScreenActive()) {
+    renderPreview();
+  }
+}
+
+function renderIoListEditorPreview(project, file) {
+  if (!previewPane || !project || !file) {
+    return;
+  }
+
+  mergeVisibleIoListSheetEdits(project);
+
+  const editorState = getIoListEditableRows(project, file);
+  const frame = document.createElement('div');
+  frame.className = 'preview-frame io-list-editor-frame';
+
+  const heading = document.createElement('h4');
+  heading.className = 'io-list-editor-title';
+  heading.textContent = `IO List: ${file.name}`;
+  frame.appendChild(heading);
+
+  const intro = document.createElement('p');
+  intro.className = 'io-list-editor-intro';
+  intro.textContent = 'Edit descriptions and addresses for the selected zone, then click Apply Changes to update Tags CSV and the IO screen preview.';
+  frame.appendChild(intro);
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'io-list-editor-toolbar';
+
+  const zones = project.ioListMeta?.zones || editorState.sheets.map((sheet) => sheet.zone).filter(Boolean);
+  const activeZone = resolveIoListEditorZone(project, zones);
+  project.ioListPreviewZone = activeZone;
+
+  const rerenderIoListEditor = () => {
+    saveProjectList();
+    renderIoListEditorPreview(project, file);
+    if (isIoListPreviewScreenActive()) {
+      renderPreview();
+    }
+  };
+
+  if (zones.length) {
+    const zoneLabel = document.createElement('label');
+    zoneLabel.className = 'io-list-editor-zone-label';
+    zoneLabel.textContent = 'Zone:';
+    const zoneSelect = document.createElement('select');
+    zoneSelect.className = 'io-list-editor-zone-select';
+    for (const zone of zones) {
+      const option = document.createElement('option');
+      option.value = zone;
+      option.textContent = zone;
+      option.selected = displayKey(zone) === displayKey(activeZone);
+      zoneSelect.appendChild(option);
+    }
+    zoneSelect.addEventListener('change', () => {
+      mergeVisibleIoListSheetEdits(project);
+      project.ioListPreviewZone = zoneSelect.value;
+      rerenderIoListEditor();
+    });
+    zoneLabel.appendChild(zoneSelect);
+    toolbar.appendChild(zoneLabel);
+  }
+
+  const applyBtn = document.createElement('button');
+  applyBtn.type = 'button';
+  applyBtn.className = 'io-list-editor-apply-btn';
+  applyBtn.textContent = 'Apply Changes';
+  applyBtn.addEventListener('click', () => {
+    try {
+      applyIoListProjectChanges(project, file, editorState);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not apply IO list changes.');
+    }
+  });
+  toolbar.appendChild(applyBtn);
+
+  const previewBtn = document.createElement('button');
+  previewBtn.type = 'button';
+  previewBtn.className = 'io-list-editor-preview-btn';
+  previewBtn.textContent = 'Open IO Screen Preview';
+  previewBtn.addEventListener('click', async () => {
+    const opened = await openProjectIoListPreviewScreen(project);
+    if (!opened) {
+      alert('Could not open 303_IO_List.xml.');
+    }
+  });
+  toolbar.appendChild(previewBtn);
+  frame.appendChild(toolbar);
+
+  if (editorState.mode === 'empty') {
+    const empty = document.createElement('div');
+    empty.className = 'preview-empty';
+    empty.textContent = 'Upload the Master Sheet Excel file under IO List → + to load editable rows.';
+    frame.appendChild(empty);
+    previewPane.innerHTML = '';
+    previewPane.appendChild(frame);
+    return;
+  }
+
+  if (editorState.mode === 'sheets') {
+    const activeSheet = getIoListZoneSheet(project, activeZone);
+    const plcDiItems = getIoListSheetPlcDiItems(activeSheet);
+
+    const section = document.createElement('section');
+    section.className = 'io-list-sheet-section';
+    section.dataset.ioSheetZone = activeSheet?.zone || activeZone;
+
+    const sectionTitle = document.createElement('h5');
+    sectionTitle.textContent = `${activeSheet?.zone || activeZone} IO List`;
+    section.appendChild(sectionTitle);
+
+    const meta = document.createElement('p');
+    meta.className = 'io-list-page-meta';
+    meta.textContent = `${plcDiItems.length} PLC digital inputs`;
+    section.appendChild(meta);
+
+    const table = document.createElement('table');
+    table.className = 'io-list-editor-table';
+    table.innerHTML = '<thead><tr><th>Type</th><th>Address</th><th>Description</th><th>PLC Tag</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+
+    for (const item of plcDiItems) {
+      const diIndex = activeSheet.diInputs.indexOf(item);
+      const tr = document.createElement('tr');
+      tr.dataset.ioRowKind = 'di';
+      tr.dataset.ioDiIndex = String(diIndex);
+      tr.dataset.ioSafety = item.isSafety ? '1' : '0';
+      tr.innerHTML = `<td data-io-field="type">${escapeHtmlText(item.type || '')}</td>`
+        + `<td><input data-io-field="address" type="text" value="${escapeHtmlAttr(item.address || '')}"></td>`
+        + `<td><input data-io-field="description" type="text" value="${escapeHtmlAttr(item.description || '')}"></td>`
+        + `<td><input data-io-field="plcTag" type="text" value="${escapeHtmlAttr(item.plcTag || '')}"></td>`;
+      tbody.appendChild(tr);
+    }
+
+    table.appendChild(tbody);
+    section.appendChild(table);
+
+    const safetyItems = (activeSheet?.diInputs || []).filter((item) => item.isSafety);
+    if (safetyItems.length) {
+      const safetyTitle = document.createElement('h5');
+      safetyTitle.className = 'io-list-subsection-title';
+      safetyTitle.textContent = `${activeSheet?.zone || activeZone} Safety Inputs (${safetyItems.length})`;
+      section.appendChild(safetyTitle);
+
+      const safetyTable = document.createElement('table');
+      safetyTable.className = 'io-list-editor-table io-list-editor-subtable';
+      safetyTable.innerHTML = '<thead><tr><th>Type</th><th>Address</th><th>Description</th><th>PLC Tag</th></tr></thead>';
+      const safetyBody = document.createElement('tbody');
+      for (const item of safetyItems) {
+        const diIndex = activeSheet.diInputs.indexOf(item);
+        const tr = document.createElement('tr');
+        tr.dataset.ioRowKind = 'di';
+        tr.dataset.ioDiIndex = String(diIndex);
+        tr.dataset.ioSafety = '1';
+        tr.innerHTML = `<td data-io-field="type">${escapeHtmlText(item.type || '')}</td>`
+          + `<td><input data-io-field="address" type="text" value="${escapeHtmlAttr(item.address || '')}"></td>`
+          + `<td><input data-io-field="description" type="text" value="${escapeHtmlAttr(item.description || '')}"></td>`
+          + `<td><input data-io-field="plcTag" type="text" value="${escapeHtmlAttr(item.plcTag || '')}"></td>`;
+        safetyBody.appendChild(tr);
+      }
+      safetyTable.appendChild(safetyBody);
+      section.appendChild(safetyTable);
+    }
+
+    const doItems = activeSheet?.doOutputs || [];
+    if (doItems.length) {
+      const doTitle = document.createElement('h5');
+      doTitle.className = 'io-list-subsection-title';
+      doTitle.textContent = `${activeSheet?.zone || activeZone} Digital Outputs (${doItems.length})`;
+      section.appendChild(doTitle);
+
+      const doTable = document.createElement('table');
+      doTable.className = 'io-list-editor-table io-list-editor-subtable';
+      doTable.innerHTML = '<thead><tr><th>Type</th><th>Address</th><th>Description</th><th>PLC Tag</th></tr></thead>';
+      const doBody = document.createElement('tbody');
+      for (const item of doItems) {
+        const doIndex = activeSheet.doOutputs.indexOf(item);
+        const tr = document.createElement('tr');
+        tr.dataset.ioRowKind = 'do';
+        tr.dataset.ioDoIndex = String(doIndex);
+        tr.innerHTML = `<td data-io-field="type">${escapeHtmlText(item.type || '')}</td>`
+          + `<td><input data-io-field="address" type="text" value="${escapeHtmlAttr(item.address || '')}"></td>`
+          + `<td><input data-io-field="description" type="text" value="${escapeHtmlAttr(item.description || '')}"></td>`
+          + `<td><input data-io-field="plcTag" type="text" value="${escapeHtmlAttr(item.plcTag || '')}"></td>`;
+        doBody.appendChild(tr);
+      }
+      doTable.appendChild(doBody);
+      section.appendChild(doTable);
+    }
+
+    frame.appendChild(section);
+  } else {
+    const table = document.createElement('table');
+    table.className = 'io-list-editor-table';
+    table.innerHTML = '<thead><tr><th>Folder</th><th>Tag</th><th>Description</th><th>Address</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+
+    for (const row of editorState.rows) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtmlText(row.folder || '')}</td>`
+        + `<td><code>${escapeHtmlText(row.tagName || '')}</code></td>`
+        + `<td><input data-io-tag-name="${escapeHtmlAttr(row.tagName || '')}" data-io-field="description" type="text" value="${escapeHtmlAttr(row.description || '')}"></td>`
+        + `<td><input data-io-tag-name="${escapeHtmlAttr(row.tagName || '')}" data-io-field="address" type="text" value="${escapeHtmlAttr(row.address || '')}"></td>`;
+      tbody.appendChild(tr);
+    }
+
+    table.appendChild(tbody);
+    frame.appendChild(table);
+  }
+
+  previewPane.innerHTML = '';
+  previewPane.appendChild(frame);
+}
+
+function escapeHtmlAttr(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;');
+}
+
+function escapeHtmlText(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function saveActiveProjectIoListFromEditor() {
+  if (!activeIoListFileKey) {
+    return true;
+  }
+
+  const record = getProjectIoListFileByKey(activeIoListFileKey);
+  if (!record) {
+    activeIoListFileKey = '';
+    return true;
+  }
+
+  try {
+    mergeVisibleIoListSheetEdits(project);
+    record.file.content = xmlEditor.value;
+    record.file.sizeBytes = new Blob([record.file.content]).size;
+    record.file.lastModified = new Date().toISOString();
+    saveProjectList();
+  } catch (err) {
+    console.error(err);
+  }
+  return true;
+}
+
+function getProjectIoPreviewMap(project) {
+  if (!project || !globalThis.IoTags) {
+    return new Map();
+  }
+
+  const parsed = getProjectIoTagsParsed(project);
+  let zone = String(project.ioListPreviewZone || '').trim();
+  const zones = parsed?.meta?.zones || [];
+  if (!zone && zones.includes('Packing')) {
+    zone = 'Packing';
+  } else if (!zone && zones.length === 1) {
+    zone = zones[0];
+  }
+
+  if (isIoListPreviewScreenActive() && zone) {
+    const zoneMap = globalThis.IoTags.buildIoListPreviewMap(parsed, {
+      page: project.ioListPreviewPage || 1,
+      zone
+    });
+    if (zoneMap.size) {
+      return zoneMap;
+    }
+  }
+
+  const bindings = getActiveParameterBindings(project);
+  if (bindings?.size) {
+    const fromParameters = globalThis.IoTags.buildPreviewMapFromParameterFile(parsed, bindings, parsed);
+    if (fromParameters.size) {
+      return fromParameters;
+    }
+  }
+
+  return globalThis.IoTags.buildIoListPreviewMap(parsed, {
+    page: project.ioListPreviewPage || 1,
+    zone
+  });
+}
+
+function resolvePreviewParameterExpression(expression) {
+  const project = currentPreviewIoProject || getPreviewIoProject();
+  if (!project || !globalThis.IoTags) {
+    return null;
+  }
+
+  const match = String(expression || '').match(/\{#\s*(\d+)\s*\}/i);
+  if (match) {
+    const key = Number(match[1]);
+    const bindings = getActiveParameterBindings(project);
+    if (bindings?.has(key)) {
+      const tagsParsed = getProjectIoTagsParsed(project);
+      const resolved = globalThis.IoTags.resolveTagPreviewValue(tagsParsed, bindings.get(key));
+      if (resolved) {
+        return resolved;
+      }
+    }
+  }
+
+  const previewMap = getProjectIoPreviewMap(project);
+  return globalThis.IoTags.resolveParameterExpression(expression, previewMap);
+}
+
+function upsertGeneratedTagsCsv(project, csvContent, sourceName = 'Tags.CSV') {
+  ensureProjectCsvData(project);
+  const name = String(sourceName || 'Tags.CSV').replace(/\.csv$/i, '');
+  const fileName = `${name}.CSV`;
+  const entry = {
+    id: `csv-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name: fileName,
+    content: csvContent,
+    sizeBytes: new Blob([csvContent]).size,
+    lastModified: new Date().toISOString()
+  };
+
+  const existingIndex = project.tagsFiles.findIndex((file) => displayKey(file.name) === displayKey(fileName));
+  if (existingIndex >= 0) {
+    project.tagsFiles[existingIndex] = {
+      ...project.tagsFiles[existingIndex],
+      ...entry,
+      id: project.tagsFiles[existingIndex].id
+    };
+  } else {
+    project.tagsFiles.push(entry);
+  }
+}
+
+async function convertIoListUploadExcel(sourceFile) {
+  const buffer = await sourceFile.arrayBuffer();
+  const options = { sourceName: sourceFile.name };
+
+  try {
+    if (typeof XLSX !== 'undefined' && globalThis.IoTags) {
+      return globalThis.IoTags.convertIoListUpload(buffer, options);
+    }
+    throw new Error('Excel support is not loaded.');
+  } catch (err) {
+    if (!/Excel support is not loaded/i.test(String(err?.message || ''))) {
+      throw err;
+    }
+  }
+
+  const response = await fetch('/api/convert-io-list-xlsx', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: buffer
+  });
+  const data = await readApiJson(response);
+  if (!response.ok) {
+    throw new Error(data.error || 'Could not convert Excel IO list on the server.');
+  }
+  return data;
+}
+
+async function importProjectIoListFiles(projectId, fileList) {
+  const project = getProjectById(projectId);
+  if (!project || !fileList?.length) {
+    throw new Error('Choose a project and at least one IO list file.');
+  }
+  if (!globalThis.IoTags) {
+    throw new Error('IO list support failed to load. Refresh the page and try again.');
+  }
+
+  ensureProjectCsvData(project);
+  let mergedText = '';
+  let combinedParsed = null;
+  let lastConverted = null;
+
+  for (const sourceFile of fileList) {
+    const isExcel = /\.xlsx$/i.test(String(sourceFile?.name || ''));
+    let converted;
+    let storedContent;
+    let name = baseFileName(sourceFile.name) || 'IO_List';
+
+    if (isExcel) {
+      if (combinedParsed) {
+        throw new Error('Upload one Excel Master Sheet at a time.');
+      }
+      const buffer = await sourceFile.arrayBuffer();
+      converted = await convertIoListUploadExcel(sourceFile);
+      storedContent = converted.summary || `# Imported from ${sourceFile.name}`;
+      name = sourceFile.name;
+      combinedParsed = converted.parsed;
+    } else {
+      const content = await readUploadedText(sourceFile);
+      mergedText += `${content}\n`;
+      storedContent = content;
+      if (!/\.(csv|txt)$/i.test(name)) {
+        name = `${name}.txt`;
+      }
+    }
+
+    lastConverted = converted;
+
+    const existingIndex = project.ioListFiles.findIndex((item) => displayKey(item.name) === displayKey(name));
+    const entry = {
+      id: `io-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name,
+      content: storedContent,
+      sizeBytes: new Blob([storedContent]).size,
+      lastModified: new Date().toISOString(),
+      sourceType: isExcel ? 'xlsx' : 'text'
+    };
+
+    if (existingIndex >= 0) {
+      project.ioListFiles[existingIndex] = {
+        ...project.ioListFiles[existingIndex],
+        ...entry,
+        id: project.ioListFiles[existingIndex].id
+      };
+    } else {
+      project.ioListFiles.push(entry);
+    }
+  }
+
+  if (!combinedParsed && mergedText.trim()) {
+    lastConverted = globalThis.IoTags.convertIoListUpload(mergedText);
+    combinedParsed = lastConverted.parsed;
+  }
+
+  if (!combinedParsed) {
+    throw new Error('No IO list rows found in the uploaded file.');
+  }
+
+  const zones = combinedParsed?.meta?.zones || [];
+  if (!project.ioListPreviewZone && zones.includes('Packing')) {
+    project.ioListPreviewZone = 'Packing';
+  } else if (!project.ioListPreviewZone && zones.length === 1) {
+    project.ioListPreviewZone = zones[0];
+  }
+
+  project.ioListMeta = combinedParsed?.meta || null;
+  project.ioListSheets = combinedParsed?.meta?.sourceSheets
+    || getProjectIoListSheets(project)
+    || [];
+  project.ioTagsParsed = combinedParsed;
+  upsertGeneratedTagsCsv(
+    project,
+    globalThis.IoTags.serializeFactoryTalkTagsCsv(combinedParsed),
+    `${project.name}-Tags`
+  );
+  upsertGeneratedParameterFiles(project, combinedParsed, project.ioListPreviewZone || '');
+  project.ioListPreviewParameterFile = project.ioListPreviewParameterFile || 'PLC DI List 01';
+  project.ioListCollapsed = false;
+  project.tagsCollapsed = false;
+  activeProjectKey = '';
+  activeProjectFolder = '';
+  activeProjectScreen = '';
+  activeProjectCsvKey = '';
+  setActiveProject(project);
+  saveProjectList();
+  renderProjectSidebar();
+  updateProjectSidebarSelection();
+
+  if (!activeProjectCsvKey && xmlEditor.value.trim()) {
+    renderPreview();
+  }
+
+  return {
+    ...lastConverted,
+    parsed: combinedParsed
+  };
+}
+
+function removeProjectIoListFile(projectId, fileId) {
+  const project = getProjectById(projectId);
+  if (!project) {
+    return;
+  }
+
+  project.ioListFiles = (project.ioListFiles || []).filter((item) => String(item.id) !== String(fileId));
+  if (activeIoListFileKey === createProjectIoListKey(projectId, fileId)) {
+    activeIoListFileKey = '';
+    previewPane.innerHTML = '';
+    xmlEditor.value = '';
+    resetHistory('');
+    displayName.value = 'None';
+  }
+  saveProjectList();
+  renderProjectSidebar();
+}
+
+function openProjectIoListFile(project, file) {
+  if (!project || !file) {
+    return;
+  }
+
+  saveActiveProjectCsvFromEditor();
+  saveActiveProjectIoListFromEditor();
+
+  activeProjectKey = '';
+  activeProjectFolder = '';
+  activeProjectScreen = '';
+  selectedDisplay = '';
+  selectedDefaultTemplate = '';
+  selectedFiles = [];
+  activeProjectCsvKey = '';
+  activeIoListFileKey = createProjectIoListKey(project.id, file.id);
+
+  setActiveProject(project);
+  displayName.value = `${project.name} / IO List / ${file.name}`;
+  xmlEditor.value = file.content;
+  resetHistory(file.content);
+  selectedObjectIndex = null;
+  clearObjectPanel();
+  setWorkspaceDockTab('xml');
+  updateProjectSidebarSelection();
+  renderIoListEditorPreview(project, file);
+}
+
+function queueIoListUpload(projectId) {
+  pendingIoListUpload = { projectId };
+  if (!projectIoListInput) {
+    return;
+  }
+  projectIoListInput.value = '';
+  projectIoListInput.click();
 }
 
 const POPUP_TYPE_PROFILES = [
@@ -439,7 +2145,20 @@ function loadProjectList() {
 }
 
 function persistProjectList() {
-  localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projectList));
+  const payload = projectList.map((project) => {
+    const { ioTagsParsed, ...rest } = project;
+    return rest;
+  });
+
+  try {
+    localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(payload));
+  } catch (err) {
+    const message = String(err?.message || err || '');
+    if (/quota/i.test(message)) {
+      throw new Error('Browser storage is full. Remove old projects or large files and try again.');
+    }
+    throw err;
+  }
 }
 
 function normalizeProjectList() {
@@ -450,13 +2169,41 @@ function normalizeProjectList() {
     project.name = normalizeProjectName(project.name || 'Untitled Project');
     project.collapsed = Boolean(project.collapsed);
     ensureProjectPopupData(project);
+    ensureProjectCsvData(project);
     project.folders = Array.isArray(project.folders) ? project.folders : [];
+    const migratedCycleTimeScreens = [];
     for (const folder of project.folders) {
       folder.name = String(folder.name || 'Folder');
       folder.collapsed = Boolean(folder.collapsed);
       folder.screens = Array.isArray(folder.screens) ? folder.screens : [];
+      for (const screen of folder.screens) {
+        if (displayKey(screen?.name) === displayKey('402_IO_List.xml')) {
+          screen.name = IO_LIST_SCREEN_FILE;
+          screen.xml = String(screen.xml || '').replace(/display="402_IO_List"/g, 'display="303_IO_List"');
+          removedLegacyScreens = true;
+        }
+        if (displayKey(screen?.name) === displayKey('105_Cycle_Time.xml') || displayKey(screen?.name) === displayKey('402_Cycletime.xml')) {
+          screen.name = CYCLE_TIME_SCREEN_FILE;
+          screen.xml = String(screen.xml || '')
+            .replace(/display="105_Cycle_Time"/g, 'display="304_Cycle_Time"')
+            .replace(/display="102_Cycletime"/g, 'display="304_Cycle_Time"')
+            .replace(/display="402_Cycletime"/g, 'display="304_Cycle_Time"')
+            .replace(/display="402_IO_List"/g, 'display="303_IO_List"');
+          migratedCycleTimeScreens.push({ fromFolder: folder, screen });
+          removedLegacyScreens = true;
+        } else if (String(screen?.xml || '').includes('display="102_Cycletime"')
+          || String(screen?.xml || '').includes('display="105_Cycle_Time"')
+          || String(screen?.xml || '').includes('display="402_Cycletime"')) {
+          screen.xml = String(screen.xml || '')
+            .replace(/display="105_Cycle_Time"/g, 'display="304_Cycle_Time"')
+            .replace(/display="102_Cycletime"/g, 'display="304_Cycle_Time"')
+            .replace(/display="402_Cycletime"/g, 'display="304_Cycle_Time"')
+            .replace(/display="402_IO_List"/g, 'display="303_IO_List"');
+          removedLegacyScreens = true;
+        }
+      }
       const beforeCount = folder.screens.length;
-      folder.screens = folder.screens.filter((screen) => displayKey(screen?.name) !== displayKey('IO_List.xml'));
+      folder.screens = folder.screens.filter((screen) => !isExcludedProjectScreen(screen?.name));
       if (folder.screens.length !== beforeCount) {
         removedLegacyScreens = true;
       }
@@ -470,10 +2217,36 @@ function normalizeProjectList() {
         screen.height = Number.isFinite(Number(screen.height)) ? Number(screen.height) : meta.height;
       }
     }
+
+    if (migratedCycleTimeScreens.length) {
+      const targetFolder = findOrCreateManualOperationFolder(project);
+      for (const { fromFolder, screen } of migratedCycleTimeScreens) {
+        const screenIndex = fromFolder.screens.indexOf(screen);
+        if (screenIndex >= 0) {
+          fromFolder.screens.splice(screenIndex, 1);
+        }
+        const alreadyPresent = targetFolder.screens.some((item) => displayKey(item.name) === displayKey(CYCLE_TIME_SCREEN_FILE));
+        if (!alreadyPresent) {
+          targetFolder.screens.push(screen);
+        }
+      }
+      targetFolder.screens = sortFolderScreens(targetFolder.screens);
+    }
+
+    const foldersBefore = projectFoldersOrderKey(project.folders);
+    project.folders = sortProjectFolders(project.folders);
+    if (projectFoldersOrderKey(project.folders) !== foldersBefore) {
+      removedLegacyScreens = true;
+    }
   }
 
   if (removedLegacyScreens) {
-    if (activeProjectKey && displayKey(getProjectScreenByKey(activeProjectKey)?.screen?.name || '') === displayKey('IO_List.xml')) {
+    if (activeProjectKey && (
+      isExcludedProjectScreen(getProjectScreenByKey(activeProjectKey)?.screen?.name || '')
+      || displayKey(getProjectScreenByKey(activeProjectKey)?.screen?.name || '') === displayKey('402_IO_List.xml')
+      || displayKey(getProjectScreenByKey(activeProjectKey)?.screen?.name || '') === displayKey('105_Cycle_Time.xml')
+      || displayKey(getProjectScreenByKey(activeProjectKey)?.screen?.name || '') === displayKey('402_Cycletime.xml')
+    )) {
       selectedDisplay = '';
       selectedFiles = [];
       displayName.value = 'None';
@@ -792,6 +2565,7 @@ function groupTemplateFiles(files) {
 
     const exact = groupFiles.find((file) => String(file.name || '').toLowerCase().startsWith(`${groupKey.toLowerCase()}_`));
     const folderName = String((exact || groupFiles[0]).name || '').replace(/\.xml$/i, '');
+    groupFiles.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
     folders.push({ key: groupKey, name: folderName, screens: groupFiles });
   }
 
@@ -953,13 +2727,23 @@ async function createNewProject(rawName) {
     }
 
     const defaultsData = await defaultsResponse.json();
-    const { folders, globalObjectFiles } = groupTemplateFiles(defaultsData.files || []);
+    const templateFiles = (defaultsData.files || []).filter((file) => !isExcludedProjectScreen(file.name));
+    const { folders, globalObjectFiles } = groupTemplateFiles(templateFiles);
     const project = {
       id: `project-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       name: projectName,
       collapsed: false,
       popupTemplates: [],
       popupPlanRows: [],
+      tagsFiles: [],
+      parametersFiles: [],
+      ioListFiles: [],
+      tagsCollapsed: false,
+      parametersCollapsed: false,
+      ioListCollapsed: false,
+      ioListPreviewPage: 1,
+      ioListPreviewZone: '',
+      ioListSheets: [],
       folders: []
     };
 
@@ -1509,6 +3293,34 @@ function getActiveStateNode(node) {
   return states[0] || null;
 }
 
+function getPreviewIndicatorStateNode(node) {
+  const expr = node.querySelector('connection[name="Indicator"]')?.getAttribute('expression')
+    || node.querySelector('connection[name="Value"]')?.getAttribute('expression');
+  const resolved = resolvePreviewParameterExpression(expr);
+  if (resolved === null || String(resolved).trim() === '') {
+    return getActiveStateNode(node);
+  }
+
+  const states = Array.from(node.querySelectorAll(':scope > states > state'));
+  if (!states.length) {
+    return null;
+  }
+
+  const match = states.find((state) => {
+    const value = state.getAttribute('value');
+    return value !== null && String(value) === String(resolved);
+  });
+  return match || getActiveStateNode(node);
+}
+
+function getVisualStateNode(node) {
+  const tag = String(node.tagName || '').toLowerCase();
+  if (tag === 'multistateindicator') {
+    return getPreviewIndicatorStateNode(node);
+  }
+  return getActiveStateNode(node);
+}
+
 function gradientDirectionCss(directionRaw) {
   const dir = String(directionRaw || '').toLowerCase();
   if (dir.includes('vertical')) {
@@ -1763,13 +3575,27 @@ function previewTextForNode(node, captionNode) {
   }
 
   if (tag === 'multistateindicator') {
-    const matched = getActiveStateNode(node);
+    const matched = getPreviewIndicatorStateNode(node);
     const matchedCaption = matched?.querySelector('caption')?.getAttribute('caption');
     return String(matchedCaption || '').trim();
   }
 
+  if (tag === 'stringdisplay' || tag === 'numericdisplay') {
+    const expr = node.querySelector('connection[name="Value"]')?.getAttribute('expression')
+      || node.querySelector('connection[name="Indicator"]')?.getAttribute('expression');
+    const resolved = resolvePreviewParameterExpression(expr);
+    if (resolved !== null && String(resolved).trim() !== '') {
+      return String(resolved);
+    }
+  }
+
   if (tag === 'stringdisplay') {
-    const expr = String(node.querySelector('connection[name="Value"]')?.getAttribute('expression') || '').toLowerCase();
+    const rawExpr = String(node.querySelector('connection[name="Value"]')?.getAttribute('expression') || '');
+    if (/\{#\s*\d+\s*\}/i.test(rawExpr)) {
+      return rawExpr.trim();
+    }
+
+    const expr = rawExpr.toLowerCase();
     if (
       expr.includes('system\\user')
       || expr.includes('system/user')
@@ -3244,6 +5070,10 @@ function renderProjectPopupPlanner() {
 }
 
 function setEditorDisplay(name, xml) {
+  activeProjectKey = '';
+  activeProjectFolder = '';
+  activeProjectScreen = '';
+  activeProjectCsvKey = '';
   selectedDisplay = name;
   selectedDefaultTemplate = '';
   displayName.value = name;
@@ -3795,6 +5625,8 @@ function setBridgeCard(status) {
 }
 
 function clearSelectedDisplay() {
+  saveActiveProjectCsvFromEditor();
+  activeProjectCsvKey = '';
   selectedDisplay = '';
   selectedDefaultTemplate = '';
   selectedFolderName = '';
@@ -4406,7 +6238,7 @@ function renderProjectSidebar() {
     const children = document.createElement('ul');
     children.className = 'folder-children';
 
-    for (const screen of folder.screens) {
+    for (const screen of sortFolderScreens(folder.screens)) {
       const screenLi = document.createElement('li');
       screenLi.className = 'display-item';
       screenLi.draggable = true;
@@ -4555,11 +6387,382 @@ function renderProjectSidebar() {
     appendTo.appendChild(folderLi);
   };
 
+  const appendCsvSection = (project, kind, label, appendTo) => {
+    ensureProjectCsvData(project);
+    const files = getProjectCsvFiles(project, kind);
+    const collapsedKey = kind === 'parameters' ? 'parametersCollapsed' : 'tagsCollapsed';
+
+    const sectionLi = document.createElement('li');
+    sectionLi.className = 'folder-item csv-section-item';
+
+    if (project[collapsedKey]) {
+      sectionLi.classList.add('collapsed');
+    }
+
+    const sectionRow = document.createElement('div');
+    sectionRow.className = 'folder-row csv-section-row';
+
+    const toggle = document.createElement('span');
+    toggle.className = 'folder-toggle';
+
+    const sectionLabel = document.createElement('span');
+    sectionLabel.className = 'folder-name';
+    sectionLabel.textContent = label;
+
+    const sectionCount = document.createElement('span');
+    sectionCount.className = 'folder-count';
+    sectionCount.textContent = `${files.length}`;
+
+    const sectionActions = document.createElement('div');
+    sectionActions.className = 'tree-actions';
+
+    if (kind === 'parameters' && files.length) {
+      const exportAllBtn = document.createElement('button');
+      exportAllBtn.type = 'button';
+      exportAllBtn.className = 'tree-action-btn';
+      exportAllBtn.textContent = '↓';
+      exportAllBtn.title = 'Export all parameter files (.par)';
+      exportAllBtn.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        try {
+          await exportAllProjectParameterFiles(project);
+        } catch (err) {
+          console.error(err);
+          alert(err.message || 'Could not export parameter files.');
+        }
+      });
+      sectionActions.appendChild(exportAllBtn);
+    }
+
+    if (kind === 'tags' && files.length) {
+      const exportAllTagsBtn = document.createElement('button');
+      exportAllTagsBtn.type = 'button';
+      exportAllTagsBtn.className = 'tree-action-btn';
+      exportAllTagsBtn.textContent = '↓';
+      exportAllTagsBtn.title = 'Download all Tags CSV files for FactoryTalk';
+      exportAllTagsBtn.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        try {
+          await exportAllProjectTagsCsvFiles(project);
+        } catch (err) {
+          console.error(err);
+          alert(err.message || 'Could not export Tags CSV files.');
+        }
+      });
+      sectionActions.appendChild(exportAllTagsBtn);
+    }
+
+    const addCsvBtn = document.createElement('button');
+    addCsvBtn.type = 'button';
+    addCsvBtn.className = 'tree-action-btn';
+    addCsvBtn.textContent = '+';
+    addCsvBtn.title = kind === 'tags'
+      ? 'Import FactoryTalk Tags CSV'
+      : 'Add parameter file (.par) with preview notes';
+    addCsvBtn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      if (kind === 'parameters') {
+        try {
+          await addProjectParameterFile(project.id);
+        } catch (err) {
+          console.error(err);
+          alert(err.message || 'Could not add parameter file.');
+        }
+        return;
+      }
+      queueProjectCsvUpload(project.id, kind);
+    });
+
+    sectionActions.appendChild(addCsvBtn);
+    sectionRow.appendChild(toggle);
+    sectionRow.appendChild(sectionLabel);
+    sectionRow.appendChild(sectionCount);
+    sectionRow.appendChild(sectionActions);
+    sectionLi.appendChild(sectionRow);
+
+    const children = document.createElement('ul');
+    children.className = 'folder-children';
+
+    for (const file of files) {
+      const fileLi = document.createElement('li');
+      fileLi.className = 'display-item csv-item';
+      fileLi.dataset.projectId = project.id;
+      fileLi.dataset.csvKind = kind;
+      fileLi.dataset.csvId = file.id;
+
+      const csvKey = createProjectCsvKey(project.id, kind, file.id);
+      if (activeProjectCsvKey === csvKey) {
+        fileLi.classList.add('active');
+      }
+
+      const row = document.createElement('div');
+      row.className = 'list-row';
+
+      const name = document.createElement('strong');
+      name.textContent = file.name;
+      row.appendChild(name);
+
+      const meta = document.createElement('div');
+      meta.className = 'screen-meta';
+      const metaMain = document.createElement('div');
+      metaMain.className = 'screen-meta-main';
+      metaMain.textContent = kind === 'parameters' && /\.par$/i.test(file.name)
+        ? `parameter file | ${kb(file.sizeBytes)}`
+        : `${kind} csv | ${kb(file.sizeBytes)}`;
+      const metaTime = document.createElement('div');
+      metaTime.className = 'screen-meta-time';
+      metaTime.textContent = shortDateTime(file.lastModified);
+      meta.appendChild(metaMain);
+      meta.appendChild(metaTime);
+
+      const actions = document.createElement('div');
+      actions.className = 'tree-actions';
+
+      if (kind === 'parameters' && /\.par$/i.test(file.name)) {
+        const exportBtn = document.createElement('button');
+        exportBtn.type = 'button';
+        exportBtn.className = 'tree-action-btn';
+        exportBtn.textContent = '↓';
+        exportBtn.title = `Export ${file.name}`;
+        exportBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          try {
+            exportProjectParameterFile(project, file);
+          } catch (err) {
+            console.error(err);
+            alert(err.message || 'Could not export parameter file.');
+          }
+        });
+        actions.appendChild(exportBtn);
+      }
+
+      if (kind === 'tags') {
+        const exportTagsBtn = document.createElement('button');
+        exportTagsBtn.type = 'button';
+        exportTagsBtn.className = 'tree-action-btn';
+        exportTagsBtn.textContent = '↓';
+        exportTagsBtn.title = `Download ${file.name} for FactoryTalk`;
+        exportTagsBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          try {
+            exportProjectTagsCsvFile(project, file);
+          } catch (err) {
+            console.error(err);
+            alert(err.message || 'Could not export Tags CSV.');
+          }
+        });
+        actions.appendChild(exportTagsBtn);
+      }
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'tree-action-btn danger';
+      removeBtn.textContent = 'X';
+      removeBtn.title = `Remove ${file.name}`;
+      removeBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (!window.confirm(`Remove ${file.name}?`)) {
+          return;
+        }
+        removeProjectCsvFile(project.id, kind, file.id);
+      });
+      actions.appendChild(removeBtn);
+
+      fileLi.appendChild(row);
+      fileLi.appendChild(meta);
+      fileLi.appendChild(actions);
+      fileLi.addEventListener('click', () => {
+        openProjectCsvFile(project, kind, file);
+      });
+      children.appendChild(fileLi);
+    }
+
+    sectionRow.addEventListener('click', () => {
+      project[collapsedKey] = !project[collapsedKey];
+      saveProjectList();
+      renderProjectSidebar();
+    });
+
+    sectionLi.appendChild(children);
+    appendTo.appendChild(sectionLi);
+  };
+
+  const appendIoListSection = (project, appendTo) => {
+    ensureProjectCsvData(project);
+    const files = project.ioListFiles || [];
+    const generatedTags = getProjectPrimaryTagsFile(project);
+
+    const sectionLi = document.createElement('li');
+    sectionLi.className = 'folder-item csv-section-item io-list-section-item';
+
+    if (project.ioListCollapsed) {
+      sectionLi.classList.add('collapsed');
+    }
+
+    const sectionRow = document.createElement('div');
+    sectionRow.className = 'folder-row csv-section-row';
+
+    const toggle = document.createElement('span');
+    toggle.className = 'folder-toggle';
+
+    const sectionLabel = document.createElement('span');
+    sectionLabel.className = 'folder-name';
+    sectionLabel.textContent = 'IO List';
+
+    const sectionCount = document.createElement('span');
+    sectionCount.className = 'folder-count';
+    sectionCount.textContent = `${files.length}`;
+
+    const sectionActions = document.createElement('div');
+    sectionActions.className = 'tree-actions';
+
+    const addIoBtn = document.createElement('button');
+    addIoBtn.type = 'button';
+    addIoBtn.className = 'tree-action-btn';
+    addIoBtn.textContent = '+';
+    addIoBtn.title = 'Upload IO list (.xlsx Master Sheet or FactoryTalk CSV/TXT) — builds Tags.CSV and preview data';
+    addIoBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      queueIoListUpload(project.id);
+    });
+
+    sectionActions.appendChild(addIoBtn);
+    sectionRow.appendChild(toggle);
+    sectionRow.appendChild(sectionLabel);
+    sectionRow.appendChild(sectionCount);
+    sectionRow.appendChild(sectionActions);
+    sectionLi.appendChild(sectionRow);
+
+    const children = document.createElement('ul');
+    children.className = 'folder-children';
+
+    if (generatedTags && (files.length || project.ioListMeta)) {
+      const tagsLi = document.createElement('li');
+      tagsLi.className = 'display-item csv-item io-generated-tags-item';
+      tagsLi.title = 'Auto-generated FactoryTalk Tags CSV from IO list upload';
+
+      const row = document.createElement('div');
+      row.className = 'list-row';
+
+      const name = document.createElement('strong');
+      name.textContent = generatedTags.name;
+      row.appendChild(name);
+
+      const meta = document.createElement('div');
+      meta.className = 'screen-meta';
+      const metaMain = document.createElement('div');
+      metaMain.className = 'screen-meta-main';
+      metaMain.textContent = 'generated tags | open in Tags';
+      meta.appendChild(metaMain);
+
+      tagsLi.appendChild(row);
+      tagsLi.appendChild(meta);
+
+      const tagsActions = document.createElement('div');
+      tagsActions.className = 'tree-actions';
+      const exportGeneratedTagsBtn = document.createElement('button');
+      exportGeneratedTagsBtn.type = 'button';
+      exportGeneratedTagsBtn.className = 'tree-action-btn';
+      exportGeneratedTagsBtn.textContent = '↓';
+      exportGeneratedTagsBtn.title = `Download ${generatedTags.name} for FactoryTalk`;
+      exportGeneratedTagsBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        try {
+          exportProjectTagsCsvFile(project, generatedTags);
+        } catch (err) {
+          console.error(err);
+          alert(err.message || 'Could not export Tags CSV.');
+        }
+      });
+      tagsActions.appendChild(exportGeneratedTagsBtn);
+      tagsLi.appendChild(tagsActions);
+
+      tagsLi.addEventListener('click', (event) => {
+        event.stopPropagation();
+        openProjectCsvFile(project, 'tags', generatedTags);
+      });
+      children.appendChild(tagsLi);
+    }
+
+    for (const file of files) {
+      const fileLi = document.createElement('li');
+      fileLi.className = 'display-item csv-item io-list-item';
+      fileLi.dataset.projectId = project.id;
+      fileLi.dataset.ioListId = file.id;
+
+      const ioKey = createProjectIoListKey(project.id, file.id);
+      if (activeIoListFileKey === ioKey) {
+        fileLi.classList.add('active');
+      }
+
+      const row = document.createElement('div');
+      row.className = 'list-row';
+
+      const name = document.createElement('strong');
+      name.textContent = file.name;
+      row.appendChild(name);
+
+      const meta = document.createElement('div');
+      meta.className = 'screen-meta';
+      const metaMain = document.createElement('div');
+      metaMain.className = 'screen-meta-main';
+      metaMain.textContent = `io source | ${kb(file.sizeBytes)}`;
+      const metaTime = document.createElement('div');
+      metaTime.className = 'screen-meta-time';
+      metaTime.textContent = shortDateTime(file.lastModified);
+      meta.appendChild(metaMain);
+      meta.appendChild(metaTime);
+
+      const actions = document.createElement('div');
+      actions.className = 'tree-actions';
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'tree-action-btn danger';
+      removeBtn.textContent = 'X';
+      removeBtn.title = `Remove ${file.name}`;
+      removeBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (!window.confirm(`Remove ${file.name}?`)) {
+          return;
+        }
+        removeProjectIoListFile(project.id, file.id);
+      });
+      actions.appendChild(removeBtn);
+
+      fileLi.appendChild(row);
+      fileLi.appendChild(meta);
+      fileLi.appendChild(actions);
+      fileLi.addEventListener('click', () => {
+        openProjectIoListFile(project, file);
+      });
+      children.appendChild(fileLi);
+    }
+
+    sectionRow.addEventListener('click', () => {
+      project.ioListCollapsed = !project.ioListCollapsed;
+      saveProjectList();
+      renderProjectSidebar();
+    });
+
+    sectionLi.appendChild(children);
+    appendTo.appendChild(sectionLi);
+  };
+
   for (const project of projectList) {
     const { section, children } = appendProjectHeader(project);
-    for (const folder of project.folders) {
+    const sortedFolders = [...(project.folders || [])].sort((a, b) => {
+      const numDiff = getFolderNumberPrefix(a?.name) - getFolderNumberPrefix(b?.name);
+      if (numDiff !== 0) {
+        return numDiff;
+      }
+      return String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { numeric: true, sensitivity: 'base' });
+    });
+    for (const folder of sortedFolders) {
       appendFolder(project, folder, children);
     }
+    appendCsvSection(project, 'tags', 'Tags', children);
+    appendCsvSection(project, 'parameters', 'Parameters', children);
+    appendIoListSection(project, children);
     displaysList.appendChild(section);
   }
 
@@ -4587,6 +6790,22 @@ function updateProjectSidebarSelection() {
     const screenProjectId = String(screenItem.dataset.projectId || '');
     const folderName = String(screenItem.dataset.folderName || '');
     const screenName = String(screenItem.dataset.screenName || '');
+    const csvKind = String(screenItem.dataset.csvKind || '');
+    const csvId = String(screenItem.dataset.csvId || '');
+
+    if (csvKind && csvId) {
+      const csvKey = createProjectCsvKey(screenProjectId, csvKind, csvId);
+      screenItem.classList.toggle('active', csvKey === activeProjectCsvKey);
+      continue;
+    }
+
+    const ioListId = String(screenItem.dataset.ioListId || '');
+    if (ioListId) {
+      const ioKey = createProjectIoListKey(screenProjectId, ioListId);
+      screenItem.classList.toggle('active', ioKey === activeIoListFileKey);
+      continue;
+    }
+
     const itemKey = createProjectKey(screenProjectId, folderName, screenName);
     screenItem.classList.toggle('active', itemKey === activeKey);
   }
@@ -4754,20 +6973,46 @@ async function refreshDefaultTemplates() {
 function resolveDisplayBackgroundColor(rawColor) {
   const color = String(rawColor || '').trim();
   if (!color) {
-    return '#d9d9d9';
+    return '#EFEFEF';
   }
 
   const normalized = color.toLowerCase();
   // FactoryTalk white screens are visually closer to an HMI neutral gray.
   if (normalized === 'white' || normalized === '#fff' || normalized === '#ffffff') {
-    return '#efefef';
+    return '#EFEFEF';
   }
 
   return color;
 }
 
+function resolveDisplayBackgroundStyle(displaySettings) {
+  if (!displaySettings) {
+    return '#EFEFEF';
+  }
+
+  const backColor = resolveDisplayBackgroundColor(displaySettings.getAttribute('backColor'));
+  const useGradient = String(displaySettings.getAttribute('useGradientStyle') || '').toLowerCase() === 'true';
+  const endColor = String(displaySettings.getAttribute('endColor') || '').trim();
+  if (useGradient && endColor) {
+    return `linear-gradient(${gradientDirectionCss(displaySettings.getAttribute('gradientDirection'))}, ${backColor}, ${endColor})`;
+  }
+
+  return backColor;
+}
+
+function applyPreviewDisplayBackground(frame, canvas, displaySettings) {
+  const backgroundStyle = resolveDisplayBackgroundStyle(displaySettings);
+  if (frame) {
+    frame.style.setProperty('background', backgroundStyle, 'important');
+  }
+  if (canvas) {
+    canvas.style.setProperty('background', backgroundStyle, 'important');
+  }
+}
+
 function renderPreview() {
   previewImageNonce = Date.now();
+  currentPreviewIoProject = getPreviewIoProject();
   const name = displayName.value.trim() || 'Untitled Display';
   const xml = xmlEditor.value.trim();
   if (!xml) {
@@ -4790,18 +7035,16 @@ function renderPreview() {
   const height = Number(displaySettings?.getAttribute('height'))
     || Number(screenHeight.value)
     || DEFAULT_PREVIEW_HEIGHT;
-  const backColor = resolveDisplayBackgroundColor(displaySettings?.getAttribute('backColor'));
 
   previewPane.innerHTML = '';
   disconnectPreviewResizeObserver();
 
   const frame = document.createElement('div');
   frame.className = 'preview-frame';
-  frame.style.background = backColor;
 
   const canvas = document.createElement('div');
-  canvas.className = 'xml-canvas';
-  canvas.style.background = backColor;
+  canvas.className = 'xml-canvas preview-display-canvas';
+  applyPreviewDisplayBackground(frame, canvas, displaySettings);
 
   canvas.addEventListener('dragover', (event) => {
     if (!event.dataTransfer?.types?.includes('application/x-popup-draft-id')) {
@@ -4851,7 +7094,7 @@ function renderPreview() {
     objectNodes.forEach((el, index) => {
       const tag = String(el.tagName || '').toLowerCase();
       const isLineTag = tag === 'line';
-      const activeStateNode = getActiveStateNode(el);
+      const activeStateNode = getVisualStateNode(el);
       const visualSource = activeStateNode || el;
       const absolutePosition = getNodeAbsolutePosition(el);
       const left = absolutePosition.left;
@@ -5194,6 +7437,17 @@ function renderPreview() {
   wrap.className = 'preview-canvas-wrap';
   wrap.appendChild(canvas);
   frame.appendChild(wrap);
+
+  if (isIoListPreviewScreenActive()) {
+    const ioStatus = getIoPreviewStatus(getPreviewIoProject());
+    if (!ioStatus.ready) {
+      const banner = document.createElement('div');
+      banner.className = 'preview-io-banner';
+      banner.textContent = ioStatus.reason;
+      frame.insertBefore(banner, frame.firstChild);
+    }
+  }
+
   previewPane.appendChild(frame);
 
   const refitPreview = () => fitCanvasToFrame(frame, canvas, width, height);
@@ -5543,7 +7797,7 @@ function appendGroupPreviewChildren(groupNode, container, groupWidth, groupHeigh
       return;
     }
 
-    const activeStateNode = getActiveStateNode(node);
+    const activeStateNode = getVisualStateNode(node);
     const visualSource = activeStateNode || node;
     const childBox = document.createElement('div');
     childBox.className = 'xml-group-child';
@@ -5587,6 +7841,10 @@ function appendGroupPreviewChildren(groupNode, container, groupWidth, groupHeigh
       captionEl.textContent = caption;
       childBox.appendChild(captionEl);
       applyCaptionStyles(childBox, node, captionNode);
+    }
+
+    if ((tag === 'stringdisplay' || tag === 'numericdisplay') && node.getAttribute('foreColor')) {
+      childBox.style.color = node.getAttribute('foreColor');
     }
 
     parentEl.appendChild(childBox);
@@ -5914,6 +8172,10 @@ async function loadDefaultTemplate(name) {
 }
 
 function setEditorProjectScreen(project, folderName, screen, xml) {
+  saveActiveProjectCsvFromEditor();
+  saveActiveProjectIoListFromEditor();
+  activeProjectCsvKey = '';
+  activeIoListFileKey = '';
   setActiveProjectScreen(project, folderName, screen.name);
   selectedDisplay = screen.name;
   selectedDefaultTemplate = '';
@@ -5933,7 +8195,7 @@ function setEditorProjectScreen(project, folderName, screen, xml) {
   renderProjectPopupPlanner();
 }
 
-async function openProjectScreen(projectId, folderName, screenName) {
+async function openProjectScreen(projectId, folderName, screenName, options = {}) {
   const project = getProjectById(projectId);
   if (!project) {
     throw new Error('Project not found');
@@ -5944,16 +8206,31 @@ async function openProjectScreen(projectId, folderName, screenName) {
     throw new Error('Screen not found');
   }
 
+  if (isIoListPreviewScreenName(screenName) && !ioListScreenUsesCurrentTemplate(screen.xml)) {
+    const folder = findProjectFolder(project, folderName);
+    await syncProjectIoListScreenFromTemplate(project, { folder, screen });
+  }
+
+  if (isCycleTimeScreenName(screenName) && !cycleTimeScreenUsesCurrentTemplate(screen.xml)) {
+    const folder = findProjectFolder(project, folderName);
+    await syncProjectCycleTimeScreenFromTemplate(project, { folder, screen });
+  }
+
   const nextKey = createProjectKey(projectId, folderName, screenName);
   if (activeProjectKey === nextKey) {
     updateProjectSidebarSelection();
+    renderPreview();
     return;
   }
 
-  if (activeProjectKey && xmlEditor.value.trim()) {
-    const saved = await autoSaveCurrentDisplay();
-    if (!saved) {
-      return;
+  if (!options.skipSave) {
+    if (activeProjectCsvKey) {
+      saveActiveProjectCsvFromEditor();
+    } else if (activeProjectKey && xmlEditor.value.trim()) {
+      const saved = await autoSaveCurrentDisplay();
+      if (!saved) {
+        return;
+      }
     }
   }
 
@@ -6067,11 +8344,22 @@ async function processProjectFolderImport(files, options = {}) {
     collapsed: false,
     popupTemplates: [],
     popupPlanRows: [],
+    tagsFiles: [],
+    parametersFiles: [],
+    ioListFiles: [],
+    tagsCollapsed: false,
+    parametersCollapsed: false,
+    ioListCollapsed: false,
+    ioListPreviewPage: 1,
+    ioListPreviewZone: '',
+    ioListSheets: [],
     folders: []
   };
 
   const importedScreens = [];
   const failed = [];
+  const allFiles = Array.from(files || []);
+  const csvFiles = allFiles.filter((file) => String(file?.name || '').toLowerCase().endsWith('.csv'));
 
   for (const file of fileList) {
     try {
@@ -6096,6 +8384,49 @@ async function processProjectFolderImport(files, options = {}) {
   project.folders = project.folders
     .filter((folder) => Array.isArray(folder.screens) && folder.screens.length)
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
+
+  for (const file of csvFiles) {
+    try {
+      const relativePath = String(file.webkitRelativePath || file.relativePath || file.name || '');
+      const pathParts = relativePath.split(/[\\/]/).filter(Boolean);
+      const parentFolder = pathParts.length > 1 ? String(pathParts[pathParts.length - 2] || '').toLowerCase() : '';
+      let kind = '';
+      if (parentFolder === 'tags' || parentFolder.includes('tag')) {
+        kind = 'tags';
+      } else if (parentFolder === 'parameters' || parentFolder.includes('param')) {
+        kind = 'parameters';
+      }
+
+      if (!kind) {
+        continue;
+      }
+
+      const content = await readUploadedText(file);
+      let name = baseFileName(file.name) || 'data.csv';
+      if (!name.toLowerCase().endsWith('.csv')) {
+        name = `${name}.csv`;
+      }
+
+      const target = getProjectCsvFiles(project, kind);
+      const existingIndex = target.findIndex((item) => displayKey(item.name) === displayKey(name));
+      const entry = {
+        id: `csv-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        name,
+        content,
+        sizeBytes: new Blob([content]).size,
+        lastModified: new Date().toISOString()
+      };
+
+      if (existingIndex >= 0) {
+        target[existingIndex] = { ...target[existingIndex], ...entry, id: target[existingIndex].id };
+      } else {
+        target.push(entry);
+      }
+    } catch (err) {
+      console.error(err);
+      failed.push(`${file.name}: ${err?.message || 'Invalid CSV'}`);
+    }
+  }
 
   if (!importedScreens.length || !project.folders.length) {
     throw new Error(failed.length
@@ -6187,6 +8518,81 @@ if (uploadFolderInput) {
       alert(err.message || 'Could not import XML files from the selected folder.');
     } finally {
       uploadFolderInput.value = '';
+    }
+  });
+}
+
+function bindProjectCsvInput(input, kind) {
+  if (!input) {
+    return;
+  }
+
+  input.addEventListener('change', async () => {
+    const pending = pendingCsvUpload;
+    pendingCsvUpload = null;
+    const files = Array.from(input.files || []);
+    input.value = '';
+
+    if (!pending?.projectId || !files.length) {
+      return;
+    }
+
+    try {
+      await importProjectCsvFiles(pending.projectId, kind, files);
+      const project = getProjectById(pending.projectId);
+      const imported = getProjectCsvFiles(project, kind);
+      const latest = imported[imported.length - 1];
+      if (latest) {
+        openProjectCsvFile(project, kind, latest);
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not import CSV file.');
+    }
+  });
+}
+
+bindProjectCsvInput(projectTagsCsvInput, 'tags');
+bindProjectCsvInput(projectParametersCsvInput, 'parameters');
+
+if (projectIoListInput) {
+  projectIoListInput.addEventListener('change', async () => {
+    const pending = pendingIoListUpload;
+    pendingIoListUpload = null;
+    const files = Array.from(projectIoListInput.files || []);
+    projectIoListInput.value = '';
+
+    if (!pending?.projectId || !files.length) {
+      return;
+    }
+
+    try {
+      const converted = await importProjectIoListFiles(pending.projectId, files);
+      const project = getProjectById(pending.projectId);
+      const tagsFile = getProjectPrimaryTagsFile(project);
+      const paramFile = getProjectParameterFile(project, 'PLC DI List 01')
+        || (project.parametersFiles || []).find((file) => /\.par$/i.test(file.name));
+      const ioFile = (project.ioListFiles || [])[project.ioListFiles.length - 1];
+      const tagCount = converted?.parsed?.tags?.length || 0;
+      const zones = (converted?.parsed?.meta?.zones || []).join(', ') || 'IO List';
+      if (ioFile) {
+        openProjectIoListFile(project, ioFile);
+      } else {
+        await openProjectIoListPreviewScreen(project);
+      }
+      alert(
+        `IO list imported successfully.\n`
+        + `${tagCount} tags written to ${tagsFile?.name || 'Tags.CSV'}.\n`
+        + `${(project.parametersFiles || []).filter((file) => /\.par$/i.test(file.name)).length} parameter file(s) generated (PLC DI List 01–06 format).\n`
+        + `Zones: ${zones}\n\n`
+        + 'The editable IO list table is open in Preview. Click Apply Changes after edits, then use Open IO Screen Preview for 303_IO_List.xml.'
+        + (paramFile
+          ? `\nParameter bindings: ${paramFile.name}`
+          : '')
+      );
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not import IO list.');
     }
   });
 }

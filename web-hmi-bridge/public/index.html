@@ -66,6 +66,9 @@
           <input id="uploadInput" type="file" accept=".xml,text/xml,application/xml" multiple />
           <input id="defaultUploadInput" type="file" accept=".xml,text/xml,application/xml" multiple />
           <input id="uploadFolderInput" type="file" webkitdirectory multiple />
+          <input id="projectTagsCsvInput" type="file" accept=".csv,text/csv,.txt,text/plain" multiple hidden />
+          <input id="projectParametersCsvInput" type="file" accept=".par,.csv,text/csv,text/plain" multiple hidden />
+          <input id="projectIoListInput" type="file" accept=".xlsx,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain" multiple hidden />
           <ul id="displaysList" class="single-list"></ul>
         </article>
 
@@ -243,6 +246,8 @@
     </main>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="vendor/xlsx.full.min.js"></script>
+    <script src="io-tags.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

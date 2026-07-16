@@ -1,0 +1,41 @@
+!============ Parameter File Created 2025/12/16 ============
+! Parameter files are used with graphic displays to specify the tags a display 
+! uses at run time. You assign parameter files in certain application components 
+! and object properties dialog boxes. Please see the Help for details.
+! Syntax:
+!     #replacement=tagname
+! Example:
+!     #23=A_COLOR
+! #23 in any expression in a graphic would be replaced by the tag  A_COLOR.
+!================================================
+
+
+
+#100={PLC_DI_Discr\List_01}
+
+#101={PLC_DI_Discr\Data_00}
+#102={PLC_DI_Discr\Data_01}
+#103={PLC_DI_Discr\Data_02}
+#104={PLC_DI_Discr\Data_03}
+#105={PLC_DI_Discr\Data_04}
+#106={PLC_DI_Discr\Data_05}
+#107={PLC_DI_Discr\Data_06}
+#108={PLC_DI_Discr\Data_07}
+
+#201={PLC_DI_No\Data_00}
+#202={PLC_DI_No\Data_01}
+#203={PLC_DI_No\Data_02}
+#204={PLC_DI_No\Data_03}
+#205={PLC_DI_No\Data_04}
+#206={PLC_DI_No\Data_05}
+#207={PLC_DI_No\Data_06}
+#208={PLC_DI_No\Data_07}
+
+#301={PLC_DI_Tags\Data_00}
+#302={PLC_DI_Tags\Data_01}
+#303={PLC_DI_Tags\Data_02}
+#304={PLC_DI_Tags\Data_03}
+#305={PLC_DI_Tags\Data_04}
+#306={PLC_DI_Tags\Data_05}
+#307={PLC_DI_Tags\Data_06}
+#308={PLC_DI_Tags\Data_07}

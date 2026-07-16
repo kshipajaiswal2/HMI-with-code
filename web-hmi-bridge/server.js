@@ -1,7 +1,9 @@
 const express = require('express');
 const http = require('http');
+const os = require('os');
 const path = require('path');
 const fs = require('fs');
+const vm = require('vm');
 const archiver = require('archiver');
 const chokidar = require('chokidar');
 const { Server } = require('socket.io');
@@ -10,7 +12,22 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = process.env.PORT || 5050;
+const PORT = Number(process.env.PORT) || 5050;
+const HOST = process.env.HOST || '0.0.0.0';
+
+function getNetworkAddresses() {
+  const addresses = new Set();
+  for (const interfaces of Object.values(os.networkInterfaces())) {
+    for (const item of interfaces || []) {
+      const family = item?.family;
+      const isIPv4 = family === 'IPv4' || family === 4;
+      if (isIPv4 && !item.internal && item.address) {
+        addresses.add(item.address);
+      }
+    }
+  }
+  return [...addresses];
+}
 const ROOT = __dirname;
 const FTIO_DIR = path.join(ROOT, 'ftio');
 const FACTORYTALK_EXPORT_DIR = process.env.FT_EXPORT_DIR || path.join(ROOT, '..', 'Export import');
@@ -52,6 +69,9 @@ for (const dir of [FTIO_DIR, FACTORYTALK_EXPORT_DIR, REIMPORT_DIR, PACKAGE_DIR, 
 }
 
 app.use(express.json({ limit: '2mb' }));
+app.get('/vendor/xlsx.full.min.js', (_req, res) => {
+  res.sendFile(path.join(ROOT, 'node_modules', 'xlsx', 'dist', 'xlsx.full.min.js'));
+});
 app.use(express.static(path.join(ROOT, 'public'), {
   etag: false,
   lastModified: false,
@@ -65,6 +85,36 @@ app.use(express.static(path.join(ROOT, 'public'), {
     }
   }
 }));
+
+function getNodeIoTags() {
+  if (getNodeIoTags.cache) {
+    return getNodeIoTags.cache;
+  }
+
+  const XLSX = require('xlsx');
+  const code = fs.readFileSync(path.join(ROOT, 'public', 'io-tags.js'), 'utf8');
+  const ctx = vm.createContext({ XLSX });
+  ctx.globalThis = ctx;
+  vm.runInContext(code, ctx);
+  getNodeIoTags.cache = ctx.IoTags;
+  return getNodeIoTags.cache;
+}
+
+app.post('/api/convert-io-list-xlsx', express.raw({ type: '*/*', limit: '30mb' }), (req, res) => {
+  try {
+    if (!req.body?.length) {
+      return res.status(400).json({ error: 'Empty Excel upload.' });
+    }
+
+    const IoTags = getNodeIoTags();
+    const result = IoTags.convertIoListUpload(Buffer.from(req.body), {
+      sourceName: 'upload.xlsx'
+    });
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ error: err.message || 'Could not convert Excel IO list.' });
+  }
+});
 
 function fileRow(dirPath, name) {
   const full = path.join(dirPath, name);
@@ -822,7 +872,9 @@ function resolveDisplayPath(name) {
 }
 
 function getDefaultPageFiles() {
-  return getFiles(DEFAULT_PAGES_DIR, isDisplayXml).map((file) => {
+  return getFiles(DEFAULT_PAGES_DIR, isDisplayXml)
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true, sensitivity: 'base' }))
+    .map((file) => {
     const xml = readTextAuto(path.join(DEFAULT_PAGES_DIR, file.name));
     const meta = parseDisplayMeta(xml);
     return {
@@ -1324,8 +1376,15 @@ watcher.on('all', (_event, _pathName) => {
 
 setInterval(notifyBridge, 5000);
 
-server.listen(PORT, () => {
-  console.log(`web-hmi-bridge running on http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`web-hmi-bridge listening on port ${PORT}`);
+  console.log(`  Local:   http://localhost:${PORT}`);
+  for (const address of getNetworkAddresses()) {
+    console.log(`  Network: http://${address}:${PORT}`);
+  }
+  if (HOST === '0.0.0.0') {
+    console.log('  Share a Network URL above with others on the same LAN.');
+  }
   console.log(`Reading FactoryTalk display exports from: ${FACTORYTALK_EXPORT_DIR}`);
   console.log(`Writing edited files and import packages to: ${REIMPORT_DIR}`);
 });

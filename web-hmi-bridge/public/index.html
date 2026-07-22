@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="workspace-toolbar.css" />
   </head>
   <body>
     <main class="shell">
@@ -69,49 +70,77 @@
           <input id="projectTagsCsvInput" type="file" accept=".csv,text/csv,.txt,text/plain" multiple hidden />
           <input id="projectParametersCsvInput" type="file" accept=".par,.csv,text/csv,text/plain" multiple hidden />
           <input id="projectIoListInput" type="file" accept=".xlsx,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain" multiple hidden />
+          <input id="projectPlcLogicTagsInput" type="file" accept=".csv,text/csv,.txt,text/plain" hidden />
+          <input id="imageLibraryUploadInput" type="file" accept=".bmp,.png,.jpg,.jpeg,.gif,.svg,.ico,.webp,image/*" hidden />
           <ul id="displaysList" class="single-list"></ul>
         </article>
 
         <article class="card editor-card">
           <div class="workspace-toolbar">
-            <div class="workspace-screen">
-              <label for="displayName">Screen</label>
-              <input id="displayName" type="text" readonly value="None" />
-            </div>
+            <div class="workspace-toolbar-row">
+              <nav class="app-menu-bar" aria-label="Workspace menu">
+                <div class="menu-group" data-menu-group>
+                  <button type="button" class="menu-label" aria-haspopup="menu" aria-expanded="false">File</button>
+                  <div class="menu-popup" role="menu">
+                    <button id="buildPackageBtn" type="button" role="menuitem">Page Import</button>
+                    <button id="buildAllPackageBtn" type="button" role="menuitem">All Import</button>
+                  </div>
+                </div>
+                <div class="menu-group" data-menu-group>
+                  <button type="button" class="menu-label" aria-haspopup="menu" aria-expanded="false">Application</button>
+                  <div class="menu-popup" role="menu">
+                    <button id="addObjectBtn" type="button" role="menuitem">Add Button</button>
+                    <button id="addImageBtn" type="button" role="menuitem">Add Image</button>
+                  </div>
+                </div>
+              </nav>
 
-            <div class="size-grid">
-              <div>
-                <label for="screenSizePreset">Size</label>
-                <select id="screenSizePreset">
-                  <option value="">Custom</option>
-                  <option value="800x600">800×600</option>
-                  <option value="1280x800">1280×800</option>
-                  <option value="1024x768">1024×768</option>
-                </select>
-              </div>
-              <div>
-                <label for="screenWidth">Width</label>
-                <input id="screenWidth" type="number" min="1" value="1024" />
-              </div>
-              <div>
-                <label for="screenHeight">Height</label>
-                <input id="screenHeight" type="number" min="1" value="768" />
-              </div>
-            </div>
+              <div class="workspace-toolbar-divider" aria-hidden="true"></div>
 
-            <div class="actions toolbar-actions">
-              <button id="previewBtn" type="button">Preview</button>
-              <button id="addObjectBtn" type="button" class="secondary">Add Button</button>
-              <button id="applySizeBtn" type="button" class="secondary">Apply Size</button>
-              <button id="buildPackageBtn" type="button">Page Import</button>
-              <button id="buildAllPackageBtn" type="button" class="secondary">All Import</button>
+              <div class="workspace-field workspace-field-inline workspace-screen">
+                <label for="displayName">Screen</label>
+                <input id="displayName" type="text" readonly value="None" />
+              </div>
+
+              <div class="workspace-toolbar-divider" aria-hidden="true"></div>
+
+              <div class="workspace-size-fields" aria-label="Screen size">
+                <div class="workspace-field workspace-field-inline">
+                  <label for="screenSizePreset">Preset</label>
+                  <select id="screenSizePreset">
+                    <option value="">Custom</option>
+                    <option value="800x600">800×600</option>
+                    <option value="1280x800">1280×800</option>
+                    <option value="1024x768">1024×768</option>
+                  </select>
+                </div>
+                <div class="workspace-field workspace-field-inline workspace-field-dim">
+                  <label for="screenWidth">W</label>
+                  <input id="screenWidth" type="number" min="1" value="1024" />
+                </div>
+                <div class="workspace-field workspace-field-inline workspace-field-dim">
+                  <label for="screenHeight">H</label>
+                  <input id="screenHeight" type="number" min="1" value="768" />
+                </div>
+              </div>
+
+              <div class="workspace-toolbar-spacer" aria-hidden="true"></div>
+
+              <div class="workspace-preview-controls" aria-label="Preview zoom">
+                <span class="workspace-section-label">Preview</span>
+                <div class="preview-zoom-controls">
+                  <button id="previewZoomOutBtn" type="button" class="preview-zoom-btn" title="Zoom out">−</button>
+                  <span id="previewZoomLabel" class="preview-zoom-label">100%</span>
+                  <button id="previewZoomInBtn" type="button" class="preview-zoom-btn" title="Zoom in">+</button>
+                  <button id="previewZoomResetBtn" type="button" class="preview-zoom-btn preview-zoom-reset-btn" title="Reset zoom to fit">Fit</button>
+                </div>
+              </div>
             </div>
           </div>
 
           <div class="editor-workspace">
             <div class="editor-layout" id="editorLayout">
               <div class="editor-preview">
-                <h3>Preview</h3>
                 <div id="previewPane" class="preview-pane"></div>
               </div>
 
@@ -179,6 +208,14 @@
                           <input id="objTextColorPicker" type="color" value="#ffffff" />
                           <span id="objTextColorSwatch" class="color-swatch" title="Text Color Preview"></span>
                         </div>
+                      </div>
+                      <div class="prop-wide" id="objImageNameRow" hidden>
+                        <label for="objImageName">Image</label>
+                        <div class="image-name-field">
+                          <input id="objImageName" type="text" value="" placeholder="Pick a file or type library name" list="imageLibraryOptions" />
+                          <button id="browseImageBtn" type="button" class="secondary">Browse…</button>
+                        </div>
+                        <datalist id="imageLibraryOptions"></datalist>
                       </div>
                       <div class="prop-wide font-apply-row">
                         <div class="font-size-field">

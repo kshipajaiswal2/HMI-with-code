@@ -62,7 +62,7 @@ function createZipArchive() {
   throw new Error('Unsupported archiver export format');
 }
 
-for (const dir of [FTIO_DIR, FACTORYTALK_EXPORT_DIR, REIMPORT_DIR, PACKAGE_DIR, DEFAULT_PAGES_DIR]) {
+for (const dir of [FTIO_DIR, FACTORYTALK_EXPORT_DIR, REIMPORT_DIR, PACKAGE_DIR, DEFAULT_PAGES_DIR, IMAGE_LIBRARY_DIR]) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -890,11 +890,16 @@ function getDefaultPageFiles() {
 function resolveDefaultPagePath(name) {
   const safeName = safeDisplayFileName(name);
   const templatePath = path.join(DEFAULT_PAGES_DIR, safeName);
-  if (!fs.existsSync(templatePath)) {
-    return null;
+  if (fs.existsSync(templatePath)) {
+    return { filePath: templatePath, source: 'default-template', name: safeName };
   }
 
-  return { filePath: templatePath, source: 'default-template', name: safeName };
+  const reimportPath = path.join(REIMPORT_DIR, safeName);
+  if (fs.existsSync(reimportPath)) {
+    return { filePath: reimportPath, source: 'reimport', name: safeName };
+  }
+
+  return null;
 }
 
 function bridgeSnapshot() {
@@ -1092,6 +1097,88 @@ app.get('/api/displays/:name', (req, res) => {
     width: meta.width,
     height: meta.height
   });
+});
+
+function listImageLibraryFiles() {
+  if (!fs.existsSync(IMAGE_LIBRARY_DIR)) {
+    return [];
+  }
+
+  const allowed = new Set(['.bmp', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp']);
+  return fs.readdirSync(IMAGE_LIBRARY_DIR)
+    .filter((file) => {
+      const fullPath = path.join(IMAGE_LIBRARY_DIR, file);
+      if (!fs.statSync(fullPath).isFile()) {
+        return false;
+      }
+      return allowed.has(path.extname(file).toLowerCase());
+    })
+    .map((file) => ({
+      file,
+      name: path.basename(file, path.extname(file))
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+function sanitizeImageUploadFileName(name) {
+  const base = path.basename(String(name || '').trim());
+  if (!base) {
+    return null;
+  }
+
+  const ext = path.extname(base).toLowerCase();
+  const allowed = new Set(['.bmp', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp']);
+  if (!allowed.has(ext)) {
+    return null;
+  }
+
+  const stem = path.basename(base, ext).replace(/[^a-zA-Z0-9._ \-()]+/g, '_').trim();
+  if (!stem) {
+    return null;
+  }
+
+  return `${stem}${ext}`;
+}
+
+app.get('/api/images', (_req, res) => {
+  const files = listImageLibraryFiles();
+  return res.json({
+    folder: IMAGE_LIBRARY_DIR,
+    files: files.map((entry) => entry.name),
+    entries: files
+  });
+});
+
+app.post('/api/images/upload', express.raw({ type: '*/*', limit: '25mb' }), (req, res) => {
+  try {
+    if (!req.body?.length) {
+      return res.status(400).json({ error: 'Empty image upload.' });
+    }
+
+    const rawName = String(req.query.name || req.headers['x-image-filename'] || 'upload.png').trim();
+    const safeName = sanitizeImageUploadFileName(rawName);
+    if (!safeName) {
+      return res.status(400).json({ error: 'Unsupported image type. Use bmp, png, jpg, gif, svg, ico, or webp.' });
+    }
+
+    if (!fs.existsSync(IMAGE_LIBRARY_DIR)) {
+      fs.mkdirSync(IMAGE_LIBRARY_DIR, { recursive: true });
+    }
+
+    const savePath = path.join(IMAGE_LIBRARY_DIR, safeName);
+    fs.writeFileSync(savePath, Buffer.from(req.body));
+
+    const imageName = path.basename(safeName, path.extname(safeName));
+    return res.json({
+      ok: true,
+      file: safeName,
+      name: imageName,
+      folder: IMAGE_LIBRARY_DIR,
+      sizeBytes: req.body.length
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Could not save image.' });
+  }
 });
 
 app.get('/api/images/:name', (req, res) => {

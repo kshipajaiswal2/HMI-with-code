@@ -1,4 +1,4 @@
-﻿const socket = io();
+const socket = io();
 
 const bridgeStatus = document.getElementById('bridgeStatus');
 const displaysList = document.getElementById('displaysList');
@@ -10,6 +10,7 @@ const uploadFolderInput = document.getElementById('uploadFolderInput');
 const projectTagsCsvInput = document.getElementById('projectTagsCsvInput');
 const projectParametersCsvInput = document.getElementById('projectParametersCsvInput');
 const projectIoListInput = document.getElementById('projectIoListInput');
+const projectPlcLogicTagsInput = document.getElementById('projectPlcLogicTagsInput');
 const importFolderBtn = document.getElementById('importFolderBtn');
 const newProjectBtn = document.getElementById('newProjectBtn');
 const projectCreatePanel = document.getElementById('projectCreatePanel');
@@ -35,9 +36,10 @@ const screenSizePreset = document.getElementById('screenSizePreset');
 const screenWidth = document.getElementById('screenWidth');
 const screenHeight = document.getElementById('screenHeight');
 const xmlEditor = document.getElementById('xmlEditor');
-const previewBtn = document.getElementById('previewBtn');
 const addObjectBtn = document.getElementById('addObjectBtn');
-const applySizeBtn = document.getElementById('applySizeBtn');
+const addImageBtn = document.getElementById('addImageBtn');
+const imageLibraryUploadInput = document.getElementById('imageLibraryUploadInput');
+const browseImageBtn = document.getElementById('browseImageBtn');
 const buildPackageBtn = document.getElementById('buildPackageBtn');
 const buildAllPackageBtn = document.getElementById('buildAllPackageBtn');
 const previewPane = document.getElementById('previewPane');
@@ -57,6 +59,9 @@ const objBackColor = document.getElementById('objBackColor');
 const objBorderColor = document.getElementById('objBorderColor');
 const objTextColor = document.getElementById('objTextColor');
 const objFontSize = document.getElementById('objFontSize');
+const objImageName = document.getElementById('objImageName');
+const objImageNameRow = document.getElementById('objImageNameRow');
+const imageLibraryOptions = document.getElementById('imageLibraryOptions');
 const applyObjectBtn = document.getElementById('applyObjectBtn');
 const objBackColorPicker = document.getElementById('objBackColorPicker');
 const objBorderColorPicker = document.getElementById('objBorderColorPicker');
@@ -72,6 +77,7 @@ const generatePopupsBtn = document.getElementById('generatePopupsBtn');
 const popupGenerateActions = document.getElementById('popupGenerateActions');
 
 let previewResizeObserver = null;
+let previewZoomLevel = 1;
 
 let selectedDisplay = '';
 let selectedFiles = [];
@@ -114,7 +120,10 @@ const ACTIVE_PROJECT_STORAGE_KEY = 'displayXmlBridge.activeProjectId';
 const SIDEBAR_MODE_DISPLAYS = 'displays';
 const SIDEBAR_MODE_DEFAULTS = 'defaults';
 const UNGROUPED_FOLDER_NAME = 'Ungrouped';
-const HISTORY_LIMIT = 120;
+const PREVIEW_ZOOM_STORAGE_KEY = 'displayXmlBridge.previewZoom';
+const PREVIEW_ZOOM_MIN = 0.5;
+const PREVIEW_ZOOM_MAX = 4;
+const PREVIEW_ZOOM_STEP = 0.1;
 const POPUP_GROUP_PREFIX = 'WB_POPUP';
 const SCREEN_SIZE_PRESETS = {
   '800x600': { width: 800, height: 600 },
@@ -131,14 +140,18 @@ let activeProjectCsvKey = '';
 let activeIoListFileKey = '';
 let pendingCsvUpload = null;
 let pendingIoListUpload = null;
+let pendingPlcLogicTagsUpload = null;
 let activeProjectKey = '';
 let currentPreviewIoProject = null;
+
+previewZoomLevel = loadPreviewZoomLevel();
 
 function displayKey(name) {
   return String(name || '').toLowerCase();
 }
 
 const IO_LIST_SCREEN_FILE = '303_IO_List.xml';
+const IO_DO_LIST_SCREEN_FILE = '410_PLC IO List.xml';
 const CYCLE_TIME_SCREEN_FILE = '304_Cycle_Time.xml';
 
 const EXCLUDED_PROJECT_SCREENS = new Set([
@@ -345,11 +358,15 @@ function ensureProjectCsvData(project) {
   project.tagsFiles = Array.isArray(project.tagsFiles) ? project.tagsFiles : [];
   project.parametersFiles = Array.isArray(project.parametersFiles) ? project.parametersFiles : [];
   project.ioListFiles = Array.isArray(project.ioListFiles) ? project.ioListFiles : [];
+  project.plcLogicTagsFiles = Array.isArray(project.plcLogicTagsFiles) ? project.plcLogicTagsFiles : [];
   project.tagsCollapsed = Boolean(project.tagsCollapsed);
   project.parametersCollapsed = Boolean(project.parametersCollapsed);
   project.ioListCollapsed = Boolean(project.ioListCollapsed);
   project.ioListPreviewPage = Math.max(1, Number(project.ioListPreviewPage) || 1);
   project.ioListPreviewZone = String(project.ioListPreviewZone || '');
+  if (project.ioListEditorFilter === undefined) {
+    project.ioListEditorFilter = 'IO';
+  }
   if (project.ioTagsParsed === undefined) {
     project.ioTagsParsed = null;
   }
@@ -365,7 +382,7 @@ function ensureProjectCsvData(project) {
       : [];
   }
 
-  for (const list of [project.tagsFiles, project.parametersFiles, project.ioListFiles]) {
+  for (const list of [project.tagsFiles, project.parametersFiles, project.ioListFiles, project.plcLogicTagsFiles]) {
     for (const file of list) {
       file.id = String(file.id || `csv-${Date.now()}-${Math.random().toString(16).slice(2)}`);
       file.name = String(file.name || 'data.csv');
@@ -374,8 +391,149 @@ function ensureProjectCsvData(project) {
       file.sizeBytes = Number.isFinite(Number(file.sizeBytes))
         ? Number(file.sizeBytes)
         : new Blob([file.content]).size;
+      if (list === project.ioListFiles && !Array.isArray(file.sheetData)) {
+        file.sheetData = [];
+      }
     }
   }
+
+  if (project.ioListMeta?.sourceSheets?.length && !(project.ioListSheets || []).length) {
+    project.ioListSheets = project.ioListMeta.sourceSheets;
+  }
+
+  for (const file of project.ioListFiles || []) {
+    if (!file.sheetData?.length && project.ioListMeta?.sourceSheets?.length) {
+      file.sheetData = project.ioListMeta.sourceSheets;
+    }
+  }
+}
+
+function normalizeIoListEditorFilter(value) {
+  const key = String(value || 'IO').toUpperCase();
+  if (key === 'DO' || key === 'SDO') {
+    return 'DO';
+  }
+  if (key === 'IO' || key === 'SDI' || key === 'DI' || key === 'ALL') {
+    return 'IO';
+  }
+  return 'IO';
+}
+
+function shouldShowIoListEditorKind(project, kind) {
+  const filter = normalizeIoListEditorFilter(project?.ioListEditorFilter);
+  const kindKey = String(kind || '').toUpperCase();
+  if (filter === 'IO') {
+    return kindKey === 'SDI' || kindKey === 'DI' || kindKey === 'OTHER';
+  }
+  if (filter === 'DO') {
+    return kindKey === 'SDO' || kindKey === 'DO';
+  }
+  return true;
+}
+
+function isGenericIoListZoneName(zone) {
+  const key = displayKey(String(zone || '').trim());
+  return !key || key === 'io' || key === 'do' || key === 'iolist';
+}
+
+function normalizeIoListZoneNames(zones) {
+  const list = Array.isArray(zones)
+    ? zones.map((zone) => String(zone || '').trim()).filter(Boolean)
+    : [];
+  const meaningful = list.filter((zone) => !isGenericIoListZoneName(zone));
+  return meaningful.length ? meaningful : [];
+}
+
+function formatIoListZoneSideLabel(zone, side) {
+  const zoneName = String(zone || '').trim();
+  if (!zoneName || isGenericIoListZoneName(zoneName)) {
+    return side;
+  }
+  return `${zoneName} ${side}`;
+}
+
+function formatIoListSectionTitle(zone, side) {
+  return `${formatIoListZoneSideLabel(zone, side)} List`;
+}
+
+function buildIoListZoneSideOptions(zones) {
+  const list = normalizeIoListZoneNames(zones);
+  if (!list.length) {
+    return [
+      { value: 'IO', zone: '', side: 'IO', label: 'IO' },
+      { value: 'DO', zone: '', side: 'DO', label: 'DO' }
+    ];
+  }
+
+  const options = [];
+  for (const zone of list) {
+    options.push({
+      value: `${zone}::IO`,
+      zone,
+      side: 'IO',
+      label: formatIoListZoneSideLabel(zone, 'IO')
+    });
+    options.push({
+      value: `${zone}::DO`,
+      zone,
+      side: 'DO',
+      label: formatIoListZoneSideLabel(zone, 'DO')
+    });
+  }
+  return options;
+}
+
+function getIoListEditorSelection(project, zones) {
+  const list = normalizeIoListZoneNames(zones);
+  const options = buildIoListZoneSideOptions(zones);
+  const side = normalizeIoListEditorFilter(project?.ioListEditorFilter);
+  const zone = resolveIoListEditorZone(project, list);
+  const preferredValue = list.length ? `${zone}::${side}` : side;
+  return options.find((option) => displayKey(option.value) === displayKey(preferredValue))
+    || options.find((option) => displayKey(option.zone) === displayKey(zone) && option.side === side)
+    || options.find((option) => displayKey(option.zone) === displayKey(zone))
+    || options[0];
+}
+
+function applyIoListEditorSelection(project, selection) {
+  if (!project || !selection) {
+    return;
+  }
+  const zone = String(selection.zone || '').trim();
+  project.ioListPreviewZone = isGenericIoListZoneName(zone) ? '' : zone;
+  project.ioListEditorFilter = selection.side || 'IO';
+}
+
+function appendIoListEditorZoneControls(toolbar, project, zones, rerenderIoListEditor) {
+  const options = buildIoListZoneSideOptions(zones);
+  const current = getIoListEditorSelection(project, zones);
+  applyIoListEditorSelection(project, current);
+
+  const zoneLabel = document.createElement('label');
+  zoneLabel.className = 'io-list-editor-zone-label';
+  zoneLabel.textContent = 'Zone:';
+  const zoneSelect = document.createElement('select');
+  zoneSelect.className = 'io-list-editor-zone-select';
+  for (const option of options) {
+    const el = document.createElement('option');
+    el.value = option.value;
+    el.textContent = option.label;
+    el.selected = displayKey(option.value) === displayKey(current.value);
+    zoneSelect.appendChild(el);
+  }
+  zoneSelect.addEventListener('change', () => {
+    mergeVisibleIoListSheetEdits(project);
+    const picked = options.find((option) => option.value === zoneSelect.value) || options[0];
+    applyIoListEditorSelection(project, picked);
+    const parsed = getProjectIoTagsParsed(project);
+    if (parsed?.tags?.length) {
+      upsertGeneratedParameterFiles(project, parsed, project.ioListPreviewZone || '');
+    }
+    saveProjectList();
+    rerenderIoListEditor();
+  });
+  zoneLabel.appendChild(zoneSelect);
+  toolbar.appendChild(zoneLabel);
 }
 
 function saveActiveProjectCsvFromEditor() {
@@ -577,7 +735,7 @@ function renderParameterFilePreview(project, file) {
 
   const intro = document.createElement('p');
   intro.className = 'parameter-preview-intro';
-  intro.textContent = 'FactoryTalk parameter bindings (#slot → tag) with live preview values from your Tags CSV / IO list.';
+  intro.textContent = 'Parameter slots (#101/#201/#301) bind to HMI tags; #301–#308 (Tags rows) show the PLC address from your Tags CSV.';
   frame.appendChild(intro);
 
   const toolbar = document.createElement('div');
@@ -616,7 +774,7 @@ function renderParameterFilePreview(project, file) {
 
   const table = document.createElement('table');
   table.className = 'parameter-preview-table';
-  table.innerHTML = '<thead><tr><th>Slot</th><th>Tag binding</th><th>Preview value</th></tr></thead>';
+  table.innerHTML = '<thead><tr><th>Slot</th><th>HMI tag binding</th><th>PLC address / preview</th></tr></thead>';
   const tbody = document.createElement('tbody');
 
   for (const row of rows) {
@@ -866,7 +1024,9 @@ function upsertGeneratedParameterFiles(project, parsed, zone = 'Packing') {
   }
 
   ensureProjectCsvData(project);
-  const builtFiles = globalThis.IoTags.buildIoListParameterFiles(parsed, { zone, maxPages: 6 });
+  const builtFiles = globalThis.IoTags.buildAllIoListParameterFiles
+    ? globalThis.IoTags.buildAllIoListParameterFiles(parsed, { zone, maxPages: 6 })
+    : globalThis.IoTags.buildIoListParameterFiles(parsed, { zone, maxPages: 6 });
   const upserted = [];
 
   for (const built of builtFiles) {
@@ -940,6 +1100,138 @@ function getProjectPrimaryTagsFile(project) {
   }
 
   return tagsCandidates[0] || project.tagsFiles[0] || null;
+}
+
+function getProjectPlcLogicTagsFile(project) {
+  if (!project) {
+    return null;
+  }
+
+  ensureProjectCsvData(project);
+  const files = (project.plcLogicTagsFiles || []).filter((file) => String(file.content || '').trim());
+  if (!files.length) {
+    return null;
+  }
+
+  return files.sort((a, b) => String(b.lastModified || '').localeCompare(String(a.lastModified || '')))[0];
+}
+
+function applyPlcLogicTagMatchingToProject(project, options = {}) {
+  if (!project || !globalThis.IoTags?.applyPlcTagsToParsed) {
+    return null;
+  }
+
+  const plcLogicFile = getProjectPlcLogicTagsFile(project);
+  const rsLogixText = String(plcLogicFile?.content || '').trim();
+  if (!rsLogixText) {
+    return null;
+  }
+
+  const sheets = getProjectIoListSheets(project);
+  if (!sheets.length) {
+    return null;
+  }
+
+  const baseParsed = project.ioTagsParsed
+    || globalThis.IoTags.rebuildParsedFromMasterSheets(sheets);
+  const { parsed, stats } = globalThis.IoTags.applyPlcTagsToParsed({
+    ...baseParsed,
+    meta: {
+      ...(baseParsed?.meta || {}),
+      sourceSheets: sheets
+    }
+  }, rsLogixText);
+
+  project.ioListMeta = parsed.meta || project.ioListMeta;
+  project.ioListSheets = parsed.meta?.sourceSheets || sheets;
+  const ioFile = (project.ioListFiles || [])[0];
+  if (ioFile && parsed.meta?.sourceSheets?.length) {
+    syncIoListSheetDataToFile(project, ioFile, parsed.meta.sourceSheets);
+    ioFile.content = globalThis.IoTags.formatMasterSheetSummary(parsed, ioFile.name);
+    ioFile.sizeBytes = new Blob([ioFile.content]).size;
+    ioFile.lastModified = new Date().toISOString();
+  }
+
+  project.ioTagsParsed = parsed;
+  upsertGeneratedTagsCsv(
+    project,
+    globalThis.IoTags.serializeFactoryTalkTagsCsv(parsed),
+    `${project.name}-Tags`
+  );
+  upsertGeneratedParameterFiles(project, parsed, project.ioListPreviewZone || '');
+
+  if (options.save !== false) {
+    saveProjectList();
+  }
+
+  return stats;
+}
+
+async function importProjectPlcLogicTagsFiles(projectId, fileList) {
+  const project = getProjectById(projectId);
+  if (!project || !fileList?.length) {
+    throw new Error('Choose a project and an RSLogix Tags CSV file.');
+  }
+  if (!globalThis.IoTags) {
+    throw new Error('IO list support failed to load. Refresh the page and try again.');
+  }
+
+  ensureProjectCsvData(project);
+  const sourceFile = fileList[0];
+  const content = await readUploadedText(sourceFile);
+  if (!globalThis.IoTags.isRsLogixTagsCsv(content)) {
+    throw new Error('This does not look like an RSLogix 5000 Tags CSV export. Export tags from Studio 5000 using CSV format.');
+  }
+
+  let name = baseFileName(sourceFile.name) || 'PLC_Logic_Tags';
+  if (!/\.csv$/i.test(name)) {
+    name = `${name}.CSV`;
+  }
+
+  const entry = {
+    id: `plc-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name,
+    content,
+    sizeBytes: new Blob([content]).size,
+    lastModified: new Date().toISOString()
+  };
+
+  const existingIndex = project.plcLogicTagsFiles.findIndex((item) => displayKey(item.name) === displayKey(name));
+  if (existingIndex >= 0) {
+    project.plcLogicTagsFiles[existingIndex] = {
+      ...project.plcLogicTagsFiles[existingIndex],
+      ...entry,
+      id: project.plcLogicTagsFiles[existingIndex].id
+    };
+  } else {
+    project.plcLogicTagsFiles.push(entry);
+  }
+
+  const stats = applyPlcLogicTagMatchingToProject(project, { save: false });
+  saveProjectList();
+  renderProjectSidebar();
+
+  if (activeIoListFileKey) {
+    const ioRecord = getProjectIoListFileByKey(activeIoListFileKey);
+    if (ioRecord?.file) {
+      renderIoListEditorPreview(project, ioRecord.file);
+    }
+  }
+
+  if (isIoListPreviewScreenActive()) {
+    renderPreview();
+  }
+
+  return { entry, stats };
+}
+
+function queuePlcLogicTagsUpload(projectId) {
+  pendingPlcLogicTagsUpload = { projectId };
+  if (!projectPlcLogicTagsInput) {
+    return;
+  }
+  projectPlcLogicTagsInput.value = '';
+  projectPlcLogicTagsInput.click();
 }
 
 function findProjectScreenByFileName(project, screenFileName) {
@@ -1094,6 +1386,46 @@ async function ensureProjectIoListScreen(project) {
   return { folder, screen };
 }
 
+async function ensureProjectIoDoListScreen(project) {
+  const existing = findProjectScreenByFileName(project, IO_DO_LIST_SCREEN_FILE);
+  if (existing) {
+    return existing;
+  }
+
+  const template = await loadDefaultTemplateXml(IO_DO_LIST_SCREEN_FILE);
+  const folder = findOrCreateManualOperationFolder(project);
+  const screen = screenMetaFromXml(IO_DO_LIST_SCREEN_FILE, adaptIoListTemplateXml(template.xml));
+  folder.screens = Array.isArray(folder.screens) ? folder.screens : [];
+  folder.screens.push(screen);
+  saveProjectList();
+  renderProjectSidebar();
+  return { folder, screen };
+}
+
+async function openProjectIoDoListPreviewScreen(project) {
+  let match = findProjectScreenByFileName(project, IO_DO_LIST_SCREEN_FILE);
+  if (!match) {
+    match = await ensureProjectIoDoListScreen(project);
+  }
+  if (!match) {
+    return false;
+  }
+
+  await openProjectScreen(project.id, match.folder.name, match.screen.name, { skipSave: true });
+  return true;
+}
+
+async function openIoListEditorScreenPreview(project, selection) {
+  const side = normalizeIoListEditorFilter(selection?.side || project?.ioListEditorFilter);
+  if (side === 'DO') {
+    project.ioListPreviewParameterFile = 'PLC DO List 01';
+    return openProjectIoDoListPreviewScreen(project);
+  }
+
+  project.ioListPreviewParameterFile = 'PLC DI List 01';
+  return openProjectIoListPreviewScreen(project);
+}
+
 async function openProjectIoListPreviewScreen(project) {
   let match = findProjectScreenByFileName(project, IO_LIST_SCREEN_FILE);
   if (!match) {
@@ -1211,8 +1543,22 @@ function getProjectIoListFileByKey(key) {
   return { project, file };
 }
 
-function getProjectIoListSheets(project) {
+function getProjectIoListSheets(project, file = null) {
   ensureProjectCsvData(project);
+
+  if (file?.sheetData?.length) {
+    project.ioListSheets = file.sheetData;
+    return file.sheetData;
+  }
+
+  if (!file && activeIoListFileKey) {
+    const record = getProjectIoListFileByKey(activeIoListFileKey);
+    if (record?.file?.sheetData?.length) {
+      project.ioListSheets = record.file.sheetData;
+      return record.file.sheetData;
+    }
+  }
+
   if (project.ioListSheets?.length) {
     return project.ioListSheets;
   }
@@ -1220,7 +1566,47 @@ function getProjectIoListSheets(project) {
     project.ioListSheets = project.ioListMeta.sourceSheets;
     return project.ioListSheets;
   }
+
+  const files = project?.ioListFiles || [];
+  const preferred = file || files.find((item) => Array.isArray(item.sheetData) && item.sheetData.length)
+    || files[files.length - 1];
+  if (preferred?.sheetData?.length) {
+    project.ioListSheets = preferred.sheetData;
+    return project.ioListSheets;
+  }
+
   return [];
+}
+
+function syncIoListSheetDataToFile(project, file, sheets) {
+  if (!project || !file || !Array.isArray(sheets) || !sheets.length) {
+    return;
+  }
+  file.sheetData = sheets;
+  project.ioListSheets = sheets;
+  if (project.ioListMeta && typeof project.ioListMeta === 'object') {
+    project.ioListMeta.sourceSheets = sheets;
+  }
+}
+
+function isIoDoPreviewContext(project) {
+  if (!project) {
+    return false;
+  }
+
+  const paramName = String(project.ioListPreviewParameterFile || getActiveParameterFile(project)?.name || '');
+  if (/plc\s*do\s*list/i.test(paramName)) {
+    return true;
+  }
+
+  if (isIoListPreviewScreenActive()) {
+    const screenName = String(displayName.value || '').split('/').pop()?.trim() || '';
+    if (/410_PLC IO List/i.test(screenName)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function collectIoListEditorRows() {
@@ -1253,7 +1639,78 @@ function getIoListZoneSheet(project, zone) {
 }
 
 function getIoListSheetPlcDiItems(sheet) {
-  return (sheet?.diInputs || []).filter((item) => !item.isSafety);
+  return (sheet?.diInputs || []).filter((item) => item.ioKind === 'DI' || (!item.ioKind && !item.isSafety));
+}
+
+function getIoListSheetItemsByKind(sheet, kind) {
+  const key = String(kind || '').toUpperCase();
+  if (key === 'SDI' || key === 'DI') {
+    return (sheet?.diInputs || []).filter((item) => (
+      item.ioKind === key || (!item.ioKind && ((key === 'SDI' && item.isSafety) || (key === 'DI' && !item.isSafety)))
+    ));
+  }
+  if (key === 'SDO' || key === 'DO') {
+    return (sheet?.doOutputs || []).filter((item) => (
+      item.ioKind === key || (!item.ioKind && ((key === 'SDO' && item.isSafety) || (key === 'DO' && !item.isSafety)))
+    ));
+  }
+  return [];
+}
+
+function formatIoListTypeCell(item) {
+  const ioKind = String(item?.ioKind || '').toUpperCase();
+  const labels = globalThis.IoTags?.IO_TYPE_LABELS || {};
+  const label = item?.ioKindLabel || labels[ioKind] || ioKind;
+  const code = escapeHtmlText(item?.type || ioKind);
+  if (!label || label === ioKind) {
+    return code;
+  }
+  return `<span class="io-type-code">${code}</span><span class="io-type-label">${escapeHtmlText(label)}</span>`;
+}
+
+function appendIoListEditorRowsTable(section, config) {
+  const {
+    title,
+    items,
+    rowKind,
+    getIndex,
+    zone
+  } = config;
+
+  if (!items.length) {
+    return;
+  }
+
+  const blockTitle = document.createElement('h5');
+  blockTitle.className = 'io-list-subsection-title';
+  blockTitle.textContent = title;
+  section.appendChild(blockTitle);
+
+  const table = document.createElement('table');
+  table.className = `io-list-editor-table${rowKind === 'di' && items[0]?.ioKind === 'SDI' ? ' io-list-editor-subtable' : ''}`;
+  table.innerHTML = '<thead><tr><th>IO Type</th><th>Point</th><th>Address</th><th>Description</th><th>PLC Tag</th></tr></thead>';
+  const tbody = document.createElement('tbody');
+
+  for (const item of items) {
+    const index = getIndex(item);
+    const tr = document.createElement('tr');
+    tr.dataset[`io${rowKind === 'di' ? 'Di' : 'Do'}Index`] = String(index);
+    if (item.isSafety) {
+      tr.dataset.ioSafety = '1';
+    }
+    if (item.ioKind) {
+      tr.dataset.ioKind = item.ioKind;
+    }
+    tr.innerHTML = `<td class="io-type-cell">${formatIoListTypeCell(item)}</td>`
+      + `<td data-io-field="type">${escapeHtmlText(item.type || '')}</td>`
+      + `<td><input data-io-field="address" type="text" value="${escapeHtmlAttr(item.address || '')}"></td>`
+      + `<td><input data-io-field="description" type="text" value="${escapeHtmlAttr(item.description || '')}"></td>`
+      + `<td><input data-io-field="plcTag" type="text" value="${escapeHtmlAttr(item.plcTag || '')}"></td>`;
+    tbody.appendChild(tr);
+  }
+
+  table.appendChild(tbody);
+  section.appendChild(table);
 }
 
 function getIoListSheetPageCount(sheet) {
@@ -1261,15 +1718,15 @@ function getIoListSheetPageCount(sheet) {
 }
 
 function resolveIoListEditorZone(project, zones, fallbackZone = '') {
-  const list = Array.isArray(zones) ? zones.filter(Boolean) : [];
+  const list = normalizeIoListZoneNames(zones);
   let zone = String(project?.ioListPreviewZone || fallbackZone || '').trim();
-  if (zone && list.some((item) => displayKey(item) === displayKey(zone))) {
+  if (zone && !isGenericIoListZoneName(zone) && list.some((item) => displayKey(item) === displayKey(zone))) {
     return zone;
   }
   if (list.includes('Packing')) {
     return 'Packing';
   }
-  return list[0] || zone || 'IO';
+  return list[0] || '';
 }
 
 function mergeVisibleIoListSheetEdits(project) {
@@ -1311,7 +1768,7 @@ function getIoListEditableRows(project, file) {
     return { mode: 'empty', rows: [], sheets: [] };
   }
 
-  const sheets = getProjectIoListSheets(project);
+  const sheets = getProjectIoListSheets(project, file);
   if (sheets.length) {
     return { mode: 'sheets', rows: [], sheets };
   }
@@ -1356,7 +1813,7 @@ function applyIoListProjectChanges(project, file, editorState) {
 
   project.ioListMeta = parsed.meta || null;
   if (parsed.meta?.sourceSheets?.length) {
-    project.ioListSheets = parsed.meta.sourceSheets;
+    syncIoListSheetDataToFile(project, file, parsed.meta.sourceSheets);
   }
   project.ioTagsParsed = parsed;
 
@@ -1399,15 +1856,30 @@ function renderIoListEditorPreview(project, file) {
 
   const intro = document.createElement('p');
   intro.className = 'io-list-editor-intro';
-  intro.textContent = 'Edit descriptions and addresses for the selected zone, then click Apply Changes to update Tags CSV and the IO screen preview.';
+  const plcLogicFile = getProjectPlcLogicTagsFile(project);
+  const matchStats = project.ioTagsParsed?.meta?.plcTagMatch || project.ioListMeta?.plcTagMatch;
+  let introText = 'Edit descriptions and addresses for the selected zone, then click Apply Changes to update Tags CSV and the IO screen preview.';
+  if (plcLogicFile) {
+    introText += ` PLC logic tags loaded from ${plcLogicFile.name}. ALIAS rows are ignored; TAG rows are checked first.`;
+    if (matchStats?.total) {
+      introText += ` Matched ${matchStats.matched}/${matchStats.total} IO points using DESCRIPTION → SPECIFIER.`;
+      if (matchStats.rslogixRowTypes?.includes('COMMENT')) {
+        introText += ' (RSLogix stores IO descriptions on COMMENT rows when TAG rows have no IO text.)';
+      }
+    }
+  } else {
+    introText += ' Upload an RSLogix Tags CSV under IO List → PLC to match IO descriptions to tag addresses from the CSV SPECIFIER column.';
+  }
+  intro.textContent = introText;
   frame.appendChild(intro);
 
   const toolbar = document.createElement('div');
   toolbar.className = 'io-list-editor-toolbar';
 
   const zones = project.ioListMeta?.zones || editorState.sheets.map((sheet) => sheet.zone).filter(Boolean);
-  const activeZone = resolveIoListEditorZone(project, zones);
-  project.ioListPreviewZone = activeZone;
+  const selection = getIoListEditorSelection(project, zones);
+  applyIoListEditorSelection(project, selection);
+  const activeZone = selection.zone || resolveIoListEditorZone(project, zones);
 
   const rerenderIoListEditor = () => {
     saveProjectList();
@@ -1417,27 +1889,17 @@ function renderIoListEditorPreview(project, file) {
     }
   };
 
-  if (zones.length) {
-    const zoneLabel = document.createElement('label');
-    zoneLabel.className = 'io-list-editor-zone-label';
-    zoneLabel.textContent = 'Zone:';
-    const zoneSelect = document.createElement('select');
-    zoneSelect.className = 'io-list-editor-zone-select';
-    for (const zone of zones) {
-      const option = document.createElement('option');
-      option.value = zone;
-      option.textContent = zone;
-      option.selected = displayKey(zone) === displayKey(activeZone);
-      zoneSelect.appendChild(option);
-    }
-    zoneSelect.addEventListener('change', () => {
-      mergeVisibleIoListSheetEdits(project);
-      project.ioListPreviewZone = zoneSelect.value;
-      rerenderIoListEditor();
-    });
-    zoneLabel.appendChild(zoneSelect);
-    toolbar.appendChild(zoneLabel);
-  }
+  appendIoListEditorZoneControls(toolbar, project, zones, rerenderIoListEditor);
+
+  const plcTagsBtn = document.createElement('button');
+  plcTagsBtn.type = 'button';
+  plcTagsBtn.className = 'io-list-editor-preview-btn';
+  plcTagsBtn.textContent = plcLogicFile ? 'Re-match PLC Tags' : 'Upload PLC Tags';
+  plcTagsBtn.title = 'Upload RSLogix Tags CSV — matches IO descriptions to SPECIFIER tag addresses';
+  plcTagsBtn.addEventListener('click', () => {
+    queuePlcLogicTagsUpload(project.id);
+  });
+  toolbar.appendChild(plcTagsBtn);
 
   const applyBtn = document.createElement('button');
   applyBtn.type = 'button';
@@ -1456,11 +1918,19 @@ function renderIoListEditorPreview(project, file) {
   const previewBtn = document.createElement('button');
   previewBtn.type = 'button';
   previewBtn.className = 'io-list-editor-preview-btn';
-  previewBtn.textContent = 'Open IO Screen Preview';
+  previewBtn.textContent = 'Open Screen Preview';
   previewBtn.addEventListener('click', async () => {
-    const opened = await openProjectIoListPreviewScreen(project);
+    const current = getIoListEditorSelection(project, zones);
+    applyIoListEditorSelection(project, current);
+    saveProjectList();
+    const opened = await openIoListEditorScreenPreview(project, current);
     if (!opened) {
-      alert('Could not open 303_IO_List.xml.');
+      const side = normalizeIoListEditorFilter(current.side);
+      alert(side === 'DO'
+        ? 'Could not open 410_PLC IO List.xml.'
+        : 'Could not open 303_IO_List.xml.');
+    } else {
+      renderPreview();
     }
   });
   toolbar.appendChild(previewBtn);
@@ -1478,113 +1948,153 @@ function renderIoListEditorPreview(project, file) {
 
   if (editorState.mode === 'sheets') {
     const activeSheet = getIoListZoneSheet(project, activeZone);
-    const plcDiItems = getIoListSheetPlcDiItems(activeSheet);
+    const sdiItems = getIoListSheetItemsByKind(activeSheet, 'SDI');
+    const diItems = getIoListSheetItemsByKind(activeSheet, 'DI');
+    const sdoItems = getIoListSheetItemsByKind(activeSheet, 'SDO');
+    const doItems = getIoListSheetItemsByKind(activeSheet, 'DO');
 
     const section = document.createElement('section');
     section.className = 'io-list-sheet-section';
     section.dataset.ioSheetZone = activeSheet?.zone || activeZone;
 
+    const ioFilter = normalizeIoListEditorFilter(project.ioListEditorFilter);
     const sectionTitle = document.createElement('h5');
-    sectionTitle.textContent = `${activeSheet?.zone || activeZone} IO List`;
+    sectionTitle.textContent = formatIoListSectionTitle(selection.zone, selection.side);
     section.appendChild(sectionTitle);
 
     const meta = document.createElement('p');
     meta.className = 'io-list-page-meta';
-    meta.textContent = `${plcDiItems.length} PLC digital inputs`;
+    meta.textContent = ioFilter === 'DO'
+      ? `SDO ${sdoItems.length}, DO ${doItems.length}`
+      : `SDI ${sdiItems.length}, DI ${diItems.length}`;
     section.appendChild(meta);
 
-    const table = document.createElement('table');
-    table.className = 'io-list-editor-table';
-    table.innerHTML = '<thead><tr><th>Type</th><th>Address</th><th>Description</th><th>PLC Tag</th></tr></thead>';
-    const tbody = document.createElement('tbody');
-
-    for (const item of plcDiItems) {
-      const diIndex = activeSheet.diInputs.indexOf(item);
-      const tr = document.createElement('tr');
-      tr.dataset.ioRowKind = 'di';
-      tr.dataset.ioDiIndex = String(diIndex);
-      tr.dataset.ioSafety = item.isSafety ? '1' : '0';
-      tr.innerHTML = `<td data-io-field="type">${escapeHtmlText(item.type || '')}</td>`
-        + `<td><input data-io-field="address" type="text" value="${escapeHtmlAttr(item.address || '')}"></td>`
-        + `<td><input data-io-field="description" type="text" value="${escapeHtmlAttr(item.description || '')}"></td>`
-        + `<td><input data-io-field="plcTag" type="text" value="${escapeHtmlAttr(item.plcTag || '')}"></td>`;
-      tbody.appendChild(tr);
+    if (ioFilter === 'DO' && !doItems.length && !sdoItems.length) {
+      const doHint = document.createElement('p');
+      doHint.className = 'io-list-page-meta io-list-empty-hint';
+      doHint.textContent = 'No DO rows found for this zone. Re-upload the Excel Master Sheet, or check the Output Type column (DO01, DO02, …).';
+      section.appendChild(doHint);
     }
 
-    table.appendChild(tbody);
-    section.appendChild(table);
-
-    const safetyItems = (activeSheet?.diInputs || []).filter((item) => item.isSafety);
-    if (safetyItems.length) {
-      const safetyTitle = document.createElement('h5');
-      safetyTitle.className = 'io-list-subsection-title';
-      safetyTitle.textContent = `${activeSheet?.zone || activeZone} Safety Inputs (${safetyItems.length})`;
-      section.appendChild(safetyTitle);
-
-      const safetyTable = document.createElement('table');
-      safetyTable.className = 'io-list-editor-table io-list-editor-subtable';
-      safetyTable.innerHTML = '<thead><tr><th>Type</th><th>Address</th><th>Description</th><th>PLC Tag</th></tr></thead>';
-      const safetyBody = document.createElement('tbody');
-      for (const item of safetyItems) {
-        const diIndex = activeSheet.diInputs.indexOf(item);
-        const tr = document.createElement('tr');
-        tr.dataset.ioRowKind = 'di';
-        tr.dataset.ioDiIndex = String(diIndex);
-        tr.dataset.ioSafety = '1';
-        tr.innerHTML = `<td data-io-field="type">${escapeHtmlText(item.type || '')}</td>`
-          + `<td><input data-io-field="address" type="text" value="${escapeHtmlAttr(item.address || '')}"></td>`
-          + `<td><input data-io-field="description" type="text" value="${escapeHtmlAttr(item.description || '')}"></td>`
-          + `<td><input data-io-field="plcTag" type="text" value="${escapeHtmlAttr(item.plcTag || '')}"></td>`;
-        safetyBody.appendChild(tr);
-      }
-      safetyTable.appendChild(safetyBody);
-      section.appendChild(safetyTable);
+    if (shouldShowIoListEditorKind(project, 'SDI')) {
+      appendIoListEditorRowsTable(section, {
+        title: `SDI — Safety Digital Input (${sdiItems.length})`,
+        items: sdiItems,
+        rowKind: 'di',
+        zone: activeSheet?.zone || activeZone,
+        getIndex: (item) => activeSheet.diInputs.indexOf(item)
+      });
     }
-
-    const doItems = activeSheet?.doOutputs || [];
-    if (doItems.length) {
-      const doTitle = document.createElement('h5');
-      doTitle.className = 'io-list-subsection-title';
-      doTitle.textContent = `${activeSheet?.zone || activeZone} Digital Outputs (${doItems.length})`;
-      section.appendChild(doTitle);
-
-      const doTable = document.createElement('table');
-      doTable.className = 'io-list-editor-table io-list-editor-subtable';
-      doTable.innerHTML = '<thead><tr><th>Type</th><th>Address</th><th>Description</th><th>PLC Tag</th></tr></thead>';
-      const doBody = document.createElement('tbody');
-      for (const item of doItems) {
-        const doIndex = activeSheet.doOutputs.indexOf(item);
-        const tr = document.createElement('tr');
-        tr.dataset.ioRowKind = 'do';
-        tr.dataset.ioDoIndex = String(doIndex);
-        tr.innerHTML = `<td data-io-field="type">${escapeHtmlText(item.type || '')}</td>`
-          + `<td><input data-io-field="address" type="text" value="${escapeHtmlAttr(item.address || '')}"></td>`
-          + `<td><input data-io-field="description" type="text" value="${escapeHtmlAttr(item.description || '')}"></td>`
-          + `<td><input data-io-field="plcTag" type="text" value="${escapeHtmlAttr(item.plcTag || '')}"></td>`;
-        doBody.appendChild(tr);
-      }
-      doTable.appendChild(doBody);
-      section.appendChild(doTable);
+    if (shouldShowIoListEditorKind(project, 'DI')) {
+      appendIoListEditorRowsTable(section, {
+        title: `DI — Digital Input (${diItems.length})`,
+        items: diItems,
+        rowKind: 'di',
+        zone: activeSheet?.zone || activeZone,
+        getIndex: (item) => activeSheet.diInputs.indexOf(item)
+      });
+    }
+    if (shouldShowIoListEditorKind(project, 'SDO')) {
+      appendIoListEditorRowsTable(section, {
+        title: `SDO — Safety Digital Output (${sdoItems.length})`,
+        items: sdoItems,
+        rowKind: 'do',
+        zone: activeSheet?.zone || activeZone,
+        getIndex: (item) => activeSheet.doOutputs.indexOf(item)
+      });
+    }
+    if (shouldShowIoListEditorKind(project, 'DO')) {
+      appendIoListEditorRowsTable(section, {
+        title: `DO — Digital Output (${doItems.length})`,
+        items: doItems,
+        rowKind: 'do',
+        zone: activeSheet?.zone || activeZone,
+        getIndex: (item) => activeSheet.doOutputs.indexOf(item)
+      });
     }
 
     frame.appendChild(section);
   } else {
-    const table = document.createElement('table');
-    table.className = 'io-list-editor-table';
-    table.innerHTML = '<thead><tr><th>Folder</th><th>Tag</th><th>Description</th><th>Address</th></tr></thead>';
-    const tbody = document.createElement('tbody');
-
+    const grouped = { SDI: [], DI: [], SDO: [], DO: [], other: [] };
     for (const row of editorState.rows) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${escapeHtmlText(row.folder || '')}</td>`
-        + `<td><code>${escapeHtmlText(row.tagName || '')}</code></td>`
-        + `<td><input data-io-tag-name="${escapeHtmlAttr(row.tagName || '')}" data-io-field="description" type="text" value="${escapeHtmlAttr(row.description || '')}"></td>`
-        + `<td><input data-io-tag-name="${escapeHtmlAttr(row.tagName || '')}" data-io-field="address" type="text" value="${escapeHtmlAttr(row.address || '')}"></td>`;
-      tbody.appendChild(tr);
+      const kind = String(row.ioType || '').toUpperCase();
+      if (kind === 'SDI' || kind === 'DI' || kind === 'SDO' || kind === 'DO') {
+        grouped[kind].push(row);
+      } else if (/^Safety_DI_/i.test(row.folder || '')) {
+        grouped.SDI.push(row);
+      } else if (/^PLC_DI_/i.test(row.folder || '')) {
+        grouped.DI.push(row);
+      } else if (/^Safety_DO_/i.test(row.folder || '')) {
+        grouped.SDO.push(row);
+      } else if (/^PLC_DO_/i.test(row.folder || '')) {
+        grouped.DO.push(row);
+      } else {
+        grouped.other.push(row);
+      }
     }
 
-    table.appendChild(tbody);
-    frame.appendChild(table);
+    const summaryFilter = normalizeIoListEditorFilter(project.ioListEditorFilter);
+    const summaryMeta = document.createElement('p');
+    summaryMeta.className = 'io-list-page-meta';
+    summaryMeta.textContent = summaryFilter === 'DO'
+      ? `SDO ${grouped.SDO.length}, DO ${grouped.DO.length}`
+      : `SDI ${grouped.SDI.length}, DI ${grouped.DI.length}`;
+    frame.appendChild(summaryMeta);
+
+    if (summaryFilter === 'DO' && !grouped.DO.length && !grouped.SDO.length) {
+      const doHint = document.createElement('p');
+      doHint.className = 'io-list-page-meta io-list-empty-hint';
+      doHint.textContent = 'No DO rows in this summary. Re-upload the Excel Master Sheet to refresh SDI/DI/SDO/DO rows.';
+      frame.appendChild(doHint);
+    }
+
+    const renderSummaryGroup = (title, rows, kind) => {
+      if (!rows.length || !shouldShowIoListEditorKind(project, kind)) {
+        return;
+      }
+      const groupTitle = document.createElement('h5');
+      groupTitle.className = 'io-list-subsection-title';
+      groupTitle.textContent = title;
+      frame.appendChild(groupTitle);
+
+      const table = document.createElement('table');
+      table.className = 'io-list-editor-table';
+      table.innerHTML = '<thead><tr><th>IO Type</th><th>Folder</th><th>Tag</th><th>Description</th><th>Address</th></tr></thead>';
+      const tbody = document.createElement('tbody');
+      for (const row of rows) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${escapeHtmlText(row.ioType || kind || '')}</td>`
+          + `<td>${escapeHtmlText(row.folder || '')}</td>`
+          + `<td><code>${escapeHtmlText(row.tagName || '')}</code></td>`
+          + `<td><input data-io-tag-name="${escapeHtmlAttr(row.tagName || '')}" data-io-field="description" type="text" value="${escapeHtmlAttr(row.description || '')}"></td>`
+          + `<td><input data-io-tag-name="${escapeHtmlAttr(row.tagName || '')}" data-io-field="address" type="text" value="${escapeHtmlAttr(row.address || '')}"></td>`;
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      frame.appendChild(table);
+    };
+
+    renderSummaryGroup(`DO — Digital Output (${grouped.DO.length})`, grouped.DO.filter((row) => /\\Data_\d+$/i.test(String(row.tagName || ''))), 'DO');
+    renderSummaryGroup(`SDO — Safety Digital Output (${grouped.SDO.length})`, grouped.SDO.filter((row) => /\\Data_\d+$/i.test(String(row.tagName || ''))), 'SDO');
+    renderSummaryGroup(`DI — Digital Input (${grouped.DI.length})`, grouped.DI.filter((row) => /\\Data_\d+$/i.test(String(row.tagName || ''))), 'DI');
+    renderSummaryGroup(`SDI — Safety Digital Input (${grouped.SDI.length})`, grouped.SDI.filter((row) => /\\Data_\d+$/i.test(String(row.tagName || ''))), 'SDI');
+
+    if (grouped.other.length && shouldShowIoListEditorKind(project, 'OTHER')) {
+      const table = document.createElement('table');
+      table.className = 'io-list-editor-table';
+      table.innerHTML = '<thead><tr><th>Folder</th><th>Tag</th><th>Description</th><th>Address</th></tr></thead>';
+      const tbody = document.createElement('tbody');
+      for (const row of grouped.other) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${escapeHtmlText(row.folder || '')}</td>`
+          + `<td><code>${escapeHtmlText(row.tagName || '')}</code></td>`
+          + `<td><input data-io-tag-name="${escapeHtmlAttr(row.tagName || '')}" data-io-field="description" type="text" value="${escapeHtmlAttr(row.description || '')}"></td>`
+          + `<td><input data-io-tag-name="${escapeHtmlAttr(row.tagName || '')}" data-io-field="address" type="text" value="${escapeHtmlAttr(row.address || '')}"></td>`;
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      frame.appendChild(table);
+    }
   }
 
   previewPane.innerHTML = '';
@@ -1617,7 +2127,7 @@ function saveActiveProjectIoListFromEditor() {
   }
 
   try {
-    mergeVisibleIoListSheetEdits(project);
+    mergeVisibleIoListSheetEdits(record.project);
     record.file.content = xmlEditor.value;
     record.file.sizeBytes = new Blob([record.file.content]).size;
     record.file.lastModified = new Date().toISOString();
@@ -1642,14 +2152,27 @@ function getProjectIoPreviewMap(project) {
     zone = zones[0];
   }
 
-  if (isIoListPreviewScreenActive() && zone) {
-    const zoneMap = globalThis.IoTags.buildIoListPreviewMap(parsed, {
+  if (zone) {
+    const buildMap = isIoDoPreviewContext(project)
+      ? globalThis.IoTags.buildIoDoListPreviewMap
+      : globalThis.IoTags.buildIoListPreviewMap;
+    const zoneMap = buildMap(parsed, {
       page: project.ioListPreviewPage || 1,
       zone
     });
-    if (zoneMap.size) {
+    if (zoneMap.size && [...zoneMap.values()].some((value) => String(value || '').trim())) {
       return zoneMap;
     }
+  }
+
+  if (isIoListPreviewScreenActive() && zone) {
+    const buildMap = isIoDoPreviewContext(project)
+      ? globalThis.IoTags.buildIoDoListPreviewMap
+      : globalThis.IoTags.buildIoListPreviewMap;
+    return buildMap(parsed, {
+      page: project.ioListPreviewPage || 1,
+      zone
+    });
   }
 
   const bindings = getActiveParameterBindings(project);
@@ -1660,7 +2183,10 @@ function getProjectIoPreviewMap(project) {
     }
   }
 
-  return globalThis.IoTags.buildIoListPreviewMap(parsed, {
+  const buildMap = isIoDoPreviewContext(project)
+    ? globalThis.IoTags.buildIoDoListPreviewMap
+    : globalThis.IoTags.buildIoListPreviewMap;
+  return buildMap(parsed, {
     page: project.ioListPreviewPage || 1,
     zone
   });
@@ -1787,7 +2313,8 @@ async function importProjectIoListFiles(projectId, fileList) {
       content: storedContent,
       sizeBytes: new Blob([storedContent]).size,
       lastModified: new Date().toISOString(),
-      sourceType: isExcel ? 'xlsx' : 'text'
+      sourceType: isExcel ? 'xlsx' : 'text',
+      sheetData: isExcel && combinedParsed?.meta?.sourceSheets ? combinedParsed.meta.sourceSheets : []
     };
 
     if (existingIndex >= 0) {
@@ -1821,13 +2348,26 @@ async function importProjectIoListFiles(projectId, fileList) {
   project.ioListSheets = combinedParsed?.meta?.sourceSheets
     || getProjectIoListSheets(project)
     || [];
+  const importedIoFile = (project.ioListFiles || []).find((item) => displayKey(item.name) === displayKey(fileList[fileList.length - 1]?.name || ''))
+    || (project.ioListFiles || [])[project.ioListFiles.length - 1];
+  if (importedIoFile && combinedParsed?.meta?.sourceSheets?.length) {
+    syncIoListSheetDataToFile(project, importedIoFile, combinedParsed.meta.sourceSheets);
+  }
   project.ioTagsParsed = combinedParsed;
-  upsertGeneratedTagsCsv(
-    project,
-    globalThis.IoTags.serializeFactoryTalkTagsCsv(combinedParsed),
-    `${project.name}-Tags`
-  );
-  upsertGeneratedParameterFiles(project, combinedParsed, project.ioListPreviewZone || '');
+  let plcTagMatchStats = null;
+  if (getProjectPlcLogicTagsFile(project)) {
+    plcTagMatchStats = applyPlcLogicTagMatchingToProject(project, { save: false });
+    if (plcTagMatchStats) {
+      combinedParsed = project.ioTagsParsed;
+    }
+  } else {
+    upsertGeneratedTagsCsv(
+      project,
+      globalThis.IoTags.serializeFactoryTalkTagsCsv(combinedParsed),
+      `${project.name}-Tags`
+    );
+    upsertGeneratedParameterFiles(project, combinedParsed, project.ioListPreviewZone || '');
+  }
   project.ioListPreviewParameterFile = project.ioListPreviewParameterFile || 'PLC DI List 01';
   project.ioListCollapsed = false;
   project.tagsCollapsed = false;
@@ -1846,7 +2386,8 @@ async function importProjectIoListFiles(projectId, fileList) {
 
   return {
     ...lastConverted,
-    parsed: combinedParsed
+    parsed: combinedParsed,
+    plcTagMatchStats
   };
 }
 
@@ -1884,6 +2425,15 @@ function openProjectIoListFile(project, file) {
   selectedFiles = [];
   activeProjectCsvKey = '';
   activeIoListFileKey = createProjectIoListKey(project.id, file.id);
+
+  if (file?.sheetData?.length) {
+    project.ioListSheets = file.sheetData;
+  } else if (project.ioListMeta?.sourceSheets?.length) {
+    project.ioListSheets = project.ioListMeta.sourceSheets;
+    syncIoListSheetDataToFile(project, file, project.ioListSheets);
+  } else {
+    project.ioListSheets = [];
+  }
 
   setActiveProject(project);
   displayName.value = `${project.name} / IO List / ${file.name}`;
@@ -3142,6 +3692,77 @@ async function buildImportPackage(files, packageLabel) {
   alert(`Import package generated and saved as ${saveOutcome.fileName}.`);
 }
 
+function loadPreviewZoomLevel() {
+  const stored = Number(localStorage.getItem(PREVIEW_ZOOM_STORAGE_KEY));
+  if (!Number.isFinite(stored)) {
+    return 1;
+  }
+  if (stored < PREVIEW_ZOOM_MIN) {
+    return 1;
+  }
+  return Math.min(PREVIEW_ZOOM_MAX, Math.max(PREVIEW_ZOOM_MIN, stored));
+}
+
+function clampPreviewZoom(value) {
+  const level = Number(value);
+  if (!Number.isFinite(level)) {
+    return 1;
+  }
+  return Math.min(PREVIEW_ZOOM_MAX, Math.max(PREVIEW_ZOOM_MIN, level));
+}
+
+function setPreviewZoomLevel(value, options = {}) {
+  previewZoomLevel = clampPreviewZoom(value);
+  localStorage.setItem(PREVIEW_ZOOM_STORAGE_KEY, String(previewZoomLevel));
+  updatePreviewZoomLabel();
+  if (options.render !== false) {
+    refitActivePreviewCanvas();
+  }
+}
+
+function adjustPreviewZoom(delta) {
+  setPreviewZoomLevel(previewZoomLevel + delta);
+}
+
+function updatePreviewZoomLabel() {
+  const label = document.getElementById('previewZoomLabel');
+  if (!label) {
+    return;
+  }
+  label.textContent = `${Math.round(previewZoomLevel * 100)}%`;
+}
+
+function getActivePreviewDisplayCanvas() {
+  const canvas = previewPane?.querySelector('.preview-display-canvas');
+  if (!canvas) {
+    return null;
+  }
+
+  const frame = canvas.closest('.preview-frame');
+  if (!frame || frame.classList.contains('parameter-preview-frame') || frame.classList.contains('io-list-editor-frame')) {
+    return null;
+  }
+
+  const width = Number(canvas.dataset.previewWidth);
+  const height = Number(canvas.dataset.previewHeight);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return null;
+  }
+
+  return { frame, canvas, width, height };
+}
+
+function refitActivePreviewCanvas() {
+  const active = getActivePreviewDisplayCanvas();
+  if (!active) {
+    updatePreviewZoomLabel();
+    return;
+  }
+
+  fitCanvasToFrame(active.frame, active.canvas, active.width, active.height);
+  updatePreviewZoomLabel();
+}
+
 function disconnectPreviewResizeObserver() {
   if (previewResizeObserver) {
     previewResizeObserver.disconnect();
@@ -3158,7 +3779,10 @@ function fitCanvasToFrame(frame, canvas, width, height) {
   const availableHeight = Math.max(1, frame.clientHeight - verticalPadding - (previewSafeInset * 2));
 
   const scale = Math.min(availableWidth / width, availableHeight / height);
-  const finalScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+  const fitScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+  const finalScale = fitScale * previewZoomLevel;
+
+  frame.classList.toggle('preview-frame-zoomed', previewZoomLevel > 1.01);
 
   let wrap = canvas.parentElement;
   if (!wrap || !wrap.classList.contains('preview-canvas-wrap')) {
@@ -3211,10 +3835,14 @@ function parseCaptionAlignment(alignmentRaw) {
   return { horizontal, vertical };
 }
 
-function applyCaptionStyles(box, node, captionNode) {
+function applyCaptionStyles(box, node, captionNode, captionEl) {
   const fontSize = Number(captionNode?.getAttribute('fontSize') || node.getAttribute('fontSize'));
   if (Number.isFinite(fontSize) && fontSize > 0) {
-    box.style.fontSize = `${fontSize}px`;
+    const sizePx = `${fontSize}px`;
+    box.style.fontSize = sizePx;
+    if (captionEl) {
+      captionEl.style.fontSize = sizePx;
+    }
   }
 
   const fontFamily = captionNode?.getAttribute('fontFamily') || node.getAttribute('fontFamily');
@@ -3459,10 +4087,11 @@ function getNodeImageName(node) {
 }
 
 function getNodeImageRenderOptions(node) {
+  const tag = String(node?.tagName || '').toLowerCase();
   const imageSettings = Array.from(node.children).find((child) => child.tagName === 'imageSettings');
   const alignmentRaw = imageSettings?.getAttribute('alignment') || 'middleCenter';
   const scaledRaw = String(imageSettings?.getAttribute('scaled') || '').toLowerCase();
-  const scaled = scaledRaw ? scaledRaw === 'true' : true;
+  const scaled = tag === 'image' ? true : (scaledRaw ? scaledRaw === 'true' : true);
   const { horizontal, vertical } = parseCaptionAlignment(alignmentRaw);
   return { horizontal, vertical, scaled };
 }
@@ -3696,13 +4325,27 @@ function applyHistorySnapshot(snapshot) {
   if (size.height) screenHeight.value = size.height;
   syncScreenPresetFromInputs();
 
+  if (selectedObjectIndex !== null) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(snapshot, 'text/xml');
+    const parseError = doc.querySelector('parsererror');
+    const nodes = parseError ? [] : getObjectNodes(doc);
+    if (selectedObjectIndex < 0 || selectedObjectIndex >= nodes.length) {
+      selectedObjectIndex = null;
+      clearObjectPanel();
+    } else {
+      populateObjectPanel(doc, selectedObjectIndex);
+    }
+  }
+
   renderPreview();
   applyingHistory = false;
 
-  if (selectedDisplay) {
-    saveDisplayXml(selectedDisplay, xmlEditor.value)
+  const targetDisplayName = getTargetDisplayName();
+  if (targetDisplayName) {
+    saveDisplayXml(targetDisplayName, xmlEditor.value)
       .then(() => {
-        updateCurrentDisplayRow(selectedDisplay, xmlEditor.value);
+        updateCurrentDisplayRow(targetDisplayName, xmlEditor.value);
         if (usingUploadedList) {
           renderDisplays(currentDisplayRows);
         } else {
@@ -3739,6 +4382,44 @@ function isEditableTarget(el) {
   }
   const tag = String(el.tagName || '').toLowerCase();
   return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
+}
+
+function isDisplayHistoryInput(el) {
+  if (!el) {
+    return false;
+  }
+  if (el === xmlEditor || el === screenWidth || el === screenHeight) {
+    return true;
+  }
+  return Boolean(el.closest?.('.object-panel'));
+}
+
+function canUseDisplayHistoryUndo() {
+  return Boolean(xmlEditor?.value?.trim()) && (historyPast.length > 1 || historyFuture.length > 0);
+}
+
+function handleDisplayHistoryShortcut(event) {
+  const key = String(event.key || '').toLowerCase();
+  const ctrlOrCmd = event.ctrlKey || event.metaKey;
+  if (!ctrlOrCmd || (key !== 'z' && key !== 'y')) {
+    return false;
+  }
+  if (!canUseDisplayHistoryUndo()) {
+    return false;
+  }
+
+  const active = document.activeElement;
+  if (isEditableTarget(active) && !isDisplayHistoryInput(active)) {
+    return false;
+  }
+
+  event.preventDefault();
+  if (key === 'y' || (key === 'z' && event.shiftKey)) {
+    redoHistory();
+  } else {
+    undoHistory();
+  }
+  return true;
 }
 
 function nextIncrementedName(doc, originalName, fallbackPrefix = 'Object') {
@@ -4305,6 +4986,204 @@ function addButtonObject() {
 
   renderPreview();
   persistCurrentXmlState();
+}
+
+async function refreshImageLibraryOptions() {
+  if (!imageLibraryOptions) {
+    return [];
+  }
+
+  try {
+    const res = await fetch('/api/images');
+    if (!res.ok) {
+      return [];
+    }
+    const data = await res.json();
+    const files = Array.isArray(data.files) ? data.files : [];
+    imageLibraryOptions.innerHTML = files
+      .map((name) => `<option value="${String(name).replace(/"/g, '&quot;')}"></option>`)
+      .join('');
+    return files;
+  } catch (_err) {
+    return [];
+  }
+}
+
+function readImageFileDimensions(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const width = Math.max(1, Number(img.naturalWidth) || 1);
+      const height = Math.max(1, Number(img.naturalHeight) || 1);
+      URL.revokeObjectURL(url);
+      resolve({ width, height });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    img.src = url;
+  });
+}
+
+async function uploadImageLibraryFile(file) {
+  if (!file) {
+    throw new Error('No image file selected.');
+  }
+
+  const buffer = await file.arrayBuffer();
+  const response = await fetch(`/api/images/upload?name=${encodeURIComponent(file.name)}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream',
+      'X-Image-Filename': file.name
+    },
+    body: buffer
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Could not upload image.');
+  }
+
+  await refreshImageLibraryOptions();
+  previewImageNonce = Date.now();
+  return data;
+}
+
+function fitImageObjectSize(naturalWidth, naturalHeight, displayWidth, displayHeight) {
+  const maxWidth = Math.max(40, Math.round(displayWidth * 0.45));
+  const maxHeight = Math.max(40, Math.round(displayHeight * 0.45));
+  const scale = Math.min(maxWidth / naturalWidth, maxHeight / naturalHeight, 1);
+  return {
+    width: Math.max(24, Math.round(naturalWidth * scale)),
+    height: Math.max(24, Math.round(naturalHeight * scale))
+  };
+}
+
+function insertImageObject(imageName, sizeHint = null) {
+  const xml = xmlEditor.value.trim();
+  if (!xml) {
+    throw new Error('Load a display XML first.');
+  }
+  if (!String(imageName || '').trim()) {
+    throw new Error('Image name is required.');
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  if (doc.querySelector('parsererror')) {
+    throw new Error('XML parse error. Fix XML before adding an image.');
+  }
+
+  const root = doc.querySelector('gfx');
+  if (!root) {
+    throw new Error('Could not find gfx root in XML.');
+  }
+
+  const displaySettings = doc.querySelector('displaySettings');
+  const displayWidth = Number(displaySettings?.getAttribute('width')) || Number(screenWidth.value) || DEFAULT_PREVIEW_WIDTH;
+  const displayHeight = Number(displaySettings?.getAttribute('height')) || Number(screenHeight.value) || DEFAULT_PREVIEW_HEIGHT;
+
+  const templateImage = Array.from(root.querySelectorAll('image'))
+    .find((node) => String(node.getAttribute('imageName') || '').trim());
+
+  const image = templateImage ? templateImage.cloneNode(true) : doc.createElement('image');
+  const objectName = uniqueObjectName(doc, 'Image');
+  const fitted = sizeHint
+    ? fitImageObjectSize(sizeHint.width, sizeHint.height, displayWidth, displayHeight)
+    : {
+      width: Math.max(40, Math.round(displayWidth * 0.18)),
+      height: Math.max(40, Math.round(displayHeight * 0.12))
+    };
+  const objWidth = fitted.width;
+  const objHeight = fitted.height;
+  const objLeft = Math.round((displayWidth - objWidth) / 2);
+  const objTop = Math.round((displayHeight - objHeight) / 2);
+
+  image.setAttribute('name', objectName);
+  image.setAttribute('left', String(objLeft));
+  image.setAttribute('top', String(objTop));
+  image.setAttribute('width', String(objWidth));
+  image.setAttribute('height', String(objHeight));
+  image.setAttribute('visible', 'true');
+  image.setAttribute('isReferenceObject', 'false');
+  image.setAttribute('imageBackStyle', 'transparent');
+  image.setAttribute('imageBackColor', '#6A6A6A');
+  image.setAttribute('imageColor', '#001C38');
+  image.setAttribute('imageBlink', 'false');
+  image.setAttribute('description', '');
+  image.setAttribute('imageName', String(imageName).trim());
+  image.removeAttribute('linkBaseObject');
+  image.removeAttribute('linkSize');
+  image.removeAttribute('linkConnections');
+  image.removeAttribute('linkAnimations');
+
+  root.appendChild(image);
+
+  xmlEditor.value = serializeXmlDoc(doc);
+  recordHistory(xmlEditor.value);
+
+  const nodes = getObjectNodes(doc);
+  selectedObjectIndex = nodes.findIndex((node) => String(node.getAttribute('name') || '') === objectName);
+  if (selectedObjectIndex >= 0) {
+    populateObjectPanel(doc, selectedObjectIndex);
+  }
+
+  renderPreview();
+  persistCurrentXmlState();
+}
+
+async function addImageObjectFromFile(file) {
+  const dimensions = await readImageFileDimensions(file);
+  const uploaded = await uploadImageLibraryFile(file);
+  insertImageObject(uploaded.name, dimensions);
+}
+
+function queueImageLibraryUpload(mode = 'insert') {
+  if (!imageLibraryUploadInput) {
+    alert('Image upload is not available in this browser view.');
+    return;
+  }
+
+  imageLibraryUploadInput.dataset.uploadMode = mode;
+  imageLibraryUploadInput.value = '';
+  imageLibraryUploadInput.click();
+}
+
+async function addImageObject() {
+  if (!xmlEditor.value.trim()) {
+    alert('Load a display XML first.');
+    return;
+  }
+
+  queueImageLibraryUpload('insert');
+}
+
+async function replaceSelectedObjectImageFromFile(file) {
+  const uploaded = await uploadImageLibraryFile(file);
+  if (objImageName) {
+    objImageName.value = uploaded.name;
+  }
+  if (selectedObjectIndex === null) {
+    return uploaded;
+  }
+
+  if (applyObjectChangesToXml()) {
+    renderPreview();
+  }
+  return uploaded;
+}
+
+function syncObjectImageNameField(node) {
+  if (!objImageNameRow) {
+    return;
+  }
+
+  const tag = String(node?.tagName || '').toLowerCase();
+  const show = tag === 'image' || Boolean(getNodeImageName(node));
+  objImageNameRow.hidden = !show;
 }
 
 function getActiveProjectForPopupPlanner() {
@@ -6626,7 +7505,18 @@ function renderProjectSidebar() {
       queueIoListUpload(project.id);
     });
 
+    const plcTagsBtn = document.createElement('button');
+    plcTagsBtn.type = 'button';
+    plcTagsBtn.className = 'tree-action-btn';
+    plcTagsBtn.textContent = 'PLC';
+    plcTagsBtn.title = 'Upload RSLogix Tags CSV — matches IO descriptions to SPECIFIER tag addresses';
+    plcTagsBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      queuePlcLogicTagsUpload(project.id);
+    });
+
     sectionActions.appendChild(addIoBtn);
+    sectionActions.appendChild(plcTagsBtn);
     sectionRow.appendChild(toggle);
     sectionRow.appendChild(sectionLabel);
     sectionRow.appendChild(sectionCount);
@@ -7029,12 +7919,16 @@ function renderPreview() {
   }
 
   const displaySettings = doc.querySelector('displaySettings');
-  const width = Number(displaySettings?.getAttribute('width'))
-    || Number(screenWidth.value)
-    || DEFAULT_PREVIEW_WIDTH;
-  const height = Number(displaySettings?.getAttribute('height'))
-    || Number(screenHeight.value)
-    || DEFAULT_PREVIEW_HEIGHT;
+  const previewSize = resolvePreviewDisplaySize(displaySettings);
+  const {
+    width,
+    height,
+    scaleX,
+    scaleY,
+    isPending,
+    xmlWidth,
+    xmlHeight
+  } = previewSize;
 
   previewPane.innerHTML = '';
   disconnectPreviewResizeObserver();
@@ -7044,6 +7938,8 @@ function renderPreview() {
 
   const canvas = document.createElement('div');
   canvas.className = 'xml-canvas preview-display-canvas';
+  canvas.dataset.previewWidth = String(width);
+  canvas.dataset.previewHeight = String(height);
   applyPreviewDisplayBackground(frame, canvas, displaySettings);
 
   canvas.addEventListener('dragover', (event) => {
@@ -7097,10 +7993,14 @@ function renderPreview() {
       const activeStateNode = getVisualStateNode(el);
       const visualSource = activeStateNode || el;
       const absolutePosition = getNodeAbsolutePosition(el);
-      const left = absolutePosition.left;
-      const top = absolutePosition.top;
-      const w = Number(el.getAttribute('width'));
-      const h = Number(el.getAttribute('height'));
+      const rawLeft = absolutePosition.left;
+      const rawTop = absolutePosition.top;
+      const rawW = Number(el.getAttribute('width'));
+      const rawH = Number(el.getAttribute('height'));
+      const left = rawLeft * scaleX;
+      const top = rawTop * scaleY;
+      const w = rawW * scaleX;
+      const h = rawH * scaleY;
       if (!Number.isFinite(left) || !Number.isFinite(top) || !Number.isFinite(w) || !Number.isFinite(h)) {
         return;
       }
@@ -7117,15 +8017,19 @@ function renderPreview() {
 
       if (isLineTag) {
         const points = parseLinePoints(el);
-        const dx = points.x2 - points.x1;
-        const dy = points.y2 - points.y1;
+        const x1 = points.x1 * scaleX;
+        const y1 = points.y1 * scaleY;
+        const x2 = points.x2 * scaleX;
+        const y2 = points.y2 * scaleY;
+        const dx = x2 - x1;
+        const dy = y2 - y1;
         const length = Math.max(1, Math.sqrt((dx * dx) + (dy * dy)));
         const angle = Math.atan2(dy, dx) * 180 / Math.PI;
         const thickness = Math.max(1, Number(el.getAttribute('lineWidth')) || 1);
 
         box.classList.add('xml-line-object');
-        box.style.left = `${(points.x1 / width) * 100}%`;
-        box.style.top = `${(points.y1 / height) * 100}%`;
+        box.style.left = `${(x1 / width) * 100}%`;
+        box.style.top = `${(y1 / height) * 100}%`;
         box.style.width = `${(length / width) * 100}%`;
         box.style.height = `${(thickness / height) * 100}%`;
         box.style.transform = `rotate(${angle}deg)`;
@@ -7138,6 +8042,12 @@ function renderPreview() {
 
       if (!isLineTag) {
         applyFillStyles(box, visualSource);
+      }
+
+      if (tag === 'image') {
+        box.classList.add('xml-image-object');
+        box.style.background = 'transparent';
+        box.style.border = 'none';
       }
 
       applyBorderStyles(box, el, visualSource);
@@ -7184,14 +8094,15 @@ function renderPreview() {
       }
 
       const caption = previewTextForNode(el, captionNode);
+      let captionEl = null;
       if (caption && tag !== 'group') {
-        const captionEl = document.createElement('span');
+        captionEl = document.createElement('span');
         captionEl.className = 'xml-object-caption';
         captionEl.textContent = caption;
         box.appendChild(captionEl);
       }
 
-      applyCaptionStyles(box, el, captionNode);
+      applyCaptionStyles(box, el, captionNode, captionEl);
       box.title = `${el.tagName} (${left},${top}) ${w}x${h}`;
 
       const commitRectChange = (nextLeft, nextTop, nextWidth, nextHeight, errorMessage) => {
@@ -7282,7 +8193,7 @@ function renderPreview() {
 
       let suppressClick = false;
       box.addEventListener('mousedown', (downEvent) => {
-        if (downEvent.button !== 0) {
+        if (downEvent.button !== 0 || isPending) {
           return;
         }
 
@@ -7351,7 +8262,7 @@ function renderPreview() {
 
       if (!isLineTag) {
         resizeHandle.addEventListener('mousedown', (downEvent) => {
-          if (downEvent.button !== 0) {
+          if (downEvent.button !== 0 || isPending) {
             return;
           }
 
@@ -7448,6 +8359,13 @@ function renderPreview() {
     }
   }
 
+  if (isPending) {
+    const sizeBanner = document.createElement('div');
+    sizeBanner.className = 'preview-io-banner';
+    sizeBanner.textContent = `Preview ${width}×${height} — size applies to all screens when you finish editing (XML is still ${xmlWidth}×${xmlHeight}).`;
+    frame.insertBefore(sizeBanner, frame.firstChild);
+  }
+
   previewPane.appendChild(frame);
 
   const refitPreview = () => fitCanvasToFrame(frame, canvas, width, height);
@@ -7459,6 +8377,8 @@ function renderPreview() {
     previewResizeObserver = new ResizeObserver(() => refitPreview());
     previewResizeObserver.observe(frame);
   }
+
+  updatePreviewZoomLabel();
 }
 
 function readSizeFromXml(xml) {
@@ -7468,6 +8388,151 @@ function readSizeFromXml(xml) {
     width: widthMatch ? Number(widthMatch[1]) : null,
     height: heightMatch ? Number(heightMatch[1]) : null
   };
+}
+
+function resolvePreviewDisplaySize(displaySettings) {
+  const xmlWidth = Number(displaySettings?.getAttribute('width'))
+    || Number(screenWidth?.value)
+    || DEFAULT_PREVIEW_WIDTH;
+  const xmlHeight = Number(displaySettings?.getAttribute('height'))
+    || Number(screenHeight?.value)
+    || DEFAULT_PREVIEW_HEIGHT;
+
+  let width = Number(screenWidth?.value);
+  let height = Number(screenHeight?.value);
+  if (!Number.isFinite(width) || width <= 0) {
+    width = xmlWidth;
+  }
+  if (!Number.isFinite(height) || height <= 0) {
+    height = xmlHeight;
+  }
+
+  return {
+    width,
+    height,
+    xmlWidth,
+    xmlHeight,
+    scaleX: width / Math.max(1, xmlWidth),
+    scaleY: height / Math.max(1, xmlHeight),
+    isPending: width !== xmlWidth || height !== xmlHeight
+  };
+}
+
+function applyRequestedSizeToEditor(options = {}) {
+  const width = Number(screenWidth?.value);
+  const height = Number(screenHeight?.value);
+  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+    return false;
+  }
+  if (!xmlEditor.value.trim()) {
+    return false;
+  }
+
+  const current = readSizeFromXml(xmlEditor.value);
+  if (current.width === width && current.height === height) {
+    if (options.render !== false && xmlEditor.value.trim()) {
+      renderPreview();
+    }
+    return false;
+  }
+
+  xmlEditor.value = resizeDisplayXml(xmlEditor.value, width, height);
+  recordHistory(xmlEditor.value);
+  if (options.render !== false) {
+    renderPreview();
+  }
+  return true;
+}
+
+function countProjectScreens(project) {
+  let total = 0;
+  for (const folder of project?.folders || []) {
+    total += (folder.screens || []).filter((screen) => String(screen?.xml || '').trim()).length;
+  }
+  return total;
+}
+
+async function saveProjectScreenXmlToServer(screen, xml) {
+  const safeXml = sanitizeXmlForFactoryTalk(xml);
+  const res = await fetch(`/api/displays/${encodeURIComponent(screen.name)}/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ xml: safeXml })
+  });
+  const data = await readApiJson(res);
+  if (!res.ok) {
+    throw new Error(data.error || `Failed to save ${screen.name}`);
+  }
+  return safeXml;
+}
+
+async function applySizeToAllProjectScreens(project, width, height) {
+  if (!project) {
+    return { total: 0, changed: 0, failures: [] };
+  }
+
+  if (activeProjectKey && xmlEditor.value.trim()) {
+    const record = getProjectScreenByKey(activeProjectKey);
+    if (record?.screen) {
+      record.screen.xml = xmlEditor.value;
+    }
+  }
+
+  let total = 0;
+  let changed = 0;
+  const failures = [];
+
+  for (const folder of project.folders || []) {
+    for (const screen of folder.screens || []) {
+      if (!String(screen?.xml || '').trim()) {
+        continue;
+      }
+
+      total += 1;
+      const current = readSizeFromXml(screen.xml);
+      let nextXml = screen.xml;
+      if (current.width !== width || current.height !== height) {
+        nextXml = resizeDisplayXml(screen.xml, width, height);
+        changed += 1;
+      }
+
+      try {
+        const safeXml = await saveProjectScreenXmlToServer(screen, nextXml);
+        const meta = screenMetaFromXml(screen.name, safeXml);
+        screen.xml = safeXml;
+        screen.width = meta.width;
+        screen.height = meta.height;
+        screen.sizeBytes = meta.sizeBytes;
+        screen.lastModified = meta.lastModified;
+
+        upsertCurrentDisplayRow({
+          name: screen.name,
+          source: 'edited',
+          sizeBytes: meta.sizeBytes,
+          lastModified: meta.lastModified,
+          width: meta.width,
+          height: meta.height
+        });
+      } catch (err) {
+        failures.push(`${screen.name}: ${err?.message || 'Save failed'}`);
+      }
+    }
+  }
+
+  saveProjectList();
+  renderProjectSidebar();
+
+  if (activeProjectKey) {
+    const record = getProjectScreenByKey(activeProjectKey);
+    if (record?.screen?.xml) {
+      xmlEditor.value = record.screen.xml;
+      resetHistory(record.screen.xml);
+      syncScreenPresetFromInputs();
+      renderPreview();
+    }
+  }
+
+  return { total, changed, failures };
 }
 
 function replaceDisplaySize(xml, width, height) {
@@ -7840,7 +8905,7 @@ function appendGroupPreviewChildren(groupNode, container, groupWidth, groupHeigh
       captionEl.className = 'xml-object-caption';
       captionEl.textContent = caption;
       childBox.appendChild(captionEl);
-      applyCaptionStyles(childBox, node, captionNode);
+      applyCaptionStyles(childBox, node, captionNode, captionEl);
     }
 
     if ((tag === 'stringdisplay' || tag === 'numericdisplay') && node.getAttribute('foreColor')) {
@@ -7924,9 +8989,40 @@ function clearObjectPanel() {
   objBorderColor.value = '';
   objTextColor.value = '';
   objFontSize.value = 10;
+  if (objImageName) {
+    objImageName.value = '';
+  }
+  if (objImageNameRow) {
+    objImageNameRow.hidden = true;
+  }
   syncColorControl(objBackColor, objBackColorPicker, objBackColorSwatch);
   syncColorControl(objBorderColor, objBorderColorPicker, objBorderColorSwatch);
   syncColorControl(objTextColor, objTextColorPicker, objTextColorSwatch);
+}
+
+function getObjectCaptionNode(node) {
+  if (!node) {
+    return null;
+  }
+
+  const visualSource = getVisualStateNode(node) || node;
+  return Array.from(visualSource.children).find((child) => child.tagName === 'caption')
+    || Array.from(node.children).find((child) => child.tagName === 'caption')
+    || null;
+}
+
+function nodeUsesDirectFontSize(node) {
+  const tag = String(node?.tagName || '').toLowerCase();
+  return [
+    'text',
+    'stringdisplay',
+    'numericdisplay',
+    'alarmlist',
+    'trend',
+    'timeanddatedisplay',
+    'listbox',
+    'datagrid'
+  ].includes(tag) || node?.hasAttribute('fontSize');
 }
 
 function populateObjectPanel(doc, index) {
@@ -7937,7 +9033,7 @@ function populateObjectPanel(doc, index) {
     return;
   }
 
-  const captionNode = Array.from(node.children).find((child) => child.tagName === 'caption');
+  const captionNode = getObjectCaptionNode(node);
   const captionValue = captionNode?.getAttribute('caption') || node.getAttribute('caption') || '';
   objType.value = node.tagName;
   objName.value = node.getAttribute('name') || '';
@@ -7950,6 +9046,10 @@ function populateObjectPanel(doc, index) {
   objBorderColor.value = node.getAttribute('borderColor') || '';
   objTextColor.value = captionNode?.getAttribute('color') || node.getAttribute('foreColor') || '';
   objFontSize.value = Number(captionNode?.getAttribute('fontSize') || node.getAttribute('fontSize') || 10);
+  if (objImageName) {
+    objImageName.value = getNodeImageName(node);
+  }
+  syncObjectImageNameField(node);
   syncColorControl(objBackColor, objBackColorPicker, objBackColorSwatch);
   syncColorControl(objBorderColor, objBorderColorPicker, objBorderColorSwatch);
   syncColorControl(objTextColor, objTextColorPicker, objTextColorSwatch);
@@ -8079,7 +9179,7 @@ async function savePackageAs(downloadUrl) {
   return triggerDirectDownload();
 }
 
-function applyObjectChangesToXml() {
+function applyObjectChangesToXml(options = {}) {
   if (selectedObjectIndex === null) {
     alert('Click an object in preview first.');
     return false;
@@ -8115,7 +9215,7 @@ function applyObjectChangesToXml() {
     node.setAttribute('borderColor', objBorderColor.value.trim());
   }
 
-  let captionNode = Array.from(node.children).find((child) => child.tagName === 'caption');
+  let captionNode = getObjectCaptionNode(node);
   const hasNodeCaption = node.hasAttribute('caption');
   const nodeTag = String(node.tagName || '').toLowerCase();
   const supportsCaptionChild = [
@@ -8127,6 +9227,7 @@ function applyObjectChangesToXml() {
   ].includes(nodeTag);
   const nextCaption = objCaption.value || node.getAttribute('name') || node.tagName;
   const needsCaption = hasNodeCaption || Boolean(captionNode) || objCaption.value.trim() || objTextColor.value.trim();
+  const fontSizeValue = String(Math.max(1, Number(objFontSize.value) || 10));
 
   if (hasNodeCaption) {
     node.setAttribute('caption', nextCaption);
@@ -8134,7 +9235,12 @@ function applyObjectChangesToXml() {
 
   if (!captionNode && supportsCaptionChild && needsCaption && !hasNodeCaption) {
     captionNode = doc.createElement('caption');
-    node.appendChild(captionNode);
+    const visualParent = getVisualStateNode(node) || node;
+    visualParent.appendChild(captionNode);
+  }
+
+  if (nodeUsesDirectFontSize(node)) {
+    node.setAttribute('fontSize', fontSizeValue);
   }
 
   if (captionNode) {
@@ -8142,11 +9248,40 @@ function applyObjectChangesToXml() {
     if (objTextColor.value.trim()) {
       captionNode.setAttribute('color', objTextColor.value.trim());
     }
-    captionNode.setAttribute('fontSize', String(Math.max(1, Number(objFontSize.value) || 10)));
+    captionNode.setAttribute('fontSize', fontSizeValue);
+  } else if (nodeUsesDirectFontSize(node) && objTextColor.value.trim()) {
+    node.setAttribute('foreColor', objTextColor.value.trim());
+  }
+
+  const nextImageName = String(objImageName?.value || '').trim();
+  if (nodeTag === 'image') {
+    if (nextImageName) {
+      node.setAttribute('imageName', nextImageName);
+    } else {
+      node.removeAttribute('imageName');
+    }
+  } else if (nextImageName) {
+    let imageSettingsNode = Array.from(node.children).find((child) => child.tagName === 'imageSettings');
+    if (!imageSettingsNode) {
+      imageSettingsNode = doc.createElement('imageSettings');
+      node.appendChild(imageSettingsNode);
+    }
+    imageSettingsNode.setAttribute('imageName', nextImageName);
+    if (!imageSettingsNode.getAttribute('alignment')) {
+      imageSettingsNode.setAttribute('alignment', 'middleCenter');
+    }
+    if (!imageSettingsNode.getAttribute('backStyle')) {
+      imageSettingsNode.setAttribute('backStyle', 'transparent');
+    }
+    if (!imageSettingsNode.getAttribute('scaled')) {
+      imageSettingsNode.setAttribute('scaled', 'false');
+    }
   }
 
   xmlEditor.value = serializeXmlDoc(doc);
-  recordHistory(xmlEditor.value);
+  if (!options.skipHistory) {
+    recordHistory(xmlEditor.value);
+  }
   return true;
 }
 
@@ -8575,6 +9710,11 @@ if (projectIoListInput) {
       const ioFile = (project.ioListFiles || [])[project.ioListFiles.length - 1];
       const tagCount = converted?.parsed?.tags?.length || 0;
       const zones = (converted?.parsed?.meta?.zones || []).join(', ') || 'IO List';
+      const counts = converted?.parsed?.meta?.counts || {};
+      const sdi = counts.sdi ?? counts.safetyDi ?? 0;
+      const di = counts.di ?? counts.plcDi ?? 0;
+      const sdo = counts.sdo ?? counts.safetyDo ?? 0;
+      const doCount = counts.do ?? counts.plcDo ?? 0;
       if (ioFile) {
         openProjectIoListFile(project, ioFile);
       } else {
@@ -8583,9 +9723,16 @@ if (projectIoListInput) {
       alert(
         `IO list imported successfully.\n`
         + `${tagCount} tags written to ${tagsFile?.name || 'Tags.CSV'}.\n`
-        + `${(project.parametersFiles || []).filter((file) => /\.par$/i.test(file.name)).length} parameter file(s) generated (PLC DI List 01–06 format).\n`
-        + `Zones: ${zones}\n\n`
-        + 'The editable IO list table is open in Preview. Click Apply Changes after edits, then use Open IO Screen Preview for 303_IO_List.xml.'
+        + `IO types: SDI ${sdi}, DI ${di}, SDO ${sdo}, DO ${doCount}\n`
+        + `${(project.parametersFiles || []).filter((file) => /\.par$/i.test(file.name)).length} parameter file(s) generated (PLC DI List and PLC DO List).\n`
+        + `Zones: ${zones}\n`
+        + (converted?.plcTagMatchStats?.total
+          ? `PLC tag matching: ${converted.plcTagMatchStats.matched}/${converted.plcTagMatchStats.total} IO points matched from RSLogix CSV.\n`
+          : getProjectPlcLogicTagsFile(project)
+            ? ''
+            : 'Tip: upload RSLogix Tags CSV (IO List → PLC) to replace inferred tag addresses with PLC logic tags.\n')
+        + '\nTags are grouped by IO type from Excel Input/Output Type (SDI, DI, SDO, DO).\n'
+        + 'The editable IO list table is open in Preview. Click Apply Changes after edits, then use Open Screen Preview (IO or DO from the Zone dropdown).'
         + (paramFile
           ? `\nParameter bindings: ${paramFile.name}`
           : '')
@@ -8593,6 +9740,32 @@ if (projectIoListInput) {
     } catch (err) {
       console.error(err);
       alert(err.message || 'Could not import IO list.');
+    }
+  });
+}
+
+if (projectPlcLogicTagsInput) {
+  projectPlcLogicTagsInput.addEventListener('change', async () => {
+    const pending = pendingPlcLogicTagsUpload;
+    pendingPlcLogicTagsUpload = null;
+    const files = Array.from(projectPlcLogicTagsInput.files || []);
+    projectPlcLogicTagsInput.value = '';
+
+    if (!pending?.projectId || !files.length) {
+      return;
+    }
+
+    try {
+      const result = await importProjectPlcLogicTagsFiles(pending.projectId, files);
+      const stats = result?.stats;
+      alert(
+        stats?.total
+          ? `PLC logic tags imported.\nTYPE column filtered: ALIAS rows skipped.\nMatched ${stats.matched}/${stats.total} IO points from ${stats.rslogixEntries} RSLogix entries (${(stats.rslogixRowTypes || []).join(', ') || 'TAG'} rows).`
+          : 'PLC logic tags imported. Upload the IO list Master Sheet first, then re-upload the RSLogix Tags CSV to match tag addresses.'
+      );
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not import PLC logic tags.');
     }
   });
 }
@@ -8640,28 +9813,199 @@ if (defaultUploadInput) {
   });
 }
 
-previewBtn.addEventListener('click', renderPreview);
+const previewZoomOutBtn = document.getElementById('previewZoomOutBtn');
+const previewZoomInBtn = document.getElementById('previewZoomInBtn');
+const previewZoomResetBtn = document.getElementById('previewZoomResetBtn');
+
+if (previewZoomOutBtn) {
+  previewZoomOutBtn.addEventListener('click', () => {
+    adjustPreviewZoom(-PREVIEW_ZOOM_STEP);
+  });
+}
+
+if (previewZoomInBtn) {
+  previewZoomInBtn.addEventListener('click', () => {
+    adjustPreviewZoom(PREVIEW_ZOOM_STEP);
+  });
+}
+
+if (previewZoomResetBtn) {
+  previewZoomResetBtn.addEventListener('click', () => {
+    setPreviewZoomLevel(1);
+    refitActivePreviewCanvas();
+  });
+}
+
+if (previewPane) {
+  previewPane.addEventListener('wheel', (event) => {
+    if (!event.ctrlKey || !getActivePreviewDisplayCanvas()) {
+      return;
+    }
+    event.preventDefault();
+    adjustPreviewZoom(event.deltaY > 0 ? -PREVIEW_ZOOM_STEP : PREVIEW_ZOOM_STEP);
+  }, { passive: false });
+}
+
+updatePreviewZoomLabel();
+
+let xmlEditorHistoryTimer = null;
+if (xmlEditor) {
+  xmlEditor.addEventListener('input', () => {
+    if (applyingHistory) {
+      return;
+    }
+    clearTimeout(xmlEditorHistoryTimer);
+    xmlEditorHistoryTimer = setTimeout(() => {
+      recordHistory(xmlEditor.value);
+      renderPreview();
+    }, 400);
+  });
+}
+
+let previewSizeInputTimer = null;
+let applyAllSizeTimer = null;
+let applyingSizeToAll = false;
+
+function schedulePreviewForScreenSizeChange() {
+  syncScreenPresetFromInputs();
+  clearTimeout(previewSizeInputTimer);
+  previewSizeInputTimer = setTimeout(() => {
+    if (xmlEditor.value.trim()) {
+      renderPreview();
+    }
+  }, 120);
+}
+
+async function applyRequestedSizeToAllScreens(options = {}) {
+  const width = Number(screenWidth?.value);
+  const height = Number(screenHeight?.value);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return;
+  }
+  if (applyingSizeToAll) {
+    return;
+  }
+
+  applyingSizeToAll = true;
+  try {
+    const project = getActiveProject();
+    const projectScreenCount = countProjectScreens(project);
+
+    if (project && projectScreenCount > 0) {
+      const result = await applySizeToAllProjectScreens(project, width, height);
+      if (usingUploadedList) {
+        renderDisplays(currentDisplayRows);
+      } else {
+        await refreshDisplays();
+      }
+
+      if (result.failures.length && options.alertOnFailure !== false) {
+        alert(
+          `Updated ${result.changed} of ${result.total} screen(s) to ${width}×${height}.\n\n`
+          + `Some saves failed:\n${result.failures.slice(0, 5).join('\n')}`
+          + (result.failures.length > 5 ? `\n...and ${result.failures.length - 5} more` : '')
+        );
+      }
+      return;
+    }
+
+    if (!applyRequestedSizeToEditor({ render: true })) {
+      return;
+    }
+
+    const targetDisplayName = getTargetDisplayName();
+    if (!targetDisplayName) {
+      return;
+    }
+
+    await saveDisplayXml(targetDisplayName, xmlEditor.value);
+    updateCurrentDisplayRow(targetDisplayName, xmlEditor.value);
+    if (usingUploadedList) {
+      renderDisplays(currentDisplayRows);
+    } else {
+      await refreshDisplays();
+    }
+  } catch (err) {
+    if (options.alertOnFailure !== false) {
+      alert(err.message || 'Could not apply size to screens.');
+    }
+  } finally {
+    applyingSizeToAll = false;
+  }
+}
+
+function scheduleApplySizeToAllScreens() {
+  syncScreenPresetFromInputs();
+  clearTimeout(applyAllSizeTimer);
+  applyAllSizeTimer = setTimeout(() => {
+    applyRequestedSizeToAllScreens({ alertOnFailure: true }).catch((err) => {
+      console.error(err);
+    });
+  }, 350);
+}
 
 if (screenSizePreset) {
   screenSizePreset.addEventListener('change', () => {
     applyScreenPreset(screenSizePreset.value);
-    if (xmlEditor.value.trim()) {
-      renderPreview();
-    }
+    scheduleApplySizeToAllScreens();
   });
 }
 
 if (screenWidth) {
-  screenWidth.addEventListener('input', syncScreenPresetFromInputs);
+  screenWidth.addEventListener('input', schedulePreviewForScreenSizeChange);
+  screenWidth.addEventListener('change', scheduleApplySizeToAllScreens);
 }
 
 if (screenHeight) {
-  screenHeight.addEventListener('input', syncScreenPresetFromInputs);
+  screenHeight.addEventListener('input', schedulePreviewForScreenSizeChange);
+  screenHeight.addEventListener('change', scheduleApplySizeToAllScreens);
 }
 
 if (addObjectBtn) {
   addObjectBtn.addEventListener('click', addButtonObject);
 }
+if (addImageBtn) {
+  addImageBtn.addEventListener('click', () => {
+    addImageObject().catch((err) => {
+      console.error(err);
+      alert(err?.message || 'Could not add image.');
+    });
+  });
+}
+
+if (browseImageBtn) {
+  browseImageBtn.addEventListener('click', () => {
+    if (selectedObjectIndex === null) {
+      queueImageLibraryUpload('insert');
+      return;
+    }
+    queueImageLibraryUpload('replace');
+  });
+}
+
+if (imageLibraryUploadInput) {
+  imageLibraryUploadInput.addEventListener('change', async () => {
+    const file = imageLibraryUploadInput.files?.[0];
+    const mode = String(imageLibraryUploadInput.dataset.uploadMode || 'insert');
+    imageLibraryUploadInput.value = '';
+    if (!file) {
+      return;
+    }
+
+    try {
+      if (mode === 'replace') {
+        await replaceSelectedObjectImageFromFile(file);
+      } else {
+        await addImageObjectFromFile(file);
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err?.message || 'Could not upload image.');
+    }
+  });
+}
+
+refreshImageLibraryOptions().catch(() => {});
 if (toggleSidebarBtn && mainGrid) {
   toggleSidebarBtn.addEventListener('click', () => {
     const collapsed = !mainGrid.classList.contains('sidebar-collapsed');
@@ -8867,41 +10211,55 @@ if (generatePopupsBtn) {
   });
 }
 
-applySizeBtn.addEventListener('click', async () => {
-  const width = Number(screenWidth.value);
-  const height = Number(screenHeight.value);
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    alert('Enter valid width and height values');
-    return;
-  }
-
-  if (!xmlEditor.value.trim()) {
-    alert('Load XML first');
-    return;
-  }
-
-  xmlEditor.value = resizeDisplayXml(xmlEditor.value, width, height);
-  recordHistory(xmlEditor.value);
-  renderPreview();
-
-  const targetDisplayName = getTargetDisplayName();
-  if (!targetDisplayName) {
-    return;
-  }
-
-  try {
-    await saveDisplayXml(targetDisplayName, xmlEditor.value);
-    updateCurrentDisplayRow(targetDisplayName, xmlEditor.value);
-    if (usingUploadedList) {
-      renderDisplays(currentDisplayRows);
-    } else {
-      await refreshDisplays();
+function closeWorkspaceMenus() {
+  for (const group of document.querySelectorAll('[data-menu-group].open')) {
+    group.classList.remove('open');
+    const trigger = group.querySelector('.menu-label');
+    if (trigger) {
+      trigger.setAttribute('aria-expanded', 'false');
     }
-    alert('Size applied and saved.');
-  } catch (err) {
-    alert(err.message || 'Size applied, but save failed.');
   }
-});
+}
+
+function initWorkspaceMenuBar() {
+  const menuBar = document.querySelector('.app-menu-bar');
+  if (!menuBar) {
+    return;
+  }
+
+  for (const group of menuBar.querySelectorAll('[data-menu-group]')) {
+    const trigger = group.querySelector('.menu-label');
+    const popup = group.querySelector('.menu-popup');
+    if (!trigger || !popup) {
+      continue;
+    }
+
+    trigger.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const willOpen = !group.classList.contains('open');
+      closeWorkspaceMenus();
+      if (willOpen) {
+        group.classList.add('open');
+        trigger.setAttribute('aria-expanded', 'true');
+      }
+    });
+
+    for (const item of popup.querySelectorAll('[role="menuitem"]')) {
+      item.addEventListener('click', () => {
+        closeWorkspaceMenus();
+      });
+    }
+  }
+
+  document.addEventListener('click', closeWorkspaceMenus);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeWorkspaceMenus();
+    }
+  });
+}
+
+initWorkspaceMenuBar();
 
 applyObjectBtn.addEventListener('click', () => {
   const changed = applyObjectChangesToXml();
@@ -8910,6 +10268,29 @@ applyObjectBtn.addEventListener('click', () => {
   }
   renderPreview();
 });
+
+let objectFontSizePreviewTimer = null;
+function scheduleObjectPropertyPreview() {
+  if (selectedObjectIndex === null) {
+    return;
+  }
+  clearTimeout(objectFontSizePreviewTimer);
+  objectFontSizePreviewTimer = setTimeout(() => {
+    if (applyObjectChangesToXml({ skipHistory: true })) {
+      recordHistory(xmlEditor.value);
+      renderPreview();
+    }
+  }, 250);
+}
+
+if (objFontSize) {
+  objFontSize.addEventListener('input', scheduleObjectPropertyPreview);
+  objFontSize.addEventListener('change', () => {
+    if (applyObjectChangesToXml()) {
+      renderPreview();
+    }
+  });
+}
 
 objBackColorPicker.addEventListener('input', () => {
   objBackColor.value = objBackColorPicker.value;
@@ -9038,6 +10419,10 @@ window.addEventListener('resize', () => {
 });
 
 document.addEventListener('keydown', (event) => {
+  if (handleDisplayHistoryShortcut(event)) {
+    return;
+  }
+
   const active = document.activeElement;
   if (isEditableTarget(active)) {
     return;

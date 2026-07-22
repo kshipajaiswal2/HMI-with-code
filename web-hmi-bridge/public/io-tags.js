@@ -360,38 +360,323 @@
     return String(value).trim();
   }
 
+  function isIoListSheetName(name) {
+    return /io\s*list/i.test(cellStr(name));
+  }
+
+  function ioListZoneFromSheetName(sheetName) {
+    const name = cellStr(sheetName);
+    const suffixMatch = name.match(/^(.*?)\s*IO\s*List\s*$/i);
+    if (suffixMatch) {
+      const zone = cellStr(suffixMatch[1]);
+      if (zone) {
+        return zone;
+      }
+    }
+
+    const ioListOnlyMatch = name.match(/^IO\s*list(?:\s+(.*))?$/i);
+    if (ioListOnlyMatch) {
+      const tail = cellStr(ioListOnlyMatch[1]);
+      if (tail && !/^v?\d+(\.\d+)?$/i.test(tail)) {
+        return tail;
+      }
+      return 'General';
+    }
+
+    const prefixMatch = name.match(/^(.*?)\s*IO\s*List\b/i);
+    if (prefixMatch) {
+      const zone = cellStr(prefixMatch[1]);
+      if (zone) {
+        return zone;
+      }
+    }
+
+    if (isIoListSheetName(name)) {
+      const zone = cellStr(name.replace(/\s*IO\s*List.*/i, ''));
+      if (zone) {
+        return zone;
+      }
+      return 'General';
+    }
+
+    return name || 'General';
+  }
+
+  const IO_TYPE_LABELS = {
+    SDI: 'Safety Digital Input',
+    SDO: 'Safety Digital Output',
+    DI: 'Digital Input',
+    DO: 'Digital Output'
+  };
+
+  function normalizeHeaderLabel(value) {
+    return cellStr(value).toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
+  }
+
+  function parseIoPointType(value) {
+    const raw = cellStr(value);
+    if (!raw || isIoListSectionLabel(raw) || isIoListSectionMarker(raw)) {
+      return null;
+    }
+
+    const codeMatch = raw.match(/^(SDI|SDO|DI|DO)(\d{1,3})$/i);
+    if (codeMatch) {
+      const kind = codeMatch[1].toUpperCase();
+      return {
+        kind,
+        ioKind: kind,
+        code: `${kind}${codeMatch[2]}`,
+        num: codeMatch[2].padStart(2, '0'),
+        isSafety: kind === 'SDI' || kind === 'SDO',
+        direction: kind === 'SDI' || kind === 'DI' ? 'input' : 'output',
+        label: IO_TYPE_LABELS[kind]
+      };
+    }
+
+    const lower = raw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (/\bsafety\b.*\binput\b|\bsdi\b/.test(lower)) {
+      return {
+        kind: 'SDI',
+        ioKind: 'SDI',
+        code: raw,
+        num: '',
+        isSafety: true,
+        direction: 'input',
+        label: IO_TYPE_LABELS.SDI
+      };
+    }
+    if (/\bsafety\b.*\boutput\b|\bsdo\b/.test(lower)) {
+      return {
+        kind: 'SDO',
+        ioKind: 'SDO',
+        code: raw,
+        num: '',
+        isSafety: true,
+        direction: 'output',
+        label: IO_TYPE_LABELS.SDO
+      };
+    }
+    if (/\bdigital\b.*\binput\b|\bdi\b/.test(lower) && !/\bsafety\b/.test(lower)) {
+      return {
+        kind: 'DI',
+        ioKind: 'DI',
+        code: raw,
+        num: '',
+        isSafety: false,
+        direction: 'input',
+        label: IO_TYPE_LABELS.DI
+      };
+    }
+    if (/\bdigital\b.*\boutput\b|\bdo\b/.test(lower) && !/\bsafety\b/.test(lower)) {
+      return {
+        kind: 'DO',
+        ioKind: 'DO',
+        code: raw,
+        num: '',
+        isSafety: false,
+        direction: 'output',
+        label: IO_TYPE_LABELS.DO
+      };
+    }
+
+    return null;
+  }
+
   function formatIoPointLabel(type, description) {
-    const ioType = cellStr(type);
+    const parsed = parseIoPointType(type);
+    const ioType = parsed?.code || cellStr(type);
     const desc = cellStr(description);
     return desc ? `${ioType} ${desc}` : ioType;
   }
 
   function inferPlcTag(ioType, existingTag) {
+    const parsed = parseIoPointType(ioType);
+    if (!parsed?.num) {
+      return cellStr(existingTag);
+    }
+
+    const expected = `[PLC]RIO01_${parsed.kind}[${parsed.num}]`;
     const tag = cellStr(existingTag);
-    if (tag) {
-      return tag;
+    if (!tag) {
+      return expected;
     }
 
-    const match = cellStr(ioType).match(/^(SDI|DI|SDO|DO)(\d+)/i);
-    if (!match) {
-      return '';
+    const tagKindMatch = tag.match(/RIO01_(SDI|SDO|DI|DO)\[/i);
+    if (tagKindMatch && tagKindMatch[1].toUpperCase() !== parsed.kind) {
+      return expected;
     }
 
-    const kind = match[1].toUpperCase();
-    const num = match[2].padStart(2, '0');
-    if (kind === 'SDI') {
-      return `[PLC]RIO01_SDI[${num}]`;
+    return tag;
+  }
+
+  function findMasterIoListHeader(rows) {
+    for (let rowIndex = 0; rowIndex < (rows || []).length; rowIndex += 1) {
+      const cells = (Array.isArray(rows[rowIndex]) ? rows[rowIndex] : []).map(cellStr);
+      const labels = cells.map(normalizeHeaderLabel);
+      const inputTypeIdx = labels.findIndex((label) => (
+        label === 'input type' || label === 'io type' || label.includes('input type')
+      ));
+      const outputTypeIdx = labels.findIndex((label, idx) => (
+        (inputTypeIdx < 0 || idx > inputTypeIdx)
+        && (label === 'output type' || label.includes('output type') || (label === 'io type' && idx !== inputTypeIdx))
+      ));
+      const slNoIdx = labels.findIndex((label) => (
+        label === 'sl no' || label === 'sno' || label === 'slno' || label.startsWith('sl no')
+        || label === 'sr no' || label.startsWith('sr no') || label === 'srno'
+      ));
+      const hasStructuredHeader = labels.some((label) => (
+        label.includes('input type') || label.includes('output type') || label === 'io type'
+      ));
+      const addressIndices = labels
+        .map((label, idx) => (label === 'address' ? idx : -1))
+        .filter((idx) => idx >= 0);
+      const tagIndices = labels
+        .map((label, idx) => (label === 'tag' || label === 'full description' ? idx : -1))
+        .filter((idx) => idx >= 0);
+      const descIndices = labels
+        .map((label, idx) => (label.includes('description') ? idx : -1))
+        .filter((idx) => idx >= 0);
+
+      if (inputTypeIdx >= 0 && hasStructuredHeader && (slNoIdx >= 0 || inputTypeIdx > 0)) {
+        const splitAt = outputTypeIdx >= 0 ? outputTypeIdx : cells.length;
+
+        return {
+          rowIndex,
+          inputType: inputTypeIdx,
+          inputAddress: addressIndices.find((idx) => idx < splitAt) ?? inputTypeIdx + 2,
+          inputDescription: descIndices.find((idx) => idx < splitAt) ?? inputTypeIdx + 4,
+          inputTag: tagIndices.find((idx) => idx < splitAt) ?? inputTypeIdx + 7,
+          outputType: outputTypeIdx,
+          outputAddress: outputTypeIdx >= 0
+            ? (addressIndices.find((idx) => idx > outputTypeIdx) ?? outputTypeIdx + 2)
+            : -1,
+          outputDescription: outputTypeIdx >= 0
+            ? (descIndices.find((idx) => idx > outputTypeIdx) ?? outputTypeIdx + 3)
+            : -1,
+          outputTag: outputTypeIdx >= 0
+            ? (tagIndices.find((idx) => idx > outputTypeIdx) ?? outputTypeIdx + 6)
+            : -1
+        };
+      }
+
+      if (outputTypeIdx >= 0 && hasStructuredHeader && inputTypeIdx < 0 && (slNoIdx >= 0 || outputTypeIdx > 0)) {
+        return {
+          rowIndex,
+          inputType: -1,
+          inputAddress: -1,
+          inputDescription: -1,
+          inputTag: -1,
+          outputType: outputTypeIdx,
+          outputAddress: addressIndices.find((idx) => idx > outputTypeIdx) ?? outputTypeIdx + 2,
+          outputDescription: descIndices.find((idx) => idx > outputTypeIdx) ?? outputTypeIdx + 3,
+          outputTag: tagIndices.find((idx) => idx > outputTypeIdx) ?? outputTypeIdx + 6
+        };
+      }
+
+      if (cells[0] === 'Sl No' && cells[1] === 'Input Type') {
+        return {
+          rowIndex,
+          inputType: 1,
+          inputAddress: 3,
+          inputDescription: 5,
+          inputTag: 8,
+          outputType: 10,
+          outputAddress: 12,
+          outputDescription: 13,
+          outputTag: 16
+        };
+      }
     }
-    if (kind === 'DI') {
-      return `[PLC]RIO01_DI[${num}]`;
+
+    return null;
+  }
+
+  function isIoListSectionLabel(value) {
+    const label = normalizeHeaderLabel(value);
+    return label === 'digital input'
+      || label === 'digital output'
+      || label === 'safety digital input'
+      || label === 'safety digital output';
+  }
+
+  function isIoListSectionMarker(value) {
+    const label = normalizeHeaderLabel(value);
+    return label === 'di' || label === 'do' || label === 'sdi' || label === 'sdo'
+      || isIoListSectionLabel(value);
+  }
+
+  function findIoPointCell(cells, startIndex, endIndex, direction) {
+    const start = Math.max(0, Number(startIndex) || 0);
+    const end = Math.max(start, Number(endIndex) || cells.length);
+    for (let index = start; index < end; index += 1) {
+      const parsed = parseIoPointType(cells[index]);
+      if (parsed?.direction === direction) {
+        return { parsed, index };
+      }
     }
-    if (kind === 'SDO') {
-      return `[PLC]RIO01_SDO[${num}]`;
+    return null;
+  }
+
+  function resolveIoSideCell(cells, header, side, direction) {
+    const baseIndex = side === 'output' ? header.outputType : header.inputType;
+    if (baseIndex < 0) {
+      return findIoPointCell(cells, 0, cells.length, direction);
     }
-    if (kind === 'DO') {
-      return `[PLC]RIO01_DO[${num}]`;
+
+    const searchEnd = side === 'output'
+      ? cells.length
+      : (header.outputType >= 0 && header.outputType !== header.inputType
+        ? header.outputType
+        : cells.length);
+    const candidates = [0, 1, -1].map((shift) => baseIndex + shift);
+    for (const index of candidates) {
+      if (index < 0 || index >= searchEnd) {
+        continue;
+      }
+      const parsed = parseIoPointType(cells[index]);
+      if (parsed?.direction === direction) {
+        return { parsed, index };
+      }
     }
-    return '';
+
+    return findIoPointCell(cells, baseIndex, searchEnd, direction);
+  }
+
+  function pickIoSideValues(cells, header, side, typeIndex) {
+    const baseTypeIndex = side === 'output' ? header.outputType : header.inputType;
+    const offset = typeIndex - baseTypeIndex;
+    const addressIndex = (side === 'output' ? header.outputAddress : header.inputAddress) + offset;
+    const descriptionIndex = (side === 'output' ? header.outputDescription : header.inputDescription) + offset;
+    const tagIndex = (side === 'output' ? header.outputTag : header.inputTag) + offset;
+    return {
+      address: cells[addressIndex],
+      description: cells[descriptionIndex],
+      plcTag: cells[tagIndex],
+      typeValue: cells[typeIndex]
+    };
+  }
+
+  function pushIoPointRecord(target, side, cells, header, match) {
+    if (!match?.parsed) {
+      return;
+    }
+
+    const values = pickIoSideValues(cells, header, side, match.index);
+    const record = {
+      type: match.parsed.code || cellStr(values.typeValue).toUpperCase(),
+      ioKind: match.parsed.ioKind,
+      ioKindLabel: match.parsed.label,
+      isSafety: match.parsed.isSafety,
+      address: values.address,
+      description: values.description,
+      plcTag: inferPlcTag(values.typeValue, values.plcTag)
+    };
+
+    if (match.parsed.direction === 'input') {
+      target.diInputs.push(record);
+    } else if (match.parsed.direction === 'output') {
+      target.doOutputs.push(record);
+    }
   }
 
   function makeStringTag(tagName, label) {
@@ -429,47 +714,61 @@
   }
 
   function parseMasterIoListSheetRows(sheetName, rows) {
-    const zone = cellStr(sheetName).replace(/\s*IO\s*List\s*$/i, '').trim();
+    const zone = ioListZoneFromSheetName(sheetName);
     const parsed = {
       zone,
       diInputs: [],
       doOutputs: []
     };
 
-    let headerFound = false;
-    for (const rawRow of rows || []) {
+    const header = findMasterIoListHeader(rows);
+    if (!header) {
+      return parsed;
+    }
+
+    for (const rawRow of (rows || []).slice(header.rowIndex + 1)) {
       const cells = (Array.isArray(rawRow) ? rawRow : []).map(cellStr);
-      if (!headerFound) {
-        if (cells[0] === 'Sl No' && cells[1] === 'Input Type') {
-          headerFound = true;
-        }
+      if (!cells.some(Boolean)) {
         continue;
       }
 
-      if (cells[5] === 'DIGITAL INPUT' || cells[13] === 'DIGITAL OUTPUT') {
+      const inputType = cells[header.inputType];
+      const outputType = header.outputType >= 0 ? cells[header.outputType] : '';
+      if (isIoListSectionLabel(inputType) || isIoListSectionLabel(outputType)) {
+        continue;
+      }
+      if (isIoListSectionMarker(inputType) || isIoListSectionMarker(outputType)) {
+        continue;
+      }
+      if (normalizeHeaderLabel(inputType) === 'input type' || normalizeHeaderLabel(outputType) === 'output type') {
+        continue;
+      }
+      if (normalizeHeaderLabel(inputType) === 'io type' || normalizeHeaderLabel(outputType) === 'io type') {
+        continue;
+      }
+      if (['_', '+', '-'].includes(cellStr(inputType)) && !parseIoPointType(outputType)) {
         continue;
       }
 
-      const inputType = cells[1];
-      if (/^SDI\d+/i.test(inputType) || /^DI\d+/i.test(inputType)) {
-        parsed.diInputs.push({
-          type: inputType.toUpperCase(),
-          isSafety: /^SDI/i.test(inputType),
-          address: cells[3],
-          description: cells[5],
-          plcTag: inferPlcTag(inputType, cells[8])
-        });
+      const inputMatch = header.inputType >= 0
+        ? resolveIoSideCell(cells, header, 'input', 'input')
+        : null;
+      if (inputMatch) {
+        pushIoPointRecord(parsed, 'input', cells, header, inputMatch);
       }
 
-      const outputType = cells[10];
-      if (/^SDO\d+/i.test(outputType) || /^DO\d+/i.test(outputType)) {
-        parsed.doOutputs.push({
-          type: outputType.toUpperCase(),
-          isSafety: /^SDO/i.test(outputType),
-          address: cells[12],
-          description: cells[13],
-          plcTag: inferPlcTag(outputType, cells[16])
-        });
+      let outputMatch = null;
+      if (header.outputType >= 0 && header.outputType !== header.inputType) {
+        outputMatch = resolveIoSideCell(cells, header, 'output', 'output');
+      } else {
+        outputMatch = findIoPointCell(cells, header.inputType, cells.length, 'output');
+      }
+
+      if (outputMatch && outputMatch.index !== inputMatch?.index) {
+        const side = header.outputType >= 0 && outputMatch.index >= header.outputType
+          ? 'output'
+          : 'input';
+        pushIoPointRecord(parsed, side, cells, header, outputMatch);
       }
     }
 
@@ -524,7 +823,7 @@
     const tags = [];
 
     for (const sheet of sheets || []) {
-      const zone = sheet.zone || 'IO';
+      const zone = cellStr(sheet.zone) || 'General';
       zoneOffsets[zone] = {
         plcDi: merged.plcDi.length,
         safetyDi: merged.safetyDi.length,
@@ -532,7 +831,7 @@
         safetyDo: merged.safetyDo.length
       };
 
-      if (zone && !merged.zones.includes(zone)) {
+      if (!merged.zones.includes(zone)) {
         merged.zones.push(zone);
       }
 
@@ -540,8 +839,8 @@
       const plcDi = (sheet.diInputs || []).filter((item) => !item.isSafety);
       const safetyDo = (sheet.doOutputs || []).filter((item) => item.isSafety);
       const plcDo = (sheet.doOutputs || []).filter((item) => !item.isSafety);
-      const inputListTitle = zone ? `${zone} Input List` : 'PLC Input List';
-      const outputListTitle = zone ? `${zone} Output List` : 'PLC Output List';
+      const inputListTitle = zone && zone !== 'General' ? `${zone} Input List` : 'PLC Input List';
+      const outputListTitle = zone && zone !== 'General' ? `${zone} Output List` : 'PLC Output List';
 
       tags.push(...buildChannelTags(safetyDi, {
         discrFolder: 'Safety_DI_Discr',
@@ -594,6 +893,10 @@
         zones: merged.zones,
         zoneOffsets,
         counts: {
+          sdi: merged.safetyDi.length,
+          di: merged.plcDi.length,
+          sdo: merged.safetyDo.length,
+          do: merged.plcDo.length,
           safetyDi: merged.safetyDi.length,
           plcDi: merged.plcDi.length,
           safetyDo: merged.safetyDo.length,
@@ -617,9 +920,14 @@
       throw new Error('Excel support is not loaded.');
     }
 
-    const sheetPattern = options.sheetPattern || / IO List$/i;
+    const sheetPattern = options.sheetPattern || null;
     const requestedSheet = cellStr(options.sheetName);
-    let sheetNames = (workbook.SheetNames || []).filter((name) => sheetPattern.test(name));
+    let sheetNames = (workbook.SheetNames || []).filter((name) => {
+      if (sheetPattern) {
+        return sheetPattern.test(name);
+      }
+      return isIoListSheetName(name);
+    });
     if (requestedSheet) {
       sheetNames = sheetNames.filter((name) => cellStr(name) === requestedSheet);
       if (!sheetNames.length && workbook.Sheets?.[requestedSheet]) {
@@ -628,7 +936,7 @@
     }
 
     if (!sheetNames.length) {
-      throw new Error('No IO List sheet found. Expected a worksheet named like "Packing IO List".');
+      throw new Error('No IO List sheet found. Name worksheets with "IO List" anywhere in the title (e.g. "Packing IO List", "Chopping IO List", "IO List").');
     }
 
     const sheets = sheetNames.map((name) => {
@@ -639,7 +947,11 @@
         raw: false
       });
       return parseMasterIoListSheetRows(name, rows);
-    });
+    }).filter((sheet) => sheet.diInputs.length || sheet.doOutputs.length);
+
+    if (!sheets.length) {
+      throw new Error('IO List worksheets were found but none contained DI/DO rows. Check the Master Sheet layout (Sl No / Input Type header).');
+    }
 
     const parsed = buildParsedFromMasterSheets(sheets);
     parsed.meta = {
@@ -664,14 +976,28 @@
     const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/);
     for (const line of lines) {
       const trimmed = String(line || '').trim();
-      if (!trimmed || trimmed.startsWith('#') || /^Folder\tTag Name\tDescription\tAddress$/i.test(trimmed)) {
+      if (!trimmed || trimmed.startsWith('#')) {
+        continue;
+      }
+      if (/^IO Type\tFolder\tTag Name/i.test(trimmed) || /^Folder\tTag Name\tDescription\tAddress$/i.test(trimmed)) {
         continue;
       }
       const cells = trimmed.includes('\t') ? trimmed.split('\t') : trimmed.split(',');
       if (cells.length < 3) {
         continue;
       }
+      if (cells.length >= 5 && /^(SDI|SDO|DI|DO)$/i.test(cellStr(cells[0]))) {
+        rows.push({
+          ioType: cellStr(cells[0]).toUpperCase(),
+          folder: cellStr(cells[1]),
+          tagName: cellStr(cells[2]),
+          description: cellStr(cells[3]),
+          address: cellStr(cells[4])
+        });
+        continue;
+      }
       rows.push({
+        ioType: '',
         folder: cellStr(cells[0]),
         tagName: cellStr(cells[1]),
         description: cellStr(cells[2]),
@@ -732,9 +1058,12 @@
     const lines = [
       `# Master Sheet IO List${sourceName ? `: ${sourceName}` : ''}`,
       `# Zones: ${zones}`,
-      `# Safety DI: ${counts.safetyDi || 0}, PLC DI: ${counts.plcDi || 0}, Safety DO: ${counts.safetyDo || 0}, PLC DO: ${counts.plcDo || 0}`,
+      `# SDI (Safety Digital Input): ${counts.sdi || counts.safetyDi || 0}`,
+      `# DI (Digital Input): ${counts.di || counts.plcDi || 0}`,
+      `# SDO (Safety Digital Output): ${counts.sdo || counts.safetyDo || 0}`,
+      `# DO (Digital Output): ${counts.do || counts.plcDo || 0}`,
       '',
-      'Folder\tTag Name\tDescription\tAddress'
+      'IO Type\tFolder\tTag Name\tDescription\tAddress'
     ];
 
     for (const tag of parsed?.tags || []) {
@@ -745,8 +1074,18 @@
         continue;
       }
       const folder = String(tag.tagName || '').split('\\')[0];
+      let ioType = '';
+      if (/^Safety_DI_/i.test(folder)) {
+        ioType = 'SDI';
+      } else if (/^PLC_DI_/i.test(folder)) {
+        ioType = 'DI';
+      } else if (/^Safety_DO_/i.test(folder)) {
+        ioType = 'SDO';
+      } else if (/^PLC_DO_/i.test(folder)) {
+        ioType = 'DO';
+      }
       const address = tag.tagType === 'D' ? tag.address : '';
-      lines.push(`${folder}\t${tag.tagName}\t${tag.tagDescription || tag.initialString || ''}\t${address}`);
+      lines.push(`${ioType}\t${folder}\t${tag.tagName}\t${tag.tagDescription || tag.initialString || ''}\t${address}`);
     }
 
     return lines.join('\n');
@@ -837,6 +1176,56 @@
       const discr = findTag(tags, `PLC_DI_Discr\\Data_${dataIdx}`);
       const number = findTag(tags, `PLC_DI_NO\\Data_${dataIdx}`);
       const digital = findTag(tags, `PLC_DI_Tags\\Data_${dataIdx}`);
+
+      map.set(101 + i, discr?.tagDescription || discr?.initialString || '');
+      map.set(201 + i, number?.tagDescription || number?.initialString || '');
+      map.set(301 + i, digital?.initialDigital || '0');
+    }
+
+    return map;
+  }
+
+  function getZonePlcDoCount(parsed, zone) {
+    const zones = parsed?.meta?.zones || [];
+    const offsets = parsed?.meta?.zoneOffsets || {};
+    const zoneIndex = zones.indexOf(zone);
+    if (zoneIndex < 0) {
+      return 8;
+    }
+
+    const start = Number(offsets[zone]?.plcDo) || 0;
+    const nextZone = zones[zoneIndex + 1];
+    const end = nextZone
+      ? Number(offsets[nextZone]?.plcDo)
+      : Number(parsed?.meta?.counts?.plcDo);
+    if (!Number.isFinite(end) || end <= start) {
+      return 8;
+    }
+    return end - start;
+  }
+
+  function buildIoDoListPreviewMap(parsed, options = {}) {
+    const tags = Array.isArray(parsed?.tags) ? parsed.tags : [];
+    const page = Math.max(1, Number(options.page) || 1);
+    const zone = cellStr(options.zone);
+    const zoneOffset = zone && parsed?.meta?.zoneOffsets?.[zone]
+      ? parsed.meta.zoneOffsets[zone].plcDo
+      : 0;
+    const map = new Map();
+    const pageSuffix = String(page).padStart(2, '0');
+    const zoneListTitle = `${zone ? `${zone} Output List` : 'PLC Output List'} ${pageSuffix}`;
+    const listTag = tags.find((tag) => tag.tagType === 'S'
+      && /\\List_\d+$/i.test(String(tag.tagName || ''))
+      && String(tag.initialString || tag.tagDescription || tag.tagDescription || '') === zoneListTitle);
+
+    map.set(100, listTag?.tagDescription || listTag?.initialString || zoneListTitle);
+
+    const base = zoneOffset + ((page - 1) * 8);
+    for (let i = 0; i < 8; i += 1) {
+      const dataIdx = String(base + i).padStart(2, '0');
+      const discr = findTag(tags, `PLC_DO_Discr\\Data_${dataIdx}`);
+      const number = findTag(tags, `PLC_DO_No\\Data_${dataIdx}`);
+      const digital = findTag(tags, `PLC_DO_Tags\\Data_${dataIdx}`);
 
       map.set(101 + i, discr?.tagDescription || discr?.initialString || '');
       map.set(201 + i, number?.tagDescription || number?.initialString || '');
@@ -966,12 +1355,25 @@
   function buildIoListParameterBindings(parsed, options = {}) {
     const tags = Array.isArray(parsed?.tags) ? parsed.tags : [];
     const page = Math.max(1, Number(options.page) || 1);
-    const bindings = buildDefaultParameterBindings(page);
+    const zone = cellStr(options.zone);
+    const zoneOffset = zone && parsed?.meta?.zoneOffsets?.[zone]
+      ? parsed.meta.zoneOffsets[zone].plcDi
+      : 0;
+    const bindings = new Map();
     const pageSuffix = String(page).padStart(2, '0');
-    const listTag = findTag(tags, `PLC_DI_Discr\\List_${pageSuffix}`);
+    const zoneListTitle = `${zone ? `${zone} Input List` : 'PLC Input List'} ${pageSuffix}`;
+    const listTag = tags.find((tag) => tag.tagType === 'S'
+      && /\\List_\d+$/i.test(String(tag.tagName || ''))
+      && String(tag.initialString || tag.tagDescription || '') === zoneListTitle);
 
-    if (listTag?.tagName) {
-      bindings.set(100, listTag.tagName);
+    bindings.set(100, listTag?.tagName || `PLC_DI_Discr\\List_${pageSuffix}`);
+
+    const base = zoneOffset + ((page - 1) * 8);
+    for (let i = 0; i < 8; i += 1) {
+      const dataIdx = String(base + i).padStart(2, '0');
+      bindings.set(101 + i, `PLC_DI_Discr\\Data_${dataIdx}`);
+      bindings.set(201 + i, `PLC_DI_NO\\Data_${dataIdx}`);
+      bindings.set(301 + i, `PLC_DI_Tags\\Data_${dataIdx}`);
     }
 
     return bindings;
@@ -994,6 +1396,23 @@
     return bindings;
   }
 
+  function buildDoParameterBindings(page = 1) {
+    const pageNum = Math.max(1, Number(page) || 1);
+    const pageSuffix = String(pageNum).padStart(2, '0');
+    const bindings = new Map();
+    bindings.set(100, `PLC_DO_Discr\\List_${pageSuffix}`);
+
+    const base = (pageNum - 1) * 8;
+    for (let i = 0; i < 8; i += 1) {
+      const dataIdx = String(base + i).padStart(2, '0');
+      bindings.set(101 + i, `PLC_DO_Discr\\Data_${dataIdx}`);
+      bindings.set(201 + i, `PLC_DO_No\\Data_${dataIdx}`);
+      bindings.set(301 + i, `PLC_DO_Tags\\Data_${dataIdx}`);
+    }
+
+    return bindings;
+  }
+
   function buildDefaultParameterFile(options = {}) {
     const page = Math.max(1, Number(options.page) || 1);
     const pageSuffix = String(page).padStart(2, '0');
@@ -1009,24 +1428,93 @@
 
   function buildIoListParameterFile(parsed, options = {}) {
     const page = Math.max(1, Number(options.page) || 1);
+    const pageSuffix = String(page).padStart(2, '0');
     const bindings = buildIoListParameterBindings(parsed, options);
-    return buildDefaultParameterFile({ page, bindings });
+    return {
+      name: `PLC DI List ${pageSuffix}.par`,
+      content: serializeParameterFile(bindings),
+      bindings
+    };
+  }
+
+  function buildIoDoListParameterBindings(parsed, options = {}) {
+    const tags = Array.isArray(parsed?.tags) ? parsed.tags : [];
+    const page = Math.max(1, Number(options.page) || 1);
+    const zone = cellStr(options.zone);
+    const zoneOffset = zone && parsed?.meta?.zoneOffsets?.[zone]
+      ? parsed.meta.zoneOffsets[zone].plcDo
+      : 0;
+    const bindings = new Map();
+    const pageSuffix = String(page).padStart(2, '0');
+    const zoneListTitle = `${zone ? `${zone} Output List` : 'PLC Output List'} ${pageSuffix}`;
+    const listTag = tags.find((tag) => tag.tagType === 'S'
+      && /\\List_\d+$/i.test(String(tag.tagName || ''))
+      && String(tag.initialString || tag.tagDescription || '') === zoneListTitle);
+
+    bindings.set(100, listTag?.tagName || `PLC_DO_Discr\\List_${pageSuffix}`);
+
+    const base = zoneOffset + ((page - 1) * 8);
+    for (let i = 0; i < 8; i += 1) {
+      const dataIdx = String(base + i).padStart(2, '0');
+      bindings.set(101 + i, `PLC_DO_Discr\\Data_${dataIdx}`);
+      bindings.set(201 + i, `PLC_DO_No\\Data_${dataIdx}`);
+      bindings.set(301 + i, `PLC_DO_Tags\\Data_${dataIdx}`);
+    }
+
+    return bindings;
+  }
+
+  function buildIoDoListParameterFile(parsed, options = {}) {
+    const page = Math.max(1, Number(options.page) || 1);
+    const pageSuffix = String(page).padStart(2, '0');
+    const bindings = buildIoDoListParameterBindings(parsed, options);
+    return {
+      name: `PLC DO List ${pageSuffix}.par`,
+      content: serializeParameterFile(bindings),
+      bindings
+    };
   }
 
   function buildIoListParameterFiles(parsed, options = {}) {
-    const totalDi = Number(parsed?.meta?.counts?.plcDi) || 0;
+    const zone = cellStr(options.zone);
+    const totalDi = zone
+      ? getZonePlcDiCount(parsed, zone)
+      : Number(parsed?.meta?.counts?.plcDi) || 0;
     const pageCount = Math.max(1, Math.ceil(totalDi / 8));
     const maxPages = Math.max(1, Number(options.maxPages) || pageCount);
     const files = [];
 
     for (let page = 1; page <= Math.min(pageCount, maxPages, 6); page += 1) {
-      files.push(buildIoListParameterFile(parsed, { page }));
+      files.push(buildIoListParameterFile(parsed, { ...options, page }));
     }
 
     return files;
   }
 
-  function resolveTagPreviewValue(tagsParsed, tagPath) {
+  function buildIoDoListParameterFiles(parsed, options = {}) {
+    const zone = cellStr(options.zone);
+    const totalDo = zone
+      ? getZonePlcDoCount(parsed, zone)
+      : Number(parsed?.meta?.counts?.plcDo) || 0;
+    const pageCount = Math.max(1, Math.ceil(totalDo / 8));
+    const maxPages = Math.max(1, Number(options.maxPages) || pageCount);
+    const files = [];
+
+    for (let page = 1; page <= Math.min(pageCount, maxPages, 6); page += 1) {
+      files.push(buildIoDoListParameterFile(parsed, { ...options, page }));
+    }
+
+    return files;
+  }
+
+  function buildAllIoListParameterFiles(parsed, options = {}) {
+    return [
+      ...buildIoListParameterFiles(parsed, options),
+      ...buildIoDoListParameterFiles(parsed, options)
+    ];
+  }
+
+  function resolveTagPreviewValue(tagsParsed, tagPath, options = {}) {
     const tags = Array.isArray(tagsParsed?.tags) ? tagsParsed.tags : [];
     const key = normalizeParameterTagPath(tagPath);
     if (!key) {
@@ -1039,6 +1527,9 @@
     }
 
     if (tag.tagType === 'D') {
+      if (options.showPlcAddress || isPlcIoTagsParameterPath(key)) {
+        return tag.address || tag.tagDescription || tag.initialDigital || '0';
+      }
       return tag.tagDescription || tag.initialString || tag.initialDigital || '0';
     }
 
@@ -1062,18 +1553,424 @@
     return map;
   }
 
+  function isPlcIoTagsParameterPath(tagPath) {
+    return /PLC_(DI|DO|SDI|SDO)_Tags\\/i.test(String(tagPath || ''))
+      || /Safety_(DI|DO)_Tags\\/i.test(String(tagPath || ''));
+  }
+
   function formatParameterPreviewNotes(bindings, tagsParsed) {
     const rows = Array.from(bindings instanceof Map ? bindings.entries() : [])
       .sort((a, b) => a[0] - b[0])
-      .map(([key, tagPath]) => ({
-        slot: `#${key}`,
-        tag: `{${normalizeParameterTagPath(tagPath)}}`,
-        value: resolveTagPreviewValue(tagsParsed, tagPath) || '—'
-      }));
+      .map(([key, tagPath]) => {
+        const normalizedPath = normalizeParameterTagPath(tagPath);
+        const showPlcAddress = isPlcIoTagsParameterPath(normalizedPath);
+        return {
+          slot: `#${key}`,
+          tag: `{${normalizedPath}}`,
+          value: resolveTagPreviewValue(tagsParsed, tagPath, { showPlcAddress }) || '—'
+        };
+      });
     return rows;
   }
 
+  const RSLOGIX_HMI_SPECIFIER = /^RIO0[123]_(DI|DO|SDI|SDO)\[\d+\]$/i;
+
+  function parseRsLogixCsvLine(line) {
+    const cells = [];
+    let current = '';
+    let inQuotes = false;
+    for (let index = 0; index < line.length; index += 1) {
+      const ch = line[index];
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+        continue;
+      }
+      if (ch === ',' && !inQuotes) {
+        cells.push(current);
+        current = '';
+        continue;
+      }
+      current += ch;
+    }
+    cells.push(current);
+    return cells.map((cell) => cellStr(cell));
+  }
+
+  function normalizeDescriptionForMatch(value) {
+    return cellStr(value)
+      .toLowerCase()
+      .replace(/\$n/gi, ' ')
+      .replace(/&/g, ' and ')
+      .replace(/[_\-/\\.,:;]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function isPreferredHmiPlcSpecifier(specifier) {
+    return RSLOGIX_HMI_SPECIFIER.test(cellStr(specifier));
+  }
+
+  function parseRsLogixDescription(rawDescription) {
+    const text = cellStr(rawDescription);
+    if (!text) {
+      return null;
+    }
+
+    const label = parseIoCommentLabel(text);
+    if (label) {
+      return {
+        ioKind: label.ioKind,
+        ioNum: label.ioNum,
+        description: label.description,
+        normalizedDescription: normalizeDescriptionForMatch(label.description),
+        normalizedFullLabel: normalizeDescriptionForMatch(text)
+      };
+    }
+
+    const codeMatch = text.match(/^(SDI|SDO|DI|DO)(\d+)\b/i);
+    return {
+      ioKind: codeMatch ? codeMatch[1].toUpperCase() : '',
+      ioNum: codeMatch ? Number.parseInt(codeMatch[2], 10) : null,
+      description: text,
+      normalizedDescription: normalizeDescriptionForMatch(text),
+      normalizedFullLabel: normalizeDescriptionForMatch(text)
+    };
+  }
+
+  function mergeRsLogixEntry(existing, incoming) {
+    if (!existing) {
+      return incoming;
+    }
+    if (incoming.preferred && !existing.preferred) {
+      return incoming;
+    }
+    if (existing.preferred && !incoming.preferred) {
+      return existing;
+    }
+    return existing;
+  }
+
+  function parseIoCommentLabel(value) {
+    const match = cellStr(value).match(/^(SDI|SDO|DI|DO)(\d+)_(.+)$/i);
+    if (!match) {
+      return null;
+    }
+
+    return {
+      ioKind: match[1].toUpperCase(),
+      ioNum: Number.parseInt(match[2], 10),
+      description: cellStr(match[3])
+    };
+  }
+
+  function formatPlcTagAddress(specifier) {
+    const address = cellStr(specifier);
+    if (!address) {
+      return '';
+    }
+    if (/^\[PLC\]/i.test(address)) {
+      return address;
+    }
+    return `[PLC]${address}`;
+  }
+
+  function isRsLogixTagsCsv(text) {
+    const sample = String(text || '').slice(0, 4000);
+    return /RSLogix 5000/i.test(sample)
+      && /TYPE,SCOPE,NAME,DESCRIPTION/i.test(sample);
+  }
+
+  function normalizeRsLogixRowType(value) {
+    return cellStr(value).toUpperCase();
+  }
+
+  function isBlockedRsLogixRowType(rowType) {
+    const type = normalizeRsLogixRowType(rowType);
+    return type === 'ALIAS'
+      || type === 'RCOMMENT'
+      || type === 'REMARK';
+  }
+
+  function isIoLikeRsLogixDescription(rawDescription) {
+    return /^(SDI|SDO|DI|DO)\d+_/i.test(cellStr(rawDescription));
+  }
+
+  function shouldParseRsLogixRow(cells, allowedTypes) {
+    const rowType = normalizeRsLogixRowType(cells[0]);
+    if (isBlockedRsLogixRowType(rowType) || !allowedTypes.has(rowType)) {
+      return false;
+    }
+
+    const name = cellStr(cells[2]);
+    const rawDescription = cellStr(cells[3]);
+    const specifier = cellStr(cells[5]);
+    const tagAddress = specifier || (isPreferredHmiPlcSpecifier(name) ? name : '');
+
+    if (rowType === 'TAG') {
+      const descriptionSource = rawDescription || name;
+      return Boolean(tagAddress) && (
+        isIoLikeRsLogixDescription(descriptionSource)
+        || isIoLikeRsLogixDescription(rawDescription)
+      );
+    }
+
+    if (rowType === 'COMMENT') {
+      return isIoLikeRsLogixDescription(rawDescription) && Boolean(specifier);
+    }
+
+    return false;
+  }
+
+  function buildRsLogixIoEntry(cells, rowType) {
+    const name = cellStr(cells[2]);
+    const rawDescription = cellStr(cells[3]);
+    const specifier = cellStr(cells[5]);
+    const descriptionSource = rawDescription || name;
+    const tagAddress = specifier || (isPreferredHmiPlcSpecifier(name) ? name : '');
+
+    if (!descriptionSource || !tagAddress) {
+      return null;
+    }
+
+    const parsedDescription = parseRsLogixDescription(descriptionSource);
+    if (!parsedDescription?.ioKind || !Number.isFinite(parsedDescription.ioNum)) {
+      return null;
+    }
+
+    return {
+      rowType: normalizeRsLogixRowType(rowType),
+      parentTag: name.toUpperCase(),
+      ioKind: parsedDescription.ioKind,
+      ioNum: parsedDescription.ioNum,
+      description: parsedDescription.description,
+      rawDescription: rawDescription || descriptionSource,
+      normalizedDescription: parsedDescription.normalizedDescription,
+      normalizedFullLabel: parsedDescription.normalizedFullLabel,
+      specifier: tagAddress,
+      preferred: isPreferredHmiPlcSpecifier(tagAddress),
+      plcTag: formatPlcTagAddress(tagAddress)
+    };
+  }
+
+  function collectRsLogixIoEntries(lines, allowedTypes) {
+    const entryMap = new Map();
+
+    for (const line of lines) {
+      if (!line.trim() || line.startsWith('remark,') || line.startsWith('0.')) {
+        continue;
+      }
+
+      const cells = parseRsLogixCsvLine(line);
+      if (!shouldParseRsLogixRow(cells, allowedTypes)) {
+        continue;
+      }
+
+      const entry = buildRsLogixIoEntry(cells, cells[0]);
+      if (!entry) {
+        continue;
+      }
+
+      const dedupeKey = `${entry.ioKind}:${entry.ioNum}:${entry.normalizedDescription}`;
+      entryMap.set(dedupeKey, mergeRsLogixEntry(entryMap.get(dedupeKey), entry));
+    }
+
+    return Array.from(entryMap.values());
+  }
+
+  function parseRsLogixTagsCsv(text) {
+    const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/);
+    const tagEntries = collectRsLogixIoEntries(lines, new Set(['TAG']));
+
+    if (tagEntries.length) {
+      return {
+        entries: tagEntries,
+        meta: { rowTypesUsed: ['TAG'], aliasRowsSkipped: true }
+      };
+    }
+
+    // Standard RSLogix CSV exports IO descriptions on COMMENT rows attached to TAG arrays.
+    const commentEntries = collectRsLogixIoEntries(lines, new Set(['COMMENT']));
+    return {
+      entries: commentEntries,
+      meta: {
+        rowTypesUsed: ['COMMENT'],
+        aliasRowsSkipped: true,
+        tagRowsEmpty: true
+      }
+    };
+  }
+
+  function buildPlcTagLookupIndex(entries) {
+    const byKindNumDesc = new Map();
+    const byKindDesc = new Map();
+    const byKindFullLabel = new Map();
+    const byKindNum = new Map();
+
+    for (const entry of entries || []) {
+      if (entry.ioKind && Number.isFinite(entry.ioNum)) {
+        const kindNumDescKey = `${entry.ioKind}:${entry.ioNum}:${entry.normalizedDescription}`;
+        byKindNumDesc.set(kindNumDescKey, mergeRsLogixEntry(byKindNumDesc.get(kindNumDescKey), entry));
+      }
+
+      if (entry.ioKind) {
+        const kindDescKey = `${entry.ioKind}:${entry.normalizedDescription}`;
+        const kindDescMatches = byKindDesc.get(kindDescKey) || [];
+        kindDescMatches.push(entry);
+        byKindDesc.set(kindDescKey, kindDescMatches);
+
+        const kindFullLabelKey = `${entry.ioKind}:${entry.normalizedFullLabel}`;
+        const kindFullLabelMatches = byKindFullLabel.get(kindFullLabelKey) || [];
+        kindFullLabelMatches.push(entry);
+        byKindFullLabel.set(kindFullLabelKey, kindFullLabelMatches);
+      }
+
+      if (entry.ioKind && Number.isFinite(entry.ioNum)) {
+        const kindNumKey = `${entry.ioKind}:${entry.ioNum}`;
+        const kindNumMatches = byKindNum.get(kindNumKey) || [];
+        kindNumMatches.push(entry);
+        byKindNum.set(kindNumKey, kindNumMatches);
+      }
+    }
+
+    return { byKindNumDesc, byKindDesc, byKindFullLabel, byKindNum, entries };
+  }
+
+  function pickPreferredPlcEntry(matches) {
+    const list = (matches || []).filter((entry) => entry?.plcTag);
+    if (!list.length) {
+      return null;
+    }
+    const preferred = list.filter((entry) => entry.preferred);
+    const pool = preferred.length ? preferred : list;
+    return pool.length === 1 ? pool[0] : (preferred[0] || null);
+  }
+
+  function descriptionsRoughlyMatch(left, right) {
+    const a = normalizeDescriptionForMatch(left);
+    const b = normalizeDescriptionForMatch(right);
+    if (!a || !b) {
+      return false;
+    }
+    if (a === b) {
+      return true;
+    }
+    return a.includes(b) || b.includes(a);
+  }
+
+  function resolveIoItemPlcTag(item, lookup) {
+    const parsed = parseIoPointType(item?.type);
+    if (!parsed?.ioKind || !lookup) {
+      return { plcTag: cellStr(item?.plcTag), matched: false };
+    }
+
+    const ioNum = Number.parseInt(parsed.num, 10)
+      || Number.parseInt(String(item?.type || '').match(/(\d+)/)?.[1] || '', 10);
+    const normalizedDescription = normalizeDescriptionForMatch(item?.description);
+    const normalizedFullLabel = normalizeDescriptionForMatch(formatIoPointLabel(item.type, item.description));
+
+    if (Number.isFinite(ioNum)) {
+      const exact = lookup.byKindNumDesc.get(`${parsed.ioKind}:${ioNum}:${normalizedDescription}`);
+      if (exact?.plcTag) {
+        return { plcTag: exact.plcTag, matched: true };
+      }
+    }
+
+    const kindDescMatches = lookup.byKindDesc.get(`${parsed.ioKind}:${normalizedDescription}`) || [];
+    const kindDescPick = pickPreferredPlcEntry(kindDescMatches);
+    if (kindDescPick?.plcTag) {
+      return { plcTag: kindDescPick.plcTag, matched: true };
+    }
+
+    const kindFullLabelMatches = lookup.byKindFullLabel.get(`${parsed.ioKind}:${normalizedFullLabel}`) || [];
+    const kindFullLabelPick = pickPreferredPlcEntry(kindFullLabelMatches);
+    if (kindFullLabelPick?.plcTag) {
+      return { plcTag: kindFullLabelPick.plcTag, matched: true };
+    }
+
+    if (Number.isFinite(ioNum)) {
+      const kindNumMatches = (lookup.byKindNum.get(`${parsed.ioKind}:${ioNum}`) || [])
+        .filter((entry) => descriptionsRoughlyMatch(entry.description, item?.description)
+          || descriptionsRoughlyMatch(entry.rawDescription, item?.description)
+          || descriptionsRoughlyMatch(entry.normalizedFullLabel, normalizedFullLabel));
+      const kindNumPick = pickPreferredPlcEntry(kindNumMatches);
+      if (kindNumPick?.plcTag) {
+        return { plcTag: kindNumPick.plcTag, matched: true };
+      }
+    }
+
+    const fuzzyKindDescMatches = (lookup.byKindDesc.get(`${parsed.ioKind}:${normalizedDescription}`) || [])
+      .concat(kindDescMatches)
+      .filter((entry, index, list) => list.indexOf(entry) === index)
+      .filter((entry) => descriptionsRoughlyMatch(entry.description, item?.description));
+    const fuzzyPick = pickPreferredPlcEntry(fuzzyKindDescMatches);
+    if (fuzzyPick?.plcTag) {
+      return { plcTag: fuzzyPick.plcTag, matched: true };
+    }
+
+    return { plcTag: cellStr(item?.plcTag), matched: false };
+  }
+
+  function applyPlcTagsToIoSheets(sheets, rsLogixText) {
+    const rsLogixParsed = parseRsLogixTagsCsv(rsLogixText);
+    const lookup = buildPlcTagLookupIndex(rsLogixParsed.entries);
+    const stats = {
+      total: 0,
+      matched: 0,
+      unmatched: 0,
+      rslogixEntries: rsLogixParsed.entries.length,
+      rslogixRowTypes: rsLogixParsed.meta?.rowTypesUsed || [],
+      aliasRowsSkipped: Boolean(rsLogixParsed.meta?.aliasRowsSkipped)
+    };
+
+    const nextSheets = (Array.isArray(sheets) ? sheets : []).map((sheet) => {
+      const diInputs = (sheet?.diInputs || []).map((item) => {
+        stats.total += 1;
+        const resolved = resolveIoItemPlcTag(item, lookup);
+        if (resolved.matched) {
+          stats.matched += 1;
+        } else {
+          stats.unmatched += 1;
+        }
+        return { ...item, plcTag: resolved.plcTag };
+      });
+
+      const doOutputs = (sheet?.doOutputs || []).map((item) => {
+        stats.total += 1;
+        const resolved = resolveIoItemPlcTag(item, lookup);
+        if (resolved.matched) {
+          stats.matched += 1;
+        } else {
+          stats.unmatched += 1;
+        }
+        return { ...item, plcTag: resolved.plcTag };
+      });
+
+      return { ...sheet, diInputs, doOutputs };
+    });
+
+    return { sheets: nextSheets, stats, lookup };
+  }
+
+  function applyPlcTagsToParsed(parsed, rsLogixText) {
+    const sourceSheets = parsed?.meta?.sourceSheets || [];
+    if (!sourceSheets.length || !cellStr(rsLogixText)) {
+      return { parsed, stats: { total: 0, matched: 0, unmatched: 0, rslogixEntries: 0 } };
+    }
+
+    const { sheets, stats } = applyPlcTagsToIoSheets(sourceSheets, rsLogixText);
+    const rebuilt = rebuildParsedFromMasterSheets(sheets);
+    rebuilt.meta = {
+      ...(rebuilt.meta || {}),
+      ...(parsed.meta || {}),
+      sourceSheets: sheets,
+      plcTagMatch: stats
+    };
+    return { parsed: rebuilt, stats };
+  }
+
   global.IoTags = {
+    IO_TYPE_LABELS,
+    parseIoPointType,
     parseIoListText,
     parseSimpleIoListCsv,
     serializeFactoryTalkTagsCsv,
@@ -1085,6 +1982,7 @@
     applyIoListSummaryEdits,
     formatMasterSheetSummary,
     buildIoListPreviewMap,
+    buildIoDoListPreviewMap,
     resolveParameterExpression,
     parseParameterFile,
     serializeParameterFile,
@@ -1093,8 +1991,15 @@
     buildDefaultParameterFile,
     buildIoListParameterFile,
     buildIoListParameterFiles,
+    buildIoDoListParameterFile,
+    buildIoDoListParameterFiles,
+    buildAllIoListParameterFiles,
     resolveTagPreviewValue,
     buildPreviewMapFromParameterFile,
-    formatParameterPreviewNotes
+    formatParameterPreviewNotes,
+    isRsLogixTagsCsv,
+    parseRsLogixTagsCsv,
+    applyPlcTagsToIoSheets,
+    applyPlcTagsToParsed
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -363,7 +363,14 @@ function ensureProjectCsvData(project) {
   project.parametersCollapsed = Boolean(project.parametersCollapsed);
   project.ioListCollapsed = Boolean(project.ioListCollapsed);
   project.ioListPreviewPage = Math.max(1, Number(project.ioListPreviewPage) || 1);
+  if (project.ioListPreviewZone === undefined) {
+    project.ioListPreviewZone = String(project.ioListPreviewZone || '');
+  }
   project.ioListPreviewZone = String(project.ioListPreviewZone || '');
+  if (project.tagsExportZone === undefined) {
+    project.tagsExportZone = '';
+  }
+  project.tagsExportZone = String(project.tagsExportZone || '');
   if (project.ioListEditorFilter === undefined) {
     project.ioListEditorFilter = 'IO';
   }
@@ -381,6 +388,9 @@ function ensureProjectCsvData(project) {
       ? project.ioListMeta.sourceSheets
       : [];
   }
+
+  migrateGeneratedTagsFromSidebar(project);
+  clearInvalidGeneratedTagsExport(project);
 
   for (const list of [project.tagsFiles, project.parametersFiles, project.ioListFiles, project.plcLogicTagsFiles]) {
     for (const file of list) {
@@ -444,48 +454,461 @@ function normalizeIoListZoneNames(zones) {
   return meaningful.length ? meaningful : [];
 }
 
-function formatIoListZoneSideLabel(zone, side) {
-  const zoneName = String(zone || '').trim();
-  if (!zoneName || isGenericIoListZoneName(zoneName)) {
-    return side;
+function isIoGeneratedTagsFileName(name) {
+  return /-Tags\.CSV$/i.test(String(name || ''));
+}
+
+function isValidFactoryTalkZoneTagsCsv(content) {
+  if (!globalThis.IoTags?.validateFactoryTalkZoneTagsCsv) {
+    return String(content || '').includes('"F","PLC_DI_Discr"');
   }
-  return `${zoneName} ${side}`;
+  return globalThis.IoTags.validateFactoryTalkZoneTagsCsv(String(content || '').replace(/^\uFEFF/, '')).ok;
 }
 
-function formatIoListSectionTitle(zone, side) {
-  return `${formatIoListZoneSideLabel(zone, side)} List`;
+function clearInvalidGeneratedTagsExport(project) {
+  if (!project?.generatedTagsExport) {
+    return;
+  }
+  const stats = project.generatedTagsExport.stats;
+  if (stats && stats.ok === false) {
+    project.generatedTagsExport = null;
+  }
+  if (project.generatedTagsExport?.content && !isValidFactoryTalkZoneTagsCsv(project.generatedTagsExport.content)) {
+    project.generatedTagsExport = null;
+  }
+  if (project.generatedTagsExport?.content) {
+    delete project.generatedTagsExport.content;
+  }
 }
 
-function buildIoListZoneSideOptions(zones) {
+function migrateGeneratedTagsFromSidebar(project) {
+  if (!project?.tagsFiles?.length) {
+    return;
+  }
+  if (!project.ioListFiles?.length && !project.ioListMeta) {
+    return;
+  }
+
+  const generated = project.tagsFiles.filter(
+    (file) => isIoGeneratedTagsFileName(file.name) && String(file.content || '').trim()
+  );
+  if (!generated.length) {
+    return;
+  }
+
+  if (!project.generatedTagsExport) {
+    const latest = generated.sort(
+      (a, b) => String(b.lastModified || '').localeCompare(String(a.lastModified || ''))
+    )[0];
+    if (isValidFactoryTalkZoneTagsCsv(latest.content)) {
+      project.generatedTagsExport = {
+        zone: String(project.tagsExportZone || project.ioListPreviewZone || '').trim(),
+        name: latest.name,
+        lastModified: latest.lastModified,
+        stats: globalThis.IoTags?.validateFactoryTalkZoneTagsCsv?.(latest.content) || null
+      };
+    }
+  }
+
+  project.tagsFiles = project.tagsFiles.filter((file) => !isIoGeneratedTagsFileName(file.name));
+}
+
+function getProjectManualTagsFiles(project) {
+  ensureProjectCsvData(project);
+  return (project.tagsFiles || []).filter((file) => !isIoGeneratedTagsFileName(file.name));
+}
+
+function resolveTagsExportZone(project, zones = []) {
+  return resolveIoListEditorZone(project, normalizeIoListZoneNames(zones));
+}
+
+function getProjectZoneTagsParsed(project, zone = '') {
+  if (!project || !globalThis.IoTags?.buildParsedForZoneExport) {
+    return getProjectIoTagsParsed(project);
+  }
+
+  const sheets = getProjectIoListSheets(project);
+  const zones = project?.ioListMeta?.zones || sheets.map((sheet) => sheet.zone).filter(Boolean);
+  const targetZone = String(zone || resolveIoListEditorZone(project, zones)).trim();
+  if (!targetZone || !sheets.length) {
+    return getProjectIoTagsParsed(project);
+  }
+
+  try {
+    return globalThis.IoTags.buildParsedForZoneExport(sheets, targetZone, {
+      zoneRioModules: getProjectZoneRioModules(project),
+      manualZoneRioModules: getProjectManualZoneRioModules(project),
+      projectName: project?.name || ''
+    });
+  } catch (_err) {
+    return getProjectIoTagsParsed(project);
+  }
+}
+
+function syncProjectZoneOutputs(project, zone = '', options = {}) {
+  if (!project || !globalThis.IoTags) {
+    return null;
+  }
+
+  const sheets = getProjectIoListSheets(project);
+  const zones = project?.ioListMeta?.zones || sheets.map((sheet) => sheet.zone).filter(Boolean);
+  const activeZone = String(zone || resolveIoListEditorZone(project, zones)).trim();
+  if (!activeZone || !sheets.length) {
+    return null;
+  }
+
+  project.ioListPreviewZone = activeZone;
+  project.tagsExportZone = activeZone;
+
+  const zoneParsed = getProjectZoneTagsParsed(project, activeZone);
+  regenerateProjectTagsCsvForZone(project, activeZone, { save: false });
+  upsertGeneratedParameterFiles(project, zoneParsed, activeZone);
+
+  if (options.save !== false) {
+    saveProjectList();
+  }
+
+  return activeZone;
+}
+
+function buildTagsCsvExportName(project, zone) {
+  const projectName = String(project?.name || 'Project').trim() || 'Project';
+  const projectSlug = projectName.replace(/[^\w.-]+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '') || 'Project';
+  const zoneSlug = String(zone || 'General').trim().replace(/[^\w.-]+/g, '_').replace(/_+/g, '_') || 'General';
+  return `${projectSlug}-${zoneSlug}-Tags`;
+}
+
+function buildProjectTagsCsvForZone(project, zone) {
+  if (!project || !globalThis.IoTags?.buildZoneTagsCsv) {
+    throw new Error('Tags export is not available.');
+  }
+
+  mergeVisibleIoListSheetEdits(project);
+
+  const sheets = getProjectIoListSheets(project);
+  if (!sheets.length) {
+    throw new Error('Upload the Master Sheet under IO List first.');
+  }
+
+  const exportZone = resolveTagsExportZone(project, project.ioListMeta?.zones || sheets.map((sheet) => sheet.zone));
+  const targetZone = String(zone || exportZone || '').trim();
+  if (!targetZone) {
+    throw new Error('Choose an export zone first.');
+  }
+
+  return globalThis.IoTags.buildZoneTagsCsv(sheets, targetZone, {
+    zoneRioModules: getProjectZoneRioModules(project),
+    manualZoneRioModules: getProjectManualZoneRioModules(project),
+    projectName: project?.name || ''
+  });
+}
+
+function regenerateProjectTagsCsvForZone(project, zone, options = {}) {
+  const zones = project?.ioListMeta?.zones
+    || getProjectIoListSheets(project).map((sheet) => sheet.zone).filter(Boolean);
+  const exportZone = String(zone || resolveTagsExportZone(project, zones)).trim();
+  if (!exportZone) {
+    throw new Error('Choose an export zone first.');
+  }
+
+  const csvContent = buildProjectTagsCsvForZone(project, exportZone);
+  const sourceName = buildTagsCsvExportName(project, exportZone);
+  project.tagsExportZone = exportZone;
+  upsertGeneratedTagsCsv(project, csvContent, sourceName);
+
+  if (options.save !== false) {
+    saveProjectList();
+  }
+
+  return { zone: exportZone, fileName: `${sourceName}.CSV`, csvContent };
+}
+
+function getProjectManualZoneRioModules(project) {
+  return project?.ioListMeta?.manualZoneRioModules || {};
+}
+
+function getProjectZoneRioModules(project) {
+  const base = project?.ioListMeta?.zoneRioModules
+    || project?.ioTagsParsed?.meta?.zoneRioModules
+    || {};
+  const manual = getProjectManualZoneRioModules(project);
+  if (!Object.keys(manual).length) {
+    return Object.keys(base).length ? base : null;
+  }
+  return { ...base, ...manual };
+}
+
+function getPlcRioModuleOptions(project) {
+  const plcLogicFile = getProjectPlcLogicTagsFile(project);
+  const rsLogixText = String(plcLogicFile?.content || '').trim();
+  if (rsLogixText && globalThis.IoTags?.parseRsLogixTagsCsv && globalThis.IoTags?.listRioModulesFromPlcEntries) {
+    const parsed = globalThis.IoTags.parseRsLogixTagsCsv(rsLogixText);
+    return globalThis.IoTags.listRioModulesFromPlcEntries(parsed.entries);
+  }
+  return globalThis.IoTags?.listRioModulesFromPlcEntries?.([], 6) || [1, 2, 3, 4, 5, 6];
+}
+
+function collectIoListZoneSetupRows(panel) {
+  const rows = [];
+  for (const tr of panel.querySelectorAll('[data-zone-setup-row]')) {
+    rows.push({
+      sheetName: String(tr.dataset.sheetName || '').trim(),
+      zone: String(tr.querySelector('[data-zone-setup-name]')?.value || '').trim(),
+      rioModule: Number.parseInt(tr.querySelector('[data-zone-setup-rio]')?.value || '', 10)
+    });
+  }
+  return rows;
+}
+
+function applyIoListZoneSetup(project, file, setupRows, options = {}) {
+  if (!project || !globalThis.IoTags?.applyZoneSetupToSheets) {
+    throw new Error('Zone setup is not available.');
+  }
+
+  const sheets = getProjectIoListSheets(project, file);
+  if (!sheets.length) {
+    throw new Error('Upload a Master Sheet Excel file first.');
+  }
+
+  const { sheets: nextSheets, zoneRioModules, zones } = globalThis.IoTags.applyZoneSetupToSheets(
+    sheets.map((sheet) => ({ ...sheet })),
+    setupRows
+  );
+
+  project.ioListMeta = {
+    ...(project.ioListMeta || {}),
+    zones,
+    manualZoneRioModules: zoneRioModules,
+    zoneRioModules
+  };
+  syncIoListSheetDataToFile(project, file, nextSheets);
+
+  let parsed = globalThis.IoTags.rebuildParsedFromMasterSheets(nextSheets, {
+    zoneRioModules
+  });
+  parsed.meta = {
+    ...(parsed.meta || {}),
+    ...(project.ioListMeta || {}),
+    sourceSheets: nextSheets,
+    manualZoneRioModules: zoneRioModules,
+    zoneRioModules
+  };
+
+  if (getProjectPlcLogicTagsFile(project)) {
+    const rematched = globalThis.IoTags.applyPlcTagsToParsed(parsed, getProjectPlcLogicTagsFile(project).content);
+    parsed = rematched.parsed;
+    project.ioListMeta = {
+      ...(parsed.meta || {}),
+      manualZoneRioModules: zoneRioModules
+    };
+    syncIoListSheetDataToFile(project, file, parsed.meta?.sourceSheets || nextSheets);
+  }
+
+  project.ioTagsParsed = parsed;
+  if (file) {
+    file.content = globalThis.IoTags.formatMasterSheetSummary(parsed, file.name);
+    file.sizeBytes = new Blob([file.content]).size;
+    file.lastModified = new Date().toISOString();
+  }
+
+  syncProjectZoneOutputs(project, project.ioListPreviewZone, { save: false });
+
+  const currentZone = String(project.ioListPreviewZone || '').trim();
+  if (currentZone && !zones.some((zone) => displayKey(zone) === displayKey(currentZone))) {
+    project.ioListPreviewZone = zones[0] || '';
+  }
+
+  if (options.save !== false) {
+    saveProjectList();
+  }
+
+  return { zones, zoneRioModules };
+}
+
+function appendIoListZoneSetupPanel(parent, project, file, sheets, zoneRioModules, rerenderIoListEditor) {
+  if (!sheets.length || !globalThis.IoTags?.buildZoneSetupRows) {
+    return;
+  }
+
+  const manualMap = getProjectManualZoneRioModules(project);
+  const setupRows = globalThis.IoTags.buildZoneSetupRows(sheets, { ...zoneRioModules, ...manualMap });
+  const rioOptions = getPlcRioModuleOptions(project);
+  const panelOpen = project.ioListZoneSetupOpen === true;
+
+  const panel = document.createElement('section');
+  panel.className = 'io-list-zone-setup';
+
+  const header = document.createElement('div');
+  header.className = 'io-list-zone-setup-header';
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.type = 'button';
+  toggleBtn.className = 'io-list-zone-setup-toggle';
+  toggleBtn.textContent = panelOpen ? 'Hide Zone Setup' : 'Zone Setup';
+  toggleBtn.title = 'Assign each Excel sheet to a zone name and RIO module (RIO01, RIO02, …)';
+
+  const hint = document.createElement('span');
+  hint.className = 'io-list-zone-setup-hint';
+  hint.textContent = 'Pick zone names and RIO modules for each IO List sheet.';
+
+  header.appendChild(toggleBtn);
+  header.appendChild(hint);
+  panel.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'io-list-zone-setup-body';
+  body.hidden = !panelOpen;
+
+  const table = document.createElement('table');
+  table.className = 'io-list-zone-setup-table';
+  table.innerHTML = '<thead><tr><th>Excel Sheet</th><th>Zone Name</th><th>RIO Module</th></tr></thead>';
+  const tbody = document.createElement('tbody');
+
+  for (const row of setupRows) {
+    const tr = document.createElement('tr');
+    tr.dataset.zoneSetupRow = '1';
+    tr.dataset.sheetName = row.sheetName;
+
+    const sheetCell = document.createElement('td');
+    sheetCell.textContent = row.sheetName;
+    sheetCell.title = row.sheetName;
+
+    const zoneCell = document.createElement('td');
+    const zoneInput = document.createElement('input');
+    zoneInput.type = 'text';
+    zoneInput.className = 'io-list-zone-setup-name';
+    zoneInput.dataset.zoneSetupName = '1';
+    zoneInput.value = row.zone;
+    zoneInput.placeholder = 'Zone name';
+    zoneCell.appendChild(zoneInput);
+
+    const rioCell = document.createElement('td');
+    const rioSelect = document.createElement('select');
+    rioSelect.className = 'io-list-zone-setup-rio';
+    rioSelect.dataset.zoneSetupRio = '1';
+    const selectedRio = Number.parseInt(row.rioModule, 10) || 1;
+    for (const rioModule of rioOptions) {
+      const option = document.createElement('option');
+      option.value = String(rioModule);
+      option.textContent = globalThis.IoTags.formatRioModuleLabel(rioModule);
+      option.selected = rioModule === selectedRio;
+      rioSelect.appendChild(option);
+    }
+    if (!rioOptions.includes(selectedRio)) {
+      const customOption = document.createElement('option');
+      customOption.value = String(selectedRio);
+      customOption.textContent = globalThis.IoTags.formatRioModuleLabel(selectedRio);
+      customOption.selected = true;
+      rioSelect.appendChild(customOption);
+    }
+    rioCell.appendChild(rioSelect);
+
+    tr.appendChild(sheetCell);
+    tr.appendChild(zoneCell);
+    tr.appendChild(rioCell);
+    tbody.appendChild(tr);
+  }
+
+  table.appendChild(tbody);
+  body.appendChild(table);
+
+  const actions = document.createElement('div');
+  actions.className = 'io-list-zone-setup-actions';
+
+  const applyBtn = document.createElement('button');
+  applyBtn.type = 'button';
+  applyBtn.className = 'io-list-editor-apply-btn';
+  applyBtn.textContent = 'Apply Zone Setup';
+  applyBtn.addEventListener('click', () => {
+    try {
+      mergeVisibleIoListSheetEdits(project);
+      applyIoListZoneSetup(project, file, collectIoListZoneSetupRows(panel));
+      rerenderIoListEditor();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not apply zone setup.');
+    }
+  });
+  actions.appendChild(applyBtn);
+  body.appendChild(actions);
+  panel.appendChild(body);
+
+  toggleBtn.addEventListener('click', () => {
+    body.hidden = !body.hidden;
+    project.ioListZoneSetupOpen = !body.hidden;
+    toggleBtn.textContent = body.hidden ? 'Zone Setup' : 'Hide Zone Setup';
+    saveProjectList();
+  });
+
+  parent.appendChild(panel);
+}
+
+function formatIoListZoneLabel(zone, rioModule) {
+  const zoneName = String(zone || '').trim();
+  const rioLabel = globalThis.IoTags?.formatRioModuleLabel?.(rioModule);
+  if (zoneName && rioLabel && !isGenericIoListZoneName(zoneName)) {
+    return `${zoneName} (${rioLabel})`;
+  }
+  if (rioLabel && !zoneName) {
+    return rioLabel;
+  }
+  return zoneName || 'General';
+}
+
+function buildIoListZoneOptions(zones, zoneRioModules) {
   const list = normalizeIoListZoneNames(zones);
   if (!list.length) {
-    return [
-      { value: 'IO', zone: '', side: 'IO', label: 'IO' },
-      { value: 'DO', zone: '', side: 'DO', label: 'DO' }
-    ];
+    return [{ value: '', zone: '', rioModule: 1, label: 'General' }];
   }
+  return list.map((zone) => ({
+    value: zone,
+    zone,
+    rioModule: zoneRioModules?.[zone] || null,
+    label: formatIoListZoneLabel(zone, zoneRioModules?.[zone])
+  }));
+}
 
+function buildIoListViewOptions() {
+  return [
+    { value: 'IO', side: 'IO', label: 'Inputs (SDI + DI)' },
+    { value: 'DO', side: 'DO', label: 'Outputs (SDO + DO)' }
+  ];
+}
+
+function formatIoListZoneSideLabel(zone, side, zoneRioModules) {
+  const zoneName = String(zone || '').trim();
+  const sideLabel = side === 'DO' ? 'Outputs' : 'Inputs';
+  if (!zoneName || isGenericIoListZoneName(zoneName)) {
+    return sideLabel;
+  }
+  return `${formatIoListZoneLabel(zoneName, zoneRioModules?.[zoneName])} — ${sideLabel}`;
+}
+
+function formatIoListSectionTitle(zone, side, zoneRioModules) {
+  return `${formatIoListZoneSideLabel(zone, side, zoneRioModules)} List`;
+}
+
+function buildIoListZoneSideOptions(zones, zoneRioModules) {
+  const zoneOptions = buildIoListZoneOptions(zones, zoneRioModules);
+  const viewOptions = buildIoListViewOptions();
   const options = [];
-  for (const zone of list) {
-    options.push({
-      value: `${zone}::IO`,
-      zone,
-      side: 'IO',
-      label: formatIoListZoneSideLabel(zone, 'IO')
-    });
-    options.push({
-      value: `${zone}::DO`,
-      zone,
-      side: 'DO',
-      label: formatIoListZoneSideLabel(zone, 'DO')
-    });
+  for (const zoneOption of zoneOptions) {
+    for (const viewOption of viewOptions) {
+      options.push({
+        value: zoneOption.zone ? `${zoneOption.zone}::${viewOption.side}` : viewOption.side,
+        zone: zoneOption.zone,
+        side: viewOption.side,
+        rioModule: zoneOption.rioModule,
+        label: formatIoListZoneSideLabel(zoneOption.zone, viewOption.side, zoneRioModules)
+      });
+    }
   }
   return options;
 }
 
-function getIoListEditorSelection(project, zones) {
+function getIoListEditorSelection(project, zones, zoneRioModules) {
   const list = normalizeIoListZoneNames(zones);
-  const options = buildIoListZoneSideOptions(zones);
+  const options = buildIoListZoneSideOptions(zones, zoneRioModules);
   const side = normalizeIoListEditorFilter(project?.ioListEditorFilter);
   const zone = resolveIoListEditorZone(project, list);
   const preferredValue = list.length ? `${zone}::${side}` : side;
@@ -504,9 +927,10 @@ function applyIoListEditorSelection(project, selection) {
   project.ioListEditorFilter = selection.side || 'IO';
 }
 
-function appendIoListEditorZoneControls(toolbar, project, zones, rerenderIoListEditor) {
-  const options = buildIoListZoneSideOptions(zones);
-  const current = getIoListEditorSelection(project, zones);
+function appendIoListEditorZoneControls(toolbar, project, zones, zoneRioModules, rerenderIoListEditor) {
+  const zoneOptions = buildIoListZoneOptions(zones, zoneRioModules);
+  const viewOptions = buildIoListViewOptions();
+  const current = getIoListEditorSelection(project, zones, zoneRioModules);
   applyIoListEditorSelection(project, current);
 
   const zoneLabel = document.createElement('label');
@@ -514,26 +938,52 @@ function appendIoListEditorZoneControls(toolbar, project, zones, rerenderIoListE
   zoneLabel.textContent = 'Zone:';
   const zoneSelect = document.createElement('select');
   zoneSelect.className = 'io-list-editor-zone-select';
-  for (const option of options) {
+  for (const option of zoneOptions) {
     const el = document.createElement('option');
     el.value = option.value;
     el.textContent = option.label;
-    el.selected = displayKey(option.value) === displayKey(current.value);
+    el.selected = displayKey(option.zone) === displayKey(current.zone);
     zoneSelect.appendChild(el);
   }
-  zoneSelect.addEventListener('change', () => {
+
+  const viewLabel = document.createElement('label');
+  viewLabel.className = 'io-list-editor-zone-label';
+  viewLabel.textContent = 'View:';
+  const viewSelect = document.createElement('select');
+  viewSelect.className = 'io-list-editor-view-select';
+  for (const option of viewOptions) {
+    const el = document.createElement('option');
+    el.value = option.value;
+    el.textContent = option.label;
+    el.selected = option.side === current.side;
+    viewSelect.appendChild(el);
+  }
+
+  const applySelection = () => {
     mergeVisibleIoListSheetEdits(project);
-    const picked = options.find((option) => option.value === zoneSelect.value) || options[0];
-    applyIoListEditorSelection(project, picked);
-    const parsed = getProjectIoTagsParsed(project);
-    if (parsed?.tags?.length) {
-      upsertGeneratedParameterFiles(project, parsed, project.ioListPreviewZone || '');
+    const pickedZone = zoneOptions.find((option) => option.value === zoneSelect.value) || zoneOptions[0];
+    const pickedView = viewOptions.find((option) => option.value === viewSelect.value) || viewOptions[0];
+    applyIoListEditorSelection(project, {
+      zone: pickedZone?.zone || '',
+      side: pickedView?.side || 'IO'
+    });
+    if (getProjectIoListSheets(project).length) {
+      syncProjectZoneOutputs(project, pickedZone?.zone || '', { save: false });
     }
     saveProjectList();
     rerenderIoListEditor();
-  });
+    if (isIoListPreviewScreenActive()) {
+      renderPreview();
+    }
+  };
+
+  zoneSelect.addEventListener('change', applySelection);
+  viewSelect.addEventListener('change', applySelection);
+
   zoneLabel.appendChild(zoneSelect);
+  viewLabel.appendChild(viewSelect);
   toolbar.appendChild(zoneLabel);
+  toolbar.appendChild(viewLabel);
 }
 
 function saveActiveProjectCsvFromEditor() {
@@ -722,7 +1172,7 @@ function renderParameterFilePreview(project, file) {
   }
 
   const parsed = globalThis.IoTags.parseParameterFile(file.content);
-  const tagsParsed = getProjectIoTagsParsed(project);
+  const tagsParsed = getProjectZoneTagsParsed(project);
   const rows = globalThis.IoTags.formatParameterPreviewNotes(parsed.bindings, tagsParsed);
 
   const frame = document.createElement('div');
@@ -732,11 +1182,6 @@ function renderParameterFilePreview(project, file) {
   heading.className = 'parameter-preview-title';
   heading.textContent = `Parameter preview: ${file.name}`;
   frame.appendChild(heading);
-
-  const intro = document.createElement('p');
-  intro.className = 'parameter-preview-intro';
-  intro.textContent = 'Parameter slots (#101/#201/#301) bind to HMI tags; #301–#308 (Tags rows) show the PLC address from your Tags CSV.';
-  frame.appendChild(intro);
 
   const toolbar = document.createElement('div');
   toolbar.className = 'parameter-preview-toolbar';
@@ -759,8 +1204,8 @@ function renderParameterFilePreview(project, file) {
   const exportAllBtn = document.createElement('button');
   exportAllBtn.type = 'button';
   exportAllBtn.className = 'parameter-export-btn secondary';
-  exportAllBtn.textContent = 'Export All';
-  exportAllBtn.title = 'Download all parameter files in this project';
+  exportAllBtn.textContent = 'Download PAR Folder';
+  exportAllBtn.title = 'Download all .par files for the active zone as a ZIP (PLC DI/DO + Safety DI/DO)';
   exportAllBtn.addEventListener('click', async () => {
     try {
       await exportAllProjectParameterFiles(project);
@@ -808,8 +1253,9 @@ function renderTagsCsvPreview(project, file) {
 
   const intro = document.createElement('p');
   intro.className = 'parameter-preview-intro';
+  const exportZone = resolveTagsExportZone(project, project.ioListMeta?.zones || []);
   intro.textContent = tagCount
-    ? `${folderCount} folders, ${tagCount} tags — FactoryTalk import format. Download and import in FactoryTalk Tag Browser.`
+    ? `${folderCount} folders, ${tagCount} tags — FactoryTalk import format${exportZone ? ` for zone "${exportZone}"` : ''}. Download and import in FactoryTalk Tag Browser.`
     : 'FactoryTalk Tags CSV file. Download and import in FactoryTalk Tag Browser.';
   frame.appendChild(intro);
 
@@ -837,7 +1283,7 @@ function renderTagsCsvPreview(project, file) {
 }
 
 function downloadTextFile(content, fileName, mimeType = 'text/plain;charset=utf-8') {
-  const blob = new Blob([String(content || '')], { type: mimeType });
+  const blob = content instanceof Blob ? content : new Blob([String(content || '')], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -846,6 +1292,176 @@ function downloadTextFile(content, fileName, mimeType = 'text/plain;charset=utf-
   anchor.click();
   anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadFactoryTalkTagsCsv(content, fileName) {
+  const text = String(content || '').replace(/^\uFEFF/, '');
+  const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+  const body = new TextEncoder().encode(text);
+  const bytes = new Uint8Array(bom.length + body.length);
+  bytes.set(bom, 0);
+  bytes.set(body, bom.length);
+  const blob = new Blob([bytes], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = String(fileName || 'Tags.CSV');
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const GENERATED_PARAMETER_FILE_PATTERN = /^(PLC (DI|DO) List|Safety (DI|DO) List) \d+\.par$/i;
+
+function isGeneratedParameterFileName(name) {
+  return GENERATED_PARAMETER_FILE_PATTERN.test(String(name || ''));
+}
+
+function pruneGeneratedParameterFiles(project, keepNames = []) {
+  if (!project) {
+    return;
+  }
+  const keep = new Set((keepNames || []).map((name) => displayKey(name)));
+  project.parametersFiles = (project.parametersFiles || []).filter((file) => {
+    if (!isGeneratedParameterFileName(file.name)) {
+      return true;
+    }
+    return keep.has(displayKey(file.name));
+  });
+}
+
+function buildProjectParameterParFiles(project, zone = '') {
+  if (!project || !globalThis.IoTags?.buildAllIoListParameterFiles) {
+    return [];
+  }
+
+  const sheets = getProjectIoListSheets(project);
+  const zones = project?.ioListMeta?.zones || sheets.map((sheet) => sheet.zone).filter(Boolean);
+  const activeZone = String(zone || resolveIoListEditorZone(project, zones)).trim();
+  if (!activeZone || !sheets.length) {
+    return [];
+  }
+
+  const zoneParsed = getProjectZoneTagsParsed(project, activeZone);
+  return globalThis.IoTags.buildAllIoListParameterFiles(zoneParsed, {
+    zone: activeZone,
+    zoneLocal: true,
+    maxPages: 12
+  });
+}
+
+function buildProjectParameterParFolderName(project, zone = '') {
+  const projectName = String(project?.name || 'Project').trim() || 'Project';
+  const sheets = getProjectIoListSheets(project);
+  const zones = project?.ioListMeta?.zones || sheets.map((sheet) => sheet.zone).filter(Boolean);
+  const activeZone = String(zone || resolveIoListEditorZone(project, zones)).trim() || 'General';
+  const zoneSlug = activeZone.replace(/[^\w.-]+/g, '_').replace(/_+/g, '_') || 'General';
+  return `${projectName}-${zoneSlug}-PAR`;
+}
+
+function crc32Bytes(data) {
+  let crc = 0xffffffff;
+  for (let index = 0; index < data.length; index += 1) {
+    crc ^= data[index];
+    for (let bit = 0; bit < 8; bit += 1) {
+      const mask = -(crc & 1);
+      crc = (crc >>> 1) ^ (0xedb88320 & mask);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function createZipBlobFromTextFiles(fileEntries) {
+  const encoder = new TextEncoder();
+  const parts = [];
+  const centralRecords = [];
+  let offset = 0;
+
+  for (const entry of fileEntries || []) {
+    const name = String(entry.name || '').replace(/\\/g, '/');
+    const nameBytes = encoder.encode(name);
+    const dataBytes = encoder.encode(String(entry.content || ''));
+    const crc = crc32Bytes(dataBytes);
+    const localHeader = new Uint8Array(30 + nameBytes.length);
+    const localView = new DataView(localHeader.buffer);
+    localView.setUint32(0, 0x04034b50, true);
+    localView.setUint16(4, 20, true);
+    localView.setUint16(6, 0, true);
+    localView.setUint16(8, 0, true);
+    localView.setUint16(10, 0, true);
+    localView.setUint16(12, 0, true);
+    localView.setUint32(14, crc, true);
+    localView.setUint32(18, dataBytes.length, true);
+    localView.setUint32(22, dataBytes.length, true);
+    localView.setUint16(26, nameBytes.length, true);
+    localView.setUint16(28, 0, true);
+    localHeader.set(nameBytes, 30);
+    parts.push(localHeader, dataBytes);
+    centralRecords.push({
+      nameBytes,
+      crc,
+      size: dataBytes.length,
+      offset
+    });
+    offset += localHeader.length + dataBytes.length;
+  }
+
+  const centralStart = offset;
+  for (const record of centralRecords) {
+    const centralHeader = new Uint8Array(46 + record.nameBytes.length);
+    const centralView = new DataView(centralHeader.buffer);
+    centralView.setUint32(0, 0x02014b50, true);
+    centralView.setUint16(4, 20, true);
+    centralView.setUint16(6, 20, true);
+    centralView.setUint16(8, 0, true);
+    centralView.setUint16(10, 0, true);
+    centralView.setUint16(12, 0, true);
+    centralView.setUint16(14, 0, true);
+    centralView.setUint32(16, record.crc, true);
+    centralView.setUint32(20, record.size, true);
+    centralView.setUint32(24, record.size, true);
+    centralView.setUint16(28, record.nameBytes.length, true);
+    centralView.setUint16(30, 0, true);
+    centralView.setUint16(32, 0, true);
+    centralView.setUint16(34, 0, true);
+    centralView.setUint16(36, 0, true);
+    centralView.setUint32(38, 0, true);
+    centralView.setUint32(42, record.offset, true);
+    centralHeader.set(record.nameBytes, 46);
+    parts.push(centralHeader);
+    offset += centralHeader.length;
+  }
+
+  const endRecord = new Uint8Array(22);
+  const endView = new DataView(endRecord.buffer);
+  endView.setUint32(0, 0x06054b50, true);
+  endView.setUint16(8, centralRecords.length, true);
+  endView.setUint16(10, centralRecords.length, true);
+  endView.setUint32(12, offset - centralStart, true);
+  endView.setUint32(16, centralStart, true);
+  parts.push(endRecord);
+
+  return new Blob(parts, { type: 'application/zip' });
+}
+
+function exportProjectParameterParFolder(project, zone = '') {
+  if (!project) {
+    throw new Error('No project selected.');
+  }
+
+  const builtFiles = buildProjectParameterParFiles(project, zone);
+  if (!builtFiles.length) {
+    throw new Error('No parameter files to export. Pick a zone in the IO List editor first.');
+  }
+
+  const folderName = buildProjectParameterParFolderName(project, zone);
+  const zipBlob = createZipBlobFromTextFiles(builtFiles.map((file) => ({
+    name: file.name,
+    content: file.content
+  })));
+  downloadTextFile(zipBlob, `${folderName}.zip`, 'application/zip');
+  return { folderName, fileCount: builtFiles.length, files: builtFiles.map((file) => file.name) };
 }
 
 function exportProjectParameterFile(project, file) {
@@ -874,6 +1490,11 @@ function exportProjectTagsCsvFile(project, file) {
     return;
   }
 
+  if (file.id === 'generated-tags-export' || isIoGeneratedTagsFileName(file.name)) {
+    exportProjectTagsCsvForZone(project, project.tagsExportZone || project.ioListPreviewZone);
+    return;
+  }
+
   if (activeProjectCsvKey === createProjectCsvKey(project.id, 'tags', file.id)) {
     saveActiveProjectCsvFromEditor();
     file = (project.tagsFiles || []).find((item) => String(item.id) === String(file.id)) || file;
@@ -890,7 +1511,42 @@ function exportProjectTagsCsvFile(project, file) {
     throw new Error(`${fileName} is empty. Upload the Master Sheet under IO List first.`);
   }
 
-  downloadTextFile(file.content, fileName);
+  downloadFactoryTalkTagsCsv(file.content, fileName);
+}
+
+function exportProjectTagsCsvForZone(project, zone = '') {
+  if (!project) {
+    throw new Error('No project selected.');
+  }
+
+  if (activeIoListFileKey) {
+    saveActiveProjectIoListFromEditor();
+  }
+
+  mergeVisibleIoListSheetEdits(project);
+
+  const sheets = getProjectIoListSheets(project);
+  const zones = project?.ioListMeta?.zones || sheets.map((sheet) => sheet.zone).filter(Boolean);
+  const exportZone = String(zone || resolveTagsExportZone(project, zones)).trim();
+  if (!exportZone) {
+    throw new Error('Pick a zone in the IO List editor first.');
+  }
+
+  const csvContent = buildProjectTagsCsvForZone(project, exportZone);
+  const fileName = `${buildTagsCsvExportName(project, exportZone)}.CSV`;
+  const validation = globalThis.IoTags?.validateFactoryTalkZoneTagsCsv?.(csvContent) || { ok: true };
+
+  if (!validation.ok) {
+    throw new Error(
+      `Tags CSV export is incomplete (${validation.folderCount || 0} folders, `
+      + `${validation.digitalTagCount || 0} PLC tags). Re-open the IO List editor and pick a zone first.`
+    );
+  }
+
+  regenerateProjectTagsCsvForZone(project, exportZone, { save: true });
+  downloadFactoryTalkTagsCsv(csvContent, fileName);
+
+  return { zone: exportZone, fileName, validation };
 }
 
 async function exportAllProjectTagsCsvFiles(project) {
@@ -926,15 +1582,19 @@ async function exportAllProjectParameterFiles(project) {
     saveActiveProjectCsvFromEditor();
   }
 
-  const files = (project.parametersFiles || []).filter((file) => String(file.content || '').trim());
-  if (!files.length) {
-    throw new Error('No parameter files to export. Add files under Parameters first.');
-  }
+  try {
+    exportProjectParameterParFolder(project);
+  } catch (err) {
+    const files = (project.parametersFiles || []).filter((file) => String(file.content || '').trim());
+    if (!files.length) {
+      throw err;
+    }
 
-  for (let index = 0; index < files.length; index += 1) {
-    exportProjectParameterFile(project, files[index]);
-    if (index < files.length - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
+    for (let index = 0; index < files.length; index += 1) {
+      exportProjectParameterFile(project, files[index]);
+      if (index < files.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
     }
   }
 }
@@ -1018,15 +1678,25 @@ async function addProjectParameterFile(projectId) {
   return entry;
 }
 
-function upsertGeneratedParameterFiles(project, parsed, zone = 'Packing') {
-  if (!project || !parsed || !globalThis.IoTags) {
+function upsertGeneratedParameterFiles(project, parsed, zone = '') {
+  if (!project || !globalThis.IoTags) {
     return [];
   }
 
   ensureProjectCsvData(project);
-  const builtFiles = globalThis.IoTags.buildAllIoListParameterFiles
-    ? globalThis.IoTags.buildAllIoListParameterFiles(parsed, { zone, maxPages: 6 })
-    : globalThis.IoTags.buildIoListParameterFiles(parsed, { zone, maxPages: 6 });
+  const zones = parsed?.meta?.zones || project.ioListMeta?.zones || [];
+  const activeZone = zone
+    || project.ioListPreviewZone
+    || resolveIoListEditorZone(project, zones);
+  const zoneParsed = parsed?.meta?.exportZone
+    ? parsed
+    : getProjectZoneTagsParsed(project, activeZone);
+  const builtFiles = globalThis.IoTags.buildAllIoListParameterFiles(zoneParsed, {
+    zone: activeZone,
+    zoneLocal: true,
+    maxPages: 12
+  });
+  pruneGeneratedParameterFiles(project, builtFiles.map((file) => file.name));
   const upserted = [];
 
   for (const built of builtFiles) {
@@ -1076,8 +1746,35 @@ function getProjectGeneratedTagsFile(project) {
   }
 
   ensureProjectCsvData(project);
-  const generatedName = `${project.name}-Tags.CSV`;
-  return project.tagsFiles.find((file) => displayKey(file.name) === displayKey(generatedName)) || null;
+  migrateGeneratedTagsFromSidebar(project);
+  clearInvalidGeneratedTagsExport(project);
+
+  const stored = project.generatedTagsExport;
+  if (stored?.zone) {
+    project.tagsExportZone = stored.zone;
+    project.ioListPreviewZone = stored.zone;
+  }
+
+  const zones = project.ioListMeta?.zones
+    || getProjectIoListSheets(project).map((sheet) => sheet.zone).filter(Boolean);
+  const exportZone = resolveTagsExportZone(project, zones);
+  if (!exportZone || !getProjectIoListSheets(project).length) {
+    return null;
+  }
+
+  try {
+    const csvContent = buildProjectTagsCsvForZone(project, exportZone);
+    const sourceName = buildTagsCsvExportName(project, exportZone);
+    return {
+      id: 'generated-tags-export',
+      name: `${sourceName}.CSV`,
+      content: csvContent,
+      sizeBytes: new Blob([csvContent]).size,
+      lastModified: stored?.lastModified || new Date().toISOString()
+    };
+  } catch (_err) {
+    return null;
+  }
 }
 
 function getProjectPrimaryTagsFile(project) {
@@ -1086,20 +1783,20 @@ function getProjectPrimaryTagsFile(project) {
   }
 
   ensureProjectCsvData(project);
-  const generated = getProjectGeneratedTagsFile(project);
-  if (generated?.content?.trim()) {
-    return generated;
-  }
-
-  const tagsCandidates = project.tagsFiles.filter((file) => /tags\.csv$/i.test(file.name));
   if (project.ioListMeta || project.ioListFiles?.length) {
-    const populated = tagsCandidates.filter((file) => String(file.content || '').trim());
-    if (populated.length) {
-      return populated.sort((a, b) => (Number(b.sizeBytes) || 0) - (Number(a.sizeBytes) || 0))[0];
+    const generated = getProjectGeneratedTagsFile(project);
+    if (generated?.content?.trim()) {
+      return generated;
     }
   }
 
-  return tagsCandidates[0] || project.tagsFiles[0] || null;
+  const manualTags = getProjectManualTagsFiles(project);
+  const populated = manualTags.filter((file) => String(file.content || '').trim());
+  if (populated.length) {
+    return populated.sort((a, b) => (Number(b.sizeBytes) || 0) - (Number(a.sizeBytes) || 0))[0];
+  }
+
+  return manualTags[0] || project.tagsFiles[0] || null;
 }
 
 function getProjectPlcLogicTagsFile(project) {
@@ -1133,12 +1830,16 @@ function applyPlcLogicTagMatchingToProject(project, options = {}) {
   }
 
   const baseParsed = project.ioTagsParsed
-    || globalThis.IoTags.rebuildParsedFromMasterSheets(sheets);
+    || globalThis.IoTags.rebuildParsedFromMasterSheets(sheets, {
+      zoneRioModules: getProjectZoneRioModules(project)
+    });
   const { parsed, stats } = globalThis.IoTags.applyPlcTagsToParsed({
     ...baseParsed,
     meta: {
       ...(baseParsed?.meta || {}),
-      sourceSheets: sheets
+      ...(project.ioListMeta || {}),
+      sourceSheets: sheets,
+      manualZoneRioModules: getProjectManualZoneRioModules(project)
     }
   }, rsLogixText);
 
@@ -1153,12 +1854,7 @@ function applyPlcLogicTagMatchingToProject(project, options = {}) {
   }
 
   project.ioTagsParsed = parsed;
-  upsertGeneratedTagsCsv(
-    project,
-    globalThis.IoTags.serializeFactoryTalkTagsCsv(parsed),
-    `${project.name}-Tags`
-  );
-  upsertGeneratedParameterFiles(project, parsed, project.ioListPreviewZone || '');
+  syncProjectZoneOutputs(project, undefined, { save: false });
 
   if (options.save !== false) {
     saveProjectList();
@@ -1723,9 +2419,6 @@ function resolveIoListEditorZone(project, zones, fallbackZone = '') {
   if (zone && !isGenericIoListZoneName(zone) && list.some((item) => displayKey(item) === displayKey(zone))) {
     return zone;
   }
-  if (list.includes('Packing')) {
-    return 'Packing';
-  }
   return list[0] || '';
 }
 
@@ -1802,7 +2495,9 @@ function applyIoListProjectChanges(project, file, editorState) {
 
   let parsed;
   if (getProjectIoListSheets(project).length) {
-    parsed = globalThis.IoTags.rebuildParsedFromMasterSheets(getProjectIoListSheets(project));
+    parsed = globalThis.IoTags.rebuildParsedFromMasterSheets(getProjectIoListSheets(project), {
+      zoneRioModules: getProjectZoneRioModules(project)
+    });
   } else {
     const rows = collectIoListEditorRows();
     if (!rows.length) {
@@ -1817,12 +2512,7 @@ function applyIoListProjectChanges(project, file, editorState) {
   }
   project.ioTagsParsed = parsed;
 
-  upsertGeneratedTagsCsv(
-    project,
-    globalThis.IoTags.serializeFactoryTalkTagsCsv(parsed),
-    `${project.name}-Tags`
-  );
-  upsertGeneratedParameterFiles(project, parsed, project.ioListPreviewZone || '');
+  syncProjectZoneOutputs(project, undefined, { save: false });
 
   file.content = globalThis.IoTags.formatMasterSheetSummary(parsed, file.name);
   file.sizeBytes = new Blob([file.content]).size;
@@ -1854,32 +2544,18 @@ function renderIoListEditorPreview(project, file) {
   heading.textContent = `IO List: ${file.name}`;
   frame.appendChild(heading);
 
-  const intro = document.createElement('p');
-  intro.className = 'io-list-editor-intro';
-  const plcLogicFile = getProjectPlcLogicTagsFile(project);
-  const matchStats = project.ioTagsParsed?.meta?.plcTagMatch || project.ioListMeta?.plcTagMatch;
-  let introText = 'Edit descriptions and addresses for the selected zone, then click Apply Changes to update Tags CSV and the IO screen preview.';
-  if (plcLogicFile) {
-    introText += ` PLC logic tags loaded from ${plcLogicFile.name}. ALIAS rows are ignored; TAG rows are checked first.`;
-    if (matchStats?.total) {
-      introText += ` Matched ${matchStats.matched}/${matchStats.total} IO points using DESCRIPTION → SPECIFIER.`;
-      if (matchStats.rslogixRowTypes?.includes('COMMENT')) {
-        introText += ' (RSLogix stores IO descriptions on COMMENT rows when TAG rows have no IO text.)';
-      }
-    }
-  } else {
-    introText += ' Upload an RSLogix Tags CSV under IO List → PLC to match IO descriptions to tag addresses from the CSV SPECIFIER column.';
-  }
-  intro.textContent = introText;
-  frame.appendChild(intro);
-
   const toolbar = document.createElement('div');
   toolbar.className = 'io-list-editor-toolbar';
 
   const zones = project.ioListMeta?.zones || editorState.sheets.map((sheet) => sheet.zone).filter(Boolean);
-  const selection = getIoListEditorSelection(project, zones);
+  const zoneRioModules = getProjectZoneRioModules(project)
+    || globalThis.IoTags?.buildZoneRioModuleMap?.(zones)
+    || {};
+  const selection = getIoListEditorSelection(project, zones, zoneRioModules);
   applyIoListEditorSelection(project, selection);
   const activeZone = selection.zone || resolveIoListEditorZone(project, zones);
+
+  const plcLogicFile = getProjectPlcLogicTagsFile(project);
 
   const rerenderIoListEditor = () => {
     saveProjectList();
@@ -1889,7 +2565,7 @@ function renderIoListEditorPreview(project, file) {
     }
   };
 
-  appendIoListEditorZoneControls(toolbar, project, zones, rerenderIoListEditor);
+  appendIoListEditorZoneControls(toolbar, project, zones, zoneRioModules, rerenderIoListEditor);
 
   const plcTagsBtn = document.createElement('button');
   plcTagsBtn.type = 'button';
@@ -1920,7 +2596,7 @@ function renderIoListEditorPreview(project, file) {
   previewBtn.className = 'io-list-editor-preview-btn';
   previewBtn.textContent = 'Open Screen Preview';
   previewBtn.addEventListener('click', async () => {
-    const current = getIoListEditorSelection(project, zones);
+    const current = getIoListEditorSelection(project, zones, zoneRioModules);
     applyIoListEditorSelection(project, current);
     saveProjectList();
     const opened = await openIoListEditorScreenPreview(project, current);
@@ -1934,7 +2610,33 @@ function renderIoListEditorPreview(project, file) {
     }
   });
   toolbar.appendChild(previewBtn);
+
+  const tagsCsvBtn = document.createElement('button');
+  tagsCsvBtn.type = 'button';
+  tagsCsvBtn.className = 'io-list-editor-preview-btn';
+  tagsCsvBtn.textContent = 'Download Tags CSV';
+  tagsCsvBtn.title = 'Download FactoryTalk Tags CSV for the selected zone';
+  tagsCsvBtn.addEventListener('click', () => {
+    try {
+      exportProjectTagsCsvForZone(project, selection.zone || activeZone);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not export Tags CSV.');
+    }
+  });
+  toolbar.appendChild(tagsCsvBtn);
   frame.appendChild(toolbar);
+
+  if (editorState.mode === 'sheets' && editorState.sheets.length) {
+    appendIoListZoneSetupPanel(
+      frame,
+      project,
+      file,
+      editorState.sheets,
+      zoneRioModules,
+      rerenderIoListEditor
+    );
+  }
 
   if (editorState.mode === 'empty') {
     const empty = document.createElement('div');
@@ -1958,15 +2660,20 @@ function renderIoListEditorPreview(project, file) {
     section.dataset.ioSheetZone = activeSheet?.zone || activeZone;
 
     const ioFilter = normalizeIoListEditorFilter(project.ioListEditorFilter);
+    const activeRioModule = zoneRioModules[activeZone] || activeSheet?.rioModule || null;
     const sectionTitle = document.createElement('h5');
-    sectionTitle.textContent = formatIoListSectionTitle(selection.zone, selection.side);
+    sectionTitle.textContent = formatIoListSectionTitle(selection.zone, selection.side, zoneRioModules);
     section.appendChild(sectionTitle);
 
     const meta = document.createElement('p');
     meta.className = 'io-list-page-meta';
-    meta.textContent = ioFilter === 'DO'
+    const rioLabel = globalThis.IoTags?.formatRioModuleLabel?.(activeRioModule);
+    const countText = ioFilter === 'DO'
       ? `SDO ${sdoItems.length}, DO ${doItems.length}`
       : `SDI ${sdiItems.length}, DI ${diItems.length}`;
+    meta.textContent = rioLabel
+      ? `${rioLabel} tags only · ${countText}`
+      : countText;
     section.appendChild(meta);
 
     if (ioFilter === 'DO' && !doItems.length && !sdoItems.length) {
@@ -2143,22 +2850,18 @@ function getProjectIoPreviewMap(project) {
     return new Map();
   }
 
-  const parsed = getProjectIoTagsParsed(project);
-  let zone = String(project.ioListPreviewZone || '').trim();
-  const zones = parsed?.meta?.zones || [];
-  if (!zone && zones.includes('Packing')) {
-    zone = 'Packing';
-  } else if (!zone && zones.length === 1) {
-    zone = zones[0];
-  }
+  const zones = project?.ioListMeta?.zones || getProjectIoListSheets(project).map((sheet) => sheet.zone).filter(Boolean);
+  let zone = resolveIoListEditorZone(project, zones);
+  const zoneParsed = zone ? getProjectZoneTagsParsed(project, zone) : getProjectIoTagsParsed(project);
 
   if (zone) {
     const buildMap = isIoDoPreviewContext(project)
       ? globalThis.IoTags.buildIoDoListPreviewMap
       : globalThis.IoTags.buildIoListPreviewMap;
-    const zoneMap = buildMap(parsed, {
+    const zoneMap = buildMap(zoneParsed, {
       page: project.ioListPreviewPage || 1,
-      zone
+      zone,
+      zoneLocal: true
     });
     if (zoneMap.size && [...zoneMap.values()].some((value) => String(value || '').trim())) {
       return zoneMap;
@@ -2169,15 +2872,16 @@ function getProjectIoPreviewMap(project) {
     const buildMap = isIoDoPreviewContext(project)
       ? globalThis.IoTags.buildIoDoListPreviewMap
       : globalThis.IoTags.buildIoListPreviewMap;
-    return buildMap(parsed, {
+    return buildMap(zoneParsed, {
       page: project.ioListPreviewPage || 1,
-      zone
+      zone,
+      zoneLocal: true
     });
   }
 
   const bindings = getActiveParameterBindings(project);
   if (bindings?.size) {
-    const fromParameters = globalThis.IoTags.buildPreviewMapFromParameterFile(parsed, bindings, parsed);
+    const fromParameters = globalThis.IoTags.buildPreviewMapFromParameterFile(zoneParsed, bindings, zoneParsed);
     if (fromParameters.size) {
       return fromParameters;
     }
@@ -2186,9 +2890,10 @@ function getProjectIoPreviewMap(project) {
   const buildMap = isIoDoPreviewContext(project)
     ? globalThis.IoTags.buildIoDoListPreviewMap
     : globalThis.IoTags.buildIoListPreviewMap;
-  return buildMap(parsed, {
+  return buildMap(zoneParsed, {
     page: project.ioListPreviewPage || 1,
-    zone
+    zone,
+    zoneLocal: Boolean(zone)
   });
 }
 
@@ -2203,8 +2908,8 @@ function resolvePreviewParameterExpression(expression) {
     const key = Number(match[1]);
     const bindings = getActiveParameterBindings(project);
     if (bindings?.has(key)) {
-      const tagsParsed = getProjectIoTagsParsed(project);
-      const resolved = globalThis.IoTags.resolveTagPreviewValue(tagsParsed, bindings.get(key));
+      const tagsParsed = getProjectZoneTagsParsed(project);
+      const resolved = globalThis.IoTags.resolveTagPreviewValue(tagsParsed, bindings.get(key), { showPlcAddress: true });
       if (resolved) {
         return resolved;
       }
@@ -2219,24 +2924,17 @@ function upsertGeneratedTagsCsv(project, csvContent, sourceName = 'Tags.CSV') {
   ensureProjectCsvData(project);
   const name = String(sourceName || 'Tags.CSV').replace(/\.csv$/i, '');
   const fileName = `${name}.CSV`;
-  const entry = {
-    id: `csv-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  const exportZone = String(project.tagsExportZone || project.ioListPreviewZone || '').trim();
+  const validation = globalThis.IoTags?.validateFactoryTalkZoneTagsCsv?.(csvContent) || null;
+
+  project.generatedTagsExport = {
+    zone: exportZone,
     name: fileName,
-    content: csvContent,
-    sizeBytes: new Blob([csvContent]).size,
-    lastModified: new Date().toISOString()
+    lastModified: new Date().toISOString(),
+    stats: validation
   };
 
-  const existingIndex = project.tagsFiles.findIndex((file) => displayKey(file.name) === displayKey(fileName));
-  if (existingIndex >= 0) {
-    project.tagsFiles[existingIndex] = {
-      ...project.tagsFiles[existingIndex],
-      ...entry,
-      id: project.tagsFiles[existingIndex].id
-    };
-  } else {
-    project.tagsFiles.push(entry);
-  }
+  project.tagsFiles = (project.tagsFiles || []).filter((file) => !isIoGeneratedTagsFileName(file.name));
 }
 
 async function convertIoListUploadExcel(sourceFile) {
@@ -2343,6 +3041,11 @@ async function importProjectIoListFiles(projectId, fileList) {
   } else if (!project.ioListPreviewZone && zones.length === 1) {
     project.ioListPreviewZone = zones[0];
   }
+  if (!project.tagsExportZone && zones.includes('Packing')) {
+    project.tagsExportZone = 'Packing';
+  } else if (!project.tagsExportZone && zones.length === 1) {
+    project.tagsExportZone = zones[0];
+  }
 
   project.ioListMeta = combinedParsed?.meta || null;
   project.ioListSheets = combinedParsed?.meta?.sourceSheets
@@ -2361,12 +3064,7 @@ async function importProjectIoListFiles(projectId, fileList) {
       combinedParsed = project.ioTagsParsed;
     }
   } else {
-    upsertGeneratedTagsCsv(
-      project,
-      globalThis.IoTags.serializeFactoryTalkTagsCsv(combinedParsed),
-      `${project.name}-Tags`
-    );
-    upsertGeneratedParameterFiles(project, combinedParsed, project.ioListPreviewZone || '');
+    syncProjectZoneOutputs(project, undefined, { save: false });
   }
   project.ioListPreviewParameterFile = project.ioListPreviewParameterFile || 'PLC DI List 01';
   project.ioListCollapsed = false;
@@ -3293,6 +3991,7 @@ async function createNewProject(rawName) {
       ioListCollapsed: false,
       ioListPreviewPage: 1,
       ioListPreviewZone: '',
+      tagsExportZone: '',
       ioListSheets: [],
       folders: []
     };
@@ -7268,7 +7967,12 @@ function renderProjectSidebar() {
 
   const appendCsvSection = (project, kind, label, appendTo) => {
     ensureProjectCsvData(project);
-    const files = getProjectCsvFiles(project, kind);
+    const files = kind === 'tags'
+      ? getProjectManualTagsFiles(project)
+      : getProjectCsvFiles(project, kind);
+    if (kind === 'tags' && !files.length) {
+      return;
+    }
     const collapsedKey = kind === 'parameters' ? 'parametersCollapsed' : 'tagsCollapsed';
 
     const sectionLi = document.createElement('li');
@@ -7300,7 +8004,7 @@ function renderProjectSidebar() {
       exportAllBtn.type = 'button';
       exportAllBtn.className = 'tree-action-btn';
       exportAllBtn.textContent = '↓';
-      exportAllBtn.title = 'Export all parameter files (.par)';
+      exportAllBtn.title = 'Download PAR folder (.zip) for the selected zone';
       exportAllBtn.addEventListener('click', async (event) => {
         event.stopPropagation();
         try {
@@ -7469,7 +8173,7 @@ function renderProjectSidebar() {
   const appendIoListSection = (project, appendTo) => {
     ensureProjectCsvData(project);
     const files = project.ioListFiles || [];
-    const generatedTags = getProjectPrimaryTagsFile(project);
+    const zones = project.ioListMeta?.zones || getProjectIoListSheets(project).map((sheet) => sheet.zone).filter(Boolean);
 
     const sectionLi = document.createElement('li');
     sectionLi.className = 'folder-item csv-section-item io-list-section-item';
@@ -7515,8 +8219,27 @@ function renderProjectSidebar() {
       queuePlcLogicTagsUpload(project.id);
     });
 
+    const downloadTagsBtn = document.createElement('button');
+    downloadTagsBtn.type = 'button';
+    downloadTagsBtn.className = 'tree-action-btn';
+    downloadTagsBtn.textContent = '↓';
+    downloadTagsBtn.title = 'Download Tags CSV for the selected zone';
+    downloadTagsBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      try {
+        const zone = resolveTagsExportZone(project, zones);
+        exportProjectTagsCsvForZone(project, zone);
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Could not export Tags CSV.');
+      }
+    });
+
     sectionActions.appendChild(addIoBtn);
     sectionActions.appendChild(plcTagsBtn);
+    if (files.length || project.ioListMeta) {
+      sectionActions.appendChild(downloadTagsBtn);
+    }
     sectionRow.appendChild(toggle);
     sectionRow.appendChild(sectionLabel);
     sectionRow.appendChild(sectionCount);
@@ -7525,54 +8248,6 @@ function renderProjectSidebar() {
 
     const children = document.createElement('ul');
     children.className = 'folder-children';
-
-    if (generatedTags && (files.length || project.ioListMeta)) {
-      const tagsLi = document.createElement('li');
-      tagsLi.className = 'display-item csv-item io-generated-tags-item';
-      tagsLi.title = 'Auto-generated FactoryTalk Tags CSV from IO list upload';
-
-      const row = document.createElement('div');
-      row.className = 'list-row';
-
-      const name = document.createElement('strong');
-      name.textContent = generatedTags.name;
-      row.appendChild(name);
-
-      const meta = document.createElement('div');
-      meta.className = 'screen-meta';
-      const metaMain = document.createElement('div');
-      metaMain.className = 'screen-meta-main';
-      metaMain.textContent = 'generated tags | open in Tags';
-      meta.appendChild(metaMain);
-
-      tagsLi.appendChild(row);
-      tagsLi.appendChild(meta);
-
-      const tagsActions = document.createElement('div');
-      tagsActions.className = 'tree-actions';
-      const exportGeneratedTagsBtn = document.createElement('button');
-      exportGeneratedTagsBtn.type = 'button';
-      exportGeneratedTagsBtn.className = 'tree-action-btn';
-      exportGeneratedTagsBtn.textContent = '↓';
-      exportGeneratedTagsBtn.title = `Download ${generatedTags.name} for FactoryTalk`;
-      exportGeneratedTagsBtn.addEventListener('click', (event) => {
-        event.stopPropagation();
-        try {
-          exportProjectTagsCsvFile(project, generatedTags);
-        } catch (err) {
-          console.error(err);
-          alert(err.message || 'Could not export Tags CSV.');
-        }
-      });
-      tagsActions.appendChild(exportGeneratedTagsBtn);
-      tagsLi.appendChild(tagsActions);
-
-      tagsLi.addEventListener('click', (event) => {
-        event.stopPropagation();
-        openProjectCsvFile(project, 'tags', generatedTags);
-      });
-      children.appendChild(tagsLi);
-    }
 
     for (const file of files) {
       const fileLi = document.createElement('li');
@@ -9487,6 +10162,7 @@ async function processProjectFolderImport(files, options = {}) {
     ioListCollapsed: false,
     ioListPreviewPage: 1,
     ioListPreviewZone: '',
+    tagsExportZone: '',
     ioListSheets: [],
     folders: []
   };
@@ -9704,7 +10380,6 @@ if (projectIoListInput) {
     try {
       const converted = await importProjectIoListFiles(pending.projectId, files);
       const project = getProjectById(pending.projectId);
-      const tagsFile = getProjectPrimaryTagsFile(project);
       const paramFile = getProjectParameterFile(project, 'PLC DI List 01')
         || (project.parametersFiles || []).find((file) => /\.par$/i.test(file.name));
       const ioFile = (project.ioListFiles || [])[project.ioListFiles.length - 1];
@@ -9722,9 +10397,9 @@ if (projectIoListInput) {
       }
       alert(
         `IO list imported successfully.\n`
-        + `${tagCount} tags written to ${tagsFile?.name || 'Tags.CSV'}.\n`
+        + `${tagCount} tags ready — use Download Tags CSV in the IO List editor (or IO List → ↓ in the sidebar).\n`
         + `IO types: SDI ${sdi}, DI ${di}, SDO ${sdo}, DO ${doCount}\n`
-        + `${(project.parametersFiles || []).filter((file) => /\.par$/i.test(file.name)).length} parameter file(s) generated (PLC DI List and PLC DO List).\n`
+        + `${(project.parametersFiles || []).filter((file) => /\.par$/i.test(file.name)).length} parameter file(s) generated (PLC DI/DO + Safety DI/DO).\n`
         + `Zones: ${zones}\n`
         + (converted?.plcTagMatchStats?.total
           ? `PLC tag matching: ${converted.plcTagMatchStats.matched}/${converted.plcTagMatchStats.total} IO points matched from RSLogix CSV.\n`

@@ -233,21 +233,51 @@
     return { folders, tags };
   }
 
-  function quoteCell(value) {
+  function formatFactoryTalkQuoted(value) {
     const text = String(value ?? '');
     if (!text) {
-      return '""';
+      return '';
     }
     return `"${text.replace(/"/g, '""')}"`;
   }
 
+  function formatFactoryTalkNumber(value) {
+    const text = String(value ?? '');
+    return text;
+  }
+
+  function serializeFolderRow(record) {
+    return [
+      formatFactoryTalkQuoted(record.tagType),
+      formatFactoryTalkQuoted(record.tagName),
+      formatFactoryTalkQuoted(record.tagDescription),
+      formatFactoryTalkQuoted(record.readOnly || 'F')
+    ].join(',');
+  }
+
+  function formatFactoryTalkCell(value, columnIndex, record) {
+    const tagType = String(record?.tagType || '').toUpperCase();
+    if (value === null || value === undefined || value === '') {
+      if (columnIndex === 2 && tagType === 'A') {
+        return '""';
+      }
+      return '';
+    }
+    const numericColumns = new Set([9, 10, 11, 12, 13, 14, 19, 21]);
+    if (numericColumns.has(columnIndex)) {
+      return formatFactoryTalkNumber(value);
+    }
+    return formatFactoryTalkQuoted(value);
+  }
+
   function serializeTagRow(record) {
-    const cells = padCells([
+    const tagType = record.tagType;
+    const cells = [
       record.tagType,
       record.tagName,
       record.tagDescription,
       record.readOnly || 'F',
-      record.dataSource || (record.tagType === 'D' ? 'D' : 'M'),
+      record.dataSource || (tagType === 'D' ? 'D' : 'M'),
       record.securityCode || '*',
       record.alarmed || 'F',
       record.nativeType,
@@ -264,17 +294,11 @@
       record.initialDigital,
       record.lengthString,
       record.initialString,
-      record.retentive || '0',
-      record.address,
-      record.systemSourceName,
-      record.systemSourceIndex,
-      record.rioAddress,
-      record.elementSizeBlock,
-      record.numberElementsBlock,
-      record.initialBlock
-    ]);
+      tagType === 'D' ? '' : (record.retentive || '0'),
+      record.address
+    ];
 
-    return cells.map((cell) => quoteCell(cell)).join(',');
+    return cells.map((value, index) => formatFactoryTalkCell(value, index, record)).join(',');
   }
 
   function serializeFactoryTalkTagsCsv(parsed) {
@@ -288,7 +312,7 @@
     ];
 
     for (const folder of folders) {
-      lines.push(serializeTagRow(folder));
+      lines.push(serializeFolderRow(folder));
     }
 
     lines.push('', ';Tag Section');
@@ -422,12 +446,14 @@
     const codeMatch = raw.match(/^(SDI|SDO|DI|DO)(\d{1,3})$/i);
     if (codeMatch) {
       const kind = codeMatch[1].toUpperCase();
+      const rawNum = codeMatch[2];
+      const isSafetyKind = kind === 'SDI' || kind === 'SDO';
       return {
         kind,
         ioKind: kind,
-        code: `${kind}${codeMatch[2]}`,
-        num: codeMatch[2].padStart(2, '0'),
-        isSafety: kind === 'SDI' || kind === 'SDO',
+        code: isSafetyKind ? `${kind}${Number.parseInt(rawNum, 10)}` : `${kind}${rawNum}`,
+        num: rawNum.padStart(2, '0'),
+        isSafety: isSafetyKind,
         direction: kind === 'SDI' || kind === 'DI' ? 'input' : 'output',
         label: IO_TYPE_LABELS[kind]
       };
@@ -489,24 +515,313 @@
     return desc ? `${ioType} ${desc}` : ioType;
   }
 
-  function inferPlcTag(ioType, existingTag) {
+  function formatRioModule(rioModule) {
+    const value = Math.max(1, Number.parseInt(String(rioModule || '1'), 10) || 1);
+    return String(value).padStart(2, '0');
+  }
+
+  function formatRioModuleLabel(rioModule) {
+    return `RIO${formatRioModule(rioModule)}`;
+  }
+
+  function formatPlcAddressIndex(kind, num) {
+    const value = Number.parseInt(String(num).replace(/^0+/, '') || '0', 10);
+    if (!Number.isFinite(value)) {
+      return String(num);
+    }
+    if (kind === 'DI') {
+      return String(value).padStart(3, '0');
+    }
+    return String(value).padStart(2, '0');
+  }
+
+  function formatFactoryTalkPlcAddress(processorName, rioModule, kind, num) {
+    const processor = cellStr(processorName) || 'PLC';
+    const index = formatPlcAddressIndex(kind, num);
+    return `[${processor}]${formatRioModuleLabel(rioModule)}_${kind}[${index}]`;
+  }
+
+  function formatProjectProcessorBase(projectName) {
+    const raw = cellStr(projectName).replace(/[^a-zA-Z0-9]/g, '');
+    if (!raw) {
+      return '';
+    }
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  }
+
+  function inferProcessorNameForZone(options = {}, zoneName = '', allZones = []) {
+    if (cellStr(options.processorName)) {
+      return cellStr(options.processorName);
+    }
+
+    const fromSheets = findProcessorNameFromSheets(options.sheets || []);
+    if (fromSheets && fromSheets !== 'PLC') {
+      return fromSheets;
+    }
+
+    const projectBase = formatProjectProcessorBase(options.projectName);
+    if (projectBase && allZones.length) {
+      const zoneIndex = allZones.findIndex((zone) => zoneNamesMatch(zone, zoneName));
+      if (zoneIndex >= 0) {
+        return `${projectBase}_Z${zoneIndex + 1}`;
+      }
+    }
+
+    return fromSheets || 'PLC';
+  }
+
+  function parseRioModuleFromPlcTag(tag) {
+    const match = cellStr(tag).match(/RIO(\d{2})_/i);
+    if (!match) {
+      return null;
+    }
+    const value = Number.parseInt(match[1], 10);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function parseRioModuleFromZoneName(zone) {
+    const name = cellStr(zone);
+    const rioMatch = name.match(/\bRIO\s*0*(\d+)\b/i);
+    if (rioMatch) {
+      return Number.parseInt(rioMatch[1], 10);
+    }
+    const zoneMatch = name.match(/\bzone\s*0*(\d+)\b/i);
+    if (zoneMatch) {
+      return Number.parseInt(zoneMatch[1], 10);
+    }
+    return null;
+  }
+
+  function buildZoneRioModuleMap(zones, options = {}) {
+    const map = {};
+    const list = (zones || []).map((zone) => cellStr(zone)).filter(Boolean);
+    const sheets = options.sheets || [];
+    const entries = options.entries || [];
+
+    for (const zone of list) {
+      const fromName = parseRioModuleFromZoneName(zone);
+      if (fromName) {
+        map[zone] = fromName;
+      }
+    }
+
+    const inferred = inferZoneRioModulesFromPlcEntries(sheets, entries);
+    for (const [zone, rioModule] of Object.entries(inferred)) {
+      if (!map[zone]) {
+        map[zone] = rioModule;
+      }
+    }
+
+    for (const sheet of sheets) {
+      const zone = cellStr(sheet.zone);
+      if (!zone || map[zone]) {
+        continue;
+      }
+      const modules = new Set();
+      for (const item of [...(sheet.diInputs || []), ...(sheet.doOutputs || [])]) {
+        const module = parseRioModuleFromPlcTag(item.plcTag);
+        if (module) {
+          modules.add(module);
+        }
+      }
+      if (modules.size === 1) {
+        map[zone] = [...modules][0];
+      }
+    }
+
+    list.forEach((zone, index) => {
+      if (!map[zone]) {
+        map[zone] = index + 1;
+      }
+    });
+
+    const manualMap = options.manualMap || options.manualZoneRioModules || {};
+    for (const [zone, rioModule] of Object.entries(manualMap)) {
+      const value = Number.parseInt(rioModule, 10);
+      if (cellStr(zone) && Number.isFinite(value) && value > 0) {
+        map[zone] = value;
+      }
+    }
+
+    return map;
+  }
+
+  function listRioModulesFromPlcEntries(entries, fallbackMax = 6) {
+    const modules = new Set();
+    for (const entry of entries || []) {
+      const rioModule = entry.rioModule
+        || parseRioModuleFromPlcTag(entry.plcTag || entry.specifier)
+        || parseRioModuleFromPlcTag(entry.parentTag);
+      if (rioModule) {
+        modules.add(rioModule);
+      }
+    }
+    if (modules.size) {
+      return [...modules].sort((a, b) => a - b);
+    }
+    return Array.from({ length: fallbackMax }, (_, index) => index + 1);
+  }
+
+  function buildZoneSetupRows(sheets, zoneRioModules = {}) {
+    return (sheets || []).map((sheet, index) => {
+      const zone = cellStr(sheet.zone) || 'General';
+      return {
+        sheetName: cellStr(sheet.sheetName) || zone || `Sheet ${index + 1}`,
+        zone,
+        rioModule: zoneRioModules[zone] || sheet.rioModule || index + 1
+      };
+    });
+  }
+
+  function applyZoneSetupToSheets(sheets, setupRows) {
+    const nextSheets = Array.isArray(sheets) ? sheets : [];
+    const rowBySheet = new Map();
+    for (const row of setupRows || []) {
+      const sheetKey = cellStr(row.sheetName);
+      const zoneKey = cellStr(row.zone);
+      if (sheetKey) {
+        rowBySheet.set(sheetKey, row);
+      }
+      if (zoneKey && !rowBySheet.has(zoneKey)) {
+        rowBySheet.set(zoneKey, row);
+      }
+    }
+
+    const zoneRioModules = {};
+    const zones = [];
+    for (const sheet of nextSheets) {
+      const row = rowBySheet.get(cellStr(sheet.sheetName))
+        || rowBySheet.get(cellStr(sheet.zone));
+      if (!row) {
+        const zone = cellStr(sheet.zone) || 'General';
+        if (zone && !zones.includes(zone)) {
+          zones.push(zone);
+        }
+        continue;
+      }
+
+      const zone = cellStr(row.zone) || cellStr(sheet.zone) || 'General';
+      const rioModule = Number.parseInt(row.rioModule, 10);
+      sheet.zone = zone;
+      if (Number.isFinite(rioModule) && rioModule > 0) {
+        sheet.rioModule = rioModule;
+        zoneRioModules[zone] = rioModule;
+      }
+      if (zone && !zones.includes(zone)) {
+        zones.push(zone);
+      }
+    }
+
+    return { sheets: nextSheets, zoneRioModules, zones };
+  }
+
+  function inferZoneRioModulesFromPlcEntries(sheets, entries) {
+    const map = {};
+    if (!Array.isArray(entries) || !entries.length) {
+      return map;
+    }
+
+    for (const sheet of sheets || []) {
+      const zone = cellStr(sheet.zone);
+      if (!zone) {
+        continue;
+      }
+
+      const items = [...(sheet.diInputs || []), ...(sheet.doOutputs || [])];
+      const scores = new Map();
+
+      for (const item of items) {
+        const parsed = parseIoPointType(item.type);
+        if (!parsed?.ioKind) {
+          continue;
+        }
+
+        const ioNum = Number.parseInt(parsed.num, 10);
+        const normalizedDescription = normalizeDescriptionForMatch(item.description);
+        const normalizedFullLabel = normalizeDescriptionForMatch(formatIoPointLabel(item.type, item.description));
+
+        for (const entry of entries) {
+          if (entry.ioKind !== parsed.ioKind) {
+            continue;
+          }
+
+          const rioModule = entry.rioModule
+            || parseRioModuleFromPlcTag(entry.plcTag || entry.specifier)
+            || parseRioModuleFromPlcTag(entry.parentTag);
+          if (!rioModule) {
+            continue;
+          }
+
+          let matched = false;
+          if (Number.isFinite(ioNum) && entry.ioNum === ioNum) {
+            matched = entry.normalizedDescription === normalizedDescription
+              || entry.normalizedFullLabel === normalizedFullLabel
+              || descriptionsRoughlyMatch(entry.description, item.description);
+          } else if (entry.normalizedDescription === normalizedDescription
+            || descriptionsRoughlyMatch(entry.description, item.description)) {
+            matched = true;
+          }
+
+          if (matched) {
+            const weight = entry.preferred ? 3 : 1;
+            scores.set(rioModule, (scores.get(rioModule) || 0) + weight);
+          }
+        }
+      }
+
+      let bestRio = null;
+      let bestScore = 0;
+      for (const [rioModule, score] of scores) {
+        if (score > bestScore) {
+          bestScore = score;
+          bestRio = rioModule;
+        }
+      }
+
+      if (bestRio) {
+        map[zone] = bestRio;
+      }
+    }
+
+    return map;
+  }
+
+  function applyRioModulesToSheets(sheets, zoneRioModules, options = {}) {
+    const preserveMatchedTags = options.preserveMatchedTags !== false;
+    for (const sheet of sheets || []) {
+      const zone = cellStr(sheet.zone) || 'General';
+      const rioModule = zoneRioModules?.[zone] || sheet.rioModule || 1;
+      sheet.rioModule = rioModule;
+      for (const item of [...(sheet.diInputs || []), ...(sheet.doOutputs || [])]) {
+        const existingRio = parseRioModuleFromPlcTag(item.plcTag);
+        item.rioModule = existingRio || item.rioModule || rioModule;
+        if (preserveMatchedTags && existingRio) {
+          continue;
+        }
+        item.plcTag = inferPlcTag(item.type, item.plcTag, item.rioModule);
+      }
+    }
+  }
+
+  function findProcessorNameFromSheets(sheets) {
+    for (const sheet of sheets || []) {
+      for (const item of [...(sheet?.diInputs || []), ...(sheet?.doOutputs || [])]) {
+        const match = cellStr(item?.plcTag).match(/^\[([^\]]+)\]/);
+        if (match) {
+          return match[1];
+        }
+      }
+    }
+    return 'PLC';
+  }
+
+  function inferPlcTag(ioType, existingTag, rioModule = 1, processorName = 'PLC') {
     const parsed = parseIoPointType(ioType);
     if (!parsed?.num) {
       return cellStr(existingTag);
     }
 
-    const expected = `[PLC]RIO01_${parsed.kind}[${parsed.num}]`;
-    const tag = cellStr(existingTag);
-    if (!tag) {
-      return expected;
-    }
-
-    const tagKindMatch = tag.match(/RIO01_(SDI|SDO|DI|DO)\[/i);
-    if (tagKindMatch && tagKindMatch[1].toUpperCase() !== parsed.kind) {
-      return expected;
-    }
-
-    return tag;
+    return formatFactoryTalkPlcAddress(processorName, rioModule, parsed.kind, parsed.num);
   }
 
   function findMasterIoListHeader(rows) {
@@ -713,9 +1028,251 @@
     };
   }
 
+  function makeAnalogTag(tagName, tagDescription, options = {}) {
+    return {
+      tagType: 'A',
+      tagName,
+      tagDescription: cellStr(tagDescription),
+      readOnly: 'F',
+      dataSource: 'M',
+      securityCode: '*',
+      alarmed: 'F',
+      nativeType: options.nativeType || 'D',
+      valueType: options.valueType || 'L',
+      minAnalog: String(options.min ?? 0),
+      maxAnalog: String(options.max ?? 100),
+      initialAnalog: String(options.initial ?? 0),
+      scale: '1',
+      offset: '0',
+      deadBand: '0',
+      retentive: '0'
+    };
+  }
+
+  const ZONE_EXPORT_FOLDERS = [
+    ...MASTER_SHEET_FOLDERS,
+    'Values'
+  ];
+
+  function zoneNamesMatch(left, right) {
+    return cellStr(left).toLowerCase() === cellStr(right).toLowerCase();
+  }
+
+  function findSheetForZone(sheets, zone) {
+    const target = cellStr(zone);
+    if (!target) {
+      return null;
+    }
+    return (sheets || []).find((sheet) => zoneNamesMatch(sheet.zone, target)) || null;
+  }
+
+  function buildGroupedChannelTags(items, config, startIndex = 0) {
+    const tags = [];
+    const {
+      discrFolder,
+      noFolder,
+      tagsFolder,
+      listTitleBase,
+      isSafety
+    } = config;
+    const pageCount = Math.max(1, Math.ceil((items || []).length / 8));
+
+    for (const [index, item] of (items || []).entries()) {
+      const dataIndex = String(startIndex + index).padStart(2, '0');
+      const label = formatIoPointLabel(item.type, item.description);
+      tags.push(makeStringTag(`${discrFolder}\\Data_${dataIndex}`, label));
+    }
+
+    for (let page = 1; page <= pageCount; page += 1) {
+      const pageStr = String(page).padStart(2, '0');
+      const title = `${listTitleBase} ${pageStr}`;
+      if (isSafety) {
+        tags.push(makeStringTag(`${discrFolder}\\Safety_List_${pageStr}`, title));
+      } else {
+        tags.push(makeStringTag(`${discrFolder}\\List_${pageStr}`, title));
+      }
+    }
+
+    for (const [index, item] of (items || []).entries()) {
+      const dataIndex = String(startIndex + index).padStart(2, '0');
+      tags.push(makeStringTag(`${noFolder}\\Data_${dataIndex}`, item.address));
+    }
+
+    for (let page = 1; page <= pageCount; page += 1) {
+      const pageStr = String(page).padStart(2, '0');
+      const title = `${listTitleBase} ${pageStr}`;
+      if (isSafety) {
+        tags.push(makeStringTag(`${noFolder}\\Safety_List_${pageStr}`, title));
+      } else {
+        tags.push(makeStringTag(`${noFolder}\\List_${pageStr}`, title));
+      }
+    }
+
+    for (const [index, item] of (items || []).entries()) {
+      const dataIndex = String(startIndex + index).padStart(2, '0');
+      const label = formatIoPointLabel(item.type, item.description);
+      tags.push(makeDigitalTag(`${tagsFolder}\\Data_${dataIndex}`, label, item.plcTag));
+    }
+
+    return tags;
+  }
+
+  function buildFactoryTalkZoneAuxTags() {
+    return [
+      makeAnalogTag('Temp_Tags\\Alarms'),
+      makeAnalogTag('Temp_Tags\\IO_LIST'),
+      makeAnalogTag('Temp_Tags\\Manual_Screen'),
+      makeAnalogTag('Temp_Tags\\Mimic_System'),
+      makeAnalogTag('Temp_Tags\\Robot_IO_LIST'),
+      makeAnalogTag('Temp_Tags\\Safety_IO_LIST'),
+      makeAnalogTag('Temp_Tags\\Setting'),
+      makeAnalogTag('Values\\Col1', 'Column 1', { nativeType: 'I', initial: 1 }),
+      makeAnalogTag('Values\\Col16', 'Column 16', { nativeType: 'I', initial: 16 }),
+      makeAnalogTag('Values\\Col2', 'Column 2', { nativeType: 'I', initial: 2 }),
+      makeAnalogTag('Values\\Col4', 'Column 4', { nativeType: 'I', initial: 4 }),
+      makeAnalogTag('Values\\Col8', 'Column 8', { nativeType: 'I', initial: 8 }),
+      makeAnalogTag('Values\\Int0', '', { nativeType: 'I', initial: 0 }),
+      makeAnalogTag('Values\\Int1', '', { nativeType: 'I', initial: 1 }),
+      makeAnalogTag('Values\\Int2', '', { nativeType: 'I', initial: 2 }),
+      makeAnalogTag('Values\\Int3', '', { nativeType: 'I', initial: 3 }),
+      makeAnalogTag('Values\\Int4', '', { nativeType: 'I', initial: 4 }),
+      makeAnalogTag('Values\\Int5', '', { nativeType: 'I', initial: 5 }),
+      makeAnalogTag('Values\\Int8', '', { nativeType: 'I', initial: 8 })
+    ];
+  }
+
+  function buildParsedForZoneExport(sheets, zone, options = {}) {
+    const sheetList = Array.isArray(sheets) ? sheets : [];
+    const zoneName = cellStr(zone) || 'General';
+    const targetSheet = findSheetForZone(sheetList, zoneName);
+    if (!targetSheet) {
+      throw new Error(`No IO List sheet found for zone "${zoneName}".`);
+    }
+
+    const allZones = [];
+    for (const sheet of sheetList) {
+      const zone = cellStr(sheet.zone);
+      if (zone && !allZones.includes(zone)) {
+        allZones.push(zone);
+      }
+    }
+    const inferredMap = buildZoneRioModuleMap(allZones.length ? allZones : [zoneName], {
+      sheets: sheetList,
+      entries: options.entries || [],
+      manualMap: options.manualZoneRioModules || {}
+    });
+    const zoneRioModules = {
+      ...inferredMap,
+      ...(options.zoneRioModules || {}),
+      ...(options.manualZoneRioModules || {})
+    };
+    applyRioModulesToSheets([targetSheet], zoneRioModules, { preserveMatchedTags: true });
+    const processorName = inferProcessorNameForZone({ ...options, sheets: sheetList }, zoneName, allZones);
+
+    const safetyDi = (targetSheet.diInputs || []).filter((item) => item.isSafety);
+    const plcDi = (targetSheet.diInputs || []).filter((item) => !item.isSafety);
+    const safetyDo = (targetSheet.doOutputs || []).filter((item) => item.isSafety);
+    const plcDo = (targetSheet.doOutputs || []).filter((item) => !item.isSafety);
+    const inputListTitle = 'PLC Input List';
+    const outputListTitle = 'PLC Output List';
+    const tags = [];
+
+    for (const item of [...safetyDi, ...plcDi, ...safetyDo, ...plcDo]) {
+      item.plcTag = inferPlcTag(item.type, item.plcTag, item.rioModule || targetSheet.rioModule, processorName);
+    }
+
+    tags.push(...buildGroupedChannelTags(plcDi, {
+      discrFolder: 'PLC_DI_Discr',
+      noFolder: 'PLC_DI_NO',
+      tagsFolder: 'PLC_DI_Tags',
+      listTitleBase: inputListTitle,
+      isSafety: false
+    }, 0));
+    tags.push(...buildGroupedChannelTags(plcDo, {
+      discrFolder: 'PLC_DO_Discr',
+      noFolder: 'PLC_DO_No',
+      tagsFolder: 'PLC_DO_Tags',
+      listTitleBase: outputListTitle,
+      isSafety: false
+    }, 0));
+    tags.push(...buildGroupedChannelTags(safetyDi, {
+      discrFolder: 'Safety_DI_Discr',
+      noFolder: 'Safety_DI_No',
+      tagsFolder: 'Safety_DI_Tags',
+      listTitleBase: 'Safety Input List',
+      isSafety: true
+    }, 0));
+    tags.push(...buildGroupedChannelTags(safetyDo, {
+      discrFolder: 'Safety_DO_Discr',
+      noFolder: 'Safety_DO_No',
+      tagsFolder: 'Safety_DO_Tags',
+      listTitleBase: 'Safety Output List',
+      isSafety: true
+    }, 0));
+    tags.push(...buildFactoryTalkZoneAuxTags());
+
+    if (!tags.length) {
+      throw new Error(`No IO rows found for zone "${zoneName}".`);
+    }
+
+    return {
+      folders: ZONE_EXPORT_FOLDERS.map((tagName) => ({
+        tagType: 'F',
+        tagName,
+        tagDescription: '',
+        readOnly: 'F'
+      })),
+      tags,
+      meta: {
+        zones: [zoneName],
+        zoneRioModules,
+        exportZone: zoneName,
+        counts: {
+          sdi: safetyDi.length,
+          di: plcDi.length,
+          sdo: safetyDo.length,
+          do: plcDo.length,
+          safetyDi: safetyDi.length,
+          plcDi: plcDi.length,
+          safetyDo: safetyDo.length,
+          plcDo: plcDo.length
+        }
+      }
+    };
+  }
+
+  function validateFactoryTalkZoneTagsCsv(csvText) {
+    const lines = String(csvText || '').replace(/^\uFEFF/, '').split(/\r?\n/);
+    const folderCount = lines.filter((line) => line.startsWith('"F"')).length;
+    const digitalTagCount = lines.filter((line) => line.startsWith('"D"')).length;
+    const stringTagCount = lines.filter((line) => line.startsWith('"S"')).length;
+    return {
+      ok: folderCount >= 14 && digitalTagCount > 0 && stringTagCount > 0,
+      folderCount,
+      digitalTagCount,
+      stringTagCount,
+      lineCount: lines.filter(Boolean).length
+    };
+  }
+
+  function buildZoneTagsCsv(sheets, zone, options = {}) {
+    const parsed = buildParsedForZoneExport(sheets, zone, options);
+    const csv = serializeFactoryTalkTagsCsv(parsed);
+    const validation = validateFactoryTalkZoneTagsCsv(csv);
+    if (!validation.ok) {
+      throw new Error(
+        `Tags CSV export for zone "${cellStr(zone)}" is incomplete `
+        + `(${validation.folderCount} folders, ${validation.digitalTagCount} PLC tags). `
+        + 'Open the IO List editor, pick the zone, and confirm the Master Sheet rows loaded.'
+      );
+    }
+    return csv;
+  }
+
   function parseMasterIoListSheetRows(sheetName, rows) {
     const zone = ioListZoneFromSheetName(sheetName);
     const parsed = {
+      sheetName: cellStr(sheetName),
       zone,
       diInputs: [],
       doOutputs: []
@@ -811,7 +1368,21 @@
     return tags;
   }
 
-  function buildParsedFromMasterSheets(sheets) {
+  function buildParsedFromMasterSheets(sheets, options = {}) {
+    const sheetList = Array.isArray(sheets) ? sheets : [];
+    const zones = [];
+    for (const sheet of sheetList) {
+      const zone = cellStr(sheet.zone) || 'General';
+      if (!zones.includes(zone)) {
+        zones.push(zone);
+      }
+    }
+    const zoneRioModules = options.zoneRioModules || buildZoneRioModuleMap(zones, {
+      sheets: sheetList,
+      entries: options.entries || []
+    });
+    applyRioModulesToSheets(sheetList, zoneRioModules, { preserveMatchedTags: true });
+
     const merged = {
       plcDi: [],
       safetyDi: [],
@@ -822,7 +1393,7 @@
     const zoneOffsets = {};
     const tags = [];
 
-    for (const sheet of sheets || []) {
+    for (const sheet of sheetList) {
       const zone = cellStr(sheet.zone) || 'General';
       zoneOffsets[zone] = {
         plcDi: merged.plcDi.length,
@@ -892,6 +1463,7 @@
       meta: {
         zones: merged.zones,
         zoneOffsets,
+        zoneRioModules,
         counts: {
           sdi: merged.safetyDi.length,
           di: merged.plcDi.length,
@@ -961,8 +1533,8 @@
     return parsed;
   }
 
-  function rebuildParsedFromMasterSheets(sheets) {
-    const parsed = buildParsedFromMasterSheets(Array.isArray(sheets) ? sheets : []);
+  function rebuildParsedFromMasterSheets(sheets, options = {}) {
+    const parsed = buildParsedFromMasterSheets(Array.isArray(sheets) ? sheets : [], options);
     ensureStandardFoldersAndIoListTag(parsed);
     parsed.meta = {
       ...(parsed.meta || {}),
@@ -1158,15 +1730,20 @@
     const tags = Array.isArray(parsed?.tags) ? parsed.tags : [];
     const page = Math.max(1, Number(options.page) || 1);
     const zone = cellStr(options.zone);
-    const zoneOffset = zone && parsed?.meta?.zoneOffsets?.[zone]
-      ? parsed.meta.zoneOffsets[zone].plcDi
-      : 0;
+    const zoneLocal = Boolean(options.zoneLocal || parsed?.meta?.exportZone);
+    const zoneOffset = zoneLocal
+      ? 0
+      : (zone && parsed?.meta?.zoneOffsets?.[zone]
+        ? parsed.meta.zoneOffsets[zone].plcDi
+        : 0);
     const map = new Map();
     const pageSuffix = String(page).padStart(2, '0');
     const zoneListTitle = `${zone ? `${zone} Input List` : 'PLC Input List'} ${pageSuffix}`;
-    const listTag = tags.find((tag) => tag.tagType === 'S'
-      && /\\List_\d+$/i.test(String(tag.tagName || ''))
-      && String(tag.initialString || tag.tagDescription || '') === zoneListTitle);
+    const listTag = zoneLocal
+      ? findTag(tags, `PLC_DI_Discr\\List_${pageSuffix}`)
+      : tags.find((tag) => tag.tagType === 'S'
+        && /\\List_\d+$/i.test(String(tag.tagName || ''))
+        && String(tag.initialString || tag.tagDescription || '') === zoneListTitle);
 
     map.set(100, listTag?.tagDescription || listTag?.initialString || zoneListTitle);
 
@@ -1179,13 +1756,17 @@
 
       map.set(101 + i, discr?.tagDescription || discr?.initialString || '');
       map.set(201 + i, number?.tagDescription || number?.initialString || '');
-      map.set(301 + i, digital?.initialDigital || '0');
+      map.set(301 + i, digital?.address || digital?.tagDescription || digital?.initialDigital || '0');
     }
 
     return map;
   }
 
   function getZonePlcDoCount(parsed, zone) {
+    if (parsed?.meta?.exportZone) {
+      return Number(parsed?.meta?.counts?.plcDo) || 8;
+    }
+
     const zones = parsed?.meta?.zones || [];
     const offsets = parsed?.meta?.zoneOffsets || {};
     const zoneIndex = zones.indexOf(zone);
@@ -1208,15 +1789,20 @@
     const tags = Array.isArray(parsed?.tags) ? parsed.tags : [];
     const page = Math.max(1, Number(options.page) || 1);
     const zone = cellStr(options.zone);
-    const zoneOffset = zone && parsed?.meta?.zoneOffsets?.[zone]
-      ? parsed.meta.zoneOffsets[zone].plcDo
-      : 0;
+    const zoneLocal = Boolean(options.zoneLocal || parsed?.meta?.exportZone);
+    const zoneOffset = zoneLocal
+      ? 0
+      : (zone && parsed?.meta?.zoneOffsets?.[zone]
+        ? parsed.meta.zoneOffsets[zone].plcDo
+        : 0);
     const map = new Map();
     const pageSuffix = String(page).padStart(2, '0');
     const zoneListTitle = `${zone ? `${zone} Output List` : 'PLC Output List'} ${pageSuffix}`;
-    const listTag = tags.find((tag) => tag.tagType === 'S'
-      && /\\List_\d+$/i.test(String(tag.tagName || ''))
-      && String(tag.initialString || tag.tagDescription || tag.tagDescription || '') === zoneListTitle);
+    const listTag = zoneLocal
+      ? findTag(tags, `PLC_DO_Discr\\List_${pageSuffix}`)
+      : tags.find((tag) => tag.tagType === 'S'
+        && /\\List_\d+$/i.test(String(tag.tagName || ''))
+        && String(tag.initialString || tag.tagDescription || tag.tagDescription || '') === zoneListTitle);
 
     map.set(100, listTag?.tagDescription || listTag?.initialString || zoneListTitle);
 
@@ -1229,7 +1815,7 @@
 
       map.set(101 + i, discr?.tagDescription || discr?.initialString || '');
       map.set(201 + i, number?.tagDescription || number?.initialString || '');
-      map.set(301 + i, digital?.initialDigital || '0');
+      map.set(301 + i, digital?.address || digital?.tagDescription || digital?.initialDigital || '0');
     }
 
     return map;
@@ -1247,8 +1833,7 @@
     return previewMap.get(key);
   }
 
-  const PARAMETER_FILE_HEADER = [
-    '!============ Parameter File Created 2025/12/16 ============',
+  const PARAMETER_FILE_HEADER_LINES = [
     '! Parameter files are used with graphic displays to specify the tags a display ',
     '! uses at run time. You assign parameter files in certain application components ',
     '! and object properties dialog boxes. Please see the Help for details.',
@@ -1257,10 +1842,29 @@
     '! Example:',
     '!     #23=A_COLOR',
     '! #23 in any expression in a graphic would be replaced by the tag  A_COLOR.',
-    '!================================================',
-    '',
-    ''
-  ].join('\n');
+    '!================================================'
+  ];
+
+  function buildParameterFileHeader() {
+    const now = new Date();
+    const date = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
+    return [
+      `!============ Parameter File Created ${date} ============`,
+      ...PARAMETER_FILE_HEADER_LINES,
+      '',
+      '',
+      '',
+      ''
+    ].join('\n');
+  }
+
+  function resolveParameterPageCount(totalPoints, maxPages) {
+    const pages = Math.max(1, Math.ceil(Math.max(Number(totalPoints) || 0, 1) / 8));
+    if (!maxPages) {
+      return pages;
+    }
+    return Math.min(pages, Math.max(1, Number(maxPages) || pages));
+  }
 
   function normalizeParameterTagPath(value) {
     let raw = String(value || '').trim();
@@ -1330,10 +1934,60 @@
       }
     }
 
-    return `${PARAMETER_FILE_HEADER}${body.join('\n')}\n`;
+    return `${buildParameterFileHeader()}${body.join('\n')}\n`;
+  }
+
+  function getZoneSafetyDiCount(parsed, zone) {
+    if (parsed?.meta?.exportZone) {
+      return Number(parsed?.meta?.counts?.safetyDi) || 0;
+    }
+
+    const zones = parsed?.meta?.zones || [];
+    const offsets = parsed?.meta?.zoneOffsets || {};
+    const zoneIndex = zones.indexOf(zone);
+    if (zoneIndex < 0) {
+      return 0;
+    }
+
+    const start = Number(offsets[zone]?.safetyDi) || 0;
+    const nextZone = zones[zoneIndex + 1];
+    const end = nextZone
+      ? Number(offsets[nextZone]?.safetyDi)
+      : Number(parsed?.meta?.counts?.safetyDi);
+    if (!Number.isFinite(end) || end <= start) {
+      return 0;
+    }
+    return end - start;
+  }
+
+  function getZoneSafetyDoCount(parsed, zone) {
+    if (parsed?.meta?.exportZone) {
+      return Number(parsed?.meta?.counts?.safetyDo) || 0;
+    }
+
+    const zones = parsed?.meta?.zones || [];
+    const offsets = parsed?.meta?.zoneOffsets || {};
+    const zoneIndex = zones.indexOf(zone);
+    if (zoneIndex < 0) {
+      return 0;
+    }
+
+    const start = Number(offsets[zone]?.safetyDo) || 0;
+    const nextZone = zones[zoneIndex + 1];
+    const end = nextZone
+      ? Number(offsets[nextZone]?.safetyDo)
+      : Number(parsed?.meta?.counts?.safetyDo);
+    if (!Number.isFinite(end) || end <= start) {
+      return 0;
+    }
+    return end - start;
   }
 
   function getZonePlcDiCount(parsed, zone) {
+    if (parsed?.meta?.exportZone) {
+      return Number(parsed?.meta?.counts?.plcDi) || 8;
+    }
+
     const zones = parsed?.meta?.zones || [];
     const offsets = parsed?.meta?.zoneOffsets || {};
     const zoneIndex = zones.indexOf(zone);
@@ -1356,15 +2010,20 @@
     const tags = Array.isArray(parsed?.tags) ? parsed.tags : [];
     const page = Math.max(1, Number(options.page) || 1);
     const zone = cellStr(options.zone);
-    const zoneOffset = zone && parsed?.meta?.zoneOffsets?.[zone]
-      ? parsed.meta.zoneOffsets[zone].plcDi
-      : 0;
+    const zoneLocal = Boolean(options.zoneLocal || parsed?.meta?.exportZone);
+    const zoneOffset = zoneLocal
+      ? 0
+      : (zone && parsed?.meta?.zoneOffsets?.[zone]
+        ? parsed.meta.zoneOffsets[zone].plcDi
+        : 0);
     const bindings = new Map();
     const pageSuffix = String(page).padStart(2, '0');
     const zoneListTitle = `${zone ? `${zone} Input List` : 'PLC Input List'} ${pageSuffix}`;
-    const listTag = tags.find((tag) => tag.tagType === 'S'
-      && /\\List_\d+$/i.test(String(tag.tagName || ''))
-      && String(tag.initialString || tag.tagDescription || '') === zoneListTitle);
+    const listTag = zoneLocal
+      ? findTag(tags, `PLC_DI_Discr\\List_${pageSuffix}`)
+      : tags.find((tag) => tag.tagType === 'S'
+        && /\\List_\d+$/i.test(String(tag.tagName || ''))
+        && String(tag.initialString || tag.tagDescription || '') === zoneListTitle);
 
     bindings.set(100, listTag?.tagName || `PLC_DI_Discr\\List_${pageSuffix}`);
 
@@ -1372,7 +2031,7 @@
     for (let i = 0; i < 8; i += 1) {
       const dataIdx = String(base + i).padStart(2, '0');
       bindings.set(101 + i, `PLC_DI_Discr\\Data_${dataIdx}`);
-      bindings.set(201 + i, `PLC_DI_NO\\Data_${dataIdx}`);
+      bindings.set(201 + i, `PLC_DI_No\\Data_${dataIdx}`);
       bindings.set(301 + i, `PLC_DI_Tags\\Data_${dataIdx}`);
     }
 
@@ -1441,15 +2100,20 @@
     const tags = Array.isArray(parsed?.tags) ? parsed.tags : [];
     const page = Math.max(1, Number(options.page) || 1);
     const zone = cellStr(options.zone);
-    const zoneOffset = zone && parsed?.meta?.zoneOffsets?.[zone]
-      ? parsed.meta.zoneOffsets[zone].plcDo
-      : 0;
+    const zoneLocal = Boolean(options.zoneLocal || parsed?.meta?.exportZone);
+    const zoneOffset = zoneLocal
+      ? 0
+      : (zone && parsed?.meta?.zoneOffsets?.[zone]
+        ? parsed.meta.zoneOffsets[zone].plcDo
+        : 0);
     const bindings = new Map();
     const pageSuffix = String(page).padStart(2, '0');
     const zoneListTitle = `${zone ? `${zone} Output List` : 'PLC Output List'} ${pageSuffix}`;
-    const listTag = tags.find((tag) => tag.tagType === 'S'
-      && /\\List_\d+$/i.test(String(tag.tagName || ''))
-      && String(tag.initialString || tag.tagDescription || '') === zoneListTitle);
+    const listTag = zoneLocal
+      ? findTag(tags, `PLC_DO_Discr\\List_${pageSuffix}`)
+      : tags.find((tag) => tag.tagType === 'S'
+        && /\\List_\d+$/i.test(String(tag.tagName || ''))
+        && String(tag.initialString || tag.tagDescription || '') === zoneListTitle);
 
     bindings.set(100, listTag?.tagName || `PLC_DO_Discr\\List_${pageSuffix}`);
 
@@ -1475,16 +2139,115 @@
     };
   }
 
+  function buildSafetyDiListParameterBindings(parsed, options = {}) {
+    const page = Math.max(1, Number(options.page) || 1);
+    const zone = cellStr(options.zone);
+    const zoneLocal = Boolean(options.zoneLocal || parsed?.meta?.exportZone);
+    const zoneOffset = zoneLocal
+      ? 0
+      : (zone && parsed?.meta?.zoneOffsets?.[zone]
+        ? parsed.meta.zoneOffsets[zone].safetyDi
+        : 0);
+    const bindings = new Map();
+    const pageSuffix = String(page).padStart(2, '0');
+    bindings.set(100, `Safety_DI_Discr\\Safety_List_${pageSuffix}`);
+
+    const base = zoneOffset + ((page - 1) * 8);
+    for (let i = 0; i < 8; i += 1) {
+      const dataIdx = String(base + i).padStart(2, '0');
+      bindings.set(101 + i, `Safety_DI_Discr\\Data_${dataIdx}`);
+      bindings.set(201 + i, `Safety_DI_No\\Data_${dataIdx}`);
+      bindings.set(301 + i, `Safety_DI_Tags\\Data_${dataIdx}`);
+    }
+
+    return bindings;
+  }
+
+  function buildSafetyDoListParameterBindings(parsed, options = {}) {
+    const page = Math.max(1, Number(options.page) || 1);
+    const zone = cellStr(options.zone);
+    const zoneLocal = Boolean(options.zoneLocal || parsed?.meta?.exportZone);
+    const zoneOffset = zoneLocal
+      ? 0
+      : (zone && parsed?.meta?.zoneOffsets?.[zone]
+        ? parsed.meta.zoneOffsets[zone].safetyDo
+        : 0);
+    const bindings = new Map();
+    const pageSuffix = String(page).padStart(2, '0');
+    bindings.set(100, `Safety_DO_Discr\\Safety_List_${pageSuffix}`);
+
+    const base = zoneOffset + ((page - 1) * 8);
+    for (let i = 0; i < 8; i += 1) {
+      const dataIdx = String(base + i).padStart(2, '0');
+      bindings.set(101 + i, `Safety_DO_Discr\\Data_${dataIdx}`);
+      bindings.set(201 + i, `Safety_DO_No\\Data_${dataIdx}`);
+      bindings.set(301 + i, `Safety_DO_Tags\\Data_${dataIdx}`);
+    }
+
+    return bindings;
+  }
+
+  function buildSafetyDiListParameterFile(parsed, options = {}) {
+    const page = Math.max(1, Number(options.page) || 1);
+    const pageSuffix = String(page).padStart(2, '0');
+    const bindings = buildSafetyDiListParameterBindings(parsed, options);
+    return {
+      name: `Safety DI List ${pageSuffix}.par`,
+      content: serializeParameterFile(bindings),
+      bindings
+    };
+  }
+
+  function buildSafetyDoListParameterFile(parsed, options = {}) {
+    const page = Math.max(1, Number(options.page) || 1);
+    const pageSuffix = String(page).padStart(2, '0');
+    const bindings = buildSafetyDoListParameterBindings(parsed, options);
+    return {
+      name: `Safety DO List ${pageSuffix}.par`,
+      content: serializeParameterFile(bindings),
+      bindings
+    };
+  }
+
+  function buildSafetyDiListParameterFiles(parsed, options = {}) {
+    const zone = cellStr(options.zone);
+    const totalDi = zone
+      ? getZoneSafetyDiCount(parsed, zone)
+      : Number(parsed?.meta?.counts?.safetyDi) || 0;
+    const pageCount = resolveParameterPageCount(totalDi, options.maxPages);
+    const files = [];
+
+    for (let page = 1; page <= pageCount; page += 1) {
+      files.push(buildSafetyDiListParameterFile(parsed, { ...options, page }));
+    }
+
+    return files;
+  }
+
+  function buildSafetyDoListParameterFiles(parsed, options = {}) {
+    const zone = cellStr(options.zone);
+    const totalDo = zone
+      ? getZoneSafetyDoCount(parsed, zone)
+      : Number(parsed?.meta?.counts?.safetyDo) || 0;
+    const pageCount = resolveParameterPageCount(totalDo, options.maxPages);
+    const files = [];
+
+    for (let page = 1; page <= pageCount; page += 1) {
+      files.push(buildSafetyDoListParameterFile(parsed, { ...options, page }));
+    }
+
+    return files;
+  }
+
   function buildIoListParameterFiles(parsed, options = {}) {
     const zone = cellStr(options.zone);
     const totalDi = zone
       ? getZonePlcDiCount(parsed, zone)
       : Number(parsed?.meta?.counts?.plcDi) || 0;
-    const pageCount = Math.max(1, Math.ceil(totalDi / 8));
-    const maxPages = Math.max(1, Number(options.maxPages) || pageCount);
+    const pageCount = resolveParameterPageCount(totalDi, options.maxPages);
     const files = [];
 
-    for (let page = 1; page <= Math.min(pageCount, maxPages, 6); page += 1) {
+    for (let page = 1; page <= pageCount; page += 1) {
       files.push(buildIoListParameterFile(parsed, { ...options, page }));
     }
 
@@ -1496,11 +2259,10 @@
     const totalDo = zone
       ? getZonePlcDoCount(parsed, zone)
       : Number(parsed?.meta?.counts?.plcDo) || 0;
-    const pageCount = Math.max(1, Math.ceil(totalDo / 8));
-    const maxPages = Math.max(1, Number(options.maxPages) || pageCount);
+    const pageCount = resolveParameterPageCount(totalDo, options.maxPages);
     const files = [];
 
-    for (let page = 1; page <= Math.min(pageCount, maxPages, 6); page += 1) {
+    for (let page = 1; page <= pageCount; page += 1) {
       files.push(buildIoDoListParameterFile(parsed, { ...options, page }));
     }
 
@@ -1510,7 +2272,9 @@
   function buildAllIoListParameterFiles(parsed, options = {}) {
     return [
       ...buildIoListParameterFiles(parsed, options),
-      ...buildIoDoListParameterFiles(parsed, options)
+      ...buildIoDoListParameterFiles(parsed, options),
+      ...buildSafetyDiListParameterFiles(parsed, options),
+      ...buildSafetyDoListParameterFiles(parsed, options)
     ];
   }
 
@@ -1573,7 +2337,7 @@
     return rows;
   }
 
-  const RSLOGIX_HMI_SPECIFIER = /^RIO0[123]_(DI|DO|SDI|SDO)\[\d+\]$/i;
+  const RSLOGIX_HMI_SPECIFIER = /^RIO\d{2}_(DI|DO|SDI|SDO)\[\d+\]$/i;
 
   function parseRsLogixCsvLine(line) {
     const cells = [];
@@ -1748,8 +2512,18 @@
       normalizedFullLabel: parsedDescription.normalizedFullLabel,
       specifier: tagAddress,
       preferred: isPreferredHmiPlcSpecifier(tagAddress),
-      plcTag: formatPlcTagAddress(tagAddress)
+      plcTag: formatPlcTagAddress(tagAddress),
+      rioModule: parseRioModuleFromPlcTag(tagAddress)
+        || parseRioModuleFromPlcTag(name)
     };
+  }
+
+  function rsLogixEntryDedupeKey(entry) {
+    const rioModule = entry.rioModule
+      || parseRioModuleFromPlcTag(entry.plcTag || entry.specifier)
+      || parseRioModuleFromPlcTag(entry.parentTag)
+      || 0;
+    return `${rioModule}:${entry.ioKind}:${entry.ioNum}:${entry.normalizedDescription}`;
   }
 
   function collectRsLogixIoEntries(lines, allowedTypes) {
@@ -1770,7 +2544,7 @@
         continue;
       }
 
-      const dedupeKey = `${entry.ioKind}:${entry.ioNum}:${entry.normalizedDescription}`;
+      const dedupeKey = rsLogixEntryDedupeKey(entry);
       entryMap.set(dedupeKey, mergeRsLogixEntry(entryMap.get(dedupeKey), entry));
     }
 
@@ -1801,42 +2575,61 @@
   }
 
   function buildPlcTagLookupIndex(entries) {
-    const byKindNumDesc = new Map();
-    const byKindDesc = new Map();
-    const byKindFullLabel = new Map();
-    const byKindNum = new Map();
+    const byRioKindNumDesc = new Map();
+    const byRioKindDesc = new Map();
+    const byRioKindFullLabel = new Map();
+    const byRioKindNum = new Map();
 
     for (const entry of entries || []) {
-      if (entry.ioKind && Number.isFinite(entry.ioNum)) {
-        const kindNumDescKey = `${entry.ioKind}:${entry.ioNum}:${entry.normalizedDescription}`;
-        byKindNumDesc.set(kindNumDescKey, mergeRsLogixEntry(byKindNumDesc.get(kindNumDescKey), entry));
+      const rioModule = entry.rioModule
+        || parseRioModuleFromPlcTag(entry.plcTag || entry.specifier)
+        || parseRioModuleFromPlcTag(entry.parentTag);
+      if (!rioModule || !entry.ioKind) {
+        continue;
       }
 
-      if (entry.ioKind) {
-        const kindDescKey = `${entry.ioKind}:${entry.normalizedDescription}`;
-        const kindDescMatches = byKindDesc.get(kindDescKey) || [];
-        kindDescMatches.push(entry);
-        byKindDesc.set(kindDescKey, kindDescMatches);
+      entry.rioModule = rioModule;
 
-        const kindFullLabelKey = `${entry.ioKind}:${entry.normalizedFullLabel}`;
-        const kindFullLabelMatches = byKindFullLabel.get(kindFullLabelKey) || [];
-        kindFullLabelMatches.push(entry);
-        byKindFullLabel.set(kindFullLabelKey, kindFullLabelMatches);
+      if (Number.isFinite(entry.ioNum)) {
+        const kindNumDescKey = `${rioModule}:${entry.ioKind}:${entry.ioNum}:${entry.normalizedDescription}`;
+        byRioKindNumDesc.set(kindNumDescKey, mergeRsLogixEntry(byRioKindNumDesc.get(kindNumDescKey), entry));
       }
 
-      if (entry.ioKind && Number.isFinite(entry.ioNum)) {
-        const kindNumKey = `${entry.ioKind}:${entry.ioNum}`;
-        const kindNumMatches = byKindNum.get(kindNumKey) || [];
+      const kindDescKey = `${rioModule}:${entry.ioKind}:${entry.normalizedDescription}`;
+      const kindDescMatches = byRioKindDesc.get(kindDescKey) || [];
+      kindDescMatches.push(entry);
+      byRioKindDesc.set(kindDescKey, kindDescMatches);
+
+      const kindFullLabelKey = `${rioModule}:${entry.ioKind}:${entry.normalizedFullLabel}`;
+      const kindFullLabelMatches = byRioKindFullLabel.get(kindFullLabelKey) || [];
+      kindFullLabelMatches.push(entry);
+      byRioKindFullLabel.set(kindFullLabelKey, kindFullLabelMatches);
+
+      if (Number.isFinite(entry.ioNum)) {
+        const kindNumKey = `${rioModule}:${entry.ioKind}:${entry.ioNum}`;
+        const kindNumMatches = byRioKindNum.get(kindNumKey) || [];
         kindNumMatches.push(entry);
-        byKindNum.set(kindNumKey, kindNumMatches);
+        byRioKindNum.set(kindNumKey, kindNumMatches);
       }
     }
 
-    return { byKindNumDesc, byKindDesc, byKindFullLabel, byKindNum, entries };
+    return { byRioKindNumDesc, byRioKindDesc, byRioKindFullLabel, byRioKindNum, entries };
   }
 
-  function pickPreferredPlcEntry(matches) {
-    const list = (matches || []).filter((entry) => entry?.plcTag);
+  function entriesForRioModule(entries, rioModule) {
+    if (!rioModule || !entries?.length) {
+      return [];
+    }
+    return entries.filter((entry) => {
+      const module = entry.rioModule
+        || parseRioModuleFromPlcTag(entry.plcTag || entry.specifier)
+        || parseRioModuleFromPlcTag(entry.parentTag);
+      return module === rioModule;
+    });
+  }
+
+  function pickPreferredPlcEntry(matches, rioModule) {
+    const list = entriesForRioModule((matches || []).filter((entry) => entry?.plcTag), rioModule);
     if (!list.length) {
       return null;
     }
@@ -1857,10 +2650,14 @@
     return a.includes(b) || b.includes(a);
   }
 
-  function resolveIoItemPlcTag(item, lookup) {
+  function resolveIoItemPlcTag(item, lookup, options = {}) {
     const parsed = parseIoPointType(item?.type);
-    if (!parsed?.ioKind || !lookup) {
-      return { plcTag: cellStr(item?.plcTag), matched: false };
+    const rioModule = options.rioModule || item?.rioModule || null;
+    if (!parsed?.ioKind || !lookup || !rioModule) {
+      return {
+        plcTag: inferPlcTag(item?.type, item?.plcTag, rioModule || 1),
+        matched: false
+      };
     }
 
     const ioNum = Number.parseInt(parsed.num, 10)
@@ -1869,83 +2666,95 @@
     const normalizedFullLabel = normalizeDescriptionForMatch(formatIoPointLabel(item.type, item.description));
 
     if (Number.isFinite(ioNum)) {
-      const exact = lookup.byKindNumDesc.get(`${parsed.ioKind}:${ioNum}:${normalizedDescription}`);
+      const exact = lookup.byRioKindNumDesc.get(`${rioModule}:${parsed.ioKind}:${ioNum}:${normalizedDescription}`);
       if (exact?.plcTag) {
         return { plcTag: exact.plcTag, matched: true };
       }
     }
 
-    const kindDescMatches = lookup.byKindDesc.get(`${parsed.ioKind}:${normalizedDescription}`) || [];
-    const kindDescPick = pickPreferredPlcEntry(kindDescMatches);
+    const kindDescMatches = lookup.byRioKindDesc.get(`${rioModule}:${parsed.ioKind}:${normalizedDescription}`) || [];
+    const kindDescPick = pickPreferredPlcEntry(kindDescMatches, rioModule);
     if (kindDescPick?.plcTag) {
       return { plcTag: kindDescPick.plcTag, matched: true };
     }
 
-    const kindFullLabelMatches = lookup.byKindFullLabel.get(`${parsed.ioKind}:${normalizedFullLabel}`) || [];
-    const kindFullLabelPick = pickPreferredPlcEntry(kindFullLabelMatches);
+    const kindFullLabelMatches = lookup.byRioKindFullLabel.get(`${rioModule}:${parsed.ioKind}:${normalizedFullLabel}`) || [];
+    const kindFullLabelPick = pickPreferredPlcEntry(kindFullLabelMatches, rioModule);
     if (kindFullLabelPick?.plcTag) {
       return { plcTag: kindFullLabelPick.plcTag, matched: true };
     }
 
     if (Number.isFinite(ioNum)) {
-      const kindNumMatches = (lookup.byKindNum.get(`${parsed.ioKind}:${ioNum}`) || [])
+      const kindNumMatches = (lookup.byRioKindNum.get(`${rioModule}:${parsed.ioKind}:${ioNum}`) || [])
         .filter((entry) => descriptionsRoughlyMatch(entry.description, item?.description)
           || descriptionsRoughlyMatch(entry.rawDescription, item?.description)
           || descriptionsRoughlyMatch(entry.normalizedFullLabel, normalizedFullLabel));
-      const kindNumPick = pickPreferredPlcEntry(kindNumMatches);
+      const kindNumPick = pickPreferredPlcEntry(kindNumMatches, rioModule);
       if (kindNumPick?.plcTag) {
         return { plcTag: kindNumPick.plcTag, matched: true };
       }
     }
 
-    const fuzzyKindDescMatches = (lookup.byKindDesc.get(`${parsed.ioKind}:${normalizedDescription}`) || [])
-      .concat(kindDescMatches)
-      .filter((entry, index, list) => list.indexOf(entry) === index)
+    const fuzzyKindDescMatches = kindDescMatches
       .filter((entry) => descriptionsRoughlyMatch(entry.description, item?.description));
-    const fuzzyPick = pickPreferredPlcEntry(fuzzyKindDescMatches);
+    const fuzzyPick = pickPreferredPlcEntry(fuzzyKindDescMatches, rioModule);
     if (fuzzyPick?.plcTag) {
       return { plcTag: fuzzyPick.plcTag, matched: true };
     }
 
-    return { plcTag: cellStr(item?.plcTag), matched: false };
+    return {
+      plcTag: inferPlcTag(item?.type, item?.plcTag, rioModule),
+      matched: false
+    };
   }
 
-  function applyPlcTagsToIoSheets(sheets, rsLogixText) {
+  function applyPlcTagsToIoSheets(sheets, rsLogixText, options = {}) {
     const rsLogixParsed = parseRsLogixTagsCsv(rsLogixText);
     const lookup = buildPlcTagLookupIndex(rsLogixParsed.entries);
+    const sheetList = Array.isArray(sheets) ? sheets : [];
+    const zones = options.zones
+      || sheetList.map((sheet) => cellStr(sheet.zone)).filter(Boolean);
+    const zoneRioModules = buildZoneRioModuleMap(zones, {
+      sheets: sheetList,
+      entries: rsLogixParsed.entries,
+      manualMap: options.manualZoneRioModules || options.zoneRioModules || {}
+    });
     const stats = {
       total: 0,
       matched: 0,
       unmatched: 0,
       rslogixEntries: rsLogixParsed.entries.length,
       rslogixRowTypes: rsLogixParsed.meta?.rowTypesUsed || [],
-      aliasRowsSkipped: Boolean(rsLogixParsed.meta?.aliasRowsSkipped)
+      aliasRowsSkipped: Boolean(rsLogixParsed.meta?.aliasRowsSkipped),
+      zoneRioModules
     };
 
-    const nextSheets = (Array.isArray(sheets) ? sheets : []).map((sheet) => {
+    const nextSheets = sheetList.map((sheet) => {
+      const zone = cellStr(sheet.zone) || 'General';
+      const rioModule = zoneRioModules[zone] || sheet.rioModule || 1;
       const diInputs = (sheet?.diInputs || []).map((item) => {
         stats.total += 1;
-        const resolved = resolveIoItemPlcTag(item, lookup);
+        const resolved = resolveIoItemPlcTag(item, lookup, { rioModule });
         if (resolved.matched) {
           stats.matched += 1;
         } else {
           stats.unmatched += 1;
         }
-        return { ...item, plcTag: resolved.plcTag };
+        return { ...item, plcTag: resolved.plcTag, rioModule };
       });
 
       const doOutputs = (sheet?.doOutputs || []).map((item) => {
         stats.total += 1;
-        const resolved = resolveIoItemPlcTag(item, lookup);
+        const resolved = resolveIoItemPlcTag(item, lookup, { rioModule });
         if (resolved.matched) {
           stats.matched += 1;
         } else {
           stats.unmatched += 1;
         }
-        return { ...item, plcTag: resolved.plcTag };
+        return { ...item, plcTag: resolved.plcTag, rioModule };
       });
 
-      return { ...sheet, diInputs, doOutputs };
+      return { ...sheet, rioModule, diInputs, doOutputs };
     });
 
     return { sheets: nextSheets, stats, lookup };
@@ -1957,13 +2766,20 @@
       return { parsed, stats: { total: 0, matched: 0, unmatched: 0, rslogixEntries: 0 } };
     }
 
-    const { sheets, stats } = applyPlcTagsToIoSheets(sourceSheets, rsLogixText);
-    const rebuilt = rebuildParsedFromMasterSheets(sheets);
+    const { sheets, stats } = applyPlcTagsToIoSheets(sourceSheets, rsLogixText, {
+      zones: parsed?.meta?.zones,
+      manualZoneRioModules: parsed?.meta?.manualZoneRioModules || {}
+    });
+    const rebuilt = rebuildParsedFromMasterSheets(sheets, {
+      zoneRioModules: stats.zoneRioModules
+    });
     rebuilt.meta = {
-      ...(rebuilt.meta || {}),
       ...(parsed.meta || {}),
+      ...(rebuilt.meta || {}),
       sourceSheets: sheets,
-      plcTagMatch: stats
+      plcTagMatch: stats,
+      zoneRioModules: stats.zoneRioModules || rebuilt.meta?.zoneRioModules,
+      manualZoneRioModules: parsed?.meta?.manualZoneRioModules || {}
     };
     return { parsed: rebuilt, stats };
   }
@@ -1971,6 +2787,16 @@
   global.IoTags = {
     IO_TYPE_LABELS,
     parseIoPointType,
+    parseRioModuleFromPlcTag,
+    formatRioModuleLabel,
+    buildZoneRioModuleMap,
+    inferZoneRioModulesFromPlcEntries,
+    listRioModulesFromPlcEntries,
+    buildZoneSetupRows,
+    applyZoneSetupToSheets,
+    buildParsedForZoneExport,
+    buildZoneTagsCsv,
+    validateFactoryTalkZoneTagsCsv,
     parseIoListText,
     parseSimpleIoListCsv,
     serializeFactoryTalkTagsCsv,
@@ -1994,6 +2820,8 @@
     buildIoDoListParameterFile,
     buildIoDoListParameterFiles,
     buildAllIoListParameterFiles,
+    buildSafetyDiListParameterFiles,
+    buildSafetyDoListParameterFiles,
     resolveTagPreviewValue,
     buildPreviewMapFromParameterFile,
     formatParameterPreviewNotes,

@@ -1806,6 +1806,81 @@ li:hover {
   margin-bottom: 12px;
 }
 
+.io-list-zone-setup {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #c7d6dc;
+  border-radius: 6px;
+  background: #f7fafb;
+}
+
+.io-list-zone-setup-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.io-list-zone-setup-toggle {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid #8aa3ad;
+  border-radius: 4px;
+  background: #fff;
+  color: #1f3a44;
+  cursor: pointer;
+}
+
+.io-list-zone-setup-toggle:hover {
+  background: #eef4f6;
+}
+
+.io-list-zone-setup-hint {
+  font-size: 11px;
+  color: #4a5d66;
+}
+
+.io-list-zone-setup-body {
+  margin-top: 10px;
+}
+
+.io-list-zone-setup-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  background: #fff;
+}
+
+.io-list-zone-setup-table th,
+.io-list-zone-setup-table td {
+  padding: 6px 8px;
+  border: 1px solid #d8e2e6;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.io-list-zone-setup-table th {
+  background: #edf3f5;
+  color: #1f3a44;
+  font-weight: 600;
+}
+
+.io-list-zone-setup-name,
+.io-list-zone-setup-rio {
+  width: 100%;
+  min-width: 120px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.io-list-zone-setup-rio {
+  min-width: 96px;
+}
+
+.io-list-zone-setup-actions {
+  margin-top: 10px;
+}
+
 .io-list-editor-zone-label {
   display: inline-flex;
   align-items: center;
@@ -1815,10 +1890,20 @@ li:hover {
 }
 
 .io-list-editor-zone-select,
+.io-list-editor-view-select,
+.io-list-editor-export-zone-select,
 .io-list-editor-page-select {
   min-width: 120px;
   padding: 4px 6px;
   font-size: 12px;
+}
+
+.io-list-editor-export-zone-select {
+  min-width: 168px;
+}
+
+.io-list-editor-view-select {
+  min-width: 148px;
 }
 
 .io-list-editor-page-select {

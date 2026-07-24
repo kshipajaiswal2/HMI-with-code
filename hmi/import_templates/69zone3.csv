@@ -1,0 +1,533 @@
+﻿;Tag Type, Tag Name, Tag Description, Read Only, Data Source, Security Code, Alarmed, Native Type, Value Type, Min Analog, Max Analog, Initial Analog, Scale, Offset, DeadBand, Units, Off Label Digital, On Label Digital, Initial Digital, Length String, Initial String, Retentive, Address, System Source Name, System Source Index, RIO Address, Element Size Block, Number Elements Block, Initial Block
+;###002 - THIS LINE CONTAINS VERSION INFORMATION. DO NOT REMOVE!!!
+
+;Folders Section (Must define folders before tags)
+"F","PLC_DI_Discr",,"F"
+"F","PLC_DI_NO",,"F"
+"F","PLC_DI_Tags",,"F"
+"F","PLC_DO_Discr",,"F"
+"F","PLC_DO_No",,"F"
+"F","PLC_DO_Tags",,"F"
+"F","Safety_DI_Discr",,"F"
+"F","Safety_DI_No",,"F"
+"F","Safety_DI_Tags",,"F"
+"F","Safety_DO_Discr",,"F"
+"F","Safety_DO_No",,"F"
+"F","Safety_DO_Tags",,"F"
+"F","Temp_Tags",,"F"
+"F","Values",,"F"
+
+;Tag Section
+"S","PLC_DI_Discr\Data_00","DI01 Packing Start PB","F","M","*","F",,,,,,,,,,,,,82,"DI01 Packing Start PB",0,
+"S","PLC_DI_Discr\Data_01","DI02 Packing Stop PB","F","M","*","F",,,,,,,,,,,,,82,"DI02 Packing Stop PB",0,
+"S","PLC_DI_Discr\Data_02","DI03 Packing System Reset PB","F","M","*","F",,,,,,,,,,,,,82,"DI03 Packing System Reset PB",0,
+"S","PLC_DI_Discr\Data_03","DI04 Packing System Safety Reset PB","F","M","*","F",,,,,,,,,,,,,82,"DI04 Packing System Safety Reset PB",0,
+"S","PLC_DI_Discr\Data_04","DI05 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI05 Spare DI",0,
+"S","PLC_DI_Discr\Data_05","DI06 Spare","F","M","*","F",,,,,,,,,,,,,82,"DI06 Spare",0,
+"S","PLC_DI_Discr\Data_06","DI07 Packing Air Pressure Switch","F","M","*","F",,,,,,,,,,,,,82,"DI07 Packing Air Pressure Switch",0,
+"S","PLC_DI_Discr\Data_07","DI08 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI08 Spare DI",0,
+"S","PLC_DI_Discr\Data_08","DI09 Incliend Belt conveyor MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI09 Incliend Belt conveyor MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_09","DI10 Material Storage Vibro-1 MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI10 Material Storage Vibro-1 MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_10","DI11 Material Storage Vibro-2 MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI11 Material Storage Vibro-2 MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_11","DI12 Bag Filling Conveyor MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI12 Bag Filling Conveyor MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_12","DI13 Bag Sealing & Stiching Conveyor MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI13 Bag Sealing & Stiching Conveyor MPCB Healt",0,
+"S","PLC_DI_Discr\Data_13","DI14 Bag Stitching Motor MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI14 Bag Stitching Motor MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_14","DI15 Bag Tilting Conveyor MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI15 Bag Tilting Conveyor MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_15","DI16 Bag Flattening Bottom Conveyor MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI16 Bag Flattening Bottom Conveyor MPCB Health",0,
+"S","PLC_DI_Discr\Data_16","DI17 Bag Flattening Top Conveyor MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI17 Bag Flattening Top Conveyor MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_17","DI18 Metal Detector Conveyor MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI18 Metal Detector Conveyor MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_18","DI19 Bag Rejection Conveyor MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI19 Bag Rejection Conveyor MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_19","DI20 Bagging Zone Dust Collector MPCB Healthy","F","M","*","F",,,,,,,,,,,,,82,"DI20 Bagging Zone Dust Collector MPCB Healthy",0,
+"S","PLC_DI_Discr\Data_20","DI21 Spare","F","M","*","F",,,,,,,,,,,,,82,"DI21 Spare",0,
+"S","PLC_DI_Discr\Data_21","DI22 Spare","F","M","*","F",,,,,,,,,,,,,82,"DI22 Spare",0,
+"S","PLC_DI_Discr\Data_22","DI23 Spare","F","M","*","F",,,,,,,,,,,,,82,"DI23 Spare",0,
+"S","PLC_DI_Discr\Data_23","DI24 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI24 Spare DI",0,
+"S","PLC_DI_Discr\Data_24","DI25 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI25 Spare DI",0,
+"S","PLC_DI_Discr\Data_25","DI26 Bag Stitching Motor Disconnector FB","F","M","*","F",,,,,,,,,,,,,82,"DI26 Bag Stitching Motor Disconnector FB",0,
+"S","PLC_DI_Discr\Data_26","DI27 Bagging Zone Dust Collector Disconnector FB","F","M","*","F",,,,,,,,,,,,,82,"DI27 Bagging Zone Dust Collector Disconnector F",0,
+"S","PLC_DI_Discr\Data_27","DI28 Spare","F","M","*","F",,,,,,,,,,,,,82,"DI28 Spare",0,
+"S","PLC_DI_Discr\Data_28","DI29 Spare","F","M","*","F",,,,,,,,,,,,,82,"DI29 Spare",0,
+"S","PLC_DI_Discr\Data_29","DI30 Spare","F","M","*","F",,,,,,,,,,,,,82,"DI30 Spare",0,
+"S","PLC_DI_Discr\Data_30","DI31 Electro Magnetic Coarse Vibro Running F/B","F","M","*","F",,,,,,,,,,,,,82,"DI31 Electro Magnetic Coarse Vibro Running F/B",0,
+"S","PLC_DI_Discr\Data_31","DI32 Electro Magnetic Fine Vibro Running F/B","F","M","*","F",,,,,,,,,,,,,82,"DI32 Electro Magnetic Fine Vibro Running F/B",0,
+"S","PLC_DI_Discr\Data_32","DI33 Diverter Flap Cylinder FWD FB","F","M","*","F",,,,,,,,,,,,,82,"DI33 Diverter Flap Cylinder FWD FB",0,
+"S","PLC_DI_Discr\Data_33","DI34 Diverter Flap Cylinder REV FB","F","M","*","F",,,,,,,,,,,,,82,"DI34 Diverter Flap Cylinder REV FB",0,
+"S","PLC_DI_Discr\Data_34","DI35 Filling Station Bag Clamp-1 Open FB","F","M","*","F",,,,,,,,,,,,,82,"DI35 Filling Station Bag Clamp-1 Open FB ",0,
+"S","PLC_DI_Discr\Data_35","DI36 Filling Station Bag Clamp-1 Close FB","F","M","*","F",,,,,,,,,,,,,82,"DI36 Filling Station Bag Clamp-1 Close FB",0,
+"S","PLC_DI_Discr\Data_36","DI37 Filling Station Bag Clamp-2 Open FB","F","M","*","F",,,,,,,,,,,,,82,"DI37 Filling Station Bag Clamp-2 Open FB",0,
+"S","PLC_DI_Discr\Data_37","DI38 Filling Station Bag Clamp-2 Close FB","F","M","*","F",,,,,,,,,,,,,82,"DI38 Filling Station Bag Clamp-2 Close FB",0,
+"S","PLC_DI_Discr\Data_38","DI39 Filling Station Bag Side Flap-1 Open FB","F","M","*","F",,,,,,,,,,,,,82,"DI39 Filling Station Bag Side Flap-1 Open FB",0,
+"S","PLC_DI_Discr\Data_39","DI40 Filling Station Bag Side Flap-1 Close FB","F","M","*","F",,,,,,,,,,,,,82,"DI40 Filling Station Bag Side Flap-1 Close FB",0,
+"S","PLC_DI_Discr\Data_40","DI41 Filling Station Bag Side Flap-2 Open FB","F","M","*","F",,,,,,,,,,,,,82,"DI41 Filling Station Bag Side Flap-2 Open FB",0,
+"S","PLC_DI_Discr\Data_41","DI42 Filling Station Bag Side Flap-2 Close FB","F","M","*","F",,,,,,,,,,,,,82,"DI42 Filling Station Bag Side Flap-2 Close FB",0,
+"S","PLC_DI_Discr\Data_42","DI43 Filling Station Bag Present Sensor","F","M","*","F",,,,,,,,,,,,,82,"DI43 Filling Station Bag Present Sensor",0,
+"S","PLC_DI_Discr\Data_43","DI44 Filling Station Bag Clamp Foot Switch","F","M","*","F",,,,,,,,,,,,,82,"DI44 Filling Station Bag Clamp Foot Switch ",0,
+"S","PLC_DI_Discr\Data_44","DI45 Filling Station Filling Start/Stop PB","F","M","*","F",,,,,,,,,,,,,82,"DI45 Filling Station Filling Start/Stop PB",0,
+"S","PLC_DI_Discr\Data_45","DI46 Filling Station Conveyor Up FB","F","M","*","F",,,,,,,,,,,,,82,"DI46 Filling Station Conveyor Up FB",0,
+"S","PLC_DI_Discr\Data_46","DI47 Filling Station Conveyor Dn FB","F","M","*","F",,,,,,,,,,,,,82,"DI47 Filling Station Conveyor Dn FB",0,
+"S","PLC_DI_Discr\Data_47","DI48 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI48 Spare DI",0,
+"S","PLC_DI_Discr\Data_48","DI49 Sealing Station Bag Entry Sensor","F","M","*","F",,,,,,,,,,,,,82,"DI49 Sealing Station Bag Entry Sensor ",0,
+"S","PLC_DI_Discr\Data_49","DI50 Sealing Station Bag Exit Sensor","F","M","*","F",,,,,,,,,,,,,82,"DI50 Sealing Station Bag Exit Sensor",0,
+"S","PLC_DI_Discr\Data_50","DI51 Sealing Station Band Sealer Machine Ready","F","M","*","F",,,,,,,,,,,,,82,"DI51 Sealing Station Band Sealer Machine Ready",0,
+"S","PLC_DI_Discr\Data_51","DI52 Sealing Station Band Sealer Machine Running","F","M","*","F",,,,,,,,,,,,,82,"DI52 Sealing Station Band Sealer Machine Runnin",0,
+"S","PLC_DI_Discr\Data_52","DI53 Sealing Station Band Sealer Machine Temperature OK","F","M","*","F",,,,,,,,,,,,,82,"DI53 Sealing Station Band Sealer Machine Temper",0,
+"S","PLC_DI_Discr\Data_53","DI54 Sealing Conveyor Start Foot Switch","F","M","*","F",,,,,,,,,,,,,82,"DI54 Sealing Conveyor Start Foot Switch",0,
+"S","PLC_DI_Discr\Data_54","DI55 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI55 Spare DI",0,
+"S","PLC_DI_Discr\Data_55","DI56 Stitching Station Cycle Start Foot Switch","F","M","*","F",,,,,,,,,,,,,82,"DI56 Stitching Station Cycle Start Foot Switch",0,
+"S","PLC_DI_Discr\Data_56","DI57 Tilting station Bag Entry sensor","F","M","*","F",,,,,,,,,,,,,82,"DI57 Tilting station Bag Entry sensor",0,
+"S","PLC_DI_Discr\Data_57","DI58 Stitching Station Bag Exit Sensor","F","M","*","F",,,,,,,,,,,,,82,"DI58 Stitching Station Bag Exit Sensor",0,
+"S","PLC_DI_Discr\Data_58","DI59 Stitching Station Thread Cutter Cylinder Fwd FB","F","M","*","F",,,,,,,,,,,,,82,"DI59 Stitching Station Thread Cutter Cylinder F",0,
+"S","PLC_DI_Discr\Data_59","DI60 Stitching Station Thread Cutter Cylinder Rev FB","F","M","*","F",,,,,,,,,,,,,82,"DI60 Stitching Station Thread Cutter Cylinder R",0,
+"S","PLC_DI_Discr\Data_60","DI61 Stitching Station Thread breake Detection Sensor-1","F","M","*","F",,,,,,,,,,,,,82,"DI61 Stitching Station Thread breake Detection ",0,
+"S","PLC_DI_Discr\Data_61","DI62 Stitching Station Thread breake Detection Sensor-2","F","M","*","F",,,,,,,,,,,,,82,"DI62 Stitching Station Thread breake Detection ",0,
+"S","PLC_DI_Discr\Data_62","DI63 Stitching Station Stitching Start Sensor","F","M","*","F",,,,,,,,,,,,,82,"DI63 Stitching Station Stitching Start Sensor",0,
+"S","PLC_DI_Discr\Data_63","DI64 Stitching Station Stitching Stop Sensor","F","M","*","F",,,,,,,,,,,,,82,"DI64 Stitching Station Stitching Stop Sensor",0,
+"S","PLC_DI_Discr\Data_64","DI65 Tilting station Bag Exit sensor","F","M","*","F",,,,,,,,,,,,,82,"DI65 Tilting station Bag Exit sensor",0,
+"S","PLC_DI_Discr\Data_65","DI66 Bag Flattner Station Bag Entry Sensor","F","M","*","F",,,,,,,,,,,,,82,"DI66 Bag Flattner Station Bag Entry Sensor ",0,
+"S","PLC_DI_Discr\Data_66","DI67 Bag Flattner Station Bag Exit Sensor","F","M","*","F",,,,,,,,,,,,,82,"DI67 Bag Flattner Station Bag Exit Sensor",0,
+"S","PLC_DI_Discr\Data_67","DI68 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI68 Spare DI",0,
+"S","PLC_DI_Discr\Data_68","DI69 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI69 Spare DI",0,
+"S","PLC_DI_Discr\Data_69","DI70 Metal Detector Station Bag Entry Sensor","F","M","*","F",,,,,,,,,,,,,82,"DI70 Metal Detector Station Bag Entry Sensor ",0,
+"S","PLC_DI_Discr\Data_70","DI71 Metal Detector Station Bag Exit Sensor","F","M","*","F",,,,,,,,,,,,,82,"DI71 Metal Detector Station Bag Exit Sensor",0,
+"S","PLC_DI_Discr\Data_71","DI72 Metal Detector FB","F","M","*","F",,,,,,,,,,,,,82,"DI72 Metal Detector FB",0,
+"S","PLC_DI_Discr\Data_72","DI73 Rejection Station Bag Present Sensor","F","M","*","F",,,,,,,,,,,,,82,"DI73 Rejection Station Bag Present Sensor ",0,
+"S","PLC_DI_Discr\Data_73","DI74 Rejection Station Bag Entry Sensor","F","M","*","F",,,,,,,,,,,,,82,"DI74 Rejection Station Bag Entry Sensor",0,
+"S","PLC_DI_Discr\Data_74","DI75 Rejection Station Bag Exit Sensor","F","M","*","F",,,,,,,,,,,,,82,"DI75 Rejection Station Bag Exit Sensor",0,
+"S","PLC_DI_Discr\Data_75","DI76 Rejection Station Pusher Cyl Forward FB","F","M","*","F",,,,,,,,,,,,,82,"DI76 Rejection Station Pusher Cyl Forward FB",0,
+"S","PLC_DI_Discr\Data_76","DI77 Rejection Station Pusher Cyl Reverse FB","F","M","*","F",,,,,,,,,,,,,82,"DI77 Rejection Station Pusher Cyl Reverse FB",0,
+"S","PLC_DI_Discr\Data_77","DI78 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI78 Spare DI",0,
+"S","PLC_DI_Discr\Data_78","DI79 Packing Zone Dust Collector Level High","F","M","*","F",,,,,,,,,,,,,82,"DI79 Packing Zone Dust Collector Level High",0,
+"S","PLC_DI_Discr\Data_79","DI80 Dust Collector Discharge BFV Open FB","F","M","*","F",,,,,,,,,,,,,82,"DI80 Dust Collector Discharge BFV Open FB",0,
+"S","PLC_DI_Discr\Data_80","DI81 Dust Collector Discharge BFV Open FB","F","M","*","F",,,,,,,,,,,,,82,"DI81 Dust Collector Discharge BFV Open FB",0,
+"S","PLC_DI_Discr\Data_81","DI82 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI82 Spare DI",0,
+"S","PLC_DI_Discr\Data_82","DI83 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"DI83 Spare DI",0,
+"S","PLC_DI_Discr\Data_83","DI84 Incliend Belt conveyor Disconnector FB","F","M","*","F",,,,,,,,,,,,,82,"DI84 Incliend Belt conveyor Disconnector FB",0,
+"S","PLC_DI_Discr\Data_84","DI85 Material Storage Vibro-1 Disconnector FB","F","M","*","F",,,,,,,,,,,,,82,"DI85 Material Storage Vibro-1 Disconnector FB",0,
+"S","PLC_DI_Discr\Data_85","DI86 Material Storage Vibro-2 Disconnector FB","F","M","*","F",,,,,,,,,,,,,82,"DI86 Material Storage Vibro-2 Disconnector FB",0,
+"S","PLC_DI_Discr\Data_86","DI87 Bag Filling Conveyor Disconnector FB","F","M","*","F",,,,,,,,,,,,,82,"DI87 Bag Filling Conveyor Disconnector FB",0,
+"S","PLC_DI_Discr\Data_87","DI88 Bag Sealing & Stiching Conveyor Disconnector FB","F","M","*","F",,,,,,,,,,,,,82,"DI88 Bag Sealing & Stiching Conveyor Disconnect",0,
+"S","PLC_DI_Discr\Data_88","DI89 Bag Tilting Conveyor Disconnector FB","F","M","*","F",,,,,,,,,,,,,82,"DI89 Bag Tilting Conveyor Disconnector FB",0,
+"S","PLC_DI_Discr\Data_89","DI90 Bag Flattening Bottom Conveyor Disconnector FB","F","M","*","F",,,,,,,,,,,,,82,"DI90 Bag Flattening Bottom Conveyor Disconnecto",0,
+"S","PLC_DI_Discr\Data_90","DI91 Bag Flattening Top Conveyor Disconnector FB","F","M","*","F",,,,,,,,,,,,,82,"DI91 Bag Flattening Top Conveyor Disconnector F",0,
+"S","PLC_DI_Discr\Data_91","DI92 Metal Detector Conveyor Disconnector FB","F","M","*","F",,,,,,,,,,,,,82,"DI92 Metal Detector Conveyor Disconnector FB",0,
+"S","PLC_DI_Discr\Data_92","DI93 Bag Rejection Conveyor Disconnector FB","F","M","*","F",,,,,,,,,,,,,82,"DI93 Bag Rejection Conveyor Disconnector FB",0,
+"S","PLC_DI_Discr\Data_93","DI94 Spare","F","M","*","F",,,,,,,,,,,,,82,"DI94 Spare",0,
+"S","PLC_DI_Discr\Data_94","DI95 Inclined Conveyor Start PB","F","M","*","F",,,,,,,,,,,,,82,"DI95 Inclined Conveyor Start PB",0,
+"S","PLC_DI_Discr\Data_95","DI96 Inclined Conveyor Stop PB","F","M","*","F",,,,,,,,,,,,,82,"DI96 Inclined Conveyor Stop PB",0,
+"S","PLC_DI_Discr\List_01","PLC Input List 01","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 01",0,
+"S","PLC_DI_Discr\List_02","PLC Input List 02","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 02",0,
+"S","PLC_DI_Discr\List_03","PLC Input List 03","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 03",0,
+"S","PLC_DI_Discr\List_04","PLC Input List 04","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 04",0,
+"S","PLC_DI_Discr\List_05","PLC Input List 05","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 05",0,
+"S","PLC_DI_Discr\List_06","PLC Input List 06","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 06",0,
+"S","PLC_DI_Discr\List_07","PLC Input List 07","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 07",0,
+"S","PLC_DI_Discr\List_08","PLC Input List 08","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 08",0,
+"S","PLC_DI_Discr\List_09","PLC Input List 09","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 09",0,
+"S","PLC_DI_Discr\List_10","PLC Input List 10","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 10",0,
+"S","PLC_DI_Discr\List_11","PLC Input List 11","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 11",0,
+"S","PLC_DI_Discr\List_12","PLC Input List 12","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 12",0,
+"S","PLC_DI_NO\Data_00","RP:I:3.0","F","M","*","F",,,,,,,,,,,,,82,"RP:I:3.0",0,
+"S","PLC_DI_NO\Data_01","RP:I:3.1","F","M","*","F",,,,,,,,,,,,,82,"RP:I:3.1",0,
+"S","PLC_DI_NO\Data_02","RP:I:3.2","F","M","*","F",,,,,,,,,,,,,82,"RP:I:3.2",0,
+"S","PLC_DI_NO\Data_03","RP:I:3.3","F","M","*","F",,,,,,,,,,,,,82,"RP:I:3.3",0,
+"S","PLC_DI_NO\Data_04","RP:I:3.4","F","M","*","F",,,,,,,,,,,,,82,"RP:I:3.4",0,
+"S","PLC_DI_NO\Data_05","RP:I:3.5","F","M","*","F",,,,,,,,,,,,,82,"RP:I:3.5",0,
+"S","PLC_DI_NO\Data_06","RP:I:3.6","F","M","*","F",,,,,,,,,,,,,82,"RP:I:3.6",0,
+"S","PLC_DI_NO\Data_07","RP:I:3.7","F","M","*","F",,,,,,,,,,,,,82,"RP:I:3.7",0,
+"S","PLC_DI_NO\Data_08","RP:I:4.0","F","M","*","F",,,,,,,,,,,,,82,"RP:I:4.0",0,
+"S","PLC_DI_NO\Data_09","RP:I:4.1","F","M","*","F",,,,,,,,,,,,,82,"RP:I:4.1",0,
+"S","PLC_DI_NO\Data_10","RP:I:4.2","F","M","*","F",,,,,,,,,,,,,82,"RP:I:4.2",0,
+"S","PLC_DI_NO\Data_11","RP:I:4.3","F","M","*","F",,,,,,,,,,,,,82,"RP:I:4.3",0,
+"S","PLC_DI_NO\Data_12","RP:I:4.4","F","M","*","F",,,,,,,,,,,,,82,"RP:I:4.4",0,
+"S","PLC_DI_NO\Data_13","RP:I:4.5","F","M","*","F",,,,,,,,,,,,,82,"RP:I:4.5",0,
+"S","PLC_DI_NO\Data_14","RP:I:4.6","F","M","*","F",,,,,,,,,,,,,82,"RP:I:4.6",0,
+"S","PLC_DI_NO\Data_15","RP:I:4.7","F","M","*","F",,,,,,,,,,,,,82,"RP:I:4.7",0,
+"S","PLC_DI_NO\Data_16","RP:I:5.0","F","M","*","F",,,,,,,,,,,,,82,"RP:I:5.0",0,
+"S","PLC_DI_NO\Data_17","RP:I:5.1","F","M","*","F",,,,,,,,,,,,,82,"RP:I:5.1",0,
+"S","PLC_DI_NO\Data_18","RP:I:5.2","F","M","*","F",,,,,,,,,,,,,82,"RP:I:5.2",0,
+"S","PLC_DI_NO\Data_19","RP:I:5.3","F","M","*","F",,,,,,,,,,,,,82,"RP:I:5.3",0,
+"S","PLC_DI_NO\Data_20","RP:I:5.4","F","M","*","F",,,,,,,,,,,,,82,"RP:I:5.4",0,
+"S","PLC_DI_NO\Data_21","RP:I:5.5","F","M","*","F",,,,,,,,,,,,,82,"RP:I:5.5",0,
+"S","PLC_DI_NO\Data_22","RP:I:5.6","F","M","*","F",,,,,,,,,,,,,82,"RP:I:5.6",0,
+"S","PLC_DI_NO\Data_23","RP:I:5.7","F","M","*","F",,,,,,,,,,,,,82,"RP:I:5.7",0,
+"S","PLC_DI_NO\Data_24","RP:I:6.0","F","M","*","F",,,,,,,,,,,,,82,"RP:I:6.0",0,
+"S","PLC_DI_NO\Data_25","RP:I:6.1","F","M","*","F",,,,,,,,,,,,,82,"RP:I:6.1",0,
+"S","PLC_DI_NO\Data_26","RP:I:6.2","F","M","*","F",,,,,,,,,,,,,82,"RP:I:6.2",0,
+"S","PLC_DI_NO\Data_27","RP:I:6.3","F","M","*","F",,,,,,,,,,,,,82,"RP:I:6.3",0,
+"S","PLC_DI_NO\Data_28","RP:I:6.4","F","M","*","F",,,,,,,,,,,,,82,"RP:I:6.4",0,
+"S","PLC_DI_NO\Data_29","RP:I:6.5","F","M","*","F",,,,,,,,,,,,,82,"RP:I:6.5",0,
+"S","PLC_DI_NO\Data_30","RP:I:6.6","F","M","*","F",,,,,,,,,,,,,82,"RP:I:6.6",0,
+"S","PLC_DI_NO\Data_31","RP:I:6.7","F","M","*","F",,,,,,,,,,,,,82,"RP:I:6.7",0,
+"S","PLC_DI_NO\Data_32","RP:I:7.0","F","M","*","F",,,,,,,,,,,,,82,"RP:I:7.0",0,
+"S","PLC_DI_NO\Data_33","RP:I:7.1","F","M","*","F",,,,,,,,,,,,,82,"RP:I:7.1",0,
+"S","PLC_DI_NO\Data_34","RP:I:7.2","F","M","*","F",,,,,,,,,,,,,82,"RP:I:7.2",0,
+"S","PLC_DI_NO\Data_35","RP:I:7.3","F","M","*","F",,,,,,,,,,,,,82,"RP:I:7.3",0,
+"S","PLC_DI_NO\Data_36","RP:I:7.4","F","M","*","F",,,,,,,,,,,,,82,"RP:I:7.4",0,
+"S","PLC_DI_NO\Data_37","RP:I:7.5","F","M","*","F",,,,,,,,,,,,,82,"RP:I:7.5",0,
+"S","PLC_DI_NO\Data_38","RP:I:7.6","F","M","*","F",,,,,,,,,,,,,82,"RP:I:7.6",0,
+"S","PLC_DI_NO\Data_39","RP:I:7.7","F","M","*","F",,,,,,,,,,,,,82,"RP:I:7.7",0,
+"S","PLC_DI_NO\Data_40","RP:I:8.0","F","M","*","F",,,,,,,,,,,,,82,"RP:I:8.0",0,
+"S","PLC_DI_NO\Data_41","RP:I:8.1","F","M","*","F",,,,,,,,,,,,,82,"RP:I:8.1",0,
+"S","PLC_DI_NO\Data_42","RP:I:8.2","F","M","*","F",,,,,,,,,,,,,82,"RP:I:8.2",0,
+"S","PLC_DI_NO\Data_43","RP:I:8.3","F","M","*","F",,,,,,,,,,,,,82,"RP:I:8.3",0,
+"S","PLC_DI_NO\Data_44","RP:I:8.4","F","M","*","F",,,,,,,,,,,,,82,"RP:I:8.4",0,
+"S","PLC_DI_NO\Data_45","RP:I:8.5","F","M","*","F",,,,,,,,,,,,,82,"RP:I:8.5",0,
+"S","PLC_DI_NO\Data_46","RP:I:8.6","F","M","*","F",,,,,,,,,,,,,82,"RP:I:8.6",0,
+"S","PLC_DI_NO\Data_47","RP:I:8.7","F","M","*","F",,,,,,,,,,,,,82,"RP:I:8.7",0,
+"S","PLC_DI_NO\Data_48","RP:I:9.0","F","M","*","F",,,,,,,,,,,,,82,"RP:I:9.0",0,
+"S","PLC_DI_NO\Data_49","RP:I:9.1","F","M","*","F",,,,,,,,,,,,,82,"RP:I:9.1",0,
+"S","PLC_DI_NO\Data_50","RP:I:9.2","F","M","*","F",,,,,,,,,,,,,82,"RP:I:9.2",0,
+"S","PLC_DI_NO\Data_51","RP:I:9.3","F","M","*","F",,,,,,,,,,,,,82,"RP:I:9.3",0,
+"S","PLC_DI_NO\Data_52","RP:I:9.4","F","M","*","F",,,,,,,,,,,,,82,"RP:I:9.4",0,
+"S","PLC_DI_NO\Data_53","RP:I:9.5","F","M","*","F",,,,,,,,,,,,,82,"RP:I:9.5",0,
+"S","PLC_DI_NO\Data_54","RP:I:9.6","F","M","*","F",,,,,,,,,,,,,82,"RP:I:9.6",0,
+"S","PLC_DI_NO\Data_55","RP:I:9.7","F","M","*","F",,,,,,,,,,,,,82,"RP:I:9.7",0,
+"S","PLC_DI_NO\Data_56","RP:I:10.0","F","M","*","F",,,,,,,,,,,,,82,"RP:I:10.0",0,
+"S","PLC_DI_NO\Data_57","RP:I:10.1","F","M","*","F",,,,,,,,,,,,,82,"RP:I:10.1",0,
+"S","PLC_DI_NO\Data_58","RP:I:10.2","F","M","*","F",,,,,,,,,,,,,82,"RP:I:10.2",0,
+"S","PLC_DI_NO\Data_59","RP:I:10.3","F","M","*","F",,,,,,,,,,,,,82,"RP:I:10.3",0,
+"S","PLC_DI_NO\Data_60","RP:I:10.4","F","M","*","F",,,,,,,,,,,,,82,"RP:I:10.4",0,
+"S","PLC_DI_NO\Data_61","RP:I:10.5","F","M","*","F",,,,,,,,,,,,,82,"RP:I:10.5",0,
+"S","PLC_DI_NO\Data_62","RP:I:10.6","F","M","*","F",,,,,,,,,,,,,82,"RP:I:10.6",0,
+"S","PLC_DI_NO\Data_63","RP:I:10.7","F","M","*","F",,,,,,,,,,,,,82,"RP:I:10.7",0,
+"S","PLC_DI_NO\Data_64","RP:I:11.0","F","M","*","F",,,,,,,,,,,,,82,"RP:I:11.0",0,
+"S","PLC_DI_NO\Data_65","RP:I:11.1","F","M","*","F",,,,,,,,,,,,,82,"RP:I:11.1",0,
+"S","PLC_DI_NO\Data_66","RP:I:11.2","F","M","*","F",,,,,,,,,,,,,82,"RP:I:11.2",0,
+"S","PLC_DI_NO\Data_67","RP:I:11.3","F","M","*","F",,,,,,,,,,,,,82,"RP:I:11.3",0,
+"S","PLC_DI_NO\Data_68","RP:I:11.4","F","M","*","F",,,,,,,,,,,,,82,"RP:I:11.4",0,
+"S","PLC_DI_NO\Data_69","RP:I:11.5","F","M","*","F",,,,,,,,,,,,,82,"RP:I:11.5",0,
+"S","PLC_DI_NO\Data_70","RP:I:11.6","F","M","*","F",,,,,,,,,,,,,82,"RP:I:11.6",0,
+"S","PLC_DI_NO\Data_71","RP:I:11.7","F","M","*","F",,,,,,,,,,,,,82,"RP:I:11.7",0,
+"S","PLC_DI_NO\Data_72","RP:I:12.0","F","M","*","F",,,,,,,,,,,,,82,"RP:I:12.0",0,
+"S","PLC_DI_NO\Data_73","RP:I:12.1","F","M","*","F",,,,,,,,,,,,,82,"RP:I:12.1",0,
+"S","PLC_DI_NO\Data_74","RP:I:12.2","F","M","*","F",,,,,,,,,,,,,82,"RP:I:12.2",0,
+"S","PLC_DI_NO\Data_75","RP:I:12.3","F","M","*","F",,,,,,,,,,,,,82,"RP:I:12.3",0,
+"S","PLC_DI_NO\Data_76","RP:I:12.4","F","M","*","F",,,,,,,,,,,,,82,"RP:I:12.4",0,
+"S","PLC_DI_NO\Data_77","RP:I:12.5","F","M","*","F",,,,,,,,,,,,,82,"RP:I:12.5",0,
+"S","PLC_DI_NO\Data_78","RP:I:12.6","F","M","*","F",,,,,,,,,,,,,82,"RP:I:12.6",0,
+"S","PLC_DI_NO\Data_79","RP:I:12.7","F","M","*","F",,,,,,,,,,,,,82,"RP:I:12.7",0,
+"S","PLC_DI_NO\Data_80","RP:I:13.0","F","M","*","F",,,,,,,,,,,,,82,"RP:I:13.0",0,
+"S","PLC_DI_NO\Data_81","RP:I:13.1","F","M","*","F",,,,,,,,,,,,,82,"RP:I:13.1",0,
+"S","PLC_DI_NO\Data_82","RP:I:13.2","F","M","*","F",,,,,,,,,,,,,82,"RP:I:13.2",0,
+"S","PLC_DI_NO\Data_83","RP:I:13.3","F","M","*","F",,,,,,,,,,,,,82,"RP:I:13.3",0,
+"S","PLC_DI_NO\Data_84","RP:I:13.4","F","M","*","F",,,,,,,,,,,,,82,"RP:I:13.4",0,
+"S","PLC_DI_NO\Data_85","RP:I:13.5","F","M","*","F",,,,,,,,,,,,,82,"RP:I:13.5",0,
+"S","PLC_DI_NO\Data_86","RP:I:13.6","F","M","*","F",,,,,,,,,,,,,82,"RP:I:13.6",0,
+"S","PLC_DI_NO\Data_87","RP:I:13.7","F","M","*","F",,,,,,,,,,,,,82,"RP:I:13.7",0,
+"S","PLC_DI_NO\Data_88","RP:I:14.0","F","M","*","F",,,,,,,,,,,,,82,"RP:I:14.0",0,
+"S","PLC_DI_NO\Data_89","RP:I:14.1","F","M","*","F",,,,,,,,,,,,,82,"RP:I:14.1",0,
+"S","PLC_DI_NO\Data_90","RP:I:14.2","F","M","*","F",,,,,,,,,,,,,82,"RP:I:14.2",0,
+"S","PLC_DI_NO\Data_91","RP:I:14.3","F","M","*","F",,,,,,,,,,,,,82,"RP:I:14.3",0,
+"S","PLC_DI_NO\Data_92","RP:I:14.4","F","M","*","F",,,,,,,,,,,,,82,"RP:I:14.4",0,
+"S","PLC_DI_NO\Data_93","RP:I:14.5","F","M","*","F",,,,,,,,,,,,,82,"RP:I:14.5",0,
+"S","PLC_DI_NO\Data_94","RP:I:14.6","F","M","*","F",,,,,,,,,,,,,82,"RP:I:14.6",0,
+"S","PLC_DI_NO\Data_95","RP:I:14.7","F","M","*","F",,,,,,,,,,,,,82,"RP:I:14.7",0,
+"S","PLC_DI_NO\List_01","PLC Input List 01","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 01",0,
+"S","PLC_DI_NO\List_02","PLC Input List 02","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 02",0,
+"S","PLC_DI_NO\List_03","PLC Input List 03","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 03",0,
+"S","PLC_DI_NO\List_04","PLC Input List 04","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 04",0,
+"S","PLC_DI_NO\List_05","PLC Input List 05","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 05",0,
+"S","PLC_DI_NO\List_06","PLC Input List 06","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 06",0,
+"S","PLC_DI_NO\List_07","PLC Input List 07","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 07",0,
+"S","PLC_DI_NO\List_08","PLC Input List 08","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 08",0,
+"S","PLC_DI_NO\List_09","PLC Input List 09","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 09",0,
+"S","PLC_DI_NO\List_10","PLC Input List 10","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 10",0,
+"S","PLC_DI_NO\List_11","PLC Input List 11","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 11",0,
+"S","PLC_DI_NO\List_12","PLC Input List 12","F","M","*","F",,,,,,,,,,,,,82,"PLC Input List 12",0,
+"D","PLC_DI_Tags\Data_00","DI01 Packing Start PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[001]"
+"D","PLC_DI_Tags\Data_01","DI02 Packing Stop PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[002]"
+"D","PLC_DI_Tags\Data_02","DI03 Packing System Reset PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[003]"
+"D","PLC_DI_Tags\Data_03","DI04 Packing System Safety Reset PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[004]"
+"D","PLC_DI_Tags\Data_04","DI05 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[005]"
+"D","PLC_DI_Tags\Data_05","DI06 3 Phase Supply Ok","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[006]"
+"D","PLC_DI_Tags\Data_06","DI07 Packing Air Pressure Switch","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[007]"
+"D","PLC_DI_Tags\Data_07","DI08 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[008]"
+"D","PLC_DI_Tags\Data_08","DI09 Incliend Belt conveyor MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[009]"
+"D","PLC_DI_Tags\Data_09","DI10 Material Storage Vibro-1 MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[010]"
+"D","PLC_DI_Tags\Data_10","DI11 Material Storage Vibro-2 MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[011]"
+"D","PLC_DI_Tags\Data_11","DI12 Bag Filling Conveyor MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[012]"
+"D","PLC_DI_Tags\Data_12","DI13 Bag Sealing & Stiching Conveyor MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[013]"
+"D","PLC_DI_Tags\Data_13","DI14 Bag Stitching Motor MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[014]"
+"D","PLC_DI_Tags\Data_14","DI15 Bag Tilting Conveyor MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[015]"
+"D","PLC_DI_Tags\Data_15","DI16 Bag Flattening Bottom Conveyor MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[016]"
+"D","PLC_DI_Tags\Data_16","DI17 Bag Flattening Top Conveyor MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[017]"
+"D","PLC_DI_Tags\Data_17","DI18 Metal Detector Conveyor MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[018]"
+"D","PLC_DI_Tags\Data_18","DI19 Bag Rejection Conveyor MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[019]"
+"D","PLC_DI_Tags\Data_19","DI20 Bagging Zone Dust Collector MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[020]"
+"D","PLC_DI_Tags\Data_20","DI21 Electro Magnetic Coarse Vibro MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[021]"
+"D","PLC_DI_Tags\Data_21","DI22 Electro Magnetic Fine Vibro MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[022]"
+"D","PLC_DI_Tags\Data_22","DI23 Band Sealer Machine MPCB Healthy","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[023]"
+"D","PLC_DI_Tags\Data_23","DI24 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[024]"
+"D","PLC_DI_Tags\Data_24","DI25 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[025]"
+"D","PLC_DI_Tags\Data_25","DI26 Bag Stitching Motor Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[026]"
+"D","PLC_DI_Tags\Data_26","DI27 Bagging Zone Dust Collector Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[027]"
+"D","PLC_DI_Tags\Data_27","DI28 Electro Magnetic Coarse Vibro Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[028]"
+"D","PLC_DI_Tags\Data_28","DI29 Electro Magnetic Fine Vibro Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[029]"
+"D","PLC_DI_Tags\Data_29","DI30 Band Sealer Machine Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[030]"
+"D","PLC_DI_Tags\Data_30","DI31 Electro Magnetic Coarse Vibro Running F/B","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[031]"
+"D","PLC_DI_Tags\Data_31","DI32 Electro Magnetic Fine Vibro Running F/B","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[032]"
+"D","PLC_DI_Tags\Data_32","DI33 Diverter Flap Cylinder FWD FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[033]"
+"D","PLC_DI_Tags\Data_33","DI34 Diverter Flap Cylinder REV FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[034]"
+"D","PLC_DI_Tags\Data_34","DI35 Filling Station Bag Clamp-1 Open FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[035]"
+"D","PLC_DI_Tags\Data_35","DI36 Filling Station Bag Clamp-1 Open FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[036]"
+"D","PLC_DI_Tags\Data_36","DI37 Filling Station Bag Clamp-2 Open FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[037]"
+"D","PLC_DI_Tags\Data_37","DI38 Filling Station Bag Clamp-2 Open FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[038]"
+"D","PLC_DI_Tags\Data_38","DI39 Filling Station Bag Side Flap-1 Open FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[039]"
+"D","PLC_DI_Tags\Data_39","DI40 Filling Station Bag Side Flap-1 Close FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[040]"
+"D","PLC_DI_Tags\Data_40","DI41 Filling Station Bag Side Flap-2 Open FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[041]"
+"D","PLC_DI_Tags\Data_41","DI42 Filling Station Bag Side Flap-2 Close FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[042]"
+"D","PLC_DI_Tags\Data_42","DI43 Filling Station Bag Present Sensor","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[043]"
+"D","PLC_DI_Tags\Data_43","DI44 Filling Station Bag Clamp Foot Switch","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[044]"
+"D","PLC_DI_Tags\Data_44","DI45 Filling Station Filling Start/Stop PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[045]"
+"D","PLC_DI_Tags\Data_45","DI46 Filling Station Conveyor Up FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[046]"
+"D","PLC_DI_Tags\Data_46","DI47 Filling Station Conveyor Dn FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[047]"
+"D","PLC_DI_Tags\Data_47","DI48 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[048]"
+"D","PLC_DI_Tags\Data_48","DI49 Sealing Station Bag Entry Sensor","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[049]"
+"D","PLC_DI_Tags\Data_49","DI50 Sealing Station Bag Exit Sensor","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[050]"
+"D","PLC_DI_Tags\Data_50","DI51 Sealing Station Band Sealer Machine Ready","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[051]"
+"D","PLC_DI_Tags\Data_51","DI52 Sealing Station Band Sealer Machine Running","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[052]"
+"D","PLC_DI_Tags\Data_52","DI53 Sealing Station Band Sealer Machine Temperature OK","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[053]"
+"D","PLC_DI_Tags\Data_53","DI54 Sealing Conveyor Start Foot Switch","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[054]"
+"D","PLC_DI_Tags\Data_54","DI55 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[055]"
+"D","PLC_DI_Tags\Data_55","DI56 Stitching Station Cycle Start Foot Switch","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[056]"
+"D","PLC_DI_Tags\Data_56","DI57 Tilting station Bag Entry sensor","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[057]"
+"D","PLC_DI_Tags\Data_57","DI58 Stitching Station Bag Exit Sensor","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[058]"
+"D","PLC_DI_Tags\Data_58","DI59 Stitching Station Thread Cutter Cylinder Fwd FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[059]"
+"D","PLC_DI_Tags\Data_59","DI60 Stitching Station Thread Cutter Cylinder Rev FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[060]"
+"D","PLC_DI_Tags\Data_60","DI61 Stitching Station Thread breake Detection Sensor-1","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[061]"
+"D","PLC_DI_Tags\Data_61","DI62 Stitching Station Thread breake Detection Sensor-2","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[062]"
+"D","PLC_DI_Tags\Data_62","DI63 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[063]"
+"D","PLC_DI_Tags\Data_63","DI64 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[064]"
+"D","PLC_DI_Tags\Data_64","DI65 Tilting station Bag Exit sensor","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[065]"
+"D","PLC_DI_Tags\Data_65","DI66 Bag Flattner Station Bag Entry Sensor","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[066]"
+"D","PLC_DI_Tags\Data_66","DI67 Bag Flattner Station Bag Exit Sensor","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[067]"
+"D","PLC_DI_Tags\Data_67","DI68 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[068]"
+"D","PLC_DI_Tags\Data_68","DI69 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[069]"
+"D","PLC_DI_Tags\Data_69","DI70 Metal Detector Station Bag Entry Sensor","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[070]"
+"D","PLC_DI_Tags\Data_70","DI71 Metal Detector Station Bag Exit Sensor","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[071]"
+"D","PLC_DI_Tags\Data_71","DI72 Metal Detector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[072]"
+"D","PLC_DI_Tags\Data_72","DI73 Rejection Station Bag Present Sensor","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[073]"
+"D","PLC_DI_Tags\Data_73","DI74 Rejection Station Bag Entry Sensor","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[074]"
+"D","PLC_DI_Tags\Data_74","DI75 Rejection Station Bag Exit Sensor","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[075]"
+"D","PLC_DI_Tags\Data_75","DI76 Rejection Station Pusher Cyl Forward FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[076]"
+"D","PLC_DI_Tags\Data_76","DI77 Rejection Station Pusher Cyl Reverse FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[077]"
+"D","PLC_DI_Tags\Data_77","DI78 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[078]"
+"D","PLC_DI_Tags\Data_78","DI79 Packing Zone Dust Collector Level High","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[079]"
+"D","PLC_DI_Tags\Data_79","DI80 Dust Collector Discharge BFV Open FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[080]"
+"D","PLC_DI_Tags\Data_80","DI81 Dust Collector Discharge BFV Open FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[081]"
+"D","PLC_DI_Tags\Data_81","DI82 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[082]"
+"D","PLC_DI_Tags\Data_82","DI83 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[083]"
+"D","PLC_DI_Tags\Data_83","DI84 Incliend Belt conveyor Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[084]"
+"D","PLC_DI_Tags\Data_84","DI85 Material Storage Vibro-1 Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[085]"
+"D","PLC_DI_Tags\Data_85","DI86 Material Storage Vibro-2 Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[086]"
+"D","PLC_DI_Tags\Data_86","DI87 Bag Filling Conveyor Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[087]"
+"D","PLC_DI_Tags\Data_87","DI88 Bag Sealing & Stiching Conveyor Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[088]"
+"D","PLC_DI_Tags\Data_88","DI89 Bag Tilting Conveyor Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[089]"
+"D","PLC_DI_Tags\Data_89","DI90 Bag Flattening Bottom Conveyor Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[090]"
+"D","PLC_DI_Tags\Data_90","DI91 Bag Flattening Top Conveyor Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[091]"
+"D","PLC_DI_Tags\Data_91","DI92 Metal Detector Conveyor Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[092]"
+"D","PLC_DI_Tags\Data_92","DI93 Bag Rejection Conveyor Disconnector FB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[093]"
+"D","PLC_DI_Tags\Data_93","DI94 Spare","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[094]"
+"D","PLC_DI_Tags\Data_94","DI95 Inclined Conveyor Start PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[095]"
+"D","PLC_DI_Tags\Data_95","DI96 Inclined Conveyor Stop PB","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DI[096]"
+"S","PLC_DO_Discr\Data_00","DO01 Packing Tower Lamp Red","F","M","*","F",,,,,,,,,,,,,82,"DO01 Packing Tower Lamp Red ",0,
+"S","PLC_DO_Discr\Data_01","DO02 Packing Tower Lamp Amber","F","M","*","F",,,,,,,,,,,,,82,"DO02 Packing Tower Lamp Amber",0,
+"S","PLC_DO_Discr\Data_02","DO03 Packing Tower Lamp Green","F","M","*","F",,,,,,,,,,,,,82,"DO03 Packing Tower Lamp Green",0,
+"S","PLC_DO_Discr\Data_03","DO04 Packing Tower Lamp Buzzer","F","M","*","F",,,,,,,,,,,,,82,"DO04 Packing Tower Lamp Buzzer",0,
+"S","PLC_DO_Discr\Data_04","DO05 Packing System Start PB Green Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO05 Packing System Start PB Green Lamp",0,
+"S","PLC_DO_Discr\Data_05","DO06 Packing System Reset PB Blue Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO06 Packing System Reset PB Blue Lamp",0,
+"S","PLC_DO_Discr\Data_06","DO07 Packing System Safety Reset PB Yellow Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO07 Packing System Safety Reset PB Yellow Lamp",0,
+"S","PLC_DO_Discr\Data_07","DO08 Filling station cycle started Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO08 Filling station cycle started Lamp",0,
+"S","PLC_DO_Discr\Data_08","DO09 Electro Magnetic Coarse Vibro Enable","F","M","*","F",,,,,,,,,,,,,82,"DO09 Electro Magnetic Coarse Vibro Enable",0,
+"S","PLC_DO_Discr\Data_09","DO10 Electro Magnetic Fine Vibro Enable","F","M","*","F",,,,,,,,,,,,,82,"DO10 Electro Magnetic Fine Vibro Enable",0,
+"S","PLC_DO_Discr\Data_10","DO11 Bag Stitching Motor Enable","F","M","*","F",,,,,,,,,,,,,82,"DO11 Bag Stitching Motor Enable",0,
+"S","PLC_DO_Discr\Data_11","DO12 Bagging Zone Dust Collector Enable","F","M","*","F",,,,,,,,,,,,,82,"DO12 Bagging Zone Dust Collector Enable",0,
+"S","PLC_DO_Discr\Data_12","DO13 Metal detector Conveyor Start Cmd","F","M","*","F",,,,,,,,,,,,,82,"DO13 Metal detector Conveyor Start Cmd",0,
+"S","PLC_DO_Discr\Data_13","DO14 Metal detector Fault Reset","F","M","*","F",,,,,,,,,,,,,82,"DO14 Metal detector Fault Reset",0,
+"S","PLC_DO_Discr\Data_14","DO15 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO15 Spare DO",0,
+"S","PLC_DO_Discr\Data_15","DO16 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO16 Spare DO",0,
+"S","PLC_DO_Discr\Data_16","DO17 Diverter Flap Cylinder FWD SOV","F","M","*","F",,,,,,,,,,,,,82,"DO17 Diverter Flap Cylinder FWD SOV",0,
+"S","PLC_DO_Discr\Data_17","DO18 Diverter Flap Cylinder REV SOV","F","M","*","F",,,,,,,,,,,,,82,"DO18 Diverter Flap Cylinder REV SOV",0,
+"S","PLC_DO_Discr\Data_18","DO19 Filling Station Bag Clamp-1/2 Open SOV","F","M","*","F",,,,,,,,,,,,,82,"DO19 Filling Station Bag Clamp-1/2 Open SOV ",0,
+"S","PLC_DO_Discr\Data_19","DO20 Filling Station Bag Clamp-1/2 Close SOV","F","M","*","F",,,,,,,,,,,,,82,"DO20 Filling Station Bag Clamp-1/2 Close SOV",0,
+"S","PLC_DO_Discr\Data_20","DO21 Filling Station Bag Side Flap-1/2 Open SOV","F","M","*","F",,,,,,,,,,,,,82,"DO21 Filling Station Bag Side Flap-1/2 Open SOV",0,
+"S","PLC_DO_Discr\Data_21","DO22 Filling Station Bag Side Flap-1/2 Close SOV","F","M","*","F",,,,,,,,,,,,,82,"DO22 Filling Station Bag Side Flap-1/2 Close SO",0,
+"S","PLC_DO_Discr\Data_22","DO23 Filling Station Conveyor Up SOV","F","M","*","F",,,,,,,,,,,,,82,"DO23 Filling Station Conveyor Up SOV",0,
+"S","PLC_DO_Discr\Data_23","DO24 Filling Station Conveyor Dn SOV","F","M","*","F",,,,,,,,,,,,,82,"DO24 Filling Station Conveyor Dn SOV",0,
+"S","PLC_DO_Discr\Data_24","DO25 Stitching Station Thread Cutter Cylinder Fwd SOV","F","M","*","F",,,,,,,,,,,,,82,"DO25 Stitching Station Thread Cutter Cylinder F",0,
+"S","PLC_DO_Discr\Data_25","DO26 Stitching Station Thread Cutter Cylinder Rev SOV","F","M","*","F",,,,,,,,,,,,,82,"DO26 Stitching Station Thread Cutter Cylinder R",0,
+"S","PLC_DO_Discr\Data_26","DO27 Rejection Station Pusher Cyl Forward SOV","F","M","*","F",,,,,,,,,,,,,82,"DO27 Rejection Station Pusher Cyl Forward SOV",0,
+"S","PLC_DO_Discr\Data_27","DO28 Rejection Station Pusher Cyl Reverse SOV","F","M","*","F",,,,,,,,,,,,,82,"DO28 Rejection Station Pusher Cyl Reverse SOV",0,
+"S","PLC_DO_Discr\Data_28","DO29 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO29 Spare DO",0,
+"S","PLC_DO_Discr\Data_29","DO30 Packing Zone Dust Collector PV01","F","M","*","F",,,,,,,,,,,,,82,"DO30 Packing Zone Dust Collector PV01",0,
+"S","PLC_DO_Discr\Data_30","DO31 Packing Zone Dust Collector PV02","F","M","*","F",,,,,,,,,,,,,82,"DO31 Packing Zone Dust Collector PV02",0,
+"S","PLC_DO_Discr\Data_31","DO32 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO32 Spare DO",0,
+"S","PLC_DO_Discr\Data_32","DO33 Inclined Conveyor Start Lamp","F","M","*","F",,,,,,,,,,,,,82,"DO33 Inclined Conveyor Start Lamp",0,
+"S","PLC_DO_Discr\Data_33","DO34 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO34 Spare DO",0,
+"S","PLC_DO_Discr\Data_34","DO35 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO35 Spare DO",0,
+"S","PLC_DO_Discr\Data_35","DO36 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO36 Spare DO",0,
+"S","PLC_DO_Discr\Data_36","DO37 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO37 Spare DO",0,
+"S","PLC_DO_Discr\Data_37","DO38 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO38 Spare DO",0,
+"S","PLC_DO_Discr\Data_38","DO39 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO39 Spare DO",0,
+"S","PLC_DO_Discr\Data_39","DO40 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"DO40 Spare DO",0,
+"S","PLC_DO_Discr\List_01","PLC Output List 01","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 01",0,
+"S","PLC_DO_Discr\List_02","PLC Output List 02","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 02",0,
+"S","PLC_DO_Discr\List_03","PLC Output List 03","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 03",0,
+"S","PLC_DO_Discr\List_04","PLC Output List 04","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 04",0,
+"S","PLC_DO_Discr\List_05","PLC Output List 05","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 05",0,
+"S","PLC_DO_No\Data_00","RP:O:15.0","F","M","*","F",,,,,,,,,,,,,82,"RP:O:15.0",0,
+"S","PLC_DO_No\Data_01","RP:O:15.1","F","M","*","F",,,,,,,,,,,,,82,"RP:O:15.1",0,
+"S","PLC_DO_No\Data_02","RP:O:15.2","F","M","*","F",,,,,,,,,,,,,82,"RP:O:15.2",0,
+"S","PLC_DO_No\Data_03","RP:O:15.3","F","M","*","F",,,,,,,,,,,,,82,"RP:O:15.3",0,
+"S","PLC_DO_No\Data_04","RP:O:15.4","F","M","*","F",,,,,,,,,,,,,82,"RP:O:15.4",0,
+"S","PLC_DO_No\Data_05","RP:O:15.5","F","M","*","F",,,,,,,,,,,,,82,"RP:O:15.5",0,
+"S","PLC_DO_No\Data_06","RP:O:15.6","F","M","*","F",,,,,,,,,,,,,82,"RP:O:15.6",0,
+"S","PLC_DO_No\Data_07","RP:O:15.7","F","M","*","F",,,,,,,,,,,,,82,"RP:O:15.7",0,
+"S","PLC_DO_No\Data_08","RP:O:16.0","F","M","*","F",,,,,,,,,,,,,82,"RP:O:16.0",0,
+"S","PLC_DO_No\Data_09","RP:O:16.1","F","M","*","F",,,,,,,,,,,,,82,"RP:O:16.1",0,
+"S","PLC_DO_No\Data_10","RP:O:16.2","F","M","*","F",,,,,,,,,,,,,82,"RP:O:16.2",0,
+"S","PLC_DO_No\Data_11","RP:O:16.3","F","M","*","F",,,,,,,,,,,,,82,"RP:O:16.3",0,
+"S","PLC_DO_No\Data_12","RP:O:16.4","F","M","*","F",,,,,,,,,,,,,82,"RP:O:16.4",0,
+"S","PLC_DO_No\Data_13","RP:O:16.5","F","M","*","F",,,,,,,,,,,,,82,"RP:O:16.5",0,
+"S","PLC_DO_No\Data_14","RP:O:16.6","F","M","*","F",,,,,,,,,,,,,82,"RP:O:16.6",0,
+"S","PLC_DO_No\Data_15","RP:O:16.7","F","M","*","F",,,,,,,,,,,,,82,"RP:O:16.7",0,
+"S","PLC_DO_No\Data_16","RP:O:17.0","F","M","*","F",,,,,,,,,,,,,82,"RP:O:17.0",0,
+"S","PLC_DO_No\Data_17","RP:O:17.1","F","M","*","F",,,,,,,,,,,,,82,"RP:O:17.1",0,
+"S","PLC_DO_No\Data_18","RP:O:17.2","F","M","*","F",,,,,,,,,,,,,82,"RP:O:17.2",0,
+"S","PLC_DO_No\Data_19","RP:O:17.3","F","M","*","F",,,,,,,,,,,,,82,"RP:O:17.3",0,
+"S","PLC_DO_No\Data_20","RP:O:17.4","F","M","*","F",,,,,,,,,,,,,82,"RP:O:17.4",0,
+"S","PLC_DO_No\Data_21","RP:O:17.5","F","M","*","F",,,,,,,,,,,,,82,"RP:O:17.5",0,
+"S","PLC_DO_No\Data_22","RP:O:17.6","F","M","*","F",,,,,,,,,,,,,82,"RP:O:17.6",0,
+"S","PLC_DO_No\Data_23","RP:O:17.7","F","M","*","F",,,,,,,,,,,,,82,"RP:O:17.7",0,
+"S","PLC_DO_No\Data_24","RP:O:18.0","F","M","*","F",,,,,,,,,,,,,82,"RP:O:18.0",0,
+"S","PLC_DO_No\Data_25","RP:O:18.1","F","M","*","F",,,,,,,,,,,,,82,"RP:O:18.1",0,
+"S","PLC_DO_No\Data_26","RP:O:18.2","F","M","*","F",,,,,,,,,,,,,82,"RP:O:18.2",0,
+"S","PLC_DO_No\Data_27","RP:O:18.3","F","M","*","F",,,,,,,,,,,,,82,"RP:O:18.3",0,
+"S","PLC_DO_No\Data_28","RP:O:18.4","F","M","*","F",,,,,,,,,,,,,82,"RP:O:18.4",0,
+"S","PLC_DO_No\Data_29","RP:O:18.5","F","M","*","F",,,,,,,,,,,,,82,"RP:O:18.5",0,
+"S","PLC_DO_No\Data_30","RP:O:18.6","F","M","*","F",,,,,,,,,,,,,82,"RP:O:18.6",0,
+"S","PLC_DO_No\Data_31","RP:O:18.7","F","M","*","F",,,,,,,,,,,,,82,"RP:O:18.7",0,
+"S","PLC_DO_No\Data_32","RP:O:19.0","F","M","*","F",,,,,,,,,,,,,82,"RP:O:19.0",0,
+"S","PLC_DO_No\Data_33","RP:O:19.1","F","M","*","F",,,,,,,,,,,,,82,"RP:O:19.1",0,
+"S","PLC_DO_No\Data_34","RP:O:19.2","F","M","*","F",,,,,,,,,,,,,82,"RP:O:19.2",0,
+"S","PLC_DO_No\Data_35","RP:O:19.3","F","M","*","F",,,,,,,,,,,,,82,"RP:O:19.3",0,
+"S","PLC_DO_No\Data_36","RP:O:19.4","F","M","*","F",,,,,,,,,,,,,82,"RP:O:19.4",0,
+"S","PLC_DO_No\Data_37","RP:O:19.5","F","M","*","F",,,,,,,,,,,,,82,"RP:O:19.5",0,
+"S","PLC_DO_No\Data_38","RP:O:19.6","F","M","*","F",,,,,,,,,,,,,82,"RP:O:19.6",0,
+"S","PLC_DO_No\Data_39","RP:O:19.7","F","M","*","F",,,,,,,,,,,,,82,"RP:O:19.7",0,
+"S","PLC_DO_No\List_01","PLC Output List 01","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 01",0,
+"S","PLC_DO_No\List_02","PLC Output List 02","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 02",0,
+"S","PLC_DO_No\List_03","PLC Output List 03","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 03",0,
+"S","PLC_DO_No\List_04","PLC Output List 04","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 04",0,
+"S","PLC_DO_No\List_05","PLC Output List 05","F","M","*","F",,,,,,,,,,,,,82,"PLC Output List 05",0,
+"S","PLC_DO_Tags\Data_00","DO01 Packing Tower Lamp Red","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[01]"
+"D","PLC_DO_Tags\Data_01","DO02 Packing Tower Lamp Amber","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DO[02]"
+"D","PLC_DO_Tags\Data_02","DO03 Packing Tower Lamp Green","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_DO[03]"
+"S","PLC_DO_Tags\Data_03","DO04 Packing Tower Lamp Buzzer","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[04]"
+"S","PLC_DO_Tags\Data_04","DO05 Packing System Start PB Green Lamp","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[05]"
+"S","PLC_DO_Tags\Data_05","DO06 Packing System Reset PB Blue Lamp","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[06]"
+"S","PLC_DO_Tags\Data_06","DO07 Packing System Safety Reset PB Yellow Lamp","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[07]"
+"S","PLC_DO_Tags\Data_07","DO08 Filling station cycle started Lamp","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[08]"
+"S","PLC_DO_Tags\Data_08","DO09 Electro Magnetic Coarse Vibro Enable","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[09]"
+"S","PLC_DO_Tags\Data_09","DO10 Electro Magnetic Fine Vibro Enable","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[10]"
+"S","PLC_DO_Tags\Data_10","DO11 Bag Stitching Motor Enable","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[11]"
+"S","PLC_DO_Tags\Data_11","DO12 Bagging Zone Dust Collector Enable","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[12]"
+"S","PLC_DO_Tags\Data_12","DO13 Metal detector Conveyor Start Cmd","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[13]"
+"S","PLC_DO_Tags\Data_13","DO14 Metal detector Fault Reset","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[14]"
+"S","PLC_DO_Tags\Data_14","DO15 Spare DO","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[15]"
+"S","PLC_DO_Tags\Data_15","DO16 Spare DO","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[16]"
+"S","PLC_DO_Tags\Data_16","DO17 Diverter Flap Cylinder FWD SOV","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[17]"
+"S","PLC_DO_Tags\Data_17","DO18 Diverter Flap Cylinder REV SOV","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[18]"
+"S","PLC_DO_Tags\Data_18","DO19 Filling Station Bag Clamp-1/2 Open SOV","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[19]"
+"S","PLC_DO_Tags\Data_19","DO20 Filling Station Bag Clamp-1/2 Close SOV","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[20]"
+"S","PLC_DO_Tags\Data_20","DO21 Filling Station Bag Side Flap-1/2 Open SOV","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[21]"
+"S","PLC_DO_Tags\Data_21","DO22 Filling Station Bag Side Flap-1/2 Close SOV","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[22]"
+"S","PLC_DO_Tags\Data_22","DO23 Filling Station Conveyor Up SOV","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[23]"
+"S","PLC_DO_Tags\Data_23","DO24 Filling Station Conveyor Dn SOV","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[24]"
+"S","PLC_DO_Tags\Data_24","DO25 Stitching Station Thread Cutter Cylinder Fwd SOV","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[25]"
+"S","PLC_DO_Tags\Data_25","DO26 Stitching Station Thread Cutter Cylinder Rev SOV","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[26]"
+"S","PLC_DO_Tags\Data_26","DO27 Rejection Station Pusher Cyl Forward SOV","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[27]"
+"S","PLC_DO_Tags\Data_27","DO28 Rejection Station Pusher Cyl Reverse SOV","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[28]"
+"S","PLC_DO_Tags\Data_28","DO29 Spare DO","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[29]"
+"S","PLC_DO_Tags\Data_29","DO30 Packing Zone Dust Collector PV01","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[30]"
+"S","PLC_DO_Tags\Data_30","DO31 Packing Zone Dust Collector PV02","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[31]"
+"S","PLC_DO_Tags\Data_31","DO32 Spare DO","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[32]"
+"S","PLC_DO_Tags\Data_32","DO33 Inclined Conveyor Start Lamp","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[33]"
+"S","PLC_DO_Tags\Data_33","DO34 Spare DO","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[34]"
+"S","PLC_DO_Tags\Data_34","DO35 Spare DO","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[35]"
+"S","PLC_DO_Tags\Data_35","DO36 Spare DO","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[36]"
+"S","PLC_DO_Tags\Data_36","DO37 Spare DO","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[37]"
+"S","PLC_DO_Tags\Data_37","DO38 Spare DO","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[38]"
+"S","PLC_DO_Tags\Data_38","DO39 Spare DO","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[39]"
+"S","PLC_DO_Tags\Data_39","DO40 Spare DO","F","D","*","F",,,,,,,,,,,,,82,"",,"[Vapr069_Z3]RIO03_DO[40]"
+"S","Safety_DI_Discr\Data_00","SDI1 Bag Filling Area E-Stop 1/1","F","M","*","F",,,,,,,,,,,,,82,"SDI1 Bag Filling Area E-Stop 1/1",0,
+"S","Safety_DI_Discr\Data_01","SDI2 Bag Filling Area E-Stop 1/2","F","M","*","F",,,,,,,,,,,,,82,"SDI2 Bag Filling Area E-Stop 1/2",0,
+"S","Safety_DI_Discr\Data_02","SDI3 Bag Rejection Area E-Stop 1/1","F","M","*","F",,,,,,,,,,,,,82,"SDI3 Bag Rejection Area E-Stop 1/1",0,
+"S","Safety_DI_Discr\Data_03","SDI4 Bag Rejection Area E-Stop 1/2","F","M","*","F",,,,,,,,,,,,,82,"SDI4 Bag Rejection Area E-Stop 1/2",0,
+"S","Safety_DI_Discr\Data_04","SDI5 HMI E-S top 1/1","F","M","*","F",,,,,,,,,,,,,82,"SDI5 HMI E-S top 1/1",0,
+"S","Safety_DI_Discr\Data_05","SDI6 HMI E-S top 1/2","F","M","*","F",,,,,,,,,,,,,82,"SDI6 HMI E-S top 1/2",0,
+"S","Safety_DI_Discr\Data_06","SDI7 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"SDI7 Spare DI",0,
+"S","Safety_DI_Discr\Data_07","SDI8 Spare DI","F","M","*","F",,,,,,,,,,,,,82,"SDI8 Spare DI",0,
+"S","Safety_DI_Discr\Safety_List_01","Safety Input List 01","F","M","*","F",,,,,,,,,,,,,82,"Safety Input List 01",0,
+"S","Safety_DI_No\Data_00","RP:I:1.0","F","M","*","F",,,,,,,,,,,,,82,"RP:1:I.0",0,
+"S","Safety_DI_No\Data_01","RP:I:1.1","F","M","*","F",,,,,,,,,,,,,82,"RP:1:I.1",0,
+"S","Safety_DI_No\Data_02","RP:I:1.2","F","M","*","F",,,,,,,,,,,,,82,"RP:1:I.2",0,
+"S","Safety_DI_No\Data_03","RP:I:1.3","F","M","*","F",,,,,,,,,,,,,82,"RP:1:I.3",0,
+"S","Safety_DI_No\Data_04","RP:I:1.4","F","M","*","F",,,,,,,,,,,,,82,"RP:1:I.4",0,
+"S","Safety_DI_No\Data_05","RP:I:1.5","F","M","*","F",,,,,,,,,,,,,82,"RP:1:I.5",0,
+"S","Safety_DI_No\Data_06","RP:I:1.6","F","M","*","F",,,,,,,,,,,,,82,"RP:1:I.6",0,
+"S","Safety_DI_No\Data_07","RP:I:1.7","F","M","*","F",,,,,,,,,,,,,82,"RP:1:I.7",0,
+"S","Safety_DI_No\Safety_List_01","Safety Input List 01","F","M","*","F",,,,,,,,,,,,,82,"Safety Input List 01",0,
+"D","Safety_DI_Tags\Data_00","SDI1 Bag Filling Area E-Stop 1/1","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDI[01]"
+"D","Safety_DI_Tags\Data_01","SDI2 Bag Filling Area E-Stop 1/2","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDI[02]"
+"D","Safety_DI_Tags\Data_02","SDI3 Bag Rejection Area E-Stop 1/1","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDI[03]"
+"D","Safety_DI_Tags\Data_03","SDI4 Bag Rejection Area E-Stop 1/2","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDI[04]"
+"D","Safety_DI_Tags\Data_04","SDI5 HMI E-S top 1/1","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDI[05]"
+"D","Safety_DI_Tags\Data_05","SDI6 HMI E-S top 1/2","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDI[06]"
+"D","Safety_DI_Tags\Data_06","SDI7 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDI[07]"
+"D","Safety_DI_Tags\Data_07","SDI8 Spare DI","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDI[08]"
+"S","Safety_DO_Discr\Data_00","SDO1 Packing Machine Safety Healhy 1/1","F","M","*","F",,,,,,,,,,,,,82,"SDO1 Packing Machine Safety Healhy 1/1",0,
+"S","Safety_DO_Discr\Data_01","SDO2 Packing Machine Safety Healhy 1/2","F","M","*","F",,,,,,,,,,,,,82,"SDO2 Packing Machine Safety Healhy 1/2",0,
+"S","Safety_DO_Discr\Data_02","SDO3 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"SDO3 Spare DO",0,
+"S","Safety_DO_Discr\Data_03","SDO4 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"SDO4 Spare DO",0,
+"S","Safety_DO_Discr\Data_04","SDO5 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"SDO5 Spare DO",0,
+"S","Safety_DO_Discr\Data_05","SDO6 Spare DO","F","M","*","F",,,,,,,,,,,,,82,"SDO6 Spare DO",0,
+"S","Safety_DO_Discr\Data_06","SDO7 Air Relief Valve 1/1","F","M","*","F",,,,,,,,,,,,,82,"SDO7 Air Relief Valve 1/1",0,
+"S","Safety_DO_Discr\Data_07","SDO8 Air Relief Valve 1/2","F","M","*","F",,,,,,,,,,,,,82,"SDO8 Air Relief Valve 1/2",0,
+"S","Safety_DO_Discr\Safety_List_01","Safety Output List 01","F","M","*","F",,,,,,,,,,,,,82,"Safety Output List 01",0,
+"S","Safety_DO_No\Data_00","RP:O:2.0","F","M","*","F",,,,,,,,,,,,,82,"RP:2:O.0",0,
+"S","Safety_DO_No\Data_01","RP:O:2.1","F","M","*","F",,,,,,,,,,,,,82,"RP:2:O.1",0,
+"S","Safety_DO_No\Data_02","RP:O:2.2","F","M","*","F",,,,,,,,,,,,,82,"RP:2:O.2",0,
+"S","Safety_DO_No\Data_03","RP:O:2.3","F","M","*","F",,,,,,,,,,,,,82,"RP:2:O.3",0,
+"S","Safety_DO_No\Data_04","RP:O:2.4","F","M","*","F",,,,,,,,,,,,,82,"RP:2:O.4",0,
+"S","Safety_DO_No\Data_05","RP:O:2.5","F","M","*","F",,,,,,,,,,,,,82,"RP:2:O.5",0,
+"S","Safety_DO_No\Data_06","RP:O:2.6","F","M","*","F",,,,,,,,,,,,,82,"RP:2:O.6",0,
+"S","Safety_DO_No\Data_07","RP:O:2.7","F","M","*","F",,,,,,,,,,,,,82,"RP:2:O.7",0,
+"S","Safety_DO_No\Safety_List_01","Safety Output List 01","F","M","*","F",,,,,,,,,,,,,82,"Safety Output List 01",0,
+"D","Safety_DO_Tags\Data_00","SDO1 Packing Machine Safety Healhy 1/1","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDO[01]"
+"D","Safety_DO_Tags\Data_01","SDO2 Packing Machine Safety Healhy 1/2","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDO[02]"
+"D","Safety_DO_Tags\Data_02","SDO3 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDO[03]"
+"D","Safety_DO_Tags\Data_03","SDO4 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDO[04]"
+"D","Safety_DO_Tags\Data_04","SDO5 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDO[05]"
+"D","Safety_DO_Tags\Data_05","SDO6 Spare DO","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDO[06]"
+"D","Safety_DO_Tags\Data_06","SDO7 Air Service Unit Coil-1 Enable","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDO[07]"
+"D","Safety_DO_Tags\Data_07","SDO8 Air Service Unit Coil-2 Enable","F","D","*","F",,,,,,,,,,"0","1","0",,,,"[Vapr069_Z3]RIO03_SDO[08]"
+"A","Temp_Tags\Alarms","","F","M","*","F","D","L",0,100,0,1,0,0,,,,,,,0,
+"A","Temp_Tags\IO_LIST","","F","M","*","F","D","L",0,100,0,1,0,0,,,,,,,0,
+"A","Temp_Tags\Manual_Screen","","F","M","*","F","D","L",0,100,0,1,0,0,,,,,,,0,
+"A","Temp_Tags\Mimic_System","","F","M","*","F","D","L",0,100,0,1,0,0,,,,,,,0,
+"A","Temp_Tags\Robot_IO_LIST","","F","M","*","F","D","L",0,100,0,1,0,0,,,,,,,0,
+"A","Temp_Tags\Safety_IO_LIST","","F","M","*","F","D","L",0,100,0,1,0,0,,,,,,,0,
+"A","Temp_Tags\Setting","","F","M","*","F","D","L",0,100,0,1,0,0,,,,,,,0,
+"A","Values\Col1","Column 1","F","M","*","F","I","L",0,100,1,1,0,0,,,,,,,0,
+"A","Values\Col16","Column 16","F","M","*","F","I","L",0,100,16,1,0,0,,,,,,,0,
+"A","Values\Col2","Column 2","F","M","*","F","I","L",0,100,2,1,0,0,,,,,,,0,
+"A","Values\Col4","Column 4","F","M","*","F","I","L",0,100,4,1,0,0,,,,,,,0,
+"A","Values\Col8","Column 8","F","M","*","F","I","L",0,100,8,1,0,0,,,,,,,0,
+"A","Values\Int0","","F","M","*","F","I","L",0,100,0,1,0,0,,,,,,,0,
+"A","Values\Int1","","F","M","*","F","I","L",0,100,1,1,0,0,,,,,,,0,
+"A","Values\Int2","","F","M","*","F","I","L",0,100,2,1,0,0,,,,,,,0,
+"A","Values\Int3","","F","M","*","F","I","L",0,100,3,1,0,0,,,,,,,0,
+"A","Values\Int4","","F","M","*","F","I","L",0,100,4,1,0,0,,,,,,,0,
+"A","Values\Int5","","F","M","*","F","I","L",0,100,5,1,0,0,,,,,,,0,
+"A","Values\Int8","","F","M","*","F","I","L",0,100,8,1,0,0,,,,,,,0,

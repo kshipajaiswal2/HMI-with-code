@@ -116,6 +116,41 @@ app.post('/api/convert-io-list-xlsx', express.raw({ type: '*/*', limit: '30mb' }
   }
 });
 
+app.post('/api/export-zone-tags-csv', express.json({ limit: '50mb' }), (req, res) => {
+  try {
+    const zone = String(req.body?.zone || '').trim();
+    const sheets = Array.isArray(req.body?.sheets) ? req.body.sheets : [];
+    if (!zone) {
+      return res.status(400).json({ error: 'Export zone is required.' });
+    }
+    if (!sheets.length) {
+      return res.status(400).json({ error: 'IO List sheet data is required.' });
+    }
+
+    const IoTags = getNodeIoTags();
+    const csv = IoTags.buildZoneTagsCsv(sheets, zone, {
+      zoneRioModules: req.body?.zoneRioModules || null,
+      manualZoneRioModules: req.body?.manualZoneRioModules || {}
+    });
+    const validation = IoTags.validateFactoryTalkZoneTagsCsv(csv);
+    if (!validation.ok) {
+      return res.status(400).json({
+        error: `Tags CSV export is incomplete (${validation.folderCount} folders, ${validation.digitalTagCount} PLC tags).`,
+        validation
+      });
+    }
+
+    const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+    const body = Buffer.from(csv, 'utf8');
+    const safeZone = zone.replace(/[^\w.-]+/g, '_').replace(/_+/g, '_') || 'Zone';
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeZone}-Tags.CSV"`);
+    return res.send(Buffer.concat([bom, body]));
+  } catch (err) {
+    return res.status(400).json({ error: err.message || 'Could not export zone Tags CSV.' });
+  }
+});
+
 function fileRow(dirPath, name) {
   const full = path.join(dirPath, name);
   const stat = fs.statSync(full);

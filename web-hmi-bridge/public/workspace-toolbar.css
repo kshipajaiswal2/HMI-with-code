@@ -112,6 +112,12 @@
   gap: 2px;
 }
 
+.editor-card .menu-popup .menu-divider {
+  height: 1px;
+  margin: 4px 8px;
+  background: #c5d3dc;
+}
+
 .editor-card .menu-popup button,
 .editor-card .menu-popup #buildPackageBtn,
 .editor-card .menu-popup #buildAllPackageBtn,

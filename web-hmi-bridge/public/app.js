@@ -38,6 +38,7 @@ const screenHeight = document.getElementById('screenHeight');
 const xmlEditor = document.getElementById('xmlEditor');
 const addObjectBtn = document.getElementById('addObjectBtn');
 const addImageBtn = document.getElementById('addImageBtn');
+const addLineBtn = document.getElementById('addLineBtn');
 const imageLibraryUploadInput = document.getElementById('imageLibraryUploadInput');
 const browseImageBtn = document.getElementById('browseImageBtn');
 const buildPackageBtn = document.getElementById('buildPackageBtn');
@@ -61,6 +62,34 @@ const objTextColor = document.getElementById('objTextColor');
 const objFontSize = document.getElementById('objFontSize');
 const objImageName = document.getElementById('objImageName');
 const objImageNameRow = document.getElementById('objImageNameRow');
+const objCaptionRow = document.getElementById('objCaptionRow');
+const objBorderColorRow = document.getElementById('objBorderColorRow');
+const objLinePropsRow = document.getElementById('objLinePropsRow');
+const objLineWidth = document.getElementById('objLineWidth');
+const objLineStyle = document.getElementById('objLineStyle');
+const objLineBackStyle = document.getElementById('objLineBackStyle');
+const objGotoPropsRow = document.getElementById('objGotoPropsRow');
+const objGotoDisplay = document.getElementById('objGotoDisplay');
+const objIndicatorPropsRow = document.getElementById('objIndicatorPropsRow');
+const objIndicatorShape = document.getElementById('objIndicatorShape');
+const objIndicatorBorderStyle = document.getElementById('objIndicatorBorderStyle');
+const objIndicatorBorderWidth = document.getElementById('objIndicatorBorderWidth');
+const objPolygonPropsRow = document.getElementById('objPolygonPropsRow');
+const objPolygonPoints = document.getElementById('objPolygonPoints');
+const objTextPropsRow = document.getElementById('objTextPropsRow');
+const objTextAlignment = document.getElementById('objTextAlignment');
+const objTextWordWrap = document.getElementById('objTextWordWrap');
+const addGotoDisplayBtn = document.getElementById('addGotoDisplayBtn');
+const addTextBtn = document.getElementById('addTextBtn');
+const addMsiRectBtn = document.getElementById('addMsiRectBtn');
+const addMsiCircleBtn = document.getElementById('addMsiCircleBtn');
+const addPolygonBtn = document.getElementById('addPolygonBtn');
+const objFontRow = document.getElementById('objFontRow');
+const objTextColorLabel = document.getElementById('objTextColorLabel');
+const objLeftLabel = document.querySelector('label[for="objLeft"]');
+const objTopLabel = document.querySelector('label[for="objTop"]');
+const objWidthLabel = document.querySelector('label[for="objWidth"]');
+const objHeightLabel = document.querySelector('label[for="objHeight"]');
 const imageLibraryOptions = document.getElementById('imageLibraryOptions');
 const applyObjectBtn = document.getElementById('applyObjectBtn');
 const objBackColorPicker = document.getElementById('objBackColorPicker');
@@ -78,10 +107,16 @@ const popupGenerateActions = document.getElementById('popupGenerateActions');
 
 let previewResizeObserver = null;
 let previewZoomLevel = 1;
+let previewRefitFrame = null;
+let persistXmlDebounceTimer = null;
+let serverProjectSaveTimer = null;
+let lineDrawState = null;
+let suppressPreviewCanvasClick = false;
 
 let selectedDisplay = '';
 let selectedFiles = [];
 let selectedObjectIndex = null;
+let selectedObjectName = null;
 let activeDockTab = 'properties';
 let usingUploadedList = false;
 let currentDisplayRows = [];
@@ -97,9 +132,11 @@ let folderNames = [];
 let folderAssignments = {};
 let folderCollapsedNames = new Set();
 let previewImageNonce = Date.now();
+const HISTORY_LIMIT = 100;
 let historyPast = [];
 let historyFuture = [];
 let applyingHistory = false;
+let bridgeDisplayFileNames = [];
 let copiedObjectXml = '';
 let copiedObjectName = '';
 let copiedObjectGroupId = '';
@@ -111,12 +148,22 @@ let generatedPopupDrafts = [];
 const TEMPLATE_DISPLAY_NAME = 'Template.xml';
 const DEFAULT_PREVIEW_WIDTH = 1024;
 const DEFAULT_PREVIEW_HEIGHT = 768;
+// Object defaults taken from hmi/import_templates/1Home.xml
+const HOME_OBJECT_TEMPLATE_XML = `<gfx>
+<text name="Text40" height="16" width="45" left="867" top="357" visible="true" wallpaper="false" isReferenceObject="false" backStyle="transparent" backColor="white" foreColor="black" wordWrap="true" sizeToFit="true" alignment="middleCenter" fontFamily="Arial" charHeight="16" charWidth="7" bold="true" italic="false" underline="false" strikethrough="false" caption="Text Label"/>
+<gotoButton name="GotoDisplayButton2" height="45" width="85" left="10" top="85" visible="true" wallpaper="false" isReferenceObject="false" audio="true" backColor="#E0E0E0" backStyle="solid" borderStyle="raised" borderUsesBackColor="false" borderWidth="4" description="" highlightColor="lime" borderColor="silver" patternColor="white" patternStyle="none" horizontalMargin="0" verticalMargin="0" shape="rectangle" touch="true" blink="false" displayPosition="false" displayLeftPosition="0" displayTopPosition="0" UseVariableDisplay="false" UseVariableDisplayPosition="false" display="101 Production" parameterFile="" parameterList="" parameterType="parameterFile" captionOnBorder="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"><caption fontFamily="Arial" fontSize="10" bold="true" italic="false" underline="false" strikethrough="false" caption="Production" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/><imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/></gotoButton>
+<multistateIndicator name="MultistateIndicator2" height="36" width="80" left="836" top="32" visible="true" wallpaper="false" isReferenceObject="false" backStyle="solid" borderStyle="raised" borderUsesBackColor="true" borderWidth="1" description="" shape="rectangle" triggerType="value" currentStateId="1" captionOnBorder="false" setLastStateId="2"><states><state stateId="0" value="0" backColor="#F83D3D" borderColor="#F83D3D" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"><caption fontFamily="Arial" fontSize="9" bold="true" italic="false" underline="false" strikethrough="false" caption="Fault" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/></state><state stateId="1" value="1" backColor="lime" borderColor="lime" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"><caption fontFamily="Arial" fontSize="9" bold="true" italic="false" underline="false" strikethrough="false" caption="Healthy" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/></state></states></multistateIndicator>
+<multistateIndicator name="MultistateIndicator12" height="22" width="22" left="385" top="415" visible="true" wallpaper="false" isReferenceObject="false" backStyle="solid" borderStyle="line" borderUsesBackColor="true" borderWidth="1" description="" shape="circle" triggerType="value" currentStateId="0" captionOnBorder="false" setLastStateId="3"><states><state stateId="0" value="0" backColor="#C6C6C6" borderColor="#C6C6C6" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/><state stateId="1" value="1" backColor="#10EB10" borderColor="#10EB10" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/><state stateId="2" value="2" backColor="#F83D3D" borderColor="#F83D3D" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/></states></multistateIndicator>
+<rectangle name="Polygon1" height="73" width="160" left="0" top="0" visible="true" wallpaper="false" isReferenceObject="false" backStyle="solid" backColor="white" foreColor="black" lineStyle="solid" lineWidth="1" patternStyle="none" patternColor="#E0E0E0" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
+</gfx>`;
+let homeTemplateRoot = null;
 const SIDEBAR_STORAGE_KEY = 'displayXmlBridge.sidebarCollapsed';
 const DOCK_STORAGE_KEY = 'displayXmlBridge.toolsDockCollapsed';
 const SIDEBAR_MODE_STORAGE_KEY = 'displayXmlBridge.sidebarMode';
 const PROJECT_NAME_STORAGE_KEY = 'displayXmlBridge.projectName';
 const PROJECTS_STORAGE_KEY = 'displayXmlBridge.projects';
 const ACTIVE_PROJECT_STORAGE_KEY = 'displayXmlBridge.activeProjectId';
+const ACTIVE_PROJECT_SCREEN_STORAGE_KEY = 'displayXmlBridge.activeProjectScreenKey';
 const SIDEBAR_MODE_DISPLAYS = 'displays';
 const SIDEBAR_MODE_DEFAULTS = 'defaults';
 const UNGROUPED_FOLDER_NAME = 'Ungrouped';
@@ -132,7 +179,7 @@ const SCREEN_SIZE_PRESETS = {
 };
 let sidebarMode = SIDEBAR_MODE_DISPLAYS;
 let currentProjectName = normalizeProjectName(localStorage.getItem(PROJECT_NAME_STORAGE_KEY) || 'Untitled Project');
-let projectList = loadProjectList();
+let projectList = [];
 let activeProjectId = localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY) || '';
 let activeProjectFolder = '';
 let activeProjectScreen = '';
@@ -302,6 +349,35 @@ function isDefaultMode() {
 
 function createProjectKey(projectId, folderName, screenName) {
   return [projectId, folderName, screenName].map((part) => String(part || '')).join('::');
+}
+
+function parseProjectKey(key) {
+  const parts = String(key || '').split('::');
+  if (parts.length < 3) {
+    return null;
+  }
+
+  const screenName = parts.pop();
+  const projectId = parts.shift();
+  const folderName = parts.join('::');
+  if (!projectId || !folderName || !screenName) {
+    return null;
+  }
+
+  return { projectId, folderName, screenName };
+}
+
+function persistActiveProjectScreenKey() {
+  if (activeProjectKey) {
+    localStorage.setItem(ACTIVE_PROJECT_SCREEN_STORAGE_KEY, activeProjectKey);
+    return;
+  }
+
+  localStorage.removeItem(ACTIVE_PROJECT_SCREEN_STORAGE_KEY);
+}
+
+function clearActiveProjectScreenKey() {
+  localStorage.removeItem(ACTIVE_PROJECT_SCREEN_STORAGE_KEY);
 }
 
 function createProjectCsvKey(projectId, kind, fileId) {
@@ -1312,6 +1388,30 @@ function downloadFactoryTalkTagsCsv(content, fileName) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function encodeFactoryTalkParameterBytes(text) {
+  const normalized = String(text || '').replace(/^\uFEFF/, '').replace(/\r?\n/g, '\r\n');
+  const bytes = new Uint8Array(normalized.length * 2);
+  for (let index = 0; index < normalized.length; index += 1) {
+    const code = normalized.charCodeAt(index);
+    bytes[index * 2] = code & 0xff;
+    bytes[index * 2 + 1] = code >> 8;
+  }
+  return bytes;
+}
+
+function downloadFactoryTalkParameterFile(content, fileName) {
+  const bytes = encodeFactoryTalkParameterBytes(content);
+  const blob = new Blob([bytes], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = String(fileName || 'Parameters.par');
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 const GENERATED_PARAMETER_FILE_PATTERN = /^(PLC (DI|DO) List|Safety (DI|DO) List) \d+\.par$/i;
 
 function isGeneratedParameterFileName(name) {
@@ -1381,7 +1481,9 @@ function createZipBlobFromTextFiles(fileEntries) {
   for (const entry of fileEntries || []) {
     const name = String(entry.name || '').replace(/\\/g, '/');
     const nameBytes = encoder.encode(name);
-    const dataBytes = encoder.encode(String(entry.content || ''));
+    const dataBytes = /\.par$/i.test(name)
+      ? encodeFactoryTalkParameterBytes(entry.content)
+      : encoder.encode(String(entry.content || ''));
     const crc = crc32Bytes(dataBytes);
     const localHeader = new Uint8Array(30 + nameBytes.length);
     const localView = new DataView(localHeader.buffer);
@@ -1482,7 +1584,7 @@ function exportProjectParameterFile(project, file) {
     throw new Error(`${fileName} is empty.`);
   }
 
-  downloadTextFile(file.content, fileName);
+  downloadFactoryTalkParameterFile(file.content, fileName);
 }
 
 function exportProjectTagsCsvFile(project, file) {
@@ -1605,7 +1707,8 @@ async function fetchDefaultParameterTemplate(page = 1) {
   if (!response.ok) {
     throw new Error(`Could not load the PLC DI List ${pageSuffix}.par reference template.`);
   }
-  return response.text();
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  return decodeTextBytes(bytes);
 }
 
 function nextProjectParameterFileName(project, prefix = 'PLC DI List') {
@@ -3407,6 +3510,125 @@ function persistProjectList() {
     }
     throw err;
   }
+
+  scheduleServerProjectSave(payload);
+}
+
+function scheduleServerProjectSave(projects = projectList) {
+  clearTimeout(serverProjectSaveTimer);
+  const payload = (Array.isArray(projects) ? projects : projectList).map((project) => {
+    const { ioTagsParsed, ...rest } = project;
+    return rest;
+  });
+
+  serverProjectSaveTimer = setTimeout(async () => {
+    serverProjectSaveTimer = null;
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projects: payload })
+      });
+      if (!res.ok) {
+        const data = await readApiJson(res);
+        console.error(data.error || 'Failed to save projects to server');
+      }
+    } catch (err) {
+      console.error('Failed to save projects to server', err);
+    }
+  }, 800);
+}
+
+async function loadProjectsOnStartup() {
+  let serverProjects = null;
+
+  try {
+    const res = await fetch('/api/projects');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.projects)) {
+        serverProjects = data.projects;
+      }
+    }
+  } catch (_err) {
+    // Server project store is optional during startup.
+  }
+
+  const localProjects = loadProjectList();
+
+  if (serverProjects?.length) {
+    projectList = serverProjects;
+    try {
+      localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(serverProjects));
+    } catch (_err) {
+      // Browser cache is best-effort when server data is available.
+    }
+    return;
+  }
+
+  projectList = localProjects;
+  if (projectList.length) {
+    scheduleServerProjectSave();
+  }
+}
+
+function syncCurrentXmlToActiveProjectScreen() {
+  if (!activeProjectKey || !xmlEditor.value.trim()) {
+    return false;
+  }
+
+  const record = getProjectScreenByKey(activeProjectKey);
+  if (!record?.screen) {
+    return false;
+  }
+
+  const sanitizedXml = sanitizeXmlForFactoryTalk(xmlEditor.value);
+  if (sanitizedXml !== xmlEditor.value) {
+    xmlEditor.value = sanitizedXml;
+  }
+
+  const meta = screenMetaFromXml(record.screen.name, sanitizedXml);
+  record.screen.xml = sanitizedXml;
+  record.screen.width = meta.width;
+  record.screen.height = meta.height;
+  record.screen.sizeBytes = meta.sizeBytes;
+  record.screen.lastModified = meta.lastModified;
+  return true;
+}
+
+function flushProjectPersistence() {
+  clearTimeout(persistXmlDebounceTimer);
+  persistXmlDebounceTimer = null;
+  clearTimeout(serverProjectSaveTimer);
+  serverProjectSaveTimer = null;
+
+  syncCurrentXmlToActiveProjectScreen();
+  const payload = projectList.map((project) => {
+    const { ioTagsParsed, ...rest } = project;
+    return rest;
+  });
+
+  try {
+    localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.error(err);
+  }
+
+  try {
+    const body = JSON.stringify({ projects: payload });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/projects', new Blob([body], { type: 'application/json' }));
+    } else {
+      fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true
+      }).catch(() => {});
+    }
+  } catch (_err) {
+    // Best-effort flush during page unload.
+  }
 }
 
 function normalizeProjectList() {
@@ -3429,6 +3651,13 @@ function normalizeProjectList() {
           screen.name = IO_LIST_SCREEN_FILE;
           screen.xml = String(screen.xml || '').replace(/display="402_IO_List"/g, 'display="303_IO_List"');
           removedLegacyScreens = true;
+        }
+        if (isOverviewScreenName(screen?.name)) {
+          const cleanedOverviewXml = stripOverviewEditorArtifacts(screen.xml);
+          if (cleanedOverviewXml !== String(screen.xml || '')) {
+            screen.xml = cleanedOverviewXml;
+            removedLegacyScreens = true;
+          }
         }
         if (displayKey(screen?.name) === displayKey('105_Cycle_Time.xml') || displayKey(screen?.name) === displayKey('402_Cycletime.xml')) {
           screen.name = CYCLE_TIME_SCREEN_FILE;
@@ -3457,7 +3686,13 @@ function normalizeProjectList() {
       }
       for (const screen of folder.screens) {
         screen.name = String(screen.name || 'Screen.xml');
-        screen.xml = String(screen.xml || '');
+        const repairedScreenXml = repairGotoButtonsInXml(String(screen.xml || ''));
+        if (repairedScreenXml !== String(screen.xml || '')) {
+          screen.xml = repairedScreenXml;
+          removedLegacyScreens = true;
+        } else {
+          screen.xml = String(screen.xml || '');
+        }
         screen.lastModified = String(screen.lastModified || new Date().toISOString());
         screen.sizeBytes = Number.isFinite(Number(screen.sizeBytes)) ? Number(screen.sizeBytes) : new Blob([screen.xml]).size;
         const meta = readSizeFromXml(screen.xml);
@@ -3506,6 +3741,26 @@ function normalizeProjectList() {
     }
     persistProjectList();
   }
+
+  const activeRecord = activeProjectKey ? getProjectScreenByKey(activeProjectKey) : null;
+  if (activeRecord && isOverviewScreenName(activeRecord.screen?.name)) {
+    const cleanedOverviewXml = stripOverviewEditorArtifacts(activeRecord.screen.xml);
+    if (cleanedOverviewXml !== String(activeRecord.screen.xml || '')) {
+      activeRecord.screen.xml = cleanedOverviewXml;
+      persistProjectList();
+    }
+    if (String(xmlEditor.value || '').includes('MSI_Rect_')) {
+      xmlEditor.value = cleanedOverviewXml;
+      recordHistory(cleanedOverviewXml);
+      selectedObjectIndex = null;
+      selectedObjectName = null;
+      clearObjectPanel();
+      renderPreview();
+      if (cleanedOverviewXml.trim()) {
+        persistCurrentXmlState();
+      }
+    }
+  }
 }
 
 function saveProjectList() {
@@ -3527,6 +3782,7 @@ function setActiveProject(project) {
     activeProjectFolder = '';
     activeProjectScreen = '';
     activeProjectKey = '';
+    clearActiveProjectScreenKey();
     localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
     setProjectName('Untitled Project');
     renderProjectPopupPlanner();
@@ -3544,6 +3800,7 @@ function setActiveProjectScreen(project, folderName, screenName) {
   activeProjectFolder = String(folderName || '');
   activeProjectScreen = String(screenName || '');
   activeProjectKey = createProjectKey(project?.id, folderName, screenName);
+  persistActiveProjectScreenKey();
 }
 
 function findProjectFolder(project, folderName) {
@@ -4534,9 +4791,41 @@ function parseCaptionAlignment(alignmentRaw) {
   return { horizontal, vertical };
 }
 
-function applyCaptionStyles(box, node, captionNode, captionEl) {
-  const fontSize = Number(captionNode?.getAttribute('fontSize') || node.getAttribute('fontSize'));
+function getNodeFontSize(node, captionNode = null) {
+  const fontSize = Number(captionNode?.getAttribute('fontSize') || node?.getAttribute('fontSize'));
   if (Number.isFinite(fontSize) && fontSize > 0) {
+    return fontSize;
+  }
+
+  const charHeight = Number(node?.getAttribute('charHeight'));
+  if (Number.isFinite(charHeight) && charHeight > 0) {
+    return charHeight;
+  }
+
+  return 10;
+}
+
+function setNodeFontSize(node, captionNode, size) {
+  const value = String(Math.max(1, Number(size) || 10));
+  const tag = String(node?.tagName || '').toLowerCase();
+
+  if (nodeUsesDirectFontSize(node)) {
+    if (tag === 'text' && node.hasAttribute('charHeight')) {
+      node.setAttribute('charHeight', value);
+      node.removeAttribute('fontSize');
+    } else {
+      node.setAttribute('fontSize', value);
+    }
+  }
+
+  if (captionNode) {
+    captionNode.setAttribute('fontSize', value);
+  }
+}
+
+function applyCaptionStyles(box, node, captionNode, captionEl) {
+  const fontSize = getNodeFontSize(node, captionNode);
+  if (fontSize > 0) {
     const sizePx = `${fontSize}px`;
     box.style.fontSize = sizePx;
     if (captionEl) {
@@ -4979,6 +5268,407 @@ function parseLinePoints(node) {
   };
 }
 
+function updateLineCoordinates(node) {
+  if (String(node?.tagName || '').toLowerCase() !== 'line') {
+    return;
+  }
+
+  const left = Number(node.getAttribute('left') || 0);
+  const top = Number(node.getAttribute('top') || 0);
+  const width = Math.max(1, Number(node.getAttribute('width') || 1));
+  const height = Math.max(1, Number(node.getAttribute('height') || 1));
+  const isHorizontal = width >= height;
+
+  if (isHorizontal) {
+    setLineEndpoints(node, left + 1, top + 1, left + width, top + 1);
+  } else {
+    setLineEndpoints(node, left + 1, top + 1, left + 1, top + height);
+  }
+}
+
+function syncLineBoundingBox(node) {
+  const points = parseLinePoints(node);
+  const minX = Math.min(points.x1, points.x2);
+  const minY = Math.min(points.y1, points.y2);
+  const maxX = Math.max(points.x1, points.x2);
+  const maxY = Math.max(points.y1, points.y2);
+  node.setAttribute('left', String(Math.round(minX)));
+  node.setAttribute('top', String(Math.round(minY)));
+  node.setAttribute('width', String(Math.max(1, Math.round(maxX - minX))));
+  node.setAttribute('height', String(Math.max(1, Math.round(maxY - minY))));
+}
+
+function setLineEndpoints(node, x1, y1, x2, y2) {
+  if (String(node?.tagName || '').toLowerCase() !== 'line') {
+    return;
+  }
+
+  node.setAttribute(
+    'line',
+    `${Math.round(x1)} ${Math.round(y1)} ${Math.round(x2)} ${Math.round(y2)} `
+  );
+  syncLineBoundingBox(node);
+}
+
+function moveLineByDelta(node, deltaX, deltaY) {
+  const points = parseLinePoints(node);
+  setLineEndpoints(
+    node,
+    points.x1 + deltaX,
+    points.y1 + deltaY,
+    points.x2 + deltaX,
+    points.y2 + deltaY
+  );
+}
+
+function scaleLinePoints(points, scaleX, scaleY) {
+  return {
+    x1: points.x1 * scaleX,
+    y1: points.y1 * scaleY,
+    x2: points.x2 * scaleX,
+    y2: points.y2 * scaleY
+  };
+}
+
+function unscaleLinePoints(points, scaleX, scaleY) {
+  const sx = Math.max(Number.EPSILON, scaleX);
+  const sy = Math.max(Number.EPSILON, scaleY);
+  return {
+    x1: points.x1 / sx,
+    y1: points.y1 / sy,
+    x2: points.x2 / sx,
+    y2: points.y2 / sy
+  };
+}
+
+function displayRectToXml(left, top, width, height, scaleX, scaleY) {
+  const sx = Math.max(Number.EPSILON, scaleX);
+  const sy = Math.max(Number.EPSILON, scaleY);
+  return {
+    left: Math.round(left / sx),
+    top: Math.round(top / sy),
+    width: Math.max(1, Math.round(width / sx)),
+    height: Math.max(1, Math.round(height / sy))
+  };
+}
+
+function displayDeltaToXml(deltaLeft, deltaTop, scaleX, scaleY) {
+  const sx = Math.max(Number.EPSILON, scaleX);
+  const sy = Math.max(Number.EPSILON, scaleY);
+  return {
+    deltaLeft: deltaLeft / sx,
+    deltaTop: deltaTop / sy
+  };
+}
+
+const LINE_HIT_PADDING = 12;
+
+function getLineBounds(points, padding = LINE_HIT_PADDING) {
+  const minX = Math.min(points.x1, points.x2);
+  const minY = Math.min(points.y1, points.y2);
+  const maxX = Math.max(points.x1, points.x2);
+  const maxY = Math.max(points.y1, points.y2);
+  return {
+    minX: minX - padding,
+    minY: minY - padding,
+    maxX: maxX + padding,
+    maxY: maxY + padding,
+    width: Math.max(1, maxX - minX + padding * 2),
+    height: Math.max(1, maxY - minY + padding * 2),
+    padding
+  };
+}
+
+function resolveLineStrokeColor(node) {
+  const raw = node.getAttribute('foreColor') || node.getAttribute('backColor') || '#000000';
+  return normalizeColor(raw) || raw || '#000000';
+}
+
+function parsePolygonPoints(node) {
+  const fromPolygon = String(node.getAttribute('polygon') || '')
+    .trim()
+    .split(/\s+/)
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v));
+
+  if (fromPolygon.length >= 6 && fromPolygon.length % 2 === 0) {
+    const points = [];
+    for (let i = 0; i < fromPolygon.length; i += 2) {
+      points.push({ x: fromPolygon[i], y: fromPolygon[i + 1] });
+    }
+    return points;
+  }
+
+  const left = Number(node.getAttribute('left') || 0);
+  const top = Number(node.getAttribute('top') || 0);
+  const width = Math.max(1, Number(node.getAttribute('width') || 1));
+  const height = Math.max(1, Number(node.getAttribute('height') || 1));
+  return [
+    { x: left, y: top },
+    { x: left + width, y: top },
+    { x: left + width, y: top + height },
+    { x: left, y: top + height }
+  ];
+}
+
+function formatPolygonPoints(points) {
+  return `${points.map((point) => `${Math.round(point.x)} ${Math.round(point.y)}`).join(' ')} `;
+}
+
+function syncPolygonBoundingBox(node) {
+  const points = parsePolygonPoints(node);
+  if (!points.length) {
+    return;
+  }
+
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const maxX = Math.max(...xs);
+  const maxY = Math.max(...ys);
+  node.setAttribute('left', String(Math.round(minX)));
+  node.setAttribute('top', String(Math.round(minY)));
+  node.setAttribute('width', String(Math.max(1, Math.round(maxX - minX))));
+  node.setAttribute('height', String(Math.max(1, Math.round(maxY - minY))));
+}
+
+function setPolygonPoints(node, points) {
+  if (String(node?.tagName || '').toLowerCase() !== 'polygon') {
+    return;
+  }
+
+  node.setAttribute('polygon', formatPolygonPoints(points));
+  syncPolygonBoundingBox(node);
+}
+
+function scalePolygonToRect(node, prevLeft, prevTop, prevWidth, prevHeight, nextLeft, nextTop, nextWidth, nextHeight) {
+  const points = parsePolygonPoints(node);
+  if (!points.length) {
+    return;
+  }
+
+  const sx = nextWidth / Math.max(1, prevWidth);
+  const sy = nextHeight / Math.max(1, prevHeight);
+  const scaled = points.map((point) => ({
+    x: nextLeft + ((point.x - prevLeft) * sx),
+    y: nextTop + ((point.y - prevTop) * sy)
+  }));
+  setPolygonPoints(node, scaled);
+}
+
+function createPolygonPreviewSvg(points, bounds, fillColor, strokeColor, strokeWidth) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${bounds.width} ${bounds.height}`);
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', '100%');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.style.display = 'block';
+  svg.style.overflow = 'visible';
+  svg.style.pointerEvents = 'none';
+
+  const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  polygon.setAttribute(
+    'points',
+    points.map((point) => `${point.x - bounds.minX},${point.y - bounds.minY}`).join(' ')
+  );
+  polygon.setAttribute('fill', fillColor || 'transparent');
+  polygon.setAttribute('stroke', strokeColor || '#000000');
+  polygon.setAttribute('stroke-width', String(Math.max(1, strokeWidth || 1)));
+  svg.appendChild(polygon);
+  return svg;
+}
+
+function createLinePreviewSvg(points, bounds, color, strokeWidth) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${bounds.width} ${bounds.height}`);
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', '100%');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.style.display = 'block';
+  svg.style.overflow = 'visible';
+  svg.style.pointerEvents = 'none';
+
+  const x1 = points.x1 - bounds.minX;
+  const y1 = points.y1 - bounds.minY;
+  const x2 = points.x2 - bounds.minX;
+  const y2 = points.y2 - bounds.minY;
+  const stroke = Math.max(1, strokeWidth);
+  const visible = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  visible.setAttribute('x1', String(x1));
+  visible.setAttribute('y1', String(y1));
+  visible.setAttribute('x2', String(x2));
+  visible.setAttribute('y2', String(y2));
+  visible.setAttribute('stroke', color);
+  visible.setAttribute('stroke-width', String(stroke));
+  visible.setAttribute('stroke-linecap', 'round');
+  visible.setAttribute('vector-effect', 'non-scaling-stroke');
+  svg.style.position = 'absolute';
+  svg.style.inset = '0';
+  svg.appendChild(visible);
+  return svg;
+}
+
+function clientToDisplayPoint(canvas, displayWidth, displayHeight, clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const x = ((clientX - rect.left) / Math.max(1, rect.width)) * displayWidth;
+  const y = ((clientY - rect.top) / Math.max(1, rect.height)) * displayHeight;
+  return {
+    x: clamp(x, 0, displayWidth),
+    y: clamp(y, 0, displayHeight)
+  };
+}
+
+function createRubberBandSvg(displayWidth, displayHeight, x1, y1, x2, y2) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'line-draw-rubberband');
+  svg.style.position = 'absolute';
+  svg.style.inset = '0';
+  svg.style.width = '100%';
+  svg.style.height = '100%';
+  svg.style.pointerEvents = 'none';
+  svg.style.overflow = 'visible';
+  svg.setAttribute('viewBox', `0 0 ${displayWidth} ${displayHeight}`);
+
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', String(x1));
+  line.setAttribute('y1', String(y1));
+  line.setAttribute('x2', String(x2));
+  line.setAttribute('y2', String(y2));
+  line.setAttribute('stroke', '#0d6470');
+  line.setAttribute('stroke-width', '2');
+  line.setAttribute('stroke-dasharray', '6 4');
+  line.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(line);
+  return svg;
+}
+
+function cancelLineDrawMode() {
+  lineDrawState = null;
+  if (packageResult) {
+    packageResult.textContent = '';
+  }
+  renderPreview();
+}
+
+function insertLineIntoXml(x1, y1, x2, y2, scaleX = 1, scaleY = 1) {
+  const xml = xmlEditor.value.trim();
+  if (!xml) {
+    return null;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  if (doc.querySelector('parsererror')) {
+    alert('XML parse error. Fix XML before adding a line.');
+    return null;
+  }
+
+  const root = doc.querySelector('gfx');
+  if (!root) {
+    alert('Could not find gfx root in XML.');
+    return null;
+  }
+
+  let endX = x2;
+  let endY = y2;
+  if (Math.hypot(endX - x1, endY - y1) < 4) {
+    endX = x1 + 120;
+    endY = y1;
+  }
+
+  const line = doc.createElement('line');
+  const lineName = uniqueObjectName(doc, 'Line');
+  line.setAttribute('name', lineName);
+  line.setAttribute('visible', 'true');
+  line.setAttribute('wallpaper', 'false');
+  line.setAttribute('isReferenceObject', 'false');
+  line.setAttribute('backStyle', 'solid');
+  line.setAttribute('lineStyle', 'solid');
+  line.setAttribute('lineWidth', '2');
+  line.setAttribute('backColor', '#C6C6C6');
+  line.setAttribute('foreColor', '#000000');
+  const xmlPoints = unscaleLinePoints({ x1, y1, x2: endX, y2: endY }, scaleX, scaleY);
+  setLineEndpoints(line, xmlPoints.x1, xmlPoints.y1, xmlPoints.x2, xmlPoints.y2);
+  root.appendChild(line);
+
+  xmlEditor.value = serializeXmlDoc(doc);
+  recordHistory(xmlEditor.value);
+
+  const nodes = getObjectNodes(doc);
+  selectedObjectIndex = nodes.findIndex((node) => String(node.getAttribute('name') || '') === lineName);
+  if (selectedObjectIndex >= 0) {
+    populateObjectPanel(doc, selectedObjectIndex);
+  }
+
+  return lineName;
+}
+
+function attachLineDrawInteraction(canvas, displayWidth, displayHeight, scaleX = 1, scaleY = 1) {
+  canvas.classList.add('line-draw-mode');
+  let startPoint = null;
+  let rubberBand = null;
+
+  const clearRubberBand = () => {
+    rubberBand?.remove();
+    rubberBand = null;
+  };
+
+  const onMouseMove = (event) => {
+    if (!startPoint || !rubberBand) {
+      return;
+    }
+
+    const endPoint = clientToDisplayPoint(canvas, displayWidth, displayHeight, event.clientX, event.clientY);
+    const line = rubberBand.querySelector('line');
+    if (line) {
+      line.setAttribute('x2', String(endPoint.x));
+      line.setAttribute('y2', String(endPoint.y));
+    }
+  };
+
+  const onMouseUp = (event) => {
+    document.removeEventListener('mousemove', onMouseMove);
+    if (!startPoint) {
+      return;
+    }
+
+    const endPoint = clientToDisplayPoint(canvas, displayWidth, displayHeight, event.clientX, event.clientY);
+    clearRubberBand();
+    lineDrawState = null;
+    canvas.classList.remove('line-draw-mode');
+    suppressPreviewCanvasClick = true;
+    insertLineIntoXml(startPoint.x, startPoint.y, endPoint.x, endPoint.y, scaleX, scaleY);
+    renderPreview();
+    persistCurrentXmlState();
+    startPoint = null;
+    setTimeout(() => {
+      suppressPreviewCanvasClick = false;
+    }, 0);
+  };
+
+  const onMouseDown = (event) => {
+    if (event.button !== 0 || event.target.closest('.xml-object, .xml-line-handle')) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    startPoint = clientToDisplayPoint(canvas, displayWidth, displayHeight, event.clientX, event.clientY);
+    clearRubberBand();
+    rubberBand = createRubberBandSvg(displayWidth, displayHeight, startPoint.x, startPoint.y, startPoint.x, startPoint.y);
+    canvas.appendChild(rubberBand);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp, { once: true });
+  };
+
+  canvas.addEventListener('mousedown', onMouseDown);
+
+  if (packageResult) {
+    packageResult.textContent = 'Draw a line: click the start point, drag to the end point, then release. Press Esc to cancel.';
+  }
+}
+
 function kb(sizeBytes) {
   return `${(sizeBytes / 1024).toFixed(1)} KB`;
 }
@@ -5081,6 +5771,115 @@ function isEditableTarget(el) {
   }
   const tag = String(el.tagName || '').toLowerCase();
   return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
+}
+
+function blocksObjectKeyboardShortcuts(el) {
+  if (!el) {
+    return false;
+  }
+
+  if (el === xmlEditor || el === screenWidth || el === screenHeight) {
+    return true;
+  }
+
+  if (el.closest?.('.sidebar-rename-input, #sidebarNameInput, #sidebarPageNoInput, #sidebarScreenNameInput, #projectNameInput')) {
+    return true;
+  }
+
+  if (el.isContentEditable) {
+    return true;
+  }
+
+  const tag = String(el.tagName || '').toLowerCase();
+  if (el.closest?.('.object-panel')) {
+    if (tag === 'textarea') {
+      return true;
+    }
+    if (tag === 'input') {
+      const type = String(el.type || 'text').toLowerCase();
+      return type === 'text' || type === 'search' || type === 'password';
+    }
+    return false;
+  }
+
+  return tag === 'input' || tag === 'textarea' || tag === 'select';
+}
+
+function focusPreviewCanvas(canvas) {
+  if (!canvas || typeof canvas.focus !== 'function') {
+    return;
+  }
+
+  const applyFocus = () => {
+    try {
+      canvas.focus({ preventScroll: true });
+    } catch (_err) {
+      canvas.focus();
+    }
+  };
+
+  applyFocus();
+  requestAnimationFrame(applyFocus);
+  setTimeout(applyFocus, 0);
+}
+
+function isDeleteObjectShortcut(event) {
+  const key = String(event.key || '');
+  const code = String(event.code || '');
+  return key === 'Delete' || code === 'Delete' || key === 'Backspace' || code === 'Backspace';
+}
+
+function canDeleteSelectedObjectFromKeyboard(active, event) {
+  if (selectedObjectIndex === null && !selectedObjectName) {
+    return false;
+  }
+
+  if (active === xmlEditor) {
+    return false;
+  }
+
+  if (active?.closest?.('.planner-table')) {
+    return false;
+  }
+
+  if (active?.closest?.('#sidebarNameInput, #sidebarPageNoInput, #sidebarScreenNameInput, #projectNameInput')) {
+    return false;
+  }
+
+  if (active?.isContentEditable) {
+    return false;
+  }
+
+  const key = String(event.key || '');
+  const code = String(event.code || '');
+  const isBackspace = key === 'Backspace' || code === 'Backspace';
+  if (isBackspace && active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
+    return false;
+  }
+
+  return true;
+}
+
+function tryDeleteSelectedObjectFromKeyboard(event) {
+  if (!isDeleteObjectShortcut(event)) {
+    return false;
+  }
+
+  if (!canDeleteSelectedObjectFromKeyboard(document.activeElement, event)) {
+    return false;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  deleteSelectedObject();
+  return true;
+}
+
+function setSelectedObject(doc, index, node = null) {
+  const nodes = doc ? getObjectNodes(doc) : [];
+  const resolvedNode = node || (index !== null && index >= 0 ? nodes[index] : null);
+  selectedObjectIndex = index;
+  selectedObjectName = resolvedNode ? String(resolvedNode.getAttribute('name') || '') || null : null;
 }
 
 function isDisplayHistoryInput(el) {
@@ -5253,6 +6052,9 @@ function pasteCopiedObject() {
 
   newNode.setAttribute('left', String(Math.round(nextLeft)));
   newNode.setAttribute('top', String(Math.round(nextTop)));
+  if (String(newNode.tagName || '').toLowerCase() === 'line') {
+    moveLineByDelta(newNode, Math.round(nextLeft) - left, Math.round(nextTop) - top);
+  }
 
   root.appendChild(newNode);
 
@@ -5356,7 +6158,11 @@ function nudgeSelectedObject(deltaX, deltaY) {
 }
 
 function deleteSelectedObject() {
-  if (selectedObjectIndex === null || !xmlEditor.value.trim()) {
+  if (!xmlEditor.value.trim()) {
+    return;
+  }
+
+  if (selectedObjectIndex === null && !selectedObjectName) {
     return;
   }
 
@@ -5367,12 +6173,24 @@ function deleteSelectedObject() {
   }
 
   const nodes = getObjectNodes(doc);
-  const node = nodes[selectedObjectIndex];
+  let index = selectedObjectIndex;
+  if (index === null || index < 0 || index >= nodes.length || !nodes[index]) {
+    if (selectedObjectName) {
+      index = nodes.findIndex((candidate) => String(candidate.getAttribute('name') || '') === selectedObjectName);
+    }
+  }
+
+  const node = index !== null && index >= 0 ? nodes[index] : null;
   if (!node || !node.parentNode) {
+    selectedObjectIndex = null;
+    selectedObjectName = null;
+    clearObjectPanel();
     return;
   }
 
-  const removedIndex = selectedObjectIndex;
+  selectedObjectIndex = index;
+
+  const removedIndex = index;
   const popupGroupName = getPopupGroupNameForNode(node);
   if (popupGroupName) {
     let removedAny = false;
@@ -5414,9 +6232,11 @@ function deleteSelectedObject() {
   const remaining = getObjectNodes(doc);
   if (!remaining.length) {
     selectedObjectIndex = null;
+    selectedObjectName = null;
     clearObjectPanel();
   } else {
     selectedObjectIndex = Math.max(0, Math.min(removedIndex, remaining.length - 1));
+    selectedObjectName = String(remaining[selectedObjectIndex]?.getAttribute('name') || '') || null;
     populateObjectPanel(doc, selectedObjectIndex);
   }
 
@@ -5474,10 +6294,101 @@ function uniqueObjectName(doc, prefix) {
   return `${prefix}_${index}`;
 }
 
+function schedulePreviewRefit(refitFn) {
+  if (previewRefitFrame) {
+    cancelAnimationFrame(previewRefitFrame);
+  }
+  previewRefitFrame = requestAnimationFrame(() => {
+    previewRefitFrame = null;
+    refitFn();
+  });
+}
+
+function updatePreviewSelectionInPlace(canvas, priorIndex, nextIndex) {
+  if (!canvas) {
+    return;
+  }
+
+  canvas.querySelectorAll('.xml-object.selected').forEach((box) => {
+    box.classList.remove('selected');
+  });
+
+  if (nextIndex !== null && nextIndex >= 0) {
+    const nextBox = canvas.querySelector(`.xml-object[data-object-index="${nextIndex}"]`);
+    nextBox?.classList.add('selected');
+  }
+}
+
+function selectionChangeNeedsFullPreview(doc, priorIndex, nextIndex) {
+  if (priorIndex === nextIndex) {
+    return false;
+  }
+
+  const nodes = getObjectNodes(doc);
+  const priorTag = priorIndex !== null && priorIndex >= 0
+    ? String(nodes[priorIndex]?.tagName || '').toLowerCase()
+    : '';
+  const nextTag = nextIndex !== null && nextIndex >= 0
+    ? String(nodes[nextIndex]?.tagName || '').toLowerCase()
+    : '';
+  return priorTag === 'line' || nextTag === 'line';
+}
+
+function refreshPreviewAfterSelection(doc, canvas, priorIndex, nextIndex) {
+  if (selectionChangeNeedsFullPreview(doc, priorIndex, nextIndex)) {
+    renderPreview();
+    return;
+  }
+
+  if (priorIndex !== nextIndex) {
+    updatePreviewSelectionInPlace(canvas, priorIndex, nextIndex);
+  }
+}
+
+function schedulePersistCurrentXmlState(delayMs = 700) {
+  clearTimeout(persistXmlDebounceTimer);
+  persistXmlDebounceTimer = setTimeout(() => {
+    persistXmlDebounceTimer = null;
+    persistCurrentXmlState();
+  }, delayMs);
+}
+
+function applyEditorDocChange(workingDoc, options = {}) {
+  const {
+    history = true,
+    render = true,
+    persist = true,
+    panelIndex = selectedObjectIndex
+  } = options;
+
+  xmlEditor.value = serializeXmlDoc(workingDoc);
+  if (history) {
+    recordHistory(xmlEditor.value);
+  }
+  if (panelIndex !== null && panelIndex >= 0) {
+    selectedObjectIndex = panelIndex;
+    populateObjectPanel(workingDoc, panelIndex);
+  }
+  if (render) {
+    renderPreview();
+  }
+  if (persist) {
+    schedulePersistCurrentXmlState();
+  }
+}
+
 function persistCurrentXmlState() {
   const targetDisplayName = getTargetDisplayName();
   if (!targetDisplayName || !xmlEditor.value.trim()) {
     return;
+  }
+
+  if (syncCurrentXmlToActiveProjectScreen()) {
+    try {
+      saveProjectList();
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   const sanitizedXml = sanitizeXmlForFactoryTalk(xmlEditor.value);
@@ -5521,15 +6432,10 @@ function addButtonObject() {
   const width = Number(displaySettings?.getAttribute('width')) || Number(screenWidth.value) || DEFAULT_PREVIEW_WIDTH;
   const height = Number(displaySettings?.getAttribute('height')) || Number(screenHeight.value) || DEFAULT_PREVIEW_HEIGHT;
 
-  const templateButton = Array.from(root.querySelectorAll('*'))
-    .find((node) => {
-      const tag = String(node.tagName || '').toLowerCase();
-      return tag === 'momentarybutton'
-        || tag === 'gotobutton'
-        || tag === 'pushbutton'
-        || tag === 'button'
-        || tag === 'multistatepushbutton';
-    });
+  const templateButton = Array.from(root.querySelectorAll('momentaryButton, momentarybutton, multistatepushbutton'))
+    .find((node) => String(node.tagName || '').toLowerCase() === 'momentarybutton')
+    || Array.from(root.querySelectorAll('multistatepushbutton'))
+      .find((node) => String(node.tagName || '').toLowerCase() === 'multistatepushbutton');
 
   const button = templateButton ? templateButton.cloneNode(true) : doc.createElement('momentaryButton');
   const buttonTag = String(button.tagName || '').toLowerCase();
@@ -5685,6 +6591,556 @@ function addButtonObject() {
 
   renderPreview();
   persistCurrentXmlState();
+}
+
+function addLineObject() {
+  if (!xmlEditor.value.trim()) {
+    alert('Load a display XML first.');
+    return;
+  }
+
+  lineDrawState = { active: true };
+  renderPreview();
+}
+
+function requireGfxDoc() {
+  const xml = xmlEditor.value.trim();
+  if (!xml) {
+    alert('Load a display XML first.');
+    return null;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  if (doc.querySelector('parsererror')) {
+    alert('XML parse error. Fix XML before adding objects.');
+    return null;
+  }
+
+  const root = doc.querySelector('gfx');
+  if (!root) {
+    alert('Could not find gfx root in XML.');
+    return null;
+  }
+
+  const displaySettings = doc.querySelector('displaySettings');
+  const width = Number(displaySettings?.getAttribute('width')) || Number(screenWidth.value) || DEFAULT_PREVIEW_WIDTH;
+  const height = Number(displaySettings?.getAttribute('height')) || Number(screenHeight.value) || DEFAULT_PREVIEW_HEIGHT;
+  return { doc, root, width, height };
+}
+
+function normalizeInsertedNode(node) {
+  node.setAttribute('visible', 'true');
+  node.setAttribute('isReferenceObject', 'false');
+  node.removeAttribute('linkBaseObject');
+  node.removeAttribute('linkSize');
+  node.removeAttribute('linkConnections');
+  node.removeAttribute('linkAnimations');
+  if (node.hasAttribute('wallpaper')) {
+    node.setAttribute('wallpaper', 'false');
+  }
+
+  Array.from(node.children).forEach((child) => {
+    const tag = String(child.tagName || '').toLowerCase();
+    if (tag === 'connections' || tag === 'animations') {
+      node.removeChild(child);
+    }
+  });
+}
+
+function centerObjectRect(objWidth, objHeight, displayWidth, displayHeight) {
+  return {
+    left: Math.round((displayWidth - objWidth) / 2),
+    top: Math.round((displayHeight - objHeight) / 2),
+    width: objWidth,
+    height: objHeight
+  };
+}
+
+function findGfxTemplate(root, tagName, predicate = null, options = {}) {
+  const tag = String(tagName || '').toLowerCase();
+  const preferHome = Boolean(options.preferHome);
+
+  const findInHome = () => {
+    if (!homeTemplateRoot) {
+      const parsed = new DOMParser().parseFromString(HOME_OBJECT_TEMPLATE_XML, 'text/xml');
+      homeTemplateRoot = parsed.querySelector('gfx');
+    }
+    if (!homeTemplateRoot) {
+      return null;
+    }
+
+    return Array.from(homeTemplateRoot.children).find((node) => {
+      if (String(node.tagName || '').toLowerCase() !== tag) {
+        return false;
+      }
+      return predicate ? predicate(node) : true;
+    }) || null;
+  };
+
+  const findInDisplay = () => Array.from(root.querySelectorAll('*')).find((node) => {
+    if (String(node.tagName || '').toLowerCase() !== tag) {
+      return false;
+    }
+    return predicate ? predicate(node) : true;
+  }) || null;
+
+  if (preferHome) {
+    return findInHome() || findInDisplay();
+  }
+
+  return findInDisplay() || findInHome();
+}
+
+function displayNameFromScreenFile(fileName) {
+  return String(fileName || '').replace(/\.xml$/i, '');
+}
+
+function getKnownGotoDisplayNames() {
+  const names = new Set();
+  const project = getActiveProject();
+  if (project) {
+    for (const fileName of getAllActiveProjectScreenFiles(project)) {
+      const displayName = displayNameFromScreenFile(fileName);
+      if (displayName) {
+        names.add(displayName);
+      }
+    }
+  }
+
+  for (const row of currentDisplayRows || []) {
+    const displayName = displayNameFromScreenFile(row.name);
+    if (displayName) {
+      names.add(displayName);
+    }
+  }
+
+  for (const fileName of bridgeDisplayFileNames || []) {
+    const displayName = displayNameFromScreenFile(fileName);
+    if (displayName) {
+      names.add(displayName);
+    }
+  }
+
+  const xml = String(xmlEditor?.value || '');
+  if (xml.trim()) {
+    const displayMatches = xml.match(/\bdisplay="([^"]+)"/gi) || [];
+    for (const match of displayMatches) {
+      const value = match.replace(/^display="/i, '').replace(/"$/, '').trim();
+      if (value) {
+        names.add(value);
+      }
+    }
+  }
+
+  return [...names].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+function isGotoButtonNode(node) {
+  const tag = String(node?.tagName || '').toLowerCase();
+  return tag === 'gotobutton';
+}
+
+function lookupGotoDisplayInXml(objectName) {
+  const name = String(objectName || '').trim();
+  if (!name || !xmlEditor?.value) {
+    return null;
+  }
+
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patterns = [
+    new RegExp(`<gotoButton\\b[^>]*\\bname="${escaped}"[^>]*\\bdisplay="([^"]*)"`, 'i'),
+    new RegExp(`<gotoButton\\b[^>]*\\bdisplay="([^"]*)"[^>]*\\bname="${escaped}"`, 'i')
+  ];
+
+  for (const pattern of patterns) {
+    const match = String(xmlEditor.value).match(pattern);
+    if (match) {
+      return match[1];
+    }
+  }
+
+  return null;
+}
+
+function getGotoDisplayTarget(node) {
+  if (!node) {
+    return '';
+  }
+
+  if (node.attributes) {
+    for (let i = 0; i < node.attributes.length; i += 1) {
+      const attr = node.attributes[i];
+      if (String(attr.name || '').toLowerCase() === 'display') {
+        return String(attr.value ?? '');
+      }
+    }
+  }
+
+  const fromXml = lookupGotoDisplayInXml(node.getAttribute('name'));
+  if (fromXml !== null) {
+    return fromXml;
+  }
+
+  return String(node.getAttribute('display') || '');
+}
+
+function resolveGotoDisplayTarget(node, captionValue = '') {
+  const stored = getGotoDisplayTarget(node).trim();
+  if (stored) {
+    return suggestGotoDisplayTarget(stored) || stored;
+  }
+
+  return suggestGotoDisplayTarget(captionValue)
+    || suggestGotoDisplayTarget(node?.getAttribute('name') || '')
+    || '';
+}
+
+function normalizeGotoLabel(value) {
+  return String(value || '').trim().toLowerCase().replace(/[\s_]+/g, '');
+}
+
+function suggestGotoDisplayTarget(label) {
+  const needle = normalizeGotoLabel(label);
+  if (!needle) {
+    return '';
+  }
+
+  const known = getKnownGotoDisplayNames();
+  const exact = known.find((name) => normalizeGotoLabel(name) === needle);
+  if (exact) {
+    return exact;
+  }
+
+  return known.find((name) => {
+    const norm = normalizeGotoLabel(name);
+    return norm.includes(needle) || needle.includes(norm);
+  }) || '';
+}
+
+function syncGotoDisplayOptions(selectedValue = '') {
+  if (!objGotoDisplay) {
+    return;
+  }
+
+  const names = getKnownGotoDisplayNames();
+  const current = String(selectedValue || objGotoDisplay.value || '').trim();
+  const options = ['<option value="">Select target screen…</option>'];
+  for (const name of names) {
+    const safe = name.replace(/"/g, '&quot;');
+    options.push(`<option value="${safe}">${safe}</option>`);
+  }
+
+  if (current && !names.includes(current)) {
+    const safe = current.replace(/"/g, '&quot;');
+    options.push(`<option value="${safe}">${safe}</option>`);
+  }
+
+  objGotoDisplay.innerHTML = options.join('');
+  objGotoDisplay.value = current;
+}
+
+function repairGotoButtonsInXml(xml) {
+  const source = String(xml || '').trim();
+  if (!source || !/<gotoButton\b/i.test(source)) {
+    return source;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(source, 'text/xml');
+  if (doc.querySelector('parsererror')) {
+    return source;
+  }
+
+  let changed = false;
+  doc.querySelectorAll('gotoButton').forEach((node) => {
+    const current = getGotoDisplayTarget(node).trim();
+    if (current && current !== '100 Home') {
+      return;
+    }
+
+    const caption = getObjectCaptionNode(node)?.getAttribute('caption') || '';
+    const target = suggestGotoDisplayTarget(caption)
+      || suggestGotoDisplayTarget(node.getAttribute('name') || '');
+    if (target && target !== current) {
+      node.setAttribute('display', target);
+      changed = true;
+    }
+  });
+
+  return changed ? serializeXmlDoc(doc) : source;
+}
+
+function placeInsertedObject(node, objectName, displayWidth, displayHeight) {
+  const objWidth = Math.max(1, Number(node.getAttribute('width')) || 1);
+  const objHeight = Math.max(1, Number(node.getAttribute('height')) || 1);
+  normalizeInsertedNode(node);
+  node.setAttribute('name', objectName);
+  node.setAttribute('left', String(Math.round((displayWidth - objWidth) / 2)));
+  node.setAttribute('top', String(Math.round((displayHeight - objHeight) / 2)));
+  node.setAttribute('width', String(objWidth));
+  node.setAttribute('height', String(objHeight));
+}
+
+function finalizeGfxInsert(doc, objectName) {
+  xmlEditor.value = serializeXmlDoc(doc);
+  recordHistory(xmlEditor.value);
+  const nodes = getObjectNodes(doc);
+  selectedObjectIndex = nodes.findIndex((node) => String(node.getAttribute('name') || '') === objectName);
+  if (selectedObjectIndex >= 0) {
+    populateObjectPanel(doc, selectedObjectIndex);
+  }
+  renderPreview();
+  persistCurrentXmlState();
+}
+
+function ensureCaptionNode(doc, node, captionText) {
+  let captionNode = Array.from(node.children).find((child) => child.tagName === 'caption');
+  if (!captionNode) {
+    captionNode = doc.createElement('caption');
+    node.appendChild(captionNode);
+  }
+  captionNode.setAttribute('caption', captionText);
+  if (!captionNode.getAttribute('color')) {
+    captionNode.setAttribute('color', 'black');
+  }
+  if (!captionNode.getAttribute('fontFamily')) {
+    captionNode.setAttribute('fontFamily', 'Arial');
+  }
+  if (!captionNode.getAttribute('fontSize')) {
+    captionNode.setAttribute('fontSize', '10');
+  }
+  if (!captionNode.getAttribute('alignment')) {
+    captionNode.setAttribute('alignment', 'middleCenter');
+  }
+  if (!captionNode.getAttribute('bold')) {
+    captionNode.setAttribute('bold', 'true');
+  }
+  if (!captionNode.getAttribute('italic')) {
+    captionNode.setAttribute('italic', 'false');
+  }
+  if (!captionNode.getAttribute('underline')) {
+    captionNode.setAttribute('underline', 'false');
+  }
+  if (!captionNode.getAttribute('strikethrough')) {
+    captionNode.setAttribute('strikethrough', 'false');
+  }
+  if (!captionNode.getAttribute('backStyle')) {
+    captionNode.setAttribute('backStyle', 'transparent');
+  }
+  if (!captionNode.getAttribute('wordWrap')) {
+    captionNode.setAttribute('wordWrap', 'false');
+  }
+  if (!captionNode.getAttribute('blink')) {
+    captionNode.setAttribute('blink', 'false');
+  }
+}
+
+function createDefaultMultistateIndicator(doc, root, width, height, shape) {
+  const templateOptions = { preferHome: true };
+  const template = findGfxTemplate(root, 'multistateIndicator', (node) => {
+    return String(node.getAttribute('shape') || '').toLowerCase() === shape;
+  }, templateOptions) || findGfxTemplate(root, 'multistateIndicator', null, templateOptions);
+  const indicator = template ? template.cloneNode(true) : doc.createElement('multistateIndicator');
+  const objectName = uniqueObjectName(doc, shape === 'circle' ? 'MSI_Circle' : 'MSI_Rect');
+
+  if (template) {
+    placeInsertedObject(indicator, objectName, width, height);
+    indicator.setAttribute('shape', shape);
+    root.appendChild(indicator);
+    return objectName;
+  }
+
+  const isCircle = shape === 'circle';
+  const rect = centerObjectRect(isCircle ? 22 : 80, isCircle ? 22 : 36, width, height);
+
+  normalizeInsertedNode(indicator);
+  indicator.setAttribute('name', objectName);
+  indicator.setAttribute('left', String(rect.left));
+  indicator.setAttribute('top', String(rect.top));
+  indicator.setAttribute('width', String(rect.width));
+  indicator.setAttribute('height', String(rect.height));
+  indicator.setAttribute('shape', shape);
+  indicator.setAttribute('backStyle', 'solid');
+  indicator.setAttribute('borderStyle', isCircle ? 'line' : 'raised');
+  indicator.setAttribute('borderUsesBackColor', 'true');
+  indicator.setAttribute('borderWidth', '1');
+  indicator.setAttribute('triggerType', 'value');
+  indicator.setAttribute('currentStateId', '0');
+  indicator.setAttribute('captionOnBorder', 'false');
+  indicator.setAttribute('setLastStateId', isCircle ? '3' : '2');
+
+  const states = doc.createElement('states');
+  [
+    { stateId: '0', value: '0', backColor: isCircle ? '#C6C6C6' : '#F83D3D', caption: isCircle ? '0' : 'Fault' },
+    { stateId: '1', value: '1', backColor: isCircle ? '#10EB10' : 'lime', caption: isCircle ? '1' : 'Healthy' },
+    { stateId: '2', value: '2', backColor: '#F83D3D', caption: 'Fault' }
+  ].forEach((entry) => {
+    const state = doc.createElement('state');
+    state.setAttribute('stateId', entry.stateId);
+    if (entry.value !== undefined) {
+      state.setAttribute('value', entry.value);
+    }
+    state.setAttribute('backColor', entry.backColor);
+    state.setAttribute('borderColor', entry.backColor);
+    state.setAttribute('patternColor', 'white');
+    state.setAttribute('patternStyle', 'none');
+    state.setAttribute('blink', 'false');
+    state.setAttribute('endColor', 'white');
+    state.setAttribute('gradientStop', '50');
+    state.setAttribute('gradientDirection', 'gradientDirectionHorizontal');
+    state.setAttribute('gradientShadingStyle', 'gradientHorizontalFromRight');
+    if (!isCircle || entry.stateId !== '2') {
+      ensureCaptionNode(doc, state, entry.caption);
+    }
+    states.appendChild(state);
+  });
+  indicator.appendChild(states);
+
+  root.appendChild(indicator);
+  return objectName;
+}
+
+function addGotoDisplayObject() {
+  const ctx = requireGfxDoc();
+  if (!ctx) {
+    return;
+  }
+
+  const { doc, root, width, height } = ctx;
+  const template = findGfxTemplate(root, 'gotoButton', null, { preferHome: true });
+  const button = template ? template.cloneNode(true) : doc.createElement('gotoButton');
+  const objectName = uniqueObjectName(doc, 'GotoDisplay');
+
+  if (template) {
+    placeInsertedObject(button, objectName, width, height);
+    ensureCaptionNode(doc, button, getObjectCaptionNode(button)?.getAttribute('caption') || 'Production');
+  } else {
+    const rect = centerObjectRect(85, 45, width, height);
+    normalizeInsertedNode(button);
+    button.setAttribute('name', objectName);
+    button.setAttribute('left', String(rect.left));
+    button.setAttribute('top', String(rect.top));
+    button.setAttribute('width', '85');
+    button.setAttribute('height', '45');
+    button.setAttribute('backColor', '#E0E0E0');
+    button.setAttribute('backStyle', 'solid');
+    button.setAttribute('borderStyle', 'raised');
+    button.setAttribute('borderUsesBackColor', 'false');
+    button.setAttribute('borderWidth', '4');
+    button.setAttribute('borderColor', 'silver');
+    button.setAttribute('display', '101 Production');
+    ensureCaptionNode(doc, button, 'Production');
+  }
+
+  const caption = getObjectCaptionNode(button)?.getAttribute('caption') || '';
+  const storedTarget = getGotoDisplayTarget(button).trim();
+  let target = suggestGotoDisplayTarget(storedTarget)
+    || suggestGotoDisplayTarget(caption)
+    || suggestGotoDisplayTarget(objectName)
+    || getKnownGotoDisplayNames()[0]
+    || storedTarget
+    || '';
+  button.setAttribute('display', target);
+
+  root.appendChild(button);
+  finalizeGfxInsert(doc, objectName);
+}
+
+function addTextObject() {
+  const ctx = requireGfxDoc();
+  if (!ctx) {
+    return;
+  }
+
+  const { doc, root, width, height } = ctx;
+  const template = findGfxTemplate(root, 'text', null, { preferHome: true });
+  const textNode = template ? template.cloneNode(true) : doc.createElement('text');
+  const objectName = uniqueObjectName(doc, 'Text');
+
+  if (template) {
+    placeInsertedObject(textNode, objectName, width, height);
+    if (!textNode.getAttribute('caption')) {
+      textNode.setAttribute('caption', 'Text Label');
+    }
+  } else {
+    const rect = centerObjectRect(45, 16, width, height);
+    normalizeInsertedNode(textNode);
+    textNode.setAttribute('name', objectName);
+    textNode.setAttribute('left', String(rect.left));
+    textNode.setAttribute('top', String(rect.top));
+    textNode.setAttribute('width', '45');
+    textNode.setAttribute('height', '16');
+    textNode.setAttribute('backStyle', 'transparent');
+    textNode.setAttribute('backColor', 'white');
+    textNode.setAttribute('foreColor', 'black');
+    textNode.setAttribute('wordWrap', 'true');
+    textNode.setAttribute('sizeToFit', 'true');
+    textNode.setAttribute('alignment', 'middleCenter');
+    textNode.setAttribute('fontFamily', 'Arial');
+    textNode.setAttribute('charHeight', '16');
+    textNode.setAttribute('charWidth', '7');
+    textNode.setAttribute('bold', 'true');
+    textNode.setAttribute('italic', 'false');
+    textNode.setAttribute('underline', 'false');
+    textNode.setAttribute('strikethrough', 'false');
+    textNode.setAttribute('caption', 'Text Label');
+  }
+
+  root.appendChild(textNode);
+  finalizeGfxInsert(doc, objectName);
+}
+
+function addMultistateIndicatorObject(shape) {
+  const ctx = requireGfxDoc();
+  if (!ctx) {
+    return;
+  }
+
+  const objectName = createDefaultMultistateIndicator(ctx.doc, ctx.root, ctx.width, ctx.height, shape);
+  finalizeGfxInsert(ctx.doc, objectName);
+}
+
+function addPolygonObject() {
+  const ctx = requireGfxDoc();
+  if (!ctx) {
+    return;
+  }
+
+  const { doc, root, width, height } = ctx;
+  const template = findGfxTemplate(root, 'rectangle', (node) => /polygon/i.test(String(node.getAttribute('name') || '')))
+    || findGfxTemplate(root, 'rectangle');
+  const objectName = uniqueObjectName(doc, 'Polygon');
+  const polyWidth = Math.max(80, Number(template?.getAttribute('width')) || 160);
+  const polyHeight = Math.max(40, Number(template?.getAttribute('height')) || 73);
+  const left = Math.round((width - polyWidth) / 2);
+  const top = Math.round((height - polyHeight) / 2);
+  const polygon = doc.createElement('polygon');
+
+  normalizeInsertedNode(polygon);
+  polygon.setAttribute('name', objectName);
+  if (template) {
+    for (const attr of ['backStyle', 'backColor', 'foreColor', 'lineStyle', 'lineWidth', 'patternStyle', 'patternColor', 'endColor', 'gradientStop', 'gradientDirection', 'gradientShadingStyle']) {
+      if (template.hasAttribute(attr)) {
+        polygon.setAttribute(attr, template.getAttribute(attr));
+      }
+    }
+  } else {
+    polygon.setAttribute('backStyle', 'solid');
+    polygon.setAttribute('backColor', 'white');
+    polygon.setAttribute('foreColor', 'black');
+    polygon.setAttribute('lineStyle', 'solid');
+    polygon.setAttribute('lineWidth', '1');
+  }
+  setPolygonPoints(polygon, [
+    { x: left, y: top },
+    { x: left + polyWidth, y: top },
+    { x: left + polyWidth, y: top + polyHeight },
+    { x: left, y: top + polyHeight }
+  ]);
+
+  root.appendChild(polygon);
+  finalizeGfxInsert(doc, objectName);
 }
 
 async function refreshImageLibraryOptions() {
@@ -5883,6 +7339,55 @@ function syncObjectImageNameField(node) {
   const tag = String(node?.tagName || '').toLowerCase();
   const show = tag === 'image' || Boolean(getNodeImageName(node));
   objImageNameRow.hidden = !show;
+}
+
+function syncLinePropsField(node) {
+  const tag = String(node?.tagName || '').toLowerCase();
+  const isLine = tag === 'line';
+  const isGoto = isGotoButtonNode(node);
+  const isIndicator = tag === 'multistateindicator';
+  const isPolygon = tag === 'polygon';
+  const isText = tag === 'text';
+
+  if (objLinePropsRow) {
+    objLinePropsRow.hidden = !isLine;
+  }
+  if (objGotoPropsRow) {
+    objGotoPropsRow.hidden = !isGoto;
+  }
+  if (objIndicatorPropsRow) {
+    objIndicatorPropsRow.hidden = !isIndicator;
+  }
+  if (objPolygonPropsRow) {
+    objPolygonPropsRow.hidden = !isPolygon;
+  }
+  if (objTextPropsRow) {
+    objTextPropsRow.hidden = !isText;
+  }
+  if (objCaptionRow) {
+    objCaptionRow.hidden = isLine || isIndicator || isPolygon;
+  }
+  if (objBorderColorRow) {
+    objBorderColorRow.hidden = isLine || isText;
+  }
+  if (objFontRow) {
+    objFontRow.hidden = isLine || isIndicator;
+  }
+  if (objTextColorLabel) {
+    objTextColorLabel.textContent = isLine ? 'Fore Color' : 'Text Color';
+  }
+  if (objLeftLabel) {
+    objLeftLabel.textContent = isLine ? 'From X' : 'Left';
+  }
+  if (objTopLabel) {
+    objTopLabel.textContent = isLine ? 'From Y' : 'Top';
+  }
+  if (objWidthLabel) {
+    objWidthLabel.textContent = isLine ? 'To X' : 'Width';
+  }
+  if (objHeightLabel) {
+    objHeightLabel.textContent = isLine ? 'To Y' : 'Height';
+  }
 }
 
 function getActiveProjectForPopupPlanner() {
@@ -6652,11 +8157,14 @@ function setEditorDisplay(name, xml) {
   activeProjectFolder = '';
   activeProjectScreen = '';
   activeProjectCsvKey = '';
+  clearActiveProjectScreenKey();
   selectedDisplay = name;
   selectedDefaultTemplate = '';
   displayName.value = name;
-  xmlEditor.value = xml;
-  resetHistory(xml);
+  let safeXml = isOverviewScreenName(name) ? stripOverviewEditorArtifacts(xml) : xml;
+  safeXml = repairGotoButtonsInXml(safeXml);
+  xmlEditor.value = safeXml;
+  resetHistory(safeXml);
   selectedObjectIndex = null;
   clearObjectPanel();
 
@@ -6697,28 +8205,28 @@ function setEditorTemplate(name, xml) {
   renderProjectPopupPlanner();
 }
 
-async function readUploadedText(file) {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
-    return new TextDecoder('utf-16le').decode(bytes.slice(2));
+function decodeTextBytes(bytes) {
+  const buffer = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  if (buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe) {
+    return new TextDecoder('utf-16le').decode(buffer.slice(2));
   }
 
-  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
-    return new TextDecoder('utf-16be').decode(bytes.slice(2));
+  if (buffer.length >= 2 && buffer[0] === 0xfe && buffer[1] === 0xff) {
+    return new TextDecoder('utf-16be').decode(buffer.slice(2));
   }
 
-  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
-    return new TextDecoder('utf-8').decode(bytes.slice(3));
+  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
+    return new TextDecoder('utf-8').decode(buffer.slice(3));
   }
 
   // Heuristic fallback for BOM-less UTF-16 exports.
-  if (bytes.length >= 8) {
+  if (buffer.length >= 8) {
     let evenZeroCount = 0;
     let oddZeroCount = 0;
-    const sample = Math.min(bytes.length, 512);
-    for (let i = 0; i < sample; i++) {
-      if (bytes[i] === 0) {
-        if (i % 2 === 0) {
+    const sample = Math.min(buffer.length, 512);
+    for (let index = 0; index < sample; index += 1) {
+      if (buffer[index] === 0) {
+        if (index % 2 === 0) {
           evenZeroCount += 1;
         } else {
           oddZeroCount += 1;
@@ -6727,15 +8235,20 @@ async function readUploadedText(file) {
     }
 
     if (oddZeroCount > evenZeroCount * 2) {
-      return new TextDecoder('utf-16le').decode(bytes);
+      return new TextDecoder('utf-16le').decode(buffer);
     }
 
     if (evenZeroCount > oddZeroCount * 2) {
-      return new TextDecoder('utf-16be').decode(bytes);
+      return new TextDecoder('utf-16be').decode(buffer);
     }
   }
 
-  return new TextDecoder('utf-8').decode(bytes);
+  return new TextDecoder('utf-8').decode(buffer);
+}
+
+async function readUploadedText(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  return decodeTextBytes(bytes);
 }
 
 function validateDisplayXml(name, xml) {
@@ -8521,6 +10034,9 @@ async function refreshDisplays() {
   }
 
   const data = await displayRes.json();
+  bridgeDisplayFileNames = Array.isArray(data.files)
+    ? data.files.map((file) => String(file?.name || '').trim()).filter(Boolean)
+    : [];
   renderDisplays(keepCurrentDisplayOrder(data.files));
 }
 
@@ -8576,7 +10092,6 @@ function applyPreviewDisplayBackground(frame, canvas, displaySettings) {
 }
 
 function renderPreview() {
-  previewImageNonce = Date.now();
   currentPreviewIoProject = getPreviewIoProject();
   const name = displayName.value.trim() || 'Untitled Display';
   const xml = xmlEditor.value.trim();
@@ -8613,9 +10128,38 @@ function renderPreview() {
 
   const canvas = document.createElement('div');
   canvas.className = 'xml-canvas preview-display-canvas';
+  canvas.tabIndex = 0;
+  canvas.setAttribute('role', 'application');
+  canvas.setAttribute('aria-label', 'Display preview canvas');
   canvas.dataset.previewWidth = String(width);
   canvas.dataset.previewHeight = String(height);
   applyPreviewDisplayBackground(frame, canvas, displaySettings);
+
+  canvas.addEventListener('keydown', (event) => {
+    if (tryDeleteSelectedObjectFromKeyboard(event)) {
+      return;
+    }
+
+    if (selectedObjectIndex === null) {
+      return;
+    }
+
+    const step = event.shiftKey ? 10 : 1;
+    const key = String(event.key || '');
+    if (key === 'ArrowLeft') {
+      event.preventDefault();
+      nudgeSelectedObject(-step, 0);
+    } else if (key === 'ArrowRight') {
+      event.preventDefault();
+      nudgeSelectedObject(step, 0);
+    } else if (key === 'ArrowUp') {
+      event.preventDefault();
+      nudgeSelectedObject(0, -step);
+    } else if (key === 'ArrowDown') {
+      event.preventDefault();
+      nudgeSelectedObject(0, step);
+    }
+  });
 
   canvas.addEventListener('dragover', (event) => {
     if (!event.dataTransfer?.types?.includes('application/x-popup-draft-id')) {
@@ -8658,6 +10202,7 @@ function renderPreview() {
   const gfxRoot = doc.querySelector('gfx');
   if (selectedObjectIndex !== null && (selectedObjectIndex < 0 || selectedObjectIndex >= objectNodes.length)) {
     selectedObjectIndex = null;
+    selectedObjectName = null;
     clearObjectPanel();
   }
 
@@ -8665,6 +10210,7 @@ function renderPreview() {
     objectNodes.forEach((el, index) => {
       const tag = String(el.tagName || '').toLowerCase();
       const isLineTag = tag === 'line';
+      const isPolygonTag = tag === 'polygon';
       const activeStateNode = getVisualStateNode(el);
       const visualSource = activeStateNode || el;
       const absolutePosition = getNodeAbsolutePosition(el);
@@ -8676,12 +10222,19 @@ function renderPreview() {
       const top = rawTop * scaleY;
       const w = rawW * scaleX;
       const h = rawH * scaleY;
-      if (!Number.isFinite(left) || !Number.isFinite(top) || !Number.isFinite(w) || !Number.isFinite(h)) {
+      if (!isLineTag && (!Number.isFinite(left) || !Number.isFinite(top) || !Number.isFinite(w) || !Number.isFinite(h))) {
+        return;
+      }
+      if (isLineTag && !String(el.getAttribute('line') || '').trim() && (!Number.isFinite(w) || !Number.isFinite(h))) {
+        return;
+      }
+      if (isPolygonTag && !String(el.getAttribute('polygon') || '').trim()) {
         return;
       }
 
       const box = document.createElement('div');
       box.className = 'xml-object';
+      box.dataset.objectIndex = String(index);
       if (selectedObjectIndex === index) {
         box.classList.add('selected');
       }
@@ -8691,31 +10244,58 @@ function renderPreview() {
       box.style.height = `${(h / height) * 100}%`;
 
       if (isLineTag) {
-        const points = parseLinePoints(el);
-        const x1 = points.x1 * scaleX;
-        const y1 = points.y1 * scaleY;
-        const x2 = points.x2 * scaleX;
-        const y2 = points.y2 * scaleY;
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const length = Math.max(1, Math.sqrt((dx * dx) + (dy * dy)));
-        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-        const thickness = Math.max(1, Number(el.getAttribute('lineWidth')) || 1);
+        const points = scaleLinePoints(parseLinePoints(el), scaleX, scaleY);
+        const bounds = getLineBounds(points);
+        const strokeWidth = Math.max(1, Number(el.getAttribute('lineWidth')) || 1);
 
         box.classList.add('xml-line-object');
-        box.style.left = `${(x1 / width) * 100}%`;
-        box.style.top = `${(y1 / height) * 100}%`;
-        box.style.width = `${(length / width) * 100}%`;
-        box.style.height = `${(thickness / height) * 100}%`;
-        box.style.transform = `rotate(${angle}deg)`;
-        box.style.transformOrigin = '0 50%';
-        box.style.padding = '0';
-
-        const lineColor = el.getAttribute('foreColor') || el.getAttribute('backColor') || '#000000';
-        box.style.background = lineColor;
+        box.style.left = `${(bounds.minX / width) * 100}%`;
+        box.style.top = `${(bounds.minY / height) * 100}%`;
+        box.style.width = `${(bounds.width / width) * 100}%`;
+        box.style.height = `${(bounds.height / height) * 100}%`;
+        box.style.background = 'rgba(0, 0, 0, 0.001)';
+        box.style.overflow = 'visible';
+        box.style.zIndex = selectedObjectIndex === index ? '35' : '20';
+        box.style.display = 'block';
+        box.style.touchAction = 'none';
+        box.appendChild(createLinePreviewSvg(points, bounds, resolveLineStrokeColor(el), strokeWidth));
       }
 
-      if (!isLineTag) {
+      if (isPolygonTag) {
+        const rawPoints = parsePolygonPoints(el);
+        const points = rawPoints.map((point) => ({
+          x: point.x * scaleX,
+          y: point.y * scaleY
+        }));
+        const xs = points.map((point) => point.x);
+        const ys = points.map((point) => point.y);
+        const padding = 8;
+        const bounds = {
+          minX: Math.min(...xs) - padding,
+          minY: Math.min(...ys) - padding,
+          width: Math.max(1, Math.max(...xs) - Math.min(...xs) + padding * 2),
+          height: Math.max(1, Math.max(...ys) - Math.min(...ys) + padding * 2)
+        };
+
+        box.classList.add('xml-polygon-object');
+        box.style.left = `${(bounds.minX / width) * 100}%`;
+        box.style.top = `${(bounds.minY / height) * 100}%`;
+        box.style.width = `${(bounds.width / width) * 100}%`;
+        box.style.height = `${(bounds.height / height) * 100}%`;
+        box.style.background = 'rgba(0, 0, 0, 0.001)';
+        box.style.overflow = 'visible';
+        box.style.zIndex = selectedObjectIndex === index ? '35' : '12';
+        box.style.display = 'block';
+        box.appendChild(createPolygonPreviewSvg(
+          points,
+          bounds,
+          el.getAttribute('backColor') || '#C6C6C6',
+          el.getAttribute('foreColor') || '#000000',
+          Number(el.getAttribute('lineWidth')) || 1
+        ));
+      }
+
+      if (!isLineTag && !isPolygonTag) {
         applyFillStyles(box, visualSource);
       }
 
@@ -8725,7 +10305,14 @@ function renderPreview() {
         box.style.border = 'none';
       }
 
-      applyBorderStyles(box, el, visualSource);
+      if (!isLineTag && !isPolygonTag) {
+        applyBorderStyles(box, el, visualSource);
+      }
+
+      if (tag === 'multistateindicator' && String(el.getAttribute('shape') || '').toLowerCase() === 'circle') {
+        box.classList.add('xml-indicator-circle');
+        box.style.borderRadius = '50%';
+      }
 
       if (tag === 'group') {
         box.classList.add('xml-group-object');
@@ -8735,7 +10322,7 @@ function renderPreview() {
       const captionNode = Array.from(visualSource.children).find((child) => child.tagName === 'caption')
         || Array.from(el.children).find((child) => child.tagName === 'caption');
       const imageName = getNodeImageName(visualSource) || getNodeImageName(el);
-      if (imageName && !isLineTag) {
+      if (imageName && !isLineTag && !isPolygonTag) {
         const imageOpts = getNodeImageRenderOptions(el);
         const imageEl = document.createElement('img');
         imageEl.className = 'xml-object-image';
@@ -8770,7 +10357,7 @@ function renderPreview() {
 
       const caption = previewTextForNode(el, captionNode);
       let captionEl = null;
-      if (caption && tag !== 'group') {
+      if (caption && tag !== 'group' && !isLineTag && !isPolygonTag) {
         captionEl = document.createElement('span');
         captionEl.className = 'xml-object-caption';
         captionEl.textContent = caption;
@@ -8778,7 +10365,37 @@ function renderPreview() {
       }
 
       applyCaptionStyles(box, el, captionNode, captionEl);
-      box.title = `${el.tagName} (${left},${top}) ${w}x${h}`;
+      if (isLineTag) {
+        const linePoints = parseLinePoints(el);
+        box.title = `${el.tagName} (${Math.round(linePoints.x1)},${Math.round(linePoints.y1)}) → (${Math.round(linePoints.x2)},${Math.round(linePoints.y2)})`;
+      } else {
+        box.title = `${el.tagName} (${left},${top}) ${w}x${h}`;
+      }
+
+      const persistLineOrRectChange = (workingDoc, options = {}) => {
+        applyEditorDocChange(workingDoc, { ...options, panelIndex: index });
+      };
+
+      const commitLineEndpointsChange = (x1, y1, x2, y2, errorMessage) => {
+        const parser = new DOMParser();
+        const workingDoc = parser.parseFromString(xmlEditor.value, 'text/xml');
+        const parseError = workingDoc.querySelector('parsererror');
+        if (parseError) {
+          alert(errorMessage);
+          renderPreview();
+          return;
+        }
+
+        const nodes = getObjectNodes(workingDoc);
+        const node = nodes[index];
+        if (!node) {
+          renderPreview();
+          return;
+        }
+
+        setLineEndpoints(node, x1, y1, x2, y2);
+        persistLineOrRectChange(workingDoc);
+      };
 
       const commitRectChange = (nextLeft, nextTop, nextWidth, nextHeight, errorMessage) => {
         const parser = new DOMParser();
@@ -8802,26 +10419,68 @@ function renderPreview() {
         const previousTop = previousPosition.top;
         const previousWidth = Math.max(1, Number(node.getAttribute('width') || 1));
         const previousHeight = Math.max(1, Number(node.getAttribute('height') || 1));
+        const xmlRect = displayRectToXml(nextLeft, nextTop, nextWidth, nextHeight, scaleX, scaleY);
+        const movedOnly = xmlRect.width === Math.round(previousWidth)
+          && xmlRect.height === Math.round(previousHeight);
 
         const popupGroup = getPopupGroupAncestor(node);
-        const movedOnly = Math.round(nextWidth) === Math.round(previousWidth)
-          && Math.round(nextHeight) === Math.round(previousHeight);
         if (movedOnly && popupGroup) {
           const groupWidth = Math.max(1, Number(popupGroup.getAttribute('width') || 1));
           const groupHeight = Math.max(1, Number(popupGroup.getAttribute('height') || 1));
           const currentGroupLeft = Number(popupGroup.getAttribute('left') || 0);
           const currentGroupTop = Number(popupGroup.getAttribute('top') || 0);
-          const deltaLeft = Math.round(nextLeft) - Math.round(previousLeft);
-          const deltaTop = Math.round(nextTop) - Math.round(previousTop);
-          const nextGroupLeft = clamp(currentGroupLeft + deltaLeft, 0, Math.max(0, width - groupWidth));
-          const nextGroupTop = clamp(currentGroupTop + deltaTop, 0, Math.max(0, height - groupHeight));
+          const prevDisplayLeft = previousLeft * scaleX;
+          const prevDisplayTop = previousTop * scaleY;
+          const delta = displayDeltaToXml(
+            Math.round(nextLeft) - Math.round(prevDisplayLeft),
+            Math.round(nextTop) - Math.round(prevDisplayTop),
+            scaleX,
+            scaleY
+          );
+          const nextGroupLeft = clamp(currentGroupLeft + delta.deltaLeft, 0, Math.max(0, width / scaleX - groupWidth));
+          const nextGroupTop = clamp(currentGroupTop + delta.deltaTop, 0, Math.max(0, height / scaleY - groupHeight));
           popupGroup.setAttribute('left', String(Math.round(nextGroupLeft)));
           popupGroup.setAttribute('top', String(Math.round(nextGroupTop)));
         } else {
-          node.setAttribute('left', String(Math.round(nextLeft)));
-          node.setAttribute('top', String(Math.round(nextTop)));
-          node.setAttribute('width', String(Math.max(1, Math.round(nextWidth))));
-          node.setAttribute('height', String(Math.max(1, Math.round(nextHeight))));
+          const nodeTagLower = String(node.tagName || '').toLowerCase();
+          if (nodeTagLower === 'polygon') {
+            const prevDisplayLeft = previousLeft * scaleX;
+            const prevDisplayTop = previousTop * scaleY;
+            const delta = displayDeltaToXml(
+              Math.round(nextLeft) - Math.round(prevDisplayLeft),
+              Math.round(nextTop) - Math.round(prevDisplayTop),
+              scaleX,
+              scaleY
+            );
+            if (movedOnly) {
+              const points = parsePolygonPoints(node).map((point) => ({
+                x: point.x + delta.deltaLeft,
+                y: point.y + delta.deltaTop
+              }));
+              setPolygonPoints(node, points);
+            } else {
+              scalePolygonToRect(
+                node,
+                previousLeft,
+                previousTop,
+                previousWidth,
+                previousHeight,
+                xmlRect.left,
+                xmlRect.top,
+                xmlRect.width,
+                xmlRect.height
+              );
+            }
+          } else {
+            node.setAttribute('left', String(xmlRect.left));
+            node.setAttribute('top', String(xmlRect.top));
+            node.setAttribute('width', String(xmlRect.width));
+            node.setAttribute('height', String(xmlRect.height));
+
+            if (nodeTagLower === 'line') {
+              updateLineCoordinates(node);
+            }
+          }
 
           if (movedOnly) {
             const groupId = getPopupGroupNameForNode(node);
@@ -8829,35 +10488,15 @@ function renderPreview() {
               workingDoc,
               groupId,
               node,
-              Math.round(nextLeft) - Math.round(previousLeft),
-              Math.round(nextTop) - Math.round(previousTop),
-              width,
-              height
+              xmlRect.left - Math.round(previousLeft),
+              xmlRect.top - Math.round(previousTop),
+              width / scaleX,
+              height / scaleY
             );
           }
         }
 
-        xmlEditor.value = serializeXmlDoc(workingDoc);
-        recordHistory(xmlEditor.value);
-
-        selectedObjectIndex = index;
-        populateObjectPanel(workingDoc, index);
-        renderPreview();
-
-        if (selectedDisplay) {
-          saveDisplayXml(selectedDisplay, xmlEditor.value)
-            .then(() => {
-              updateCurrentDisplayRow(selectedDisplay, xmlEditor.value);
-              if (usingUploadedList) {
-                renderDisplays(currentDisplayRows);
-              } else {
-                refreshDisplays().catch(() => {});
-              }
-            })
-            .catch((err) => {
-              console.error(err);
-            });
-        }
+        persistLineOrRectChange(workingDoc);
       };
 
       const resizeHandle = document.createElement('span');
@@ -8867,24 +10506,117 @@ function renderPreview() {
       }
 
       let suppressClick = false;
-      box.addEventListener('mousedown', (downEvent) => {
-        if (downEvent.button !== 0 || isPending) {
+      box.addEventListener('pointerdown', (downEvent) => {
+        if (downEvent.button !== 0) {
           return;
         }
 
         if (isLineTag) {
-          return;
-        }
+          downEvent.preventDefault();
+          downEvent.stopPropagation();
+          const priorSelection = selectedObjectIndex;
+          setSelectedObject(doc, index, el);
+          populateObjectPanel(doc, index);
+          focusPreviewCanvas(canvas);
+          box.setPointerCapture(downEvent.pointerId);
 
-        if (downEvent.target.closest('.xml-resize-handle')) {
+          const startPoints = scaleLinePoints(parseLinePoints(el), scaleX, scaleY);
+          const startX = downEvent.clientX;
+          const startY = downEvent.clientY;
+          let moved = false;
+          let previewPoints = { ...startPoints };
+
+          const renderLinePreview = (points) => {
+            const bounds = getLineBounds(points);
+            box.style.left = `${(bounds.minX / width) * 100}%`;
+            box.style.top = `${(bounds.minY / height) * 100}%`;
+            box.style.width = `${(bounds.width / width) * 100}%`;
+            box.style.height = `${(bounds.height / height) * 100}%`;
+            box.querySelector('svg')?.remove();
+            box.appendChild(createLinePreviewSvg(
+              points,
+              bounds,
+              resolveLineStrokeColor(el),
+              Math.max(1, Number(el.getAttribute('lineWidth')) || 1)
+            ));
+          };
+
+          const onMove = (moveEvent) => {
+            if (moveEvent.pointerId !== downEvent.pointerId) {
+              return;
+            }
+
+            const { scaleX: dragScaleX, scaleY: dragScaleY } = getCanvasScale(canvas, width, height);
+            if (!Number.isFinite(dragScaleX) || !Number.isFinite(dragScaleY) || dragScaleX <= 0 || dragScaleY <= 0) {
+              return;
+            }
+
+            const deltaX = (moveEvent.clientX - startX) / dragScaleX;
+            const deltaY = (moveEvent.clientY - startY) / dragScaleY;
+            const dragDistance = Math.abs(moveEvent.clientX - startX) + Math.abs(moveEvent.clientY - startY);
+            if (dragDistance > 2) {
+              moved = true;
+              suppressClick = true;
+            }
+
+            if (!moved) {
+              return;
+            }
+
+            previewPoints = {
+              x1: startPoints.x1 + deltaX,
+              y1: startPoints.y1 + deltaY,
+              x2: startPoints.x2 + deltaX,
+              y2: startPoints.y2 + deltaY
+            };
+            box.classList.add('dragging');
+            renderLinePreview(previewPoints);
+          };
+
+          const onUp = (upEvent) => {
+            if (upEvent.pointerId !== downEvent.pointerId) {
+              return;
+            }
+
+            box.releasePointerCapture(upEvent.pointerId);
+            box.removeEventListener('pointermove', onMove);
+            box.classList.remove('dragging');
+
+            if (moved) {
+              const xmlPoints = unscaleLinePoints(previewPoints, scaleX, scaleY);
+              commitLineEndpointsChange(
+                xmlPoints.x1,
+                xmlPoints.y1,
+                xmlPoints.x2,
+                xmlPoints.y2,
+                'XML parse error. Could not save moved line.'
+              );
+            } else {
+              refreshPreviewAfterSelection(doc, canvas, priorSelection, index);
+              focusPreviewCanvas(canvas);
+            }
+
+            setTimeout(() => {
+              suppressClick = false;
+            }, 0);
+          };
+
+          box.addEventListener('pointermove', onMove);
+          box.addEventListener('pointerup', onUp, { once: true });
+          box.addEventListener('pointercancel', onUp, { once: true });
           return;
         }
 
         downEvent.preventDefault();
         downEvent.stopPropagation();
+        const priorSelection = selectedObjectIndex;
+        setSelectedObject(doc, index, el);
+        populateObjectPanel(doc, index);
+        focusPreviewCanvas(canvas);
+        box.setPointerCapture(downEvent.pointerId);
 
-        const { scaleX, scaleY } = getCanvasScale(canvas, width, height);
-        if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || scaleX <= 0 || scaleY <= 0) {
+        const { scaleX: canvasScaleX, scaleY: canvasScaleY } = getCanvasScale(canvas, width, height);
+        if (!Number.isFinite(canvasScaleX) || !Number.isFinite(canvasScaleY) || canvasScaleX <= 0 || canvasScaleY <= 0) {
           return;
         }
 
@@ -8892,11 +10624,19 @@ function renderPreview() {
         const startY = downEvent.clientY;
         let nextLeft = left;
         let nextTop = top;
+        let nextWidth = w;
+        let nextHeight = h;
         let moved = false;
+        let resized = false;
+        const isResize = downEvent.target.closest('.xml-resize-handle');
 
         const onMove = (moveEvent) => {
-          const deltaX = (moveEvent.clientX - startX) / scaleX;
-          const deltaY = (moveEvent.clientY - startY) / scaleY;
+          if (moveEvent.pointerId !== downEvent.pointerId) {
+            return;
+          }
+
+          const deltaX = (moveEvent.clientX - startX) / canvasScaleX;
+          const deltaY = (moveEvent.clientY - startY) / canvasScaleY;
           const dragDistance = Math.abs(moveEvent.clientX - startX) + Math.abs(moveEvent.clientY - startY);
           if (dragDistance > 2) {
             moved = true;
@@ -8907,84 +10647,36 @@ function renderPreview() {
             return;
           }
 
-          nextLeft = clamp(left + deltaX, 0, Math.max(0, width - w));
-          nextTop = clamp(top + deltaY, 0, Math.max(0, height - h));
-
-          box.classList.add('dragging');
-          box.style.left = `${(nextLeft / width) * 100}%`;
-          box.style.top = `${(nextTop / height) * 100}%`;
-        };
-
-        const onUp = () => {
-          document.removeEventListener('mousemove', onMove);
-          box.classList.remove('dragging');
-
-          if (!moved) {
-            suppressClick = false;
-            return;
-          }
-
-          commitRectChange(nextLeft, nextTop, w, h, 'XML parse error. Could not save dragged position.');
-
-          setTimeout(() => {
-            suppressClick = false;
-          }, 0);
-        };
-
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp, { once: true });
-      });
-
-      if (!isLineTag) {
-        resizeHandle.addEventListener('mousedown', (downEvent) => {
-          if (downEvent.button !== 0 || isPending) {
-            return;
-          }
-
-          downEvent.preventDefault();
-          downEvent.stopPropagation();
-
-        const { scaleX, scaleY } = getCanvasScale(canvas, width, height);
-        if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || scaleX <= 0 || scaleY <= 0) {
-          return;
-        }
-
-        selectedObjectIndex = index;
-        populateObjectPanel(doc, index);
-
-        const startX = downEvent.clientX;
-        const startY = downEvent.clientY;
-        let nextWidth = w;
-        let nextHeight = h;
-        let resized = false;
-        suppressClick = true;
-
-        const onMove = (moveEvent) => {
-          const deltaX = (moveEvent.clientX - startX) / scaleX;
-          const deltaY = (moveEvent.clientY - startY) / scaleY;
-          const dragDistance = Math.abs(moveEvent.clientX - startX) + Math.abs(moveEvent.clientY - startY);
-          if (dragDistance > 2) {
+          if (isResize) {
             resized = true;
+            nextWidth = clamp(w + deltaX, 1, Math.max(1, width - left));
+            nextHeight = clamp(h + deltaY, 1, Math.max(1, height - top));
+            box.classList.add('resizing');
+            box.style.width = `${(nextWidth / width) * 100}%`;
+            box.style.height = `${(nextHeight / height) * 100}%`;
+          } else {
+            nextLeft = clamp(left + deltaX, 0, Math.max(0, width - w));
+            nextTop = clamp(top + deltaY, 0, Math.max(0, height - h));
+            box.classList.add('dragging');
+            box.style.left = `${(nextLeft / width) * 100}%`;
+            box.style.top = `${(nextTop / height) * 100}%`;
           }
+        };
 
-          if (!resized) {
+        const onUp = (upEvent) => {
+          if (upEvent.pointerId !== downEvent.pointerId) {
             return;
           }
 
-          nextWidth = clamp(w + deltaX, 1, Math.max(1, width - left));
-          nextHeight = clamp(h + deltaY, 1, Math.max(1, height - top));
+          box.releasePointerCapture(upEvent.pointerId);
+          box.removeEventListener('pointermove', onMove);
+          box.classList.remove('dragging', 'resizing');
 
-          box.classList.add('resizing');
-          box.style.width = `${(nextWidth / width) * 100}%`;
-          box.style.height = `${(nextHeight / height) * 100}%`;
-        };
-
-        const onUp = () => {
-          document.removeEventListener('mousemove', onMove);
-          box.classList.remove('resizing');
-
-          if (resized) {
-            commitRectChange(left, top, nextWidth, nextHeight, 'XML parse error. Could not save resized dimensions.');
+          if (moved) {
+            commitRectChange(nextLeft, nextTop, nextWidth, nextHeight, 'XML parse error. Could not save object change.');
+          } else {
+            refreshPreviewAfterSelection(doc, canvas, priorSelection, index);
+            focusPreviewCanvas(canvas);
           }
 
           setTimeout(() => {
@@ -8992,10 +10684,10 @@ function renderPreview() {
           }, 0);
         };
 
-          document.addEventListener('mousemove', onMove);
-          document.addEventListener('mouseup', onUp, { once: true });
-        });
-      }
+        box.addEventListener('pointermove', onMove);
+        box.addEventListener('pointerup', onUp, { once: true });
+        box.addEventListener('pointercancel', onUp, { once: true });
+      });
 
       box.addEventListener('click', (event) => {
         if (suppressClick) {
@@ -9005,18 +10697,108 @@ function renderPreview() {
         }
 
         event.stopPropagation();
-        selectedObjectIndex = index;
-        populateObjectPanel(doc, index);
-        renderPreview();
       });
       canvas.appendChild(box);
+
+      if (selectedObjectIndex === index && isLineTag) {
+        const linePoints = scaleLinePoints(parseLinePoints(el), scaleX, scaleY);
+        [
+          { key: 'start', x: linePoints.x1, y: linePoints.y1, fixedX: linePoints.x2, fixedY: linePoints.y2 },
+          { key: 'end', x: linePoints.x2, y: linePoints.y2, fixedX: linePoints.x1, fixedY: linePoints.y1 }
+        ].forEach((handlePoint) => {
+          const handle = document.createElement('div');
+          handle.className = 'xml-line-handle';
+          handle.title = handlePoint.key === 'start' ? 'Line start' : 'Line end';
+          handle.style.left = `${(handlePoint.x / width) * 100}%`;
+          handle.style.top = `${(handlePoint.y / height) * 100}%`;
+          handle.style.zIndex = '40';
+          handle.style.touchAction = 'none';
+          handle.addEventListener('pointerdown', (downEvent) => {
+            if (downEvent.button !== 0) {
+              return;
+            }
+
+            downEvent.preventDefault();
+            downEvent.stopPropagation();
+            handle.setPointerCapture(downEvent.pointerId);
+            setSelectedObject(doc, index, el);
+            populateObjectPanel(doc, index);
+            focusPreviewCanvas(canvas);
+
+            const onMove = (moveEvent) => {
+              if (moveEvent.pointerId !== downEvent.pointerId) {
+                return;
+              }
+
+              const point = clientToDisplayPoint(canvas, width, height, moveEvent.clientX, moveEvent.clientY);
+              handle.style.left = `${(point.x / width) * 100}%`;
+              handle.style.top = `${(point.y / height) * 100}%`;
+
+              const nextPoints = handlePoint.key === 'start'
+                ? { x1: point.x, y1: point.y, x2: handlePoint.fixedX, y2: handlePoint.fixedY }
+                : { x1: handlePoint.fixedX, y1: handlePoint.fixedY, x2: point.x, y2: point.y };
+              const bounds = getLineBounds(nextPoints);
+              box.style.left = `${(bounds.minX / width) * 100}%`;
+              box.style.top = `${(bounds.minY / height) * 100}%`;
+              box.style.width = `${(bounds.width / width) * 100}%`;
+              box.style.height = `${(bounds.height / height) * 100}%`;
+              box.querySelector('svg')?.remove();
+              box.appendChild(createLinePreviewSvg(
+                nextPoints,
+                bounds,
+                resolveLineStrokeColor(el),
+                Math.max(1, Number(el.getAttribute('lineWidth')) || 1)
+              ));
+            };
+
+            const onUp = (upEvent) => {
+              if (upEvent.pointerId !== downEvent.pointerId) {
+                return;
+              }
+
+              handle.releasePointerCapture(upEvent.pointerId);
+              handle.removeEventListener('pointermove', onMove);
+              const point = clientToDisplayPoint(canvas, width, height, upEvent.clientX, upEvent.clientY);
+              const displayPoints = handlePoint.key === 'start'
+                ? { x1: point.x, y1: point.y, x2: handlePoint.fixedX, y2: handlePoint.fixedY }
+                : { x1: handlePoint.fixedX, y1: handlePoint.fixedY, x2: point.x, y2: point.y };
+              const xmlPoints = unscaleLinePoints(displayPoints, scaleX, scaleY);
+              commitLineEndpointsChange(
+                xmlPoints.x1,
+                xmlPoints.y1,
+                xmlPoints.x2,
+                xmlPoints.y2,
+                'XML parse error. Could not save line.'
+              );
+            };
+
+            handle.addEventListener('pointermove', onMove);
+            handle.addEventListener('pointerup', onUp, { once: true });
+            handle.addEventListener('pointercancel', onUp, { once: true });
+          });
+          handle.addEventListener('click', (event) => {
+            event.stopPropagation();
+          });
+          canvas.appendChild(handle);
+        });
+      }
     });
   }
 
-  canvas.addEventListener('click', () => {
-    selectedObjectIndex = null;
+  if (lineDrawState?.active) {
+    attachLineDrawInteraction(canvas, width, height, scaleX, scaleY);
+  }
+
+  canvas.addEventListener('click', (event) => {
+    if (lineDrawState?.active || suppressPreviewCanvasClick) {
+      return;
+    }
+    if (event.target.closest('.xml-object, .xml-line-handle')) {
+      return;
+    }
+    const priorSelection = selectedObjectIndex;
     clearObjectPanel();
-    renderPreview();
+    refreshPreviewAfterSelection(doc, canvas, priorSelection, null);
   });
 
   const wrap = document.createElement('div');
@@ -9044,16 +10826,48 @@ function renderPreview() {
   previewPane.appendChild(frame);
 
   const refitPreview = () => fitCanvasToFrame(frame, canvas, width, height);
-  refitPreview();
-  requestAnimationFrame(refitPreview);
-  setTimeout(refitPreview, 60);
+  schedulePreviewRefit(refitPreview);
+  setTimeout(() => schedulePreviewRefit(refitPreview), 60);
 
   if (typeof ResizeObserver !== 'undefined') {
-    previewResizeObserver = new ResizeObserver(() => refitPreview());
+    previewResizeObserver = new ResizeObserver(() => schedulePreviewRefit(refitPreview));
     previewResizeObserver.observe(frame);
   }
 
   updatePreviewZoomLabel();
+}
+
+function isOverviewScreenName(name) {
+  return displayKey(name) === displayKey('100_Overview.xml');
+}
+
+function stripOverviewEditorArtifacts(xml) {
+  const source = String(xml || '').trim();
+  if (!source || !/MSI_Rect_\d+/i.test(source)) {
+    return source;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(source, 'text/xml');
+  if (doc.querySelector('parsererror')) {
+    return source;
+  }
+
+  const root = doc.querySelector('gfx');
+  if (!root) {
+    return source;
+  }
+
+  let changed = false;
+  Array.from(root.children).forEach((child) => {
+    const name = String(child.getAttribute('name') || '');
+    if (/^MSI_Rect_\d+$/i.test(name)) {
+      root.removeChild(child);
+      changed = true;
+    }
+  });
+
+  return changed ? serializeXmlDoc(doc) : source;
 }
 
 function readSizeFromXml(xml) {
@@ -9636,6 +11450,22 @@ function getObjectNodes(doc) {
       }
 
       if (
+        tag === 'polygon'
+        && String(child.getAttribute('polygon') || '').trim()
+      ) {
+        nodes.push(child);
+        return;
+      }
+
+      if (
+        tag === 'line'
+        && String(child.getAttribute('line') || '').trim()
+      ) {
+        nodes.push(child);
+        return;
+      }
+
+      if (
         child.hasAttribute('left')
         && child.hasAttribute('top')
         && child.hasAttribute('width')
@@ -9653,6 +11483,8 @@ function getObjectNodes(doc) {
 }
 
 function clearObjectPanel() {
+  selectedObjectIndex = null;
+  selectedObjectName = null;
   objType.value = 'None';
   objName.value = '';
   objCaption.value = '';
@@ -9670,6 +11502,37 @@ function clearObjectPanel() {
   if (objImageNameRow) {
     objImageNameRow.hidden = true;
   }
+  if (objLineWidth) {
+    objLineWidth.value = 1;
+  }
+  if (objLineStyle) {
+    objLineStyle.value = 'solid';
+  }
+  if (objLineBackStyle) {
+    objLineBackStyle.value = 'solid';
+  }
+  if (objGotoDisplay) {
+    objGotoDisplay.value = '';
+  }
+  if (objIndicatorShape) {
+    objIndicatorShape.value = 'rectangle';
+  }
+  if (objIndicatorBorderStyle) {
+    objIndicatorBorderStyle.value = 'line';
+  }
+  if (objIndicatorBorderWidth) {
+    objIndicatorBorderWidth.value = 1;
+  }
+  if (objPolygonPoints) {
+    objPolygonPoints.value = '';
+  }
+  if (objTextAlignment) {
+    objTextAlignment.value = 'middleCenter';
+  }
+  if (objTextWordWrap) {
+    objTextWordWrap.value = 'false';
+  }
+  syncLinePropsField(null);
   syncColorControl(objBackColor, objBackColorPicker, objBackColorSwatch);
   syncColorControl(objBorderColor, objBorderColorPicker, objBorderColorSwatch);
   syncColorControl(objTextColor, objTextColorPicker, objTextColorSwatch);
@@ -9700,7 +11563,14 @@ function nodeUsesDirectFontSize(node) {
   ].includes(tag) || node?.hasAttribute('fontSize');
 }
 
-function populateObjectPanel(doc, index) {
+function populateObjectPanel(_doc, index) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlEditor.value, 'text/xml');
+  if (doc.querySelector('parsererror')) {
+    clearObjectPanel();
+    return;
+  }
+
   const nodes = getObjectNodes(doc);
   const node = nodes[index];
   if (!node) {
@@ -9708,23 +11578,81 @@ function populateObjectPanel(doc, index) {
     return;
   }
 
+  selectedObjectIndex = index;
+  selectedObjectName = String(node.getAttribute('name') || '') || null;
+
   const captionNode = getObjectCaptionNode(node);
   const captionValue = captionNode?.getAttribute('caption') || node.getAttribute('caption') || '';
   objType.value = node.tagName;
   objName.value = node.getAttribute('name') || '';
   objCaption.value = captionValue;
-  objLeft.value = Number(node.getAttribute('left') || 0);
-  objTop.value = Number(node.getAttribute('top') || 0);
-  objWidth.value = Number(node.getAttribute('width') || 1);
-  objHeight.value = Number(node.getAttribute('height') || 1);
+  const nodeTag = String(node.tagName || '').toLowerCase();
+  if (nodeTag === 'line') {
+    const points = parseLinePoints(node);
+    objLeft.value = Math.round(points.x1);
+    objTop.value = Math.round(points.y1);
+    objWidth.value = Math.round(points.x2);
+    objHeight.value = Math.round(points.y2);
+  } else {
+    objLeft.value = Number(node.getAttribute('left') || 0);
+    objTop.value = Number(node.getAttribute('top') || 0);
+    objWidth.value = Number(node.getAttribute('width') || 1);
+    objHeight.value = Number(node.getAttribute('height') || 1);
+  }
   objBackColor.value = node.getAttribute('backColor') || '';
   objBorderColor.value = node.getAttribute('borderColor') || '';
-  objTextColor.value = captionNode?.getAttribute('color') || node.getAttribute('foreColor') || '';
-  objFontSize.value = Number(captionNode?.getAttribute('fontSize') || node.getAttribute('fontSize') || 10);
+  if (nodeTag === 'line') {
+    objTextColor.value = node.getAttribute('foreColor') || '';
+    if (objLineWidth) {
+      objLineWidth.value = Number(node.getAttribute('lineWidth') || 1);
+    }
+    if (objLineStyle) {
+      objLineStyle.value = node.getAttribute('lineStyle') || 'solid';
+    }
+    if (objLineBackStyle) {
+      objLineBackStyle.value = node.getAttribute('backStyle') || 'solid';
+    }
+  } else if (isGotoButtonNode(node)) {
+    objTextColor.value = captionNode?.getAttribute('color') || node.getAttribute('foreColor') || '';
+    if (objGotoDisplay) {
+      syncGotoDisplayOptions(resolveGotoDisplayTarget(node, captionValue));
+    }
+  } else if (nodeTag === 'multistateindicator') {
+    const activeState = getVisualStateNode(node);
+    objTextColor.value = activeState?.querySelector('caption')?.getAttribute('color') || '';
+    objBackColor.value = activeState?.getAttribute('backColor') || node.getAttribute('backColor') || '';
+    objBorderColor.value = activeState?.getAttribute('borderColor') || node.getAttribute('borderColor') || '';
+    if (objIndicatorShape) {
+      objIndicatorShape.value = node.getAttribute('shape') || 'rectangle';
+    }
+    if (objIndicatorBorderStyle) {
+      objIndicatorBorderStyle.value = node.getAttribute('borderStyle') || 'line';
+    }
+    if (objIndicatorBorderWidth) {
+      objIndicatorBorderWidth.value = Number(node.getAttribute('borderWidth') || 1);
+    }
+  } else if (nodeTag === 'polygon') {
+    objTextColor.value = node.getAttribute('foreColor') || '';
+    if (objPolygonPoints) {
+      objPolygonPoints.value = String(node.getAttribute('polygon') || '').trim();
+    }
+  } else if (nodeTag === 'text') {
+    objTextColor.value = node.getAttribute('foreColor') || '';
+    if (objTextAlignment) {
+      objTextAlignment.value = node.getAttribute('alignment') || 'middleCenter';
+    }
+    if (objTextWordWrap) {
+      objTextWordWrap.value = String(node.getAttribute('wordWrap') || 'false').toLowerCase() === 'true' ? 'true' : 'false';
+    }
+  } else {
+    objTextColor.value = captionNode?.getAttribute('color') || node.getAttribute('foreColor') || '';
+  }
+  objFontSize.value = getNodeFontSize(node, captionNode);
   if (objImageName) {
     objImageName.value = getNodeImageName(node);
   }
   syncObjectImageNameField(node);
+  syncLinePropsField(node);
   syncColorControl(objBackColor, objBackColorPicker, objBackColorSwatch);
   syncColorControl(objBorderColor, objBorderColorPicker, objBorderColorSwatch);
   syncColorControl(objTextColor, objTextColorPicker, objTextColorSwatch);
@@ -9878,6 +11806,77 @@ function applyObjectChangesToXml(options = {}) {
   }
 
   node.setAttribute('name', objName.value || node.getAttribute('name') || 'Object');
+
+  const nodeTag = String(node.tagName || '').toLowerCase();
+  if (nodeTag === 'line') {
+    setLineEndpoints(
+      node,
+      Number(objLeft.value) || 0,
+      Number(objTop.value) || 0,
+      Number(objWidth.value) || 0,
+      Number(objHeight.value) || 0
+    );
+
+    if (objTextColor.value.trim()) {
+      node.setAttribute('foreColor', objTextColor.value.trim());
+    }
+    if (objBackColor.value.trim()) {
+      node.setAttribute('backColor', objBackColor.value.trim());
+    }
+    if (objLineWidth) {
+      node.setAttribute('lineWidth', String(Math.max(1, Number(objLineWidth.value) || 1)));
+    }
+    if (objLineStyle) {
+      node.setAttribute('lineStyle', objLineStyle.value || 'solid');
+    }
+    if (objLineBackStyle) {
+      node.setAttribute('backStyle', objLineBackStyle.value || 'solid');
+    }
+
+    xmlEditor.value = serializeXmlDoc(doc);
+    if (!options.skipHistory) {
+      recordHistory(xmlEditor.value);
+    }
+    return true;
+  }
+
+  if (nodeTag === 'polygon') {
+    if (objPolygonPoints?.value.trim()) {
+      const coords = objPolygonPoints.value.trim().split(/\s+/).map(Number).filter(Number.isFinite);
+      if (coords.length >= 6 && coords.length % 2 === 0) {
+        const points = [];
+        for (let i = 0; i < coords.length; i += 2) {
+          points.push({ x: coords[i], y: coords[i + 1] });
+        }
+        setPolygonPoints(node, points);
+      }
+    } else {
+      const nextLeft = Number(objLeft.value) || 0;
+      const nextTop = Number(objTop.value) || 0;
+      const nextWidth = Math.max(1, Number(objWidth.value) || 1);
+      const nextHeight = Math.max(1, Number(objHeight.value) || 1);
+      setPolygonPoints(node, [
+        { x: nextLeft, y: nextTop },
+        { x: nextLeft + nextWidth, y: nextTop },
+        { x: nextLeft + nextWidth, y: nextTop + nextHeight },
+        { x: nextLeft, y: nextTop + nextHeight }
+      ]);
+    }
+
+    if (objTextColor.value.trim()) {
+      node.setAttribute('foreColor', objTextColor.value.trim());
+    }
+    if (objBackColor.value.trim()) {
+      node.setAttribute('backColor', objBackColor.value.trim());
+    }
+
+    xmlEditor.value = serializeXmlDoc(doc);
+    if (!options.skipHistory) {
+      recordHistory(xmlEditor.value);
+    }
+    return true;
+  }
+
   node.setAttribute('left', String(Number(objLeft.value) || 0));
   node.setAttribute('top', String(Number(objTop.value) || 0));
   node.setAttribute('width', String(Math.max(1, Number(objWidth.value) || 1)));
@@ -9890,9 +11889,39 @@ function applyObjectChangesToXml(options = {}) {
     node.setAttribute('borderColor', objBorderColor.value.trim());
   }
 
+  if (isGotoButtonNode(node) && objGotoDisplay) {
+    node.setAttribute('display', objGotoDisplay.value.trim());
+  }
+
+  if (nodeTag === 'multistateindicator') {
+    if (objIndicatorBorderStyle) {
+      node.setAttribute('borderStyle', objIndicatorBorderStyle.value || 'line');
+    }
+    if (objIndicatorBorderWidth) {
+      node.setAttribute('borderWidth', String(Math.max(0, Number(objIndicatorBorderWidth.value) || 0)));
+    }
+    const activeState = getVisualStateNode(node);
+    if (activeState) {
+      if (objBackColor.value.trim()) {
+        activeState.setAttribute('backColor', objBackColor.value.trim());
+      }
+      if (objBorderColor.value.trim()) {
+        activeState.setAttribute('borderColor', objBorderColor.value.trim());
+      }
+    }
+  }
+
+  if (nodeTag === 'text') {
+    if (objTextAlignment) {
+      node.setAttribute('alignment', objTextAlignment.value || 'middleCenter');
+    }
+    if (objTextWordWrap) {
+      node.setAttribute('wordWrap', objTextWordWrap.value || 'false');
+    }
+  }
+
   let captionNode = getObjectCaptionNode(node);
   const hasNodeCaption = node.hasAttribute('caption');
-  const nodeTag = String(node.tagName || '').toLowerCase();
   const supportsCaptionChild = [
     'gotobutton',
     'momentarybutton',
@@ -9908,22 +11937,26 @@ function applyObjectChangesToXml(options = {}) {
     node.setAttribute('caption', nextCaption);
   }
 
+  if (nodeTag === 'text') {
+    node.setAttribute('caption', nextCaption);
+    if (objTextColor.value.trim()) {
+      node.setAttribute('foreColor', objTextColor.value.trim());
+    }
+  }
+
   if (!captionNode && supportsCaptionChild && needsCaption && !hasNodeCaption) {
     captionNode = doc.createElement('caption');
     const visualParent = getVisualStateNode(node) || node;
     visualParent.appendChild(captionNode);
   }
 
-  if (nodeUsesDirectFontSize(node)) {
-    node.setAttribute('fontSize', fontSizeValue);
-  }
+  setNodeFontSize(node, captionNode, fontSizeValue);
 
   if (captionNode) {
     captionNode.setAttribute('caption', nextCaption);
     if (objTextColor.value.trim()) {
       captionNode.setAttribute('color', objTextColor.value.trim());
     }
-    captionNode.setAttribute('fontSize', fontSizeValue);
   } else if (nodeUsesDirectFontSize(node) && objTextColor.value.trim()) {
     node.setAttribute('foreColor', objTextColor.value.trim());
   }
@@ -9991,8 +12024,12 @@ function setEditorProjectScreen(project, folderName, screen, xml) {
   selectedDefaultTemplate = '';
   selectedFiles = [screen.name];
   displayName.value = `${project.name} / ${folderName} / ${screen.name}`;
-  xmlEditor.value = xml;
-  resetHistory(xml);
+  let screenXml = isOverviewScreenName(screen.name)
+    ? stripOverviewEditorArtifacts(xml)
+    : xml;
+  screenXml = repairGotoButtonsInXml(screenXml);
+  xmlEditor.value = screenXml;
+  resetHistory(screenXml);
   selectedObjectIndex = null;
   clearObjectPanel();
 
@@ -10647,6 +12684,24 @@ if (addImageBtn) {
     });
   });
 }
+if (addLineBtn) {
+  addLineBtn.addEventListener('click', addLineObject);
+}
+if (addGotoDisplayBtn) {
+  addGotoDisplayBtn.addEventListener('click', addGotoDisplayObject);
+}
+if (addTextBtn) {
+  addTextBtn.addEventListener('click', addTextObject);
+}
+if (addMsiRectBtn) {
+  addMsiRectBtn.addEventListener('click', () => addMultistateIndicatorObject('rectangle'));
+}
+if (addMsiCircleBtn) {
+  addMsiCircleBtn.addEventListener('click', () => addMultistateIndicatorObject('circle'));
+}
+if (addPolygonBtn) {
+  addPolygonBtn.addEventListener('click', addPolygonObject);
+}
 
 if (browseImageBtn) {
   browseImageBtn.addEventListener('click', () => {
@@ -10944,6 +12999,17 @@ applyObjectBtn.addEventListener('click', () => {
   renderPreview();
 });
 
+if (objGotoDisplay) {
+  objGotoDisplay.addEventListener('change', () => {
+    if (selectedObjectIndex === null) {
+      return;
+    }
+    if (applyObjectChangesToXml()) {
+      renderPreview();
+    }
+  });
+}
+
 let objectFontSizePreviewTimer = null;
 function scheduleObjectPropertyPreview() {
   if (selectedObjectIndex === null) {
@@ -11062,6 +13128,7 @@ async function init() {
   syncScreenPresetFromInputs();
 
   setProjectName(currentProjectName);
+  await loadProjectsOnStartup();
   normalizeProjectList();
 
   const restoredProject = getProjectById(activeProjectId) || projectList[0] || null;
@@ -11069,6 +13136,29 @@ async function init() {
     setActiveProject(restoredProject);
   } else {
     setProjectName(currentProjectName);
+  }
+
+  let restoredScreen = false;
+  const savedScreenKey = localStorage.getItem(ACTIVE_PROJECT_SCREEN_STORAGE_KEY) || '';
+  if (savedScreenKey) {
+    const parsed = parseProjectKey(savedScreenKey);
+    if (parsed && getProjectById(parsed.projectId)) {
+      try {
+        await openProjectScreen(parsed.projectId, parsed.folderName, parsed.screenName, { skipSave: true });
+        restoredScreen = true;
+      } catch (_err) {
+        restoredScreen = false;
+      }
+    }
+  }
+
+  if (!restoredScreen && restoredProject) {
+    const firstFolder = restoredProject.folders?.[0];
+    const firstScreen = firstFolder?.screens?.[0];
+    if (firstFolder && firstScreen) {
+      setEditorProjectScreen(restoredProject, firstFolder.name, firstScreen, firstScreen.xml);
+      updateProjectSidebarSelection();
+    }
   }
 
   const sidebarCollapsed = localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1';
@@ -11083,8 +13173,17 @@ async function init() {
   ensureProjectSidebarWheelScroll();
   renderProjectSidebar();
   renderProjectPopupPlanner();
+  clearObjectPanel();
+  try {
+    await refreshDisplays();
+  } catch (_err) {
+    // Display list is optional during startup.
+  }
   renderPreview();
 }
+
+window.addEventListener('pagehide', flushProjectPersistence);
+window.addEventListener('beforeunload', flushProjectPersistence);
 
 window.addEventListener('resize', () => {
   enforceProjectSidebarLayout();
@@ -11094,12 +13193,18 @@ window.addEventListener('resize', () => {
 });
 
 document.addEventListener('keydown', (event) => {
+  if (tryDeleteSelectedObjectFromKeyboard(event)) {
+    return;
+  }
+}, true);
+
+document.addEventListener('keydown', (event) => {
   if (handleDisplayHistoryShortcut(event)) {
     return;
   }
 
   const active = document.activeElement;
-  if (isEditableTarget(active)) {
+  if (blocksObjectKeyboardShortcuts(active)) {
     return;
   }
 
@@ -11129,18 +13234,16 @@ document.addEventListener('keydown', (event) => {
     return;
   }
 
+  if (key === 'Escape' && lineDrawState?.active) {
+    event.preventDefault();
+    cancelLineDrawMode();
+    return;
+  }
+
   if (ctrlOrCmd && key.toLowerCase() === 'v') {
     if (copiedObjectXml) {
       event.preventDefault();
       pasteCopiedObject();
-    }
-    return;
-  }
-
-  if (key === 'Delete' || key === 'Backspace') {
-    if (selectedObjectIndex !== null) {
-      event.preventDefault();
-      deleteSelectedObject();
     }
     return;
   }

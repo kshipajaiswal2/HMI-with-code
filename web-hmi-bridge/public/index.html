@@ -87,10 +87,17 @@
                   </div>
                 </div>
                 <div class="menu-group" data-menu-group>
-                  <button type="button" class="menu-label" aria-haspopup="menu" aria-expanded="false">Application</button>
+                  <button type="button" class="menu-label" aria-haspopup="menu" aria-expanded="false">Objects</button>
                   <div class="menu-popup" role="menu">
-                    <button id="addObjectBtn" type="button" role="menuitem">Add Button</button>
+                    <button id="addGotoDisplayBtn" type="button" role="menuitem">Go To Display Button</button>
+                    <button id="addTextBtn" type="button" role="menuitem">Text</button>
+                    <button id="addMsiRectBtn" type="button" role="menuitem">Multi-State Indicator (Rectangle)</button>
+                    <button id="addMsiCircleBtn" type="button" role="menuitem">Multi-State Indicator (Circle)</button>
+                    <button id="addPolygonBtn" type="button" role="menuitem">Polygon</button>
+                    <div class="menu-divider" role="separator" aria-hidden="true"></div>
+                    <button id="addObjectBtn" type="button" role="menuitem">Momentary Button</button>
                     <button id="addImageBtn" type="button" role="menuitem">Add Image</button>
+                    <button id="addLineBtn" type="button" role="menuitem">Add Line</button>
                   </div>
                 </div>
               </nav>
@@ -165,7 +172,7 @@
                         <label for="objName">Name</label>
                         <input id="objName" type="text" value="" />
                       </div>
-                      <div>
+                      <div id="objCaptionRow">
                         <label for="objCaption">Caption</label>
                         <input id="objCaption" type="text" value="" />
                       </div>
@@ -193,7 +200,7 @@
                           <span id="objBackColorSwatch" class="color-swatch" title="Back Color Preview"></span>
                         </div>
                       </div>
-                      <div class="prop-wide">
+                      <div class="prop-wide" id="objBorderColorRow">
                         <label for="objBorderColor">Border Color</label>
                         <div class="color-field">
                           <input id="objBorderColor" type="text" value="" placeholder="#002952" />
@@ -201,8 +208,88 @@
                           <span id="objBorderColorSwatch" class="color-swatch" title="Border Color Preview"></span>
                         </div>
                       </div>
+                      <div class="prop-wide" id="objGotoPropsRow" hidden>
+                        <label for="objGotoDisplay">Target Display</label>
+                        <select id="objGotoDisplay">
+                          <option value="">Select target screen…</option>
+                        </select>
+                      </div>
+                      <div class="prop-wide" id="objIndicatorPropsRow" hidden>
+                        <div class="line-props-grid">
+                          <div>
+                            <label for="objIndicatorShape">Shape</label>
+                            <input id="objIndicatorShape" type="text" readonly value="rectangle" />
+                          </div>
+                          <div>
+                            <label for="objIndicatorBorderStyle">Border Style</label>
+                            <select id="objIndicatorBorderStyle">
+                              <option value="line">Line</option>
+                              <option value="raised">Raised</option>
+                              <option value="sunken">Sunken</option>
+                              <option value="none">None</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label for="objIndicatorBorderWidth">Border Width</label>
+                            <input id="objIndicatorBorderWidth" type="number" min="0" value="1" />
+                          </div>
+                        </div>
+                      </div>
+                      <div class="prop-wide" id="objPolygonPropsRow" hidden>
+                        <label for="objPolygonPoints">Polygon Points (x y …)</label>
+                        <input id="objPolygonPoints" type="text" value="" placeholder="100 100 200 100 150 180" />
+                      </div>
+                      <div class="prop-wide" id="objTextPropsRow" hidden>
+                        <div class="line-props-grid">
+                          <div>
+                            <label for="objTextAlignment">Alignment</label>
+                            <select id="objTextAlignment">
+                              <option value="topLeft">Top Left</option>
+                              <option value="topCenter">Top Center</option>
+                              <option value="topRight">Top Right</option>
+                              <option value="middleLeft">Middle Left</option>
+                              <option value="middleCenter">Middle Center</option>
+                              <option value="middleRight">Middle Right</option>
+                              <option value="bottomLeft">Bottom Left</option>
+                              <option value="bottomCenter">Bottom Center</option>
+                              <option value="bottomRight">Bottom Right</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label for="objTextWordWrap">Word Wrap</label>
+                            <select id="objTextWordWrap">
+                              <option value="false">Off</option>
+                              <option value="true">On</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="prop-wide" id="objLinePropsRow" hidden>
+                        <div class="line-props-grid">
+                          <div>
+                            <label for="objLineWidth">Line Width</label>
+                            <input id="objLineWidth" type="number" min="1" value="1" />
+                          </div>
+                          <div>
+                            <label for="objLineStyle">Line Style</label>
+                            <select id="objLineStyle">
+                              <option value="solid">Solid</option>
+                              <option value="dash">Dash</option>
+                              <option value="dot">Dot</option>
+                              <option value="dashDot">Dash Dot</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label for="objLineBackStyle">Back Style</label>
+                            <select id="objLineBackStyle">
+                              <option value="solid">Solid</option>
+                              <option value="transparent">Transparent</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
                       <div class="prop-wide">
-                        <label for="objTextColor">Text Color</label>
+                        <label for="objTextColor" id="objTextColorLabel">Text Color</label>
                         <div class="color-field">
                           <input id="objTextColor" type="text" value="" placeholder="#ffffff" />
                           <input id="objTextColorPicker" type="color" value="#ffffff" />
@@ -217,7 +304,7 @@
                         </div>
                         <datalist id="imageLibraryOptions"></datalist>
                       </div>
-                      <div class="prop-wide font-apply-row">
+                      <div class="prop-wide font-apply-row" id="objFontRow">
                         <div class="font-size-field">
                           <label for="objFontSize">Font Size</label>
                           <input id="objFontSize" type="number" min="1" value="10" />
@@ -285,6 +372,6 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="vendor/xlsx.full.min.js"></script>
     <script src="io-tags.js?v=20260616"></script>
-    <script src="app.js?v=20260616"></script>
+    <script src="app.js?v=20260727b"></script>
   </body>
 </html>

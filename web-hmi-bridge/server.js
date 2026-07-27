@@ -39,6 +39,7 @@ const PACKAGE_DIR = path.join(REIMPORT_DIR, 'packages');
 const DEFAULT_PAGES_DIR = path.join(FTIO_DIR, 'default-pages');
 const DISPLAY_FOLDERS_PATH = path.join(FTIO_DIR, 'display-folders.json');
 const DELETED_DISPLAYS_PATH = path.join(FTIO_DIR, 'deleted-displays.json');
+const PROJECTS_STORE_PATH = path.join(FTIO_DIR, 'projects-store.json');
 
 function createZipArchive() {
   const options = { zlib: { level: 9 } };
@@ -68,7 +69,7 @@ for (const dir of [FTIO_DIR, FACTORYTALK_EXPORT_DIR, REIMPORT_DIR, PACKAGE_DIR, 
   }
 }
 
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '50mb' }));
 app.get('/vendor/xlsx.full.min.js', (_req, res) => {
   res.sendFile(path.join(ROOT, 'node_modules', 'xlsx', 'dist', 'xlsx.full.min.js'));
 });
@@ -1114,6 +1115,42 @@ app.post('/api/display-folders/save', (req, res) => {
     : {};
   const saved = writeDisplayFolderConfig({ folders, assignments });
   return res.json({ ok: true, ...saved });
+});
+
+function readProjectsStore() {
+  try {
+    if (!fs.existsSync(PROJECTS_STORE_PATH)) {
+      return [];
+    }
+
+    const parsed = JSON.parse(fs.readFileSync(PROJECTS_STORE_PATH, 'utf8'));
+    return Array.isArray(parsed?.projects) ? parsed.projects : [];
+  } catch (_err) {
+    return [];
+  }
+}
+
+function writeProjectsStore(projects) {
+  const payload = {
+    projects: Array.isArray(projects) ? projects : [],
+    updatedAt: new Date().toISOString()
+  };
+  fs.writeFileSync(PROJECTS_STORE_PATH, JSON.stringify(payload, null, 2), 'utf8');
+  return payload;
+}
+
+app.get('/api/projects', (_req, res) => {
+  return res.json({ projects: readProjectsStore() });
+});
+
+app.post('/api/projects', (req, res) => {
+  const projects = req.body?.projects;
+  if (!Array.isArray(projects)) {
+    return res.status(400).json({ error: 'projects array required' });
+  }
+
+  const saved = writeProjectsStore(projects);
+  return res.json({ ok: true, count: saved.projects.length, updatedAt: saved.updatedAt });
 });
 
 app.get('/api/displays/:name', (req, res) => {

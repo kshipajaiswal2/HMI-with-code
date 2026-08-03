@@ -1,10 +1,15 @@
-# PC HMI Runtime
+# Plant HMI — Windows PC Platform
 
-Standalone operator HMI for PC deployment. Live tag communication, alarms, navigation, and modular JSON-based screen authoring.
+Our own HMI software for Windows, equivalent to Rockwell FactoryTalk View.
 
-This is separate from the FactoryTalk engineering bridge in `web-hmi-bridge/`.
+## Two apps in one platform
 
-## Quick start
+| App | Purpose | Launch |
+|-----|---------|--------|
+| **Studio** | Engineering — new projects, explorer, display editing | `npm run desktop` |
+| **Runtime** | Operator — live HMI on panel PC | `npm run desktop:runtime` |
+
+## Quick start (Windows)
 
 ```powershell
 cd pc-hmi-runtime
@@ -12,70 +17,74 @@ npm install
 npm start
 ```
 
-Open `http://localhost:5060` in a browser. For kiosk deployment, use Chrome/Edge in fullscreen mode.
+Open **http://127.0.0.1:8080** — Studio IDE with project explorer.
 
-## What works now
+### Windows desktop app
 
-- Live tag simulator with realistic value changes
-- Overview screen with production metrics and status indicators
-- Active Alarms screen with acknowledge
-- Alarm banner across all screens
-- Standard navigation bar (Overview, Settings, Manual, Alarms, Recipe, Legends, Login)
-- JSON screen definitions — add screens without code changes to the renderer
-- Socket.io real-time tag and alarm updates
+```powershell
+npm install
+npm run desktop          # Studio (like View Studio)
+npm run desktop:runtime  # Operator runtime (like View Runtime)
+npm run desktop:kiosk    # Full-screen operator mode
+```
+
+## New project workflow
+
+1. Open Studio → **New Project** → enter name
+2. All **18 standard displays** are created automatically (Overview, Settings, Manual, Alarms, Recipe, etc.)
+3. Click displays in explorer to preview
+4. **＋ Display** to add custom screens
+5. **✕ Display** to remove screens
+6. **▶ Run** to launch operator runtime
+
+## Standard display library
+
+Every new project includes:
+
+| Folder | Screens |
+|--------|---------|
+| 100 Overview | Overview, Production Data, Prestart, Safety, Mimic |
+| 200 Settings | Settings |
+| 300 Manual | Manual Operation, PLC IO List, PLC Architecture, IO List, Cycle Time |
+| 400 Alarms | Active Alarms, Alarm History, Alarm Remedies |
+| 500 Recipe | Recipe, Recipe Detail |
+| 600 Legends | Legends |
+| 700 Users | User Management |
+
+Defined in `config/standard-screens.json`.
 
 ## Project structure
 
 ```
-pc-hmi-runtime/
-├── config/project.json     Project settings, tags, alarms, users
-├── screens/                JSON screen definitions
-├── faceplates/             Reusable equipment popup templates
-├── schemas/                JSON Schema for screen/faceplate validation
-├── server/                 Express + Socket.io backend
-│   └── services/           Tag, Alarm, User services + Simulator driver
-└── public/                 Browser UI + component registry
+projects/
+  _template/           ← master library (do not edit)
+  MyProject/
+    project.json       ← tags, alarms, users, PLC settings
+    navigation.json    ← nav bar config
+    screens/*.json     ← display definitions
 ```
 
-## Adding a new screen
+## Features (Rockwell parity)
 
-Create `screens/200_Settings.json`:
+| Feature | Status |
+|---------|--------|
+| Project Studio + explorer | Done |
+| 18 standard displays / new project | Done |
+| Add / delete displays | Done |
+| Runtime navigation | Done |
+| Alarms (active, ack, history) | Done |
+| User login / security | Done |
+| IO diagnostics screens | Done |
+| Windows desktop (Electron) | Done |
+| OPC UA live PLC | Planned |
+| Faceplate library | Planned |
+| Trending + historian | Planned |
+| Recipe PLC download | Planned |
 
-```json
-{
-  "id": "200_Settings",
-  "title": "Settings",
-  "navGroup": "settings",
-  "layout": "standard",
-  "components": [
-    {
-      "type": "Grid",
-      "style": { "className": "metric-grid" },
-      "children": [
-        { "type": "NumericDisplay", "tag": "Production.Rate", "label": "Rate", "format": "float", "decimals": 1 }
-      ]
-    }
-  ]
-}
-```
-
-Restart is not required — refresh the browser and click the nav button.
-
-## Configuration
-
-Edit `config/project.json` to define tags, alarms, users, and communication settings.
-
-| Setting | Description |
-|---------|-------------|
-| `communication.driver` | `simulator` (now) or `opcua` (planned) |
-| `startupScreen` | Screen id shown on launch |
-| `tags` | Tag definitions loaded at startup |
-| `alarms` | Alarm definitions bound to boolean tags |
-
-## Architecture
-
-See `docs/pc_hmi_platform.md` for the full platform architecture and roadmap.
+Full architecture: `docs/pc_hmi_platform.md`
 
 ## Port
 
-Default: **5060** (engineering bridge uses 5050). Override with `PORT` environment variable.
+Default **8080** (Chrome blocks 5060). Override with `PORT` env variable.
+
+Login: operator/operator · engineer/engineer · admin/admin

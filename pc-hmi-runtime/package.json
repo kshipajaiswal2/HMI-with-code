@@ -1,15 +1,21 @@
 {
-  "name": "pc-hmi-runtime",
-  "version": "0.1.0",
+  "name": "plant-hmi",
+  "version": "0.2.0",
   "private": true,
-  "description": "PC-based HMI runtime with live tag communication, alarms, and modular screen rendering",
+  "description": "Windows PC-based HMI platform — Studio + Runtime, Rockwell-equivalent features",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
+    "dev": "node --watch server/index.js",
+    "desktop": "electron electron/main.js",
+    "desktop:runtime": "electron electron/main.js --runtime",
+    "desktop:kiosk": "electron electron/main.js --runtime --kiosk"
   },
   "dependencies": {
     "express": "^4.19.2",
     "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "electron": "^34.0.0"
   }
 }

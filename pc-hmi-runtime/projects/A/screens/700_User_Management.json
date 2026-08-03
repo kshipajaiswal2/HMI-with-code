@@ -1,0 +1,10 @@
+{
+  "id": "700_User_Management",
+  "title": "User Management",
+  "navGroup": "users",
+  "securityLevel": 0,
+  "components": [
+    { "type": "SectionHeader", "label": "User Login" },
+    { "type": "LoginPanel", "id": "login-panel" }
+  ]
+}

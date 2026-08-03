@@ -23,19 +23,51 @@ class SimulatorDriver {
   }
 
   seedValues() {
-    this.tagService.set('System.AutoMode', true);
-    this.tagService.set('System.Healthy', true);
-    this.tagService.set('System.Running', true);
-    this.tagService.set('Production.Count', 1247);
-    this.tagService.set('Production.Rate', 342.5);
-    this.tagService.set('Production.Efficiency', 87.3);
-    this.tagService.set('Recipe.Active', 'Standard Batch A');
-    this.tagService.set('Recipe.Number', 1);
-    this.tagService.set('Alarm.EStop', false);
-    this.tagService.set('Alarm.DoorOpen', false);
-    this.tagService.set('Alarm.LowAir', false);
-    this.tagService.set('Alarm.MotorFault', false);
-    this.tagService.set('Alarm.HighTemp', false);
+    const seeds = {
+      'System.AutoMode': true,
+      'System.Healthy': true,
+      'System.Running': true,
+      'Production.Count': 1247,
+      'Production.Rate': 342.5,
+      'Production.Efficiency': 87.3,
+      'Production.Target': 2000,
+      'Production.Rejects': 12,
+      'Recipe.Active': 'Standard Batch A',
+      'Recipe.Number': 1,
+      'Recipe.DownloadReady': true,
+      'Settings.SpeedSetpoint': 100.0,
+      'Settings.TempSetpoint': 65.0,
+      'Settings.AutoStart': true,
+      'Manual.ConveyorRun': false,
+      'Manual.PumpRun': false,
+      'Manual.VFD_Speed': 0,
+      'Safety.EStopOK': true,
+      'Safety.DoorClosed': true,
+      'Safety.LightCurtainOK': true,
+      'Prestart.PowerOK': true,
+      'Prestart.AirOK': true,
+      'Prestart.SafetyOK': true,
+      'Prestart.Ready': true,
+      'Comm.PLCConnected': true,
+      'Comm.ScanRate': 10.2,
+      'CycleTime.Last': 4.2,
+      'CycleTime.Average': 4.5,
+      'CycleTime.Best': 3.8,
+      'IO.DI_001': false,
+      'IO.DI_002': false,
+      'IO.DI_003': false,
+      'IO.DO_001': true,
+      'IO.DO_002': false,
+      'IO.AI_001': 72.5,
+      'Alarm.EStop': false,
+      'Alarm.DoorOpen': false,
+      'Alarm.LowAir': false,
+      'Alarm.MotorFault': false,
+      'Alarm.HighTemp': false
+    };
+    for (const [name, value] of Object.entries(seeds)) {
+      this.tagService.set(name, value);
+    }
   }
 
   update() {
@@ -43,7 +75,7 @@ class SimulatorDriver {
     this.tick++;
 
     const count = this.tagService.get('Production.Count');
-    if (count && this.tagService.get('System.Running')?.value) {
+    if (count?.value && this.tagService.get('System.Running')?.value) {
       this.tagService.set('Production.Count', count.value + Math.floor(Math.random() * 3));
     }
 
@@ -52,6 +84,12 @@ class SimulatorDriver {
 
     const eff = 85 + Math.sin(this.tick * 0.05) * 5;
     this.tagService.set('Production.Efficiency', Math.round(eff * 10) / 10);
+
+    const cycle = 4.2 + Math.sin(this.tick * 0.08) * 0.3;
+    this.tagService.set('CycleTime.Last', Math.round(cycle * 10) / 10);
+
+    const level = 70 + Math.sin(this.tick * 0.06) * 8;
+    this.tagService.set('IO.AI_001', Math.round(level * 10) / 10);
 
     if (this.tick % 30 === 0) {
       this.tagService.set('Alarm.LowAir', Math.random() > 0.7);

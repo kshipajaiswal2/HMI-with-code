@@ -1,0 +1,24 @@
+{
+  "id": "102_Prestart",
+  "title": "Prestart Checklist",
+  "navGroup": "overview",
+  "securityLevel": 0,
+  "components": [
+    { "type": "SubNav", "navKey": "overview" },
+    { "type": "SectionHeader", "label": "Prestart Checklist" },
+    {
+      "type": "Grid",
+      "style": { "className": "checklist-grid" },
+      "children": [
+        { "type": "StateIndicator", "tag": "Prestart.PowerOK", "label": "Power Supply",
+          "states": { "true": { "text": "OK", "color": "#00c000" }, "false": { "text": "FAIL", "color": "#cc0000" } } },
+        { "type": "StateIndicator", "tag": "Prestart.AirOK", "label": "Air Pressure",
+          "states": { "true": { "text": "OK", "color": "#00c000" }, "false": { "text": "FAIL", "color": "#cc0000" } } },
+        { "type": "StateIndicator", "tag": "Prestart.SafetyOK", "label": "Safety Systems",
+          "states": { "true": { "text": "OK", "color": "#00c000" }, "false": { "text": "FAIL", "color": "#cc0000" } } },
+        { "type": "StateIndicator", "tag": "Prestart.Ready", "label": "Prestart Complete",
+          "states": { "true": { "text": "READY", "color": "#00c000" }, "false": { "text": "NOT READY", "color": "#ff8000" } } }
+      ]
+    }
+  ]
+}

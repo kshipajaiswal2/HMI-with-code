@@ -1,0 +1,21 @@
+{
+  "id": "402_Alarm_Remedies_Popup",
+  "title": "Alarm Remedies",
+  "navGroup": "alarms",
+  "layout": "popup",
+  "securityLevel": 0,
+  "components": [
+    { "type": "SubNav", "navKey": "alarms" },
+    { "type": "SectionHeader", "label": "Alarm Remedies" },
+    {
+      "type": "LegendTable",
+      "items": [
+        { "color": "#990033", "label": "Priority 1 — Stop machine, investigate immediately" },
+        { "color": "#cc0000", "label": "Priority 2 — Fault condition, reset after correction" },
+        { "color": "#ff8000", "label": "Priority 3 — Warning, monitor and acknowledge" },
+        { "color": "#002952", "label": "Acknowledged — operator has seen the alarm" }
+      ]
+    },
+    { "type": "Text", "label": "Refer to equipment manual for detailed remedy steps." }
+  ]
+}

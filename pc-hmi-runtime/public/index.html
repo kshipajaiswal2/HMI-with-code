@@ -2,77 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=1024, initial-scale=1.0" />
-    <title>Plant HMI Runtime</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css" />
+    <meta http-equiv="refresh" content="0;url=/studio.html" />
+    <title>Plant HMI Studio</title>
   </head>
   <body>
-    <div id="app" class="hmi-app">
-      <header class="hmi-header">
-        <div class="header-left">
-          <div class="logo-mark">PH</div>
-          <div>
-            <div class="header-title" id="projectName">Plant HMI</div>
-            <div class="header-subtitle" id="screenTitle">Loading...</div>
-          </div>
-        </div>
-        <div class="header-center" id="headerIndicators"></div>
-        <div class="header-right">
-          <div class="clock" id="clock"></div>
-          <div class="comm-status" id="commStatus">
-            <span class="dot"></span>
-            <span>Connecting...</span>
-          </div>
-        </div>
-      </header>
-
-      <main class="hmi-content" id="screenContent"></main>
-
-      <footer class="alarm-banner hidden" id="alarmBanner">
-        <span class="alarm-icon">⚠</span>
-        <span id="alarmBannerText"></span>
-        <button type="button" id="ackBannerBtn" class="ack-btn">Acknowledge</button>
-      </footer>
-
-      <nav class="hmi-nav" id="navBar">
-        <button type="button" data-screen="100_Overview" data-group="overview">
-          <span class="nav-icon">⌂</span>
-          <span>Overview</span>
-        </button>
-        <button type="button" data-screen="200_Settings" data-group="settings">
-          <span class="nav-icon">⚙</span>
-          <span>Settings</span>
-        </button>
-        <button type="button" data-screen="300_Manual" data-group="manual">
-          <span class="nav-icon">☞</span>
-          <span>Manual</span>
-        </button>
-        <button type="button" data-screen="400_Active_Alarms" data-group="alarms">
-          <span class="nav-icon">🔔</span>
-          <span>Alarms</span>
-        </button>
-        <button type="button" data-screen="500_Recipe" data-group="recipe">
-          <span class="nav-icon">📋</span>
-          <span>Recipe</span>
-        </button>
-        <button type="button" data-screen="600_Legends" data-group="legends">
-          <span class="nav-icon">ℹ</span>
-          <span>Legends</span>
-        </button>
-        <div class="nav-spacer"></div>
-        <div class="nav-user" id="navUser">Guest</div>
-        <button type="button" data-screen="700_Users" data-group="users">
-          <span class="nav-icon">👤</span>
-          <span>Login</span>
-        </button>
-      </nav>
-    </div>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="components/registry.js"></script>
-    <script src="app.js"></script>
+    <p>Redirecting to <a href="/studio.html">Plant HMI Studio</a>...</p>
   </body>
 </html>

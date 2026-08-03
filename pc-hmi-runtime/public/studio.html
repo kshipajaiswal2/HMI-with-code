@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Plant HMI Studio</title>
+    <link rel="stylesheet" href="studio.css" />
+  </head>
+  <body>
+    <div class="studio-app">
+      <header class="menu-bar">
+        <div class="menu-root">
+          <button type="button" class="menu-item" id="fileMenuBtn">File</button>
+          <div class="menu-dropdown hidden" id="fileMenu">
+            <div class="menu-entry has-submenu">
+              <span>New</span><span class="sub-arrow">▶</span>
+              <div class="menu-submenu">
+                <button type="button" class="menu-entry" data-action="new-display"><span class="mi">🖼</span> Display</button>
+                <button type="button" class="menu-entry" data-action="new-local-message"><span class="mi">💬</span> Local Message</button>
+                <button type="button" class="menu-entry" data-action="new-parameter"><span class="mi">📋</span> Parameter</button>
+                <button type="button" class="menu-entry" data-action="new-data-log"><span class="mi">📊</span> Data Log</button>
+                <button type="button" class="menu-entry" data-action="new-macro"><span class="mi">⚡</span> Macro</button>
+                <button type="button" class="menu-entry" data-action="new-library"><span class="mi">📚</span> Library</button>
+                <button type="button" class="menu-entry" data-action="new-info-message"><span class="mi">ℹ</span> Information Message</button>
+                <button type="button" class="menu-entry" data-action="new-recipe"><span class="mi">📝</span> RecipePlus</button>
+              </div>
+            </div>
+            <button type="button" class="menu-entry" data-action="save">Save</button>
+            <button type="button" class="menu-entry" data-action="save-as">Save As...</button>
+            <button type="button" class="menu-entry" data-action="close-display">Close</button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry" data-action="select-app-type">Select Application Type...</button>
+            <button type="button" class="menu-entry" data-action="new-project">New Application...</button>
+            <button type="button" class="menu-entry" data-action="open-project">Open Application...</button>
+            <button type="button" class="menu-entry" data-action="delete-project">Delete Application...</button>
+            <button type="button" class="menu-entry" data-action="close-app">Close Application</button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry disabled">Print...</button>
+            <button type="button" class="menu-entry disabled">Print Setup...</button>
+            <div class="menu-entry has-submenu">
+              <span>Recent Applications</span><span class="sub-arrow">▶</span>
+              <div class="menu-submenu" id="recentProjectsMenu"></div>
+            </div>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry" data-action="exit">Exit</button>
+          </div>
+        </div>
+        <div class="menu-root">
+          <button type="button" class="menu-item" id="editMenuBtn">Edit</button>
+          <div class="menu-dropdown hidden" id="editMenu">
+            <button type="button" class="menu-entry disabled" data-edit-action="undo"><span>Undo</span><span class="shortcut">Alt+Backspace</span></button>
+            <button type="button" class="menu-entry disabled" data-edit-action="redo"><span>Redo</span><span class="shortcut">Ctrl+Backspace</span></button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry disabled" data-edit-action="cut"><span>Cut</span><span class="shortcut">Ctrl+X</span></button>
+            <button type="button" class="menu-entry disabled" data-edit-action="copy"><span>Copy</span><span class="shortcut">Ctrl+C</span></button>
+            <button type="button" class="menu-entry disabled" data-edit-action="paste"><span>Paste</span><span class="shortcut">Ctrl+V</span></button>
+            <button type="button" class="menu-entry disabled" data-edit-action="paste-no-strings">Paste without localized strings</button>
+            <button type="button" class="menu-entry disabled" data-edit-action="delete"><span>Delete</span></button>
+            <button type="button" class="menu-entry disabled" data-edit-action="duplicate"><span>Duplicate</span><span class="shortcut">Ctrl+D</span></button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry disabled" data-edit-action="copy-animation">Copy Animation</button>
+            <button type="button" class="menu-entry disabled" data-edit-action="paste-animation">Paste Animation</button>
+            <button type="button" class="menu-entry disabled" data-edit-action="tag-substitution"><span>Tag Substitution...</span><span class="shortcut">Ctrl+R</span></button>
+            <button type="button" class="menu-entry disabled" data-edit-action="connections">Connections...</button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry" data-edit-action="display-settings">Display Settings...</button>
+            <button type="button" class="menu-entry" data-edit-action="key-assignments"><span>Key Assignments...</span><span class="shortcut">Ctrl+K</span></button>
+            <div class="menu-entry has-submenu" data-edit-submenu="wallpaper">
+              <span>Wallpaper</span><span class="sub-arrow">▶</span>
+              <div class="menu-submenu">
+                <button type="button" class="menu-entry" data-edit-action="wallpaper-none">None</button>
+                <button type="button" class="menu-entry" data-edit-action="wallpaper-color">Solid Color...</button>
+                <button type="button" class="menu-entry" data-edit-action="wallpaper-image">Image...</button>
+              </div>
+            </div>
+            <button type="button" class="menu-entry" data-edit-action="select-all"><span>Select All</span><span class="shortcut">Ctrl+A</span></button>
+            <button type="button" class="menu-entry" data-edit-action="clear-all">Clear All</button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry" data-edit-action="global-object-defaults">Global Object Defaults</button>
+            <button type="button" class="menu-entry disabled" data-edit-action="global-object-param-values">Global Object Parameter Values</button>
+            <button type="button" class="menu-entry disabled" data-edit-action="global-object-param-definitions">Global Object Parameter Definitions</button>
+            <button type="button" class="menu-entry disabled" data-edit-action="edit-base-object">Edit Base Object</button>
+            <button type="button" class="menu-entry disabled" data-edit-action="break-link">Break Link</button>
+          </div>
+        </div>
+        <div class="menu-root">
+          <button type="button" class="menu-item" id="viewMenuBtn">View</button>
+          <div class="menu-dropdown hidden" id="viewMenu">
+            <button type="button" class="menu-entry checkable" data-view-action="status-bar" data-view-toggle="statusBar"><span class="check"></span><span>Status Bar</span></button>
+            <button type="button" class="menu-entry checkable" data-view-action="workbook-mode" data-view-toggle="workbookMode"><span class="check"></span><span>Workbook Mode</span></button>
+            <button type="button" class="menu-entry checkable" data-view-action="explorer-window" data-view-toggle="explorerWindow"><span class="check"></span><span>Explorer Window</span></button>
+            <div class="menu-entry has-submenu">
+              <span>Toolbars</span><span class="sub-arrow">▶</span>
+              <div class="menu-submenu">
+                <button type="button" class="menu-entry checkable" data-view-action="toolbar-standard" data-view-toggle="toolbars.standard"><span class="check"></span><span>Standard</span></button>
+                <button type="button" class="menu-entry checkable" data-view-action="toolbar-graphics" data-view-toggle="toolbars.graphics"><span class="check"></span><span>Graphics</span></button>
+                <button type="button" class="menu-entry checkable" data-view-action="toolbar-alignment" data-view-toggle="toolbars.alignment"><span class="check"></span><span>Alignment</span></button>
+                <button type="button" class="menu-entry checkable" data-view-action="toolbar-arrange" data-view-toggle="toolbars.arrange"><span class="check"></span><span>Arrange</span></button>
+                <button type="button" class="menu-entry checkable" data-view-action="toolbar-states" data-view-toggle="toolbars.states"><span class="check"></span><span>States</span></button>
+                <button type="button" class="menu-entry checkable" data-view-action="toolbar-patterns" data-view-toggle="toolbars.patternStyles"><span class="check"></span><span>Pattern Styles</span></button>
+                <button type="button" class="menu-entry checkable" data-view-action="toolbar-back" data-view-toggle="toolbars.backStyles"><span class="check"></span><span>Back Styles</span></button>
+                <button type="button" class="menu-entry checkable" data-view-action="toolbar-fg" data-view-toggle="toolbars.foregroundColors"><span class="check"></span><span>Foreground Colors</span></button>
+                <button type="button" class="menu-entry checkable" data-view-action="toolbar-bg" data-view-toggle="toolbars.backgroundColors"><span class="check"></span><span>Background Colors</span></button>
+              </div>
+            </div>
+            <button type="button" class="menu-entry checkable" data-view-action="property-panel" data-view-toggle="propertyPanel"><span class="check"></span><span>Property Panel</span></button>
+            <button type="button" class="menu-entry checkable" data-view-action="object-explorer" data-view-toggle="objectExplorer"><span class="check"></span><span>Object Explorer</span></button>
+            <button type="button" class="menu-entry checkable" data-view-action="toolbox" data-view-toggle="toolbox"><span class="check"></span><span>Toolbox</span></button>
+            <button type="button" class="menu-entry checkable" data-view-action="diagnostics-list" data-view-toggle="diagnosticsList"><span class="check"></span><span>Diagnostics List</span></button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry checkable disabled" data-view-action="edit-display" data-view-toggle="editDisplay"><span class="check"></span><span>Edit Display</span></button>
+            <button type="button" class="menu-entry" data-view-action="test-display">Test Display</button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry checkable" data-view-action="grayscale" data-view-toggle="showGrayscale"><span class="check"></span><span>Show Displays in Grayscale</span></button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry checkable" data-view-action="show-grid" data-view-toggle="showGrid"><span class="check"></span><span>Show Grid</span></button>
+            <button type="button" class="menu-entry checkable" data-view-action="snap-on" data-view-toggle="snapOn"><span class="check"></span><span>Snap On</span></button>
+            <button type="button" class="menu-entry" data-view-action="grid-settings">Grid Settings...</button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry" data-view-action="zoom-in">Zoom In</button>
+            <button type="button" class="menu-entry" data-view-action="zoom-out">Zoom Out</button>
+            <button type="button" class="menu-entry disabled" data-view-action="cancel-zoom">Cancel Zoom</button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry" data-view-action="animation">Animation</button>
+          </div>
+        </div>
+        <div class="menu-root">
+          <button type="button" class="menu-item" id="objectsMenuBtn">Objects</button>
+          <div class="menu-dropdown menu-dropdown-wide hidden" id="objectsMenu"></div>
+        </div>
+        <div class="menu-root">
+          <button type="button" class="menu-item" id="applicationMenuBtn">Application</button>
+          <div class="menu-dropdown hidden" id="applicationMenu">
+            <button type="button" class="menu-entry" data-app-action="test-application"><span class="mi">🏃</span> Test Application</button>
+            <button type="button" class="menu-entry" data-app-action="create-runtime"><span class="mi">📦</span> Create Runtime Application...</button>
+            <button type="button" class="menu-entry" data-app-action="change-language"><span class="mi">🌐</span> Change Application Language...</button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry" data-app-action="app-properties">Application Properties...</button>
+          </div>
+        </div>
+        <div class="menu-root">
+          <button type="button" class="menu-item" id="toolsMenuBtn">Tools</button>
+          <div class="menu-dropdown menu-dropdown-wide hidden" id="toolsMenu">
+            <button type="button" class="menu-entry" data-tools-action="diag-setup">Diagnostics Setup...</button>
+            <button type="button" class="menu-entry" data-tools-action="diag-viewer">Diagnostics Viewer...</button>
+            <button type="button" class="menu-entry" data-tools-action="transfer"><span class="mi">⇄</span> Transfer Utility...</button>
+            <button type="button" class="menu-entry" data-tools-action="tag-wizard">Tag Import and Export Wizard...</button>
+            <button type="button" class="menu-entry" data-tools-action="app-manager">Application Manager...</button>
+            <button type="button" class="menu-entry disabled" data-tools-action="firmware">Firmware Upgrade Wizard...</button>
+            <button type="button" class="menu-entry" data-tools-action="languages">Languages...</button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry" data-tools-action="find"><span class="mi">🔍</span><span>Find...</span><span class="shortcut">Ctrl+F</span></button>
+            <button type="button" class="menu-entry" data-tools-action="replace"><span class="mi">🔄</span><span>Replace...</span><span class="shortcut">Ctrl+H</span></button>
+            <button type="button" class="menu-entry" data-tools-action="cross-ref"><span class="mi">📄</span><span>Cross Reference...</span><span class="shortcut">Ctrl+E</span></button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry disabled" data-tools-action="domain-cert">Domain Certificate...</button>
+            <button type="button" class="menu-entry disabled" data-tools-action="tamper-detect">CSV Data Log Tamper Detection Utility...</button>
+            <div class="menu-sep"></div>
+            <button type="button" class="menu-entry" data-tools-action="options">Options...</button>
+          </div>
+        </div>
+        <span class="menu-item-static">Window</span>
+        <span class="menu-item-static">Help</span>
+        <span class="menu-title">Plant HMI Studio — View Machine Edition</span>
+      </header>
+
+      <div class="toolbar-stack" id="toolbarStack">
+        <div class="toolbar toolbar-single" id="toolbarMain">
+          <div class="tb-group" data-toolbar-group="standard">
+            <button type="button" class="tb-icon" data-tb="run" title="Test Display / Run"><svg viewBox="0 0 16 16"><path d="M4 2l10 6-10 6V2z" fill="currentColor"/></svg></button>
+            <button type="button" class="tb-icon tb-active" data-tb="stop" title="Stop"><svg viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" fill="currentColor"/></svg></button>
+            <span class="tb-sep"></span>
+            <button type="button" class="tb-icon disabled" data-tb="cut" title="Cut"><svg viewBox="0 0 16 16"><path d="M5 2l6 6-2 2-6-6 2-2zm0 12l2-2 6 6-2 2-6-6z" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></button>
+            <button type="button" class="tb-icon disabled" data-tb="copy" title="Copy"><svg viewBox="0 0 16 16"><rect x="5" y="2" width="8" height="10" fill="none" stroke="currentColor"/><rect x="3" y="4" width="8" height="10" fill="#fff" stroke="currentColor"/></svg></button>
+            <button type="button" class="tb-icon disabled" data-tb="paste" title="Paste"><svg viewBox="0 0 16 16"><rect x="4" y="2" width="8" height="3" fill="none" stroke="currentColor"/><rect x="5" y="5" width="6" height="9" fill="#fff" stroke="currentColor"/></svg></button>
+            <span class="tb-sep"></span>
+            <button type="button" class="tb-btn compact" data-action="new-project" title="New Project">New</button>
+            <button type="button" class="tb-btn compact" data-action="open-project" title="Open">Open</button>
+            <button type="button" class="tb-btn compact" data-action="save" title="Save">Save</button>
+            <button type="button" class="tb-btn compact" data-action="add-display" title="Add Display">+Disp</button>
+            <button type="button" class="tb-btn compact" data-action="delete-display" title="Delete Display">-Disp</button>
+          </div>
+          <div class="tb-group" data-toolbar-group="arrange">
+            <span class="tb-sep"></span>
+            <button type="button" class="tb-icon disabled" data-tb="group" title="Group"><svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" fill="none" stroke="currentColor"/><rect x="9" y="9" width="6" height="6" fill="none" stroke="currentColor"/></svg></button>
+            <button type="button" class="tb-icon disabled" data-tb="same-size" title="Make Same Size"><svg viewBox="0 0 16 16"><rect x="2" y="4" width="5" height="5" fill="none" stroke="currentColor"/><rect x="9" y="7" width="5" height="5" fill="none" stroke="currentColor"/></svg></button>
+            <button type="button" class="tb-icon disabled" data-tb="fit-window" title="Fit to Window"><svg viewBox="0 0 16 16"><path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3" fill="none" stroke="currentColor"/></svg></button>
+            <button type="button" class="tb-icon" data-tb="zoom-in" title="Zoom In"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4" fill="none" stroke="currentColor"/><path d="M10 10l4 4M7 5v4M5 7h4" stroke="currentColor"/></svg></button>
+            <button type="button" class="tb-icon" data-tb="zoom-out" title="Zoom Out"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4" fill="none" stroke="currentColor"/><path d="M10 10l4 4M5 7h4" stroke="currentColor"/></svg></button>
+            <button type="button" class="tb-icon disabled" data-tb="undo" title="Undo"><svg viewBox="0 0 16 16"><path d="M3 8h8a3 3 0 100-6H8" fill="none" stroke="currentColor"/><path d="M6 5L3 8l3 3" fill="none" stroke="currentColor"/></svg></button>
+            <button type="button" class="tb-icon disabled" data-tb="redo" title="Redo"><svg viewBox="0 0 16 16"><path d="M13 8H5a3 3 0 110-6h3" fill="none" stroke="currentColor"/><path d="M10 5l3 3-3 3" fill="none" stroke="currentColor"/></svg></button>
+          </div>
+          <div class="tb-group" data-toolbar-group="graphics">
+            <span class="tb-sep"></span>
+            <button type="button" class="tb-icon disabled" title="Rectangle">▭</button>
+            <button type="button" class="tb-icon disabled" title="Ellipse">○</button>
+            <button type="button" class="tb-icon disabled" title="Text">T</button>
+            <button type="button" class="tb-icon disabled" title="Line">╱</button>
+            <button type="button" class="tb-icon disabled" title="Button">Btn</button>
+          </div>
+          <div class="tb-group" data-toolbar-group="alignment">
+            <span class="tb-sep"></span>
+            <button type="button" class="tb-icon disabled" data-tb="align-left" title="Align Left"><svg viewBox="0 0 16 16"><path d="M2 1v14M5 4h6M5 8h4" stroke="currentColor" fill="none"/></svg></button>
+            <button type="button" class="tb-icon disabled" data-tb="align-right" title="Align Right"><svg viewBox="0 0 16 16"><path d="M14 1v14M11 4H5M11 8h4" stroke="currentColor" fill="none"/></svg></button>
+            <button type="button" class="tb-icon disabled" data-tb="align-hcenter" title="Align Horizontal Centers"><svg viewBox="0 0 16 16"><path d="M8 1v14M4 5h8M5 8h6" stroke="currentColor" fill="none"/></svg></button>
+            <button type="button" class="tb-icon disabled" data-tb="align-top" title="Align Top"><svg viewBox="0 0 16 16"><path d="M1 2h14M4 5v6M8 5v4" stroke="currentColor" fill="none"/></svg></button>
+            <button type="button" class="tb-icon disabled" data-tb="align-bottom" title="Align Bottom"><svg viewBox="0 0 16 16"><path d="M1 14h14M4 5v6M8 8v4" stroke="currentColor" fill="none"/></svg></button>
+            <button type="button" class="tb-icon disabled" data-tb="align-vcenter" title="Align Vertical Centers"><svg viewBox="0 0 16 16"><path d="M1 8h14M5 4v8M8 5v6" stroke="currentColor" fill="none"/></svg></button>
+            <button type="button" class="tb-icon disabled" data-tb="distribute" title="Distribute"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2" fill="currentColor"/><path d="M8 2v2M8 12v2M2 8h2M12 8h2" stroke="currentColor"/></svg></button>
+            <button type="button" class="tb-icon disabled" data-tb="create-group" title="Create Group"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor"/><rect x="11" y="11" width="4" height="4" fill="currentColor"/></svg></button>
+          </div>
+          <div class="tb-group hidden" data-toolbar-group="states">
+            <span class="tb-sep"></span>
+            <span class="tb-label">States</span>
+          </div>
+          <div class="tb-group hidden" data-toolbar-group="patternStyles">
+            <span class="tb-sep"></span>
+            <span class="tb-label">Patterns</span>
+          </div>
+          <div class="tb-group hidden" data-toolbar-group="backStyles">
+            <span class="tb-sep"></span>
+            <span class="tb-label">Back</span>
+          </div>
+          <div class="tb-group hidden" data-toolbar-group="foregroundColors">
+            <span class="tb-sep"></span>
+            <button type="button" class="tb-color" style="background:#000" disabled></button>
+            <button type="button" class="tb-color" style="background:#c00" disabled></button>
+            <button type="button" class="tb-color" style="background:#060" disabled></button>
+            <button type="button" class="tb-color" style="background:#006" disabled></button>
+          </div>
+          <div class="tb-group hidden" data-toolbar-group="backgroundColors">
+            <span class="tb-sep"></span>
+            <button type="button" class="tb-color" style="background:#fff" disabled></button>
+            <button type="button" class="tb-color" style="background:#ccc" disabled></button>
+            <button type="button" class="tb-color" style="background:#888" disabled></button>
+            <button type="button" class="tb-color" style="background:#333" disabled></button>
+          </div>
+          <span class="tb-spacer"></span>
+          <select id="projectSelect" class="project-select" title="Active project"></select>
+        </div>
+      </div>
+
+      <div class="workbook-tabs hidden" id="workbookTabs"></div>
+
+      <div class="studio-body" id="studioBody">
+        <aside class="side-panel hidden" id="toolboxPanel">
+          <div class="side-panel-header"><strong>Toolbox</strong></div>
+          <div class="side-panel-body toolbox-list">
+            <div class="toolbox-item">Numeric Display</div>
+            <div class="toolbox-item">State Indicator</div>
+            <div class="toolbox-item">Button</div>
+            <div class="toolbox-item">Panel</div>
+            <div class="toolbox-item">Grid</div>
+            <div class="toolbox-item">Trend</div>
+            <p class="side-hint">Drag-and-drop editor planned</p>
+          </div>
+        </aside>
+
+        <aside class="explorer-panel" id="explorerPanel">
+          <div class="explorer-header">
+            <strong>Explorer</strong>
+            <span id="explorerProject">—</span>
+          </div>
+          <div class="explorer-tree" id="explorerTree"></div>
+        </aside>
+
+        <main class="workspace" id="workspace">
+          <div class="workspace-grid hidden" id="workspaceGrid"></div>
+          <div class="workspace-welcome" id="workspaceWelcome">
+            <h2>Plant HMI Studio</h2>
+            <p>Select a display from the explorer, or create a new project to get started.</p>
+            <button type="button" class="welcome-btn" data-action="new-project">New Project</button>
+          </div>
+          <iframe id="previewFrame" class="preview-frame hidden" title="Display preview"></iframe>
+          <div id="panelView" class="panel-view hidden"></div>
+        </main>
+
+        <aside class="side-panel hidden" id="propertyPanel">
+          <div class="side-panel-header"><strong>Property Panel</strong></div>
+          <div class="side-panel-body" id="propertyPanelBody">
+            <p class="side-hint">Select a display or object to view properties.</p>
+          </div>
+        </aside>
+
+        <aside class="side-panel hidden" id="objectExplorerPanel">
+          <div class="side-panel-header"><strong>Object Explorer</strong></div>
+          <div class="side-panel-body" id="objectExplorerBody"></div>
+        </aside>
+
+        <aside class="side-panel hidden" id="diagnosticsPanel">
+          <div class="side-panel-header"><strong>Diagnostics List</strong></div>
+          <div class="side-panel-body" id="diagnosticsPanelBody">
+            <p class="side-hint">Runtime diagnostics appear here during Test Display.</p>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="status-bar" id="statusBar">
+        <button type="button" class="tab active" data-tab="application">Application</button>
+        <button type="button" class="tab" data-tab="communications">Communications</button>
+        <span class="status-msg" id="statusMsg">Ready</span>
+      </footer>
+    </div>
+
+    <dialog id="newProjectDialog" class="dialog">
+      <form id="newProjectForm">
+        <h3>New Application</h3>
+        <label>Project name<input type="text" id="newProjectName" maxlength="60" placeholder="My Plant HMI" required /></label>
+        <p class="dialog-error hidden" id="newProjectNameError"></p>
+        <p class="dialog-hint">Creates a project with all 18 standard Plant HMI displays (Overview, Settings, Manual, Alarms, Recipe, etc.)</p>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">Create</button>
+          <button type="button" class="dialog-btn" id="cancelNewProject">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="addDisplayDialog" class="dialog">
+      <form id="addDisplayForm">
+        <h3>Add Display</h3>
+        <label>Page No<input type="text" id="addPageNo" inputmode="numeric" maxlength="6" placeholder="305" required /></label>
+        <label>Screen Name<input type="text" id="addScreenName" maxlength="40" placeholder="Custom_Screen" required /></label>
+        <label>Folder
+          <select id="addFolder">
+            <option value="100_Overview">100 Overview</option>
+            <option value="200_Settings">200 Settings</option>
+            <option value="300_Manual_Operation">300 Manual Operation</option>
+            <option value="400_Active_Alarms">400 Active Alarms</option>
+            <option value="500_Recipe">500 Recipe</option>
+            <option value="600_Legends">600 Legends</option>
+            <option value="700_User_Management">700 User Management</option>
+          </select>
+        </label>
+        <p class="dialog-hint">Display ID will be generated as PageNo_ScreenName (e.g. 305_Custom_Screen)</p>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">Add</button>
+          <button type="button" class="dialog-btn" id="cancelAddDisplay">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="openProjectDialog" class="dialog dialog-wide">
+        <h3>Open Application</h3>
+      <p class="dialog-hint">Open a project or delete one you no longer need.</p>
+      <ul id="projectList" class="project-list"></ul>
+      <div class="dialog-actions">
+        <button type="button" class="dialog-btn" id="closeOpenProject">Close</button>
+      </div>
+    </dialog>
+
+    <dialog id="globalObjectDefaultsDialog" class="dialog dialog-ft">
+      <form id="globalObjectDefaultsForm">
+        <h3>Global Object Defaults</h3>
+        <p class="dialog-hint">Specify the default values for properties of global reference objects.</p>
+        <fieldset class="ft-fieldset">
+          <legend>LinkAnimation default</legend>
+          <label class="radio-row"><input type="radio" name="linkAnimation" value="doNotLink" /> Do not link</label>
+          <label class="radio-row"><input type="radio" name="linkAnimation" value="linkWithExpressions" checked /> Link with expressions</label>
+          <label class="radio-row"><input type="radio" name="linkAnimation" value="linkWithoutExpressions" /> Link without expressions</label>
+        </fieldset>
+        <fieldset class="ft-fieldset">
+          <legend>LinkConnections default</legend>
+          <label class="radio-row"><input type="radio" name="linkConnections" value="true" checked /> True</label>
+          <label class="radio-row"><input type="radio" name="linkConnections" value="false" /> False</label>
+        </fieldset>
+        <fieldset class="ft-fieldset">
+          <legend>LinkSize default</legend>
+          <label class="radio-row"><input type="radio" name="linkSize" value="true" checked /> True</label>
+          <label class="radio-row"><input type="radio" name="linkSize" value="false" /> False</label>
+        </fieldset>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelGlobalDefaults">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyGlobalDefaults" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpGlobalDefaults">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="displaySettingsDialog" class="dialog">
+      <form id="displaySettingsForm">
+        <h3>Display Settings</h3>
+        <label>Display title<input type="text" id="displaySettingsTitle" maxlength="60" /></label>
+        <label>Width (px)<input type="number" id="displaySettingsWidth" min="320" max="4096" value="1024" /></label>
+        <label>Height (px)<input type="number" id="displaySettingsHeight" min="240" max="4096" value="768" /></label>
+        <label>Background color<input type="color" id="displaySettingsBg" value="#2a2a2a" /></label>
+        <label>Security level<input type="number" id="displaySettingsSecurity" min="0" max="10" value="0" /></label>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelDisplaySettings">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="keyAssignmentsDialog" class="dialog dialog-wide">
+      <form id="keyAssignmentsForm">
+        <h3>Key Assignments</h3>
+        <p class="dialog-hint">Assign function keys to navigate to displays at runtime.</p>
+        <div id="keyAssignmentsGrid" class="key-grid"></div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelKeyAssignments">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="wallpaperColorDialog" class="dialog">
+      <form id="wallpaperColorForm">
+        <h3>Wallpaper — Solid Color</h3>
+        <label>Color<input type="color" id="wallpaperColorPicker" value="#1a1a1a" /></label>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelWallpaperColor">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="gridSettingsDialog" class="dialog">
+      <form id="gridSettingsForm">
+        <h3>Grid Settings</h3>
+        <label>Grid spacing (px)<input type="number" id="gridSizeInput" min="4" max="100" value="10" /></label>
+        <label>Snap distance (px)<input type="number" id="snapDistanceInput" min="1" max="50" value="5" /></label>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelGridSettings">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="projectSettingsDialog" class="dialog dialog-ft dialog-settings">
+      <form id="projectSettingsForm">
+        <h3 id="projectSettingsTitle">Project Settings</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-tab="runtime">Runtime</button>
+          <button type="button" class="dialog-tab" data-tab="inactivity">Inactivity</button>
+        </div>
+        <div class="dialog-tab-panel active" data-tab-panel="general">
+          <div class="ps-window-size">
+            <label for="psWindowProfile" class="ps-inline-label">Project window size :</label>
+            <select id="psWindowProfile"></select>
+          </div>
+          <div class="ps-size-row hidden" id="psCustomSizeRow">
+            <label>Width<input type="number" id="psWidth" min="320" max="4096" /></label>
+            <label>Height<input type="number" id="psHeight" min="240" max="4096" /></label>
+          </div>
+          <p class="ps-window-warning">Any unsaved Alarm Setup changes will be lost if the Project Window Size setting is changed from a PanelView Plus to PanelView Plus Compact terminal, or vice versa.</p>
+        </div>
+        <div class="dialog-tab-panel" data-tab-panel="runtime">
+          <label>Application name<input type="text" id="psAppName" maxlength="80" required /></label>
+          <label>Subtitle<input type="text" id="psSubtitle" maxlength="80" /></label>
+          <label>Startup display<select id="psStartup"></select></label>
+          <fieldset class="ft-fieldset">
+            <legend>Execution Target</legend>
+            <label class="radio-row"><input type="radio" name="executionTarget" value="panel-standard" /> Execute on Panel PC (Standard)</label>
+            <label class="radio-row"><input type="radio" name="executionTarget" value="panel-performance" checked /> Execute on Panel PC (Performance)</label>
+            <label class="radio-row"><input type="radio" name="executionTarget" value="browser" /> Execute in Browser / Desktop Runtime</label>
+          </fieldset>
+          <label>Communication driver
+            <select id="psDriver">
+              <option value="simulator">Simulator (offline)</option>
+              <option value="opcua">OPC UA (planned)</option>
+            </select>
+          </label>
+          <label>Poll interval (ms)<input type="number" id="psPoll" min="50" max="10000" value="200" /></label>
+          <label class="radio-row"><input type="checkbox" id="psFullscreen" /> Start runtime in full screen (kiosk)</label>
+        </div>
+        <div class="dialog-tab-panel" data-tab-panel="inactivity">
+          <label class="radio-row"><input type="checkbox" id="psInactivityEnabled" /> Enable inactivity timeout</label>
+          <label>Timeout (minutes)<input type="number" id="psTimeoutMin" min="1" max="480" value="15" /></label>
+          <label>Action on timeout
+            <select id="psInactivityAction">
+              <option value="logout">Log out user</option>
+              <option value="blank">Blank screen</option>
+              <option value="home">Return to startup display</option>
+              <option value="none">No action</option>
+            </select>
+          </label>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelProjectSettings">Cancel</button>
+          <button type="button" class="dialog-btn" id="helpProjectSettings">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="applicationLanguageDialog" class="dialog">
+      <form id="applicationLanguageForm">
+        <h3>Change Application Language</h3>
+        <label>Runtime language
+          <select id="appLanguageSelect">
+            <option value="en">English</option>
+            <option value="de">German</option>
+            <option value="fr">French</option>
+            <option value="es">Spanish</option>
+            <option value="hi">Hindi</option>
+          </select>
+        </label>
+        <p class="dialog-hint">Localized string support is planned. Language preference is saved with the project.</p>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelAppLanguage">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="createRuntimeDialog" class="dialog dialog-wide">
+      <h3>Create Runtime Application</h3>
+      <p class="dialog-hint">Build a standalone Windows runtime from the active project.</p>
+      <div class="runtime-steps">
+        <p><strong>Browser runtime (development)</strong></p>
+        <code class="cmd-block">npm start</code>
+        <p>Open <strong>http://127.0.0.1:8080/runtime.html</strong></p>
+        <p><strong>Windows desktop runtime (Electron)</strong></p>
+        <code class="cmd-block">npm run desktop:runtime</code>
+        <p><strong>Fullscreen panel PC / kiosk</strong></p>
+        <code class="cmd-block">npm run desktop:kiosk</code>
+      </div>
+      <p class="dialog-hint">Packaged .exe installer is on the roadmap. Active project: <strong id="createRuntimeProject">—</strong></p>
+      <div class="dialog-actions">
+        <button type="button" class="dialog-btn primary" id="launchRuntimeFromDialog">Test Application</button>
+        <button type="button" class="dialog-btn" id="closeCreateRuntime">Close</button>
+      </div>
+    </dialog>
+
+    <dialog id="findDialog" class="dialog">
+      <form id="findForm">
+        <h3>Find</h3>
+        <label>Find what<input type="text" id="findText" autofocus /></label>
+        <label class="radio-row"><input type="checkbox" id="findInDisplays" checked /> Search display names</label>
+        <label class="radio-row"><input type="checkbox" id="findInTags" checked /> Search tag names</label>
+        <div id="findResults" class="tool-results"></div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">Find Next</button>
+          <button type="button" class="dialog-btn" id="cancelFind">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="replaceDialog" class="dialog">
+      <form id="replaceForm">
+        <h3>Replace</h3>
+        <label>Find what<input type="text" id="replaceFindText" /></label>
+        <label>Replace with<input type="text" id="replaceWithText" /></label>
+        <p class="dialog-hint">Replace in tag bindings across all display JSON files (active project).</p>
+        <div id="replacePreview" class="tool-results"></div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">Replace All</button>
+          <button type="button" class="dialog-btn" id="cancelReplace">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="crossRefDialog" class="dialog dialog-wide">
+      <form id="crossRefForm">
+        <h3>Cross Reference</h3>
+        <label>Tag or text<input type="text" id="crossRefText" placeholder="e.g. System.Healthy" /></label>
+        <div id="crossRefResults" class="tool-results"></div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">Search</button>
+          <button type="button" class="dialog-btn" id="cancelCrossRef">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="tagWizardDialog" class="dialog dialog-wide">
+      <h3>Tag Import and Export Wizard</h3>
+      <p class="dialog-hint">Import or export HMI tag definitions for project <strong id="tagWizardProject">—</strong>.</p>
+      <div class="runtime-steps">
+        <p><strong>Export tags</strong> — downloads <code>tags.json</code> from the active project.</p>
+        <p><strong>Import tags</strong> — paste JSON array of tag definitions below and merge into project.</p>
+      </div>
+      <label>Import tags (JSON array)<textarea id="tagImportJson" rows="8" placeholder='[{"name":"My.Tag","type":"bool","description":""}]'></textarea></label>
+      <div class="dialog-actions">
+        <button type="button" class="dialog-btn primary" id="exportTagsBtn">Export Tags</button>
+        <button type="button" class="dialog-btn" id="importTagsBtn">Import Tags</button>
+        <button type="button" class="dialog-btn" id="closeTagWizard">Close</button>
+      </div>
+    </dialog>
+
+    <dialog id="optionsDialog" class="dialog">
+      <form id="optionsForm">
+        <h3>Options</h3>
+        <fieldset class="ft-fieldset">
+          <legend>Studio defaults</legend>
+          <label class="radio-row"><input type="checkbox" id="optStatusBar" /> Show status bar on startup</label>
+          <label class="radio-row"><input type="checkbox" id="optExplorer" /> Show explorer on startup</label>
+          <label class="radio-row"><input type="checkbox" id="optWorkbook" /> Workbook mode on startup</label>
+          <label>Default grid spacing (px)<input type="number" id="optGridSize" min="4" max="100" /></label>
+        </fieldset>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelOptions">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="transferDialog" class="dialog dialog-wide">
+      <h3>Transfer Utility</h3>
+      <p class="dialog-hint">Deploy the active project to a panel PC or runtime station.</p>
+      <p>Plant HMI transfer packages the <code>projects/&lt;id&gt;/</code> folder. Copy it to the target machine and run <code>npm start</code> or the Electron runtime.</p>
+      <p class="dialog-hint">Automated FTP/USB deployment is planned.</p>
+      <div class="dialog-actions">
+        <button type="button" class="dialog-btn" id="closeTransfer">Close</button>
+      </div>
+    </dialog>
+
+    <dialog id="explorerFilterDialog" class="dialog">
+      <form id="explorerFilterForm">
+        <h3>Filter</h3>
+        <label>Show items matching
+          <input type="text" id="explorerFilterText" placeholder="Display name or number…" />
+        </label>
+        <p class="dialog-hint">Leave blank to show all items in the explorer tree.</p>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">Apply</button>
+          <button type="button" class="dialog-btn" id="clearExplorerFilter">Clear</button>
+          <button type="button" class="dialog-btn" id="cancelExplorerFilter">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="explorerContextMenu" class="context-menu hidden"></div>
+
+    <script src="studio-objects-menu.js"></script>
+    <script src="studio.js"></script>
+  </body>
+</html>

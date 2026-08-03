@@ -1,0 +1,24 @@
+{
+  "description": "Standard Plant HMI display library — every new project starts with these screens",
+  "startupScreen": "100_Overview",
+  "screens": [
+    { "id": "100_Overview", "folder": "100_Overview", "title": "Overview", "navGroup": "overview" },
+    { "id": "101_Production_Data", "folder": "100_Overview", "title": "Production Data", "navGroup": "overview" },
+    { "id": "102_Prestart", "folder": "100_Overview", "title": "Prestart Checklist", "navGroup": "overview" },
+    { "id": "103_Safety", "folder": "100_Overview", "title": "Safety", "navGroup": "overview" },
+    { "id": "104_Mimic_Screen", "folder": "100_Overview", "title": "Mimic", "navGroup": "overview" },
+    { "id": "200_Settings", "folder": "200_Settings", "title": "Settings", "navGroup": "settings" },
+    { "id": "300_Manual_Operation", "folder": "300_Manual_Operation", "title": "Manual Operation", "navGroup": "manual" },
+    { "id": "301_PLC_IO_List", "folder": "300_Manual_Operation", "title": "PLC IO List", "navGroup": "manual" },
+    { "id": "302_PLC_Architecture", "folder": "300_Manual_Operation", "title": "PLC Architecture", "navGroup": "manual" },
+    { "id": "303_IO_List", "folder": "300_Manual_Operation", "title": "IO List", "navGroup": "manual" },
+    { "id": "304_Cycle_Time", "folder": "300_Manual_Operation", "title": "Cycle Time", "navGroup": "manual" },
+    { "id": "400_Active_Alarms", "folder": "400_Active_Alarms", "title": "Active Alarms", "navGroup": "alarms" },
+    { "id": "401_Alarm_History", "folder": "400_Active_Alarms", "title": "Alarm History", "navGroup": "alarms" },
+    { "id": "402_Alarm_Remedies_Popup", "folder": "400_Active_Alarms", "title": "Alarm Remedies", "navGroup": "alarms" },
+    { "id": "500_Recipe", "folder": "500_Recipe", "title": "Recipe", "navGroup": "recipe" },
+    { "id": "500_Recipe_1", "folder": "500_Recipe", "title": "Recipe Detail", "navGroup": "recipe" },
+    { "id": "600_Legends", "folder": "600_Legends", "title": "Legends", "navGroup": "legends" },
+    { "id": "700_User_Management", "folder": "700_User_Management", "title": "User Management", "navGroup": "users" }
+  ]
+}

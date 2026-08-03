@@ -8,23 +8,41 @@ const { TagService } = require('./services/tag-service');
 const { AlarmService } = require('./services/alarm-service');
 const { UserService } = require('./services/user-service');
 const { SimulatorDriver } = require('./services/communication/simulator');
+const { ProjectService } = require('./services/project-service');
 
 const ROOT = path.join(__dirname, '..');
-const PORT = process.env.PORT || 5060;
+const PORT = process.env.PORT || 8080;
 
-const projectConfig = JSON.parse(
-  fs.readFileSync(path.join(ROOT, 'config', 'project.json'), 'utf8')
-);
-
+const projectService = new ProjectService(ROOT);
 const tagService = new TagService();
 const alarmService = new AlarmService(tagService);
-const userService = new UserService(projectConfig.users);
+let userService = new UserService([]);
+let navigationConfig = {};
+let projectConfig = {};
+let driver = null;
 
-tagService.loadDefinitions(projectConfig.tags);
-alarmService.loadDefinitions(projectConfig.alarms);
+function loadProjectRuntime(projectId) {
+  const id = projectId || projectService.getActiveId();
+  projectConfig = projectService.readProjectConfig(id);
+  navigationConfig = projectService.readNavigation(id);
+  userService = new UserService(projectConfig.users || []);
 
-const driver = new SimulatorDriver(tagService, alarmService);
-driver.connect();
+  tagService.tags.clear();
+  tagService.loadDefinitions(projectConfig.tags || []);
+  alarmService.definitions = [];
+  alarmService.active = [];
+  alarmService.loadDefinitions(projectConfig.alarms || []);
+
+  if (driver) driver.disconnect();
+  driver = new SimulatorDriver(tagService, alarmService);
+  driver.connect();
+}
+
+function resolveProjectId(req) {
+  return req.query.project || req.body?.projectId || projectService.getActiveId();
+}
+
+loadProjectRuntime();
 
 const app = express();
 const server = http.createServer(app);
@@ -32,41 +50,133 @@ const io = new Server(server, { cors: { origin: '*' } });
 
 app.use(express.json());
 app.use(express.static(path.join(ROOT, 'public')));
-app.use('/screens', express.static(path.join(ROOT, 'screens')));
-app.use('/faceplates', express.static(path.join(ROOT, 'faceplates')));
+app.use('/projects', express.static(path.join(ROOT, 'projects')));
 
-function loadScreens() {
-  const dir = path.join(ROOT, 'screens');
-  return fs.readdirSync(dir)
-    .filter((f) => f.endsWith('.json'))
-    .map((f) => {
-      const screen = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
-      return { id: screen.id, title: screen.title, navGroup: screen.navGroup, file: f };
-    })
-    .sort((a, b) => a.id.localeCompare(b.id));
-}
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(ROOT, 'public', 'studio.html'));
+});
 
-app.get('/api/runtime/status', (_req, res) => {
+app.get('/api/projects/standard-library', (_req, res) => {
+  res.json(projectService.readStandardLibrary());
+});
+
+app.post('/api/projects/:id/screens', (req, res) => {
+  try {
+    const screen = projectService.addScreen(req.params.id, req.body || {});
+    res.json({ success: true, screen });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/projects/:id/screens/:screenId', (req, res) => {
+  try {
+    const result = projectService.deleteScreen(req.params.id, req.params.screenId);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.patch('/api/projects/:id/config', (req, res) => {
+  try {
+    const config = projectService.updateProjectConfig(req.params.id, req.body || {});
+    if (req.params.id === projectService.getActiveId()) loadProjectRuntime(req.params.id);
+    res.json({ success: true, config });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.patch('/api/projects/:id/screens/:screenId', (req, res) => {
+  try {
+    const screen = projectService.updateScreen(req.params.id, req.params.screenId, req.body || {});
+    res.json({ success: true, screen });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/projects', (_req, res) => {
   res.json({
-    platform: 'Plant HMI Runtime',
-    version: '0.1.0',
-    communication: driver.getStatus(),
-    currentUser: userService.getCurrentUser(),
-    startupScreen: projectConfig.startupScreen,
-    projectName: projectConfig.name
+    activeId: projectService.getActiveId(),
+    projects: projectService.listProjects()
   });
 });
 
-app.get('/api/runtime/screens', (_req, res) => {
-  res.json(loadScreens());
+app.get('/api/projects/active', (_req, res) => {
+  res.json(projectService.getActiveProject());
+});
+
+app.get('/api/projects/:id/explorer', (req, res) => {
+  if (!projectService.projectExists(req.params.id)) {
+    return res.status(404).json({ error: 'Project not found' });
+  }
+  res.json(projectService.buildExplorerTree(req.params.id));
+});
+
+app.post('/api/projects', (req, res) => {
+  const { name } = req.body || {};
+  if (!name?.trim()) return res.status(400).json({ error: 'Project name required' });
+  try {
+    const created = projectService.createProject(name.trim());
+    loadProjectRuntime(created.id);
+    io.emit('project-changed', projectService.getActiveProject());
+    res.json({ success: true, project: created, active: projectService.getActiveProject() });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/projects/:id', (req, res) => {
+  try {
+    const result = projectService.deleteProject(req.params.id);
+    if (result.activeId) loadProjectRuntime(result.activeId);
+    io.emit('project-changed', projectService.getActiveProject());
+    res.json({ success: true, ...result, active: projectService.getActiveProject() });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/projects/:id/open', (req, res) => {
+  try {
+    const active = projectService.openProject(req.params.id);
+    loadProjectRuntime(active.id);
+    io.emit('project-changed', projectService.getActiveProject());
+    res.json({ success: true, active });
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+app.get('/api/runtime/navigation', (req, res) => {
+  const pid = resolveProjectId(req);
+  res.json(projectService.readNavigation(pid));
+});
+
+app.get('/api/runtime/status', (req, res) => {
+  const pid = resolveProjectId(req);
+  const config = projectService.readProjectConfig(pid);
+  res.json({
+    platform: 'Plant HMI Studio',
+    version: '0.2.0',
+    projectId: pid,
+    communication: driver.getStatus(),
+    currentUser: userService.getCurrentUser(),
+    startupScreen: config.startupScreen || '100_Overview',
+    projectName: config.name || pid
+  });
+});
+
+app.get('/api/runtime/screens', (req, res) => {
+  res.json(projectService.listScreens(resolveProjectId(req)));
 });
 
 app.get('/api/runtime/screens/:id', (req, res) => {
-  const file = path.join(ROOT, 'screens', `${req.params.id}.json`);
-  if (!fs.existsSync(file)) {
-    return res.status(404).json({ error: 'Screen not found' });
-  }
-  res.json(JSON.parse(fs.readFileSync(file, 'utf8')));
+  const screen = projectService.getScreen(resolveProjectId(req), req.params.id);
+  if (!screen) return res.status(404).json({ error: 'Screen not found' });
+  res.json(screen);
 });
 
 app.get('/api/runtime/tags', (_req, res) => {
@@ -99,9 +209,7 @@ app.post('/api/runtime/tags/write', (req, res) => {
 app.post('/api/runtime/login', (req, res) => {
   const { username, password } = req.body || {};
   const result = userService.login(username, password);
-  if (result.success) {
-    io.emit('user-changed', result.user);
-  }
+  if (result.success) io.emit('user-changed', result.user);
   res.json(result);
 });
 
@@ -116,7 +224,8 @@ io.on('connection', (socket) => {
     tags: tagService.getAll(),
     alarms: alarmService.getState(),
     user: userService.getCurrentUser(),
-    communication: driver.getStatus()
+    communication: driver.getStatus(),
+    project: projectService.getActiveProject()
   });
 
   socket.on('subscribe', (tagNames) => {
@@ -135,6 +244,7 @@ alarmService.on('change', (state) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Plant HMI Runtime listening on http://localhost:${PORT}`);
-  console.log(`Driver: simulator | Screens: ${loadScreens().length}`);
+  const active = projectService.getActiveProject();
+  console.log(`Plant HMI Studio listening on http://localhost:${PORT}`);
+  console.log(`Active project: ${active?.name} | Screens: ${active?.screens?.length || 0}`);
 });

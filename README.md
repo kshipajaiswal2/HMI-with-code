@@ -1,11 +1,13 @@
 # PlantHMI
 
-PlantHMI contains two products:
+PlantHMI is our own **Windows PC-based HMI platform** — equivalent to Rockwell FactoryTalk View, with full customization control.
 
-1. **PC HMI Runtime** (`pc-hmi-runtime/`) — Standalone operator HMI for PC deployment with live tags, alarms, navigation, and JSON-based screen authoring.
-2. **Engineering Bridge** (`web-hmi-bridge/`) — FactoryTalk View ME engineering workspace with a PowerShell generator pipeline and a browser-based bridge for display XML editing, tag export, and import packaging.
+| Product | Folder | Purpose |
+|---------|--------|---------|
+| **Plant HMI Studio + Runtime** | `pc-hmi-runtime/` | Windows HMI — engineering studio, operator runtime, 18 standard displays per project |
+| **Engineering Bridge** | `web-hmi-bridge/` | Legacy FactoryTalk XML tooling (tag generation, import packaging) |
 
-The engineering bridge produces tag definitions and screen specs; the runtime consumes them for live operation.
+See `docs/pc_hmi_platform.md` for the full architecture and Rockwell feature parity roadmap.
 
 ## What this repository contains
 

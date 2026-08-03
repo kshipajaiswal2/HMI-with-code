@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://planthmi.local/schemas/faceplate.schema.json",
+  "title": "HMI Faceplate Definition",
+  "type": "object",
+  "required": ["id", "title", "equipmentType", "bindings", "components"],
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "equipmentType": {
+      "type": "string",
+      "enum": ["motor_dol", "motor_vfd", "conveyor", "pneumatic", "servo", "generic"]
+    },
+    "bindings": {
+      "type": "object",
+      "description": "Required tag bindings passed when opening the faceplate",
+      "additionalProperties": { "type": "string" }
+    },
+    "components": {
+      "type": "array",
+      "items": { "$ref": "screen.schema.json#/definitions/component" }
+    }
+  }
+}

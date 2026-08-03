@@ -1,4 +1,0 @@
-Delete these displays first if FactoryTalk import is merging instead of replacing:
-- 910_NEW
-
-After deleting, run Batch Import with BatchImport.xml from this folder.

@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://planthmi.local/schemas/screen.schema.json",
+  "title": "HMI Screen Definition",
+  "type": "object",
+  "required": ["id", "title", "layout", "components"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9]{3}_[A-Za-z0-9_]+$",
+      "description": "Unique screen identifier, e.g. 100_Overview"
+    },
+    "title": { "type": "string" },
+    "navGroup": {
+      "type": "string",
+      "enum": ["overview", "settings", "manual", "alarms", "recipe", "legends", "users", "none"],
+      "description": "Which nav bar button is active on this screen"
+    },
+    "layout": {
+      "type": "string",
+      "enum": ["standard", "popup", "fullscreen"],
+      "description": "standard = header + nav + content + alarm banner"
+    },
+    "securityLevel": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10,
+      "default": 0,
+      "description": "Minimum user role level required to view this screen"
+    },
+    "components": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/component" }
+    }
+  },
+  "definitions": {
+    "component": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "Text", "NavButton", "NumericDisplay", "StateIndicator",
+            "AlarmList", "AlarmBanner", "MomentaryButton", "ToggleButton",
+            "TrendChart", "RecipeSelector", "UserDisplay", "Panel", "Grid"
+          ]
+        },
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "tag": { "type": "string", "description": "Tag binding path, e.g. System.AutoMode" },
+        "target": { "type": "string", "description": "Navigation target screen id" },
+        "format": { "type": "string", "enum": ["integer", "float", "string", "boolean", "percent"] },
+        "decimals": { "type": "integer", "minimum": 0, "maximum": 6 },
+        "unit": { "type": "string" },
+        "states": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string" },
+              "color": { "type": "string" }
+            }
+          }
+        },
+        "columns": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "style": { "type": "object" },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/component" }
+        }
+      }
+    }
+  }
+}

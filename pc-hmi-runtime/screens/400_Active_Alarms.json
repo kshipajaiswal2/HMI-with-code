@@ -1,0 +1,22 @@
+{
+  "id": "400_Active_Alarms",
+  "title": "Active Alarms",
+  "navGroup": "alarms",
+  "layout": "standard",
+  "securityLevel": 0,
+  "components": [
+    {
+      "type": "Panel",
+      "id": "alarm-actions",
+      "style": { "className": "alarm-actions" },
+      "children": [
+        { "type": "Text", "label": "Active alarm list — acknowledge to clear banner" }
+      ]
+    },
+    {
+      "type": "AlarmList",
+      "id": "active-alarms",
+      "columns": ["time", "priority", "message", "status"]
+    }
+  ]
+}

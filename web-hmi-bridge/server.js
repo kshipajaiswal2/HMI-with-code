@@ -938,6 +938,32 @@ function resolveDefaultPagePath(name) {
   return null;
 }
 
+function buildHmiOverview() {
+  const modules = [
+    { id: 'alarms', name: 'Alarms', status: 'ready', description: 'Real-time alarm state, acknowledgements, and history.' },
+    { id: 'diagnostics', name: 'Diagnostics', status: 'ready', description: 'Device health, PLC connectivity, and communication trends.' },
+    { id: 'trending', name: 'Trending', status: 'ready', description: 'Historical values and operational event charts.' },
+    { id: 'recipes', name: 'Recipes', status: 'ready', description: 'Batch and product parameter management.' },
+    { id: 'users', name: 'User Management', status: 'ready', description: 'Role-based access and operator permissions.' },
+    { id: 'navigation', name: 'Navigation', status: 'ready', description: 'Standardized HMI screen navigation and faceplates.' }
+  ];
+
+  return {
+    connected: true,
+    platform: 'Plant HMI Platform',
+    status: 'stable',
+    modules,
+    summary: {
+      screens: 18,
+      faceplates: 6,
+      alarms: 24,
+      recipes: 4,
+      users: 8
+    },
+    generatedAt: new Date().toISOString()
+  };
+}
+
 function bridgeSnapshot() {
   return {
     connected: true,
@@ -1511,6 +1537,10 @@ app.get('/api/packages/download/latest.zip', (_req, res) => {
   archive.pipe(res);
   archive.directory(latest.folderPath, false);
   archive.finalize();
+});
+
+app.get('/api/hmi/overview', (_req, res) => {
+  res.json(buildHmiOverview());
 });
 
 io.on('connection', (socket) => {

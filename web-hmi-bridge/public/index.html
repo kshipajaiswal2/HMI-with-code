@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Display XML Bridge</title>
+    <title>Plant HMI Workspace</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -13,7 +13,7 @@
   <body>
     <main class="shell">
       <header class="hero">
-        <h1>Display XML Bridge</h1>
+        <h1>Plant HMI Workspace</h1>
         <div class="status-card" id="bridgeStatus">
           <span class="dot"></span>
           <span>Checking bridge...</span>
@@ -22,6 +22,26 @@
 
       <section class="grid" id="mainGrid">
         <article class="card exports-card">
+          <div class="card-heading-row">
+            <div>
+              <h2>Plant HMI Platform</h2>
+              <p class="card-subtitle">A modular Plant HMI foundation for stable operations, diagnostics, recipes, alarms, and user workflows.</p>
+            </div>
+            <button id="refreshHmiBtn" type="button" class="mode-btn accent">Refresh</button>
+          </div>
+
+          <div id="hmiOverview" class="hmi-overview"></div>
+
+          <div class="hmi-module-grid" id="hmiModuleGrid"></div>
+
+          <div class="hmi-panel">
+            <h3>Implementation roadmap</h3>
+            <ul>
+              <li>Stable communication layer for OPC/PLC/driver integration</li>
+              <li>Reusable faceplates, alarm templates, trends, and navigation patterns</li>
+              <li>Easy-maintenance screen authoring with shared component library</li>
+            </ul>
+          </div>
           <div class="displays-header">
             <h2>Projects</h2>
             <div class="header-actions">

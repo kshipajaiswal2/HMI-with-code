@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Runtime logs
+*.log
+server.log
+
+# Generated / disposable build outputs
+generated/
+web-hmi-bridge/ftio/reimport/packages/
+
+# Temp / debug artifacts
+tmp-*
+**/tmp-*
+
+# FactoryTalk runtime cache
+hmi/MyPlantHMI/cache_old/
+hmi/MyPlantHMI/PrivateDirectory_old/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Empty root lockfile (no root package.json)
+/package-lock.json
+
+# Large generated test project data
+web-hmi-bridge/scripts/test-project.json

@@ -45,6 +45,9 @@ const buildPackageBtn = document.getElementById('buildPackageBtn');
 const buildAllPackageBtn = document.getElementById('buildAllPackageBtn');
 const previewPane = document.getElementById('previewPane');
 const packageResult = document.getElementById('packageResult');
+const refreshHmiBtn = document.getElementById('refreshHmiBtn');
+const hmiOverview = document.getElementById('hmiOverview');
+const hmiModuleGrid = document.getElementById('hmiModuleGrid');
 const workspaceDockTabs = document.getElementById('workspaceDockTabs');
 const workspaceDockTabButtons = Array.from(document.querySelectorAll('[data-dock-tab]'));
 const workspaceDockPanels = Array.from(document.querySelectorAll('[data-dock-panel]'));
@@ -4102,7 +4105,7 @@ function setProjectName(name) {
   if (sidebarTitle) {
     sidebarTitle.textContent = 'Projects';
   }
-  document.title = `${currentProjectName} - Display XML Bridge`;
+  document.title = `${currentProjectName} - Plant HMI Workspace`;
 }
 
 function normalizeFolderName(name) {
@@ -12951,6 +12954,59 @@ function closeWorkspaceMenus() {
   }
 }
 
+async function refreshHmiOverview() {
+  if (!hmiOverview || !hmiModuleGrid) {
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/hmi/overview');
+    if (!response.ok) {
+      throw new Error('Unable to load HMI overview');
+    }
+
+    const data = await response.json();
+    hmiOverview.innerHTML = `
+      <div class="hmi-overview-card">
+        <strong>${escapeHtml(data.platform || 'Plant HMI')}</strong>
+        <span>${escapeHtml(data.status || 'stable')}</span>
+      </div>
+      <div class="hmi-overview-card">
+        <strong>${data.summary?.screens ?? 0}</strong>
+        <span>Standard screens</span>
+      </div>
+      <div class="hmi-overview-card">
+        <strong>${data.summary?.faceplates ?? 0}</strong>
+        <span>Reusable faceplates</span>
+      </div>
+      <div class="hmi-overview-card">
+        <strong>${data.summary?.alarms ?? 0}</strong>
+        <span>Alarm templates</span>
+      </div>
+    `;
+
+    hmiModuleGrid.innerHTML = (data.modules || []).map((module) => `
+      <article class="hmi-module-card">
+        <div class="module-pill">${escapeHtml(module.status || 'ready')}</div>
+        <h4>${escapeHtml(module.name || module.id)}</h4>
+        <p>${escapeHtml(module.description || '')}</p>
+      </article>
+    `).join('');
+  } catch (_error) {
+    hmiOverview.innerHTML = '<div class="hmi-overview-card"><strong>Unavailable</strong><span>Could not load HMI overview.</span></div>';
+    hmiModuleGrid.innerHTML = '';
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function initWorkspaceMenuBar() {
   const menuBar = document.querySelector('.app-menu-bar');
   if (!menuBar) {
@@ -13049,6 +13105,10 @@ objTextColorPicker.addEventListener('input', () => {
 objBackColor.addEventListener('input', () => syncColorControl(objBackColor, objBackColorPicker, objBackColorSwatch));
 objBorderColor.addEventListener('input', () => syncColorControl(objBorderColor, objBorderColorPicker, objBorderColorSwatch));
 objTextColor.addEventListener('input', () => syncColorControl(objTextColor, objTextColorPicker, objTextColorSwatch));
+
+if (refreshHmiBtn) {
+  refreshHmiBtn.addEventListener('click', () => refreshHmiOverview());
+}
 
 buildPackageBtn.addEventListener('click', async () => {
   try {
@@ -13169,6 +13229,7 @@ async function init() {
   const res = await fetch('/api/bridge/status');
   const status = await res.json();
   setBridgeCard(status);
+  await refreshHmiOverview();
   enforceProjectSidebarLayout();
   ensureProjectSidebarWheelScroll();
   renderProjectSidebar();

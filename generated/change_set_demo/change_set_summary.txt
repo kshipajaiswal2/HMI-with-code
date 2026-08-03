@@ -1,9 +1,0 @@
-InputDir=generated
-OutputDir=generated/change_set_demo
-NewShortcut=PLC01
-RenameRobotTags=True
-RobotTagsRenamed=4
-AddedAlarms=20
-DeviceRows=62
-AlarmRows=480
-ScreenRows=62

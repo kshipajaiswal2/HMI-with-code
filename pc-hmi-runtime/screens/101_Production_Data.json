@@ -1,0 +1,20 @@
+{
+  "id": "101_Production_Data",
+  "title": "Production Data",
+  "navGroup": "overview",
+  "layout": "standard",
+  "securityLevel": 0,
+  "components": [
+    {
+      "type": "Grid",
+      "style": { "className": "metric-grid" },
+      "children": [
+        { "type": "NumericDisplay", "tag": "Production.Count", "label": "Total Count", "format": "integer" },
+        { "type": "NumericDisplay", "tag": "Production.Rate", "label": "Rate", "format": "float", "decimals": 1, "unit": "units/hr" },
+        { "type": "NumericDisplay", "tag": "Production.Efficiency", "label": "OEE", "format": "percent", "decimals": 1 },
+        { "type": "NumericDisplay", "tag": "Recipe.Number", "label": "Recipe #", "format": "integer" },
+        { "type": "NumericDisplay", "tag": "Recipe.Active", "label": "Recipe Name", "format": "string" }
+      ]
+    }
+  ]
+}

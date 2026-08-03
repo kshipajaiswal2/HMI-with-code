@@ -234,6 +234,84 @@ h3 {
   transition: opacity 150ms ease, transform 150ms ease, padding 150ms ease;
 }
 
+.card-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.card-subtitle {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.hmi-overview {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+
+.hmi-overview-card,
+.hmi-module-card,
+.hmi-panel {
+  border: 1px solid var(--panel-soft-border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 10px 12px;
+  box-shadow: 0 8px 18px #1520280d;
+}
+
+.hmi-overview-card strong {
+  display: block;
+  font-size: 1.2rem;
+  margin-bottom: 4px;
+}
+
+.hmi-module-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+
+.hmi-module-card h4 {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+}
+
+.hmi-module-card p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+.hmi-module-card .module-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eaf5f7;
+  color: var(--accent-cool);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.hmi-panel ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
 .grid.sidebar-collapsed .exports-card {
   opacity: 1;
   transform: none;

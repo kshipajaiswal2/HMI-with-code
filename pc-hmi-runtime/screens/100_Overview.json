@@ -1,0 +1,94 @@
+{
+  "id": "100_Overview",
+  "title": "Overview",
+  "navGroup": "overview",
+  "layout": "standard",
+  "securityLevel": 0,
+  "components": [
+    {
+      "type": "Panel",
+      "id": "status-row",
+      "style": { "className": "status-row" },
+      "children": [
+        {
+          "type": "StateIndicator",
+          "tag": "System.AutoMode",
+          "label": "Mode",
+          "states": {
+            "0": { "text": "Manual", "color": "#0066cc" },
+            "1": { "text": "Auto", "color": "#00c000" },
+            "true": { "text": "Auto", "color": "#00c000" },
+            "false": { "text": "Manual", "color": "#0066cc" }
+          }
+        },
+        {
+          "type": "StateIndicator",
+          "tag": "System.Healthy",
+          "label": "Health",
+          "states": {
+            "0": { "text": "Fault", "color": "#cc0000" },
+            "1": { "text": "Healthy", "color": "#00c000" },
+            "true": { "text": "Healthy", "color": "#00c000" },
+            "false": { "text": "Fault", "color": "#cc0000" }
+          }
+        },
+        {
+          "type": "StateIndicator",
+          "tag": "System.Running",
+          "label": "Line",
+          "states": {
+            "0": { "text": "Stopped", "color": "#888888" },
+            "1": { "text": "Running", "color": "#00c000" },
+            "true": { "text": "Running", "color": "#00c000" },
+            "false": { "text": "Stopped", "color": "#888888" }
+          }
+        }
+      ]
+    },
+    {
+      "type": "Grid",
+      "id": "production-grid",
+      "style": { "className": "metric-grid" },
+      "children": [
+        {
+          "type": "NumericDisplay",
+          "tag": "Production.Count",
+          "label": "Production Count",
+          "format": "integer"
+        },
+        {
+          "type": "NumericDisplay",
+          "tag": "Production.Rate",
+          "label": "Production Rate",
+          "format": "float",
+          "decimals": 1,
+          "unit": "units/hr"
+        },
+        {
+          "type": "NumericDisplay",
+          "tag": "Production.Efficiency",
+          "label": "Efficiency",
+          "format": "percent",
+          "decimals": 1
+        },
+        {
+          "type": "NumericDisplay",
+          "tag": "Recipe.Active",
+          "label": "Active Recipe",
+          "format": "string"
+        }
+      ]
+    },
+    {
+      "type": "Panel",
+      "id": "quick-nav",
+      "style": { "className": "quick-nav" },
+      "children": [
+        { "type": "NavButton", "label": "Production Data", "target": "101_Production_Data" },
+        { "type": "NavButton", "label": "Prestart Checklist", "target": "102_Prestart" },
+        { "type": "NavButton", "label": "Safety", "target": "103_Safety" },
+        { "type": "NavButton", "label": "Mimic", "target": "104_Mimic" }
+      ]
+    }
+  ]
+}

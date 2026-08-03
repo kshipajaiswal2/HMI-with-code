@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<gfx xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="Gfx-ME15.xsd">
-    <displaySettings displayType="onTop" cannotBeReplaced="false" positionX="0" positionY="0" securityCode="*" backColor="white" titleBar="false" maximumTagUpdateRate="0.05" focusHighlightColor="#0078D7" disableFocusHighlight="false" size="specifySizeInPixels" width="490" height="192" displayNumber="0" disableInitialInputFocus="false" startupMacro="" shutdownMacro="" useGradientStyle="false" endColor="teal" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight"/>
-    <localMessageDisplay name="LocalMessageDisplay1" height="186" width="480" left="0" top="0" visible="true" wallpaper="false" isReferenceObject="false" backColor="#F5E11B" backStyle="solid" foreColor="black" fontFamily="Arial" fontSize="20" bold="true" italic="false" underline="false" strikethrough="false" borderColor="#001C38" borderStyle="line" borderUsesBackColor="true" borderWidth="4" patternColor="white" patternStyle="none" blink="false" description="" messageFile="" UseVariableMesssageFile="false" wordWrap="true" alignment="middleCenter" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight" UseEchoMessage="false">
-        <connections>
-            <connection name="Value" expression="{Temp_Tags\Alarms}"/>
-        </connections>
-    </localMessageDisplay>
-</gfx>

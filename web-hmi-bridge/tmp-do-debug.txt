@@ -1,6 +1,0 @@
-Chopper IO List: raw DO refs=64
-Dryer IO List: raw DO refs=64
-Packing IO List: raw DO refs=80
-Chopper: parsed DI=64 DO=40 plcDO=32
-Dryer: parsed DI=40 DO=40 plcDO=32
-Packing: parsed DI=96 DO=48 plcDO=40

@@ -1,9 +1,11 @@
 # PlantHMI
 
-PlantHMI is a FactoryTalk View ME engineering workspace with two connected workflows:
+PlantHMI contains two products:
 
-1. A PowerShell generator pipeline that turns master-sheet and template inputs into reusable project assets.
-2. A browser-based bridge for previewing display XML, generating FactoryTalk import files (Tags CSV, PAR), and packaging displays for import.
+1. **PC HMI Runtime** (`pc-hmi-runtime/`) — Standalone operator HMI for PC deployment with live tags, alarms, navigation, and JSON-based screen authoring.
+2. **Engineering Bridge** (`web-hmi-bridge/`) — FactoryTalk View ME engineering workspace with a PowerShell generator pipeline and a browser-based bridge for display XML editing, tag export, and import packaging.
+
+The engineering bridge produces tag definitions and screen specs; the runtime consumes them for live operation.
 
 ## What this repository contains
 
@@ -25,7 +27,9 @@ PlantHMI is a FactoryTalk View ME engineering workspace with two connected workf
 | `scripts/` | Build and generation scripts |
 | `templates/` | Pipeline configuration and reusable input templates |
 | `generated/` | Generated CSV and summary outputs (disposable) |
+| `pc-hmi-runtime/` | PC-based HMI runtime (live tags, alarms, screen renderer) |
 | `web-hmi-bridge/` | Node.js bridge server and browser UI |
+| `docs/pc_hmi_platform.md` | PC HMI platform architecture and roadmap |
 | `web-hmi-bridge/public/` | Browser app (`app.js`, `io-tags.js`, UI) |
 | `web-hmi-bridge/ftio/default-pages/` | Starting XML library used by **New Project** |
 | `web-hmi-bridge/ftio/reimport/` | Edited XML working area |

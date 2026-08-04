@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Plant HMI Studio</title>
-    <link rel="stylesheet" href="studio.css" />
+    <link rel="stylesheet" href="studio.css?v=0.2.2" />
   </head>
   <body>
     <div class="studio-app">
@@ -236,7 +236,10 @@
             <button type="button" class="tb-color" style="background:#333" disabled></button>
           </div>
           <span class="tb-spacer"></span>
-          <select id="projectSelect" class="project-select" title="Active project"></select>
+          <div class="project-select-wrap">
+            <select id="projectSelect" class="project-select" title="Active project"></select>
+            <button type="button" class="project-delete-btn" id="deleteProjectBtn" title="Delete current project">Delete</button>
+          </div>
         </div>
       </div>
 
@@ -258,10 +261,11 @@
 
         <aside class="explorer-panel" id="explorerPanel">
           <div class="explorer-header">
-            <strong>Explorer</strong>
-            <span id="explorerProject">—</span>
+            <span class="explorer-title">Explorer</span>
+            <span class="explorer-project" id="explorerProject">—</span>
           </div>
           <div class="explorer-tree" id="explorerTree"></div>
+          <div class="explorer-resizer" id="explorerResizer" title="Drag to resize explorer"></div>
         </aside>
 
         <main class="workspace" id="workspace">
@@ -271,7 +275,9 @@
             <p>Select a display from the explorer, or create a new project to get started.</p>
             <button type="button" class="welcome-btn" data-action="new-project">New Project</button>
           </div>
-          <iframe id="previewFrame" class="preview-frame hidden" title="Display preview"></iframe>
+          <div class="preview-stage hidden" id="previewStage">
+            <iframe id="previewFrame" class="preview-frame" title="Display preview"></iframe>
+          </div>
           <div id="panelView" class="panel-view hidden"></div>
         </main>
 
@@ -377,14 +383,45 @@
       </form>
     </dialog>
 
-    <dialog id="displaySettingsDialog" class="dialog">
+    <dialog id="displaySettingsDialog" class="dialog dialog-ft dialog-settings">
       <form id="displaySettingsForm">
         <h3>Display Settings</h3>
-        <label>Display title<input type="text" id="displaySettingsTitle" maxlength="60" /></label>
-        <label>Width (px)<input type="number" id="displaySettingsWidth" min="320" max="4096" value="1024" /></label>
-        <label>Height (px)<input type="number" id="displaySettingsHeight" min="240" max="4096" value="768" /></label>
-        <label>Background color<input type="color" id="displaySettingsBg" value="#2a2a2a" /></label>
-        <label>Security level<input type="number" id="displaySettingsSecurity" min="0" max="10" value="0" /></label>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-ds-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-ds-tab="behavior">Behavior</button>
+        </div>
+        <div class="dialog-tab-panel active" data-ds-tab-panel="general">
+          <fieldset class="ft-fieldset">
+            <legend>Display Type</legend>
+            <label class="radio-row"><input type="radio" name="displayType" value="replace" checked /> Replace</label>
+            <label class="radio-row"><input type="radio" name="displayType" value="onTop" /> On Top</label>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Size</legend>
+            <label class="radio-row"><input type="radio" name="sizeMode" value="project" /> Use Project Size</label>
+            <label class="radio-row"><input type="radio" name="sizeMode" value="custom" checked /> Specify Size in Pixels</label>
+            <div class="ps-size-row" id="displaySettingsSizeRow">
+              <label>Width<input type="number" id="displaySettingsWidth" min="320" max="4096" value="800" /></label>
+              <label>Height<input type="number" id="displaySettingsHeight" min="240" max="4096" value="600" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Position</legend>
+            <div class="ps-size-row">
+              <label>X<input type="number" id="displaySettingsX" value="0" /></label>
+              <label>Y<input type="number" id="displaySettingsY" value="0" /></label>
+            </div>
+          </fieldset>
+          <label class="ds-color-row">Background color<input type="color" id="displaySettingsBg" value="#EBEBEB" /></label>
+          <label>Display Number<input type="number" id="displaySettingsNumber" min="1" max="9999" value="1" /></label>
+          <label>Security code<input type="number" id="displaySettingsSecurity" min="0" max="10" value="0" /></label>
+          <label class="radio-row"><input type="checkbox" id="displaySettingsTitleBar" /> Title Bar</label>
+          <label>Title<input type="text" id="displaySettingsTitle" maxlength="60" /></label>
+        </div>
+        <div class="dialog-tab-panel" data-ds-tab-panel="behavior">
+          <label class="radio-row"><input type="checkbox" id="displaySettingsDisableFocus" /> Disable Initial Input Focus</label>
+          <label>Maximum Tag Update Rate (sec)<input type="number" id="displaySettingsTagRate" min="1" max="60" value="1" /></label>
+        </div>
         <div class="dialog-actions">
           <button type="submit" class="dialog-btn primary">OK</button>
           <button type="button" class="dialog-btn" id="cancelDisplaySettings">Cancel</button>
@@ -621,9 +658,100 @@
       </form>
     </dialog>
 
-    <div id="explorerContextMenu" class="context-menu hidden"></div>
+    <div id="startupOverlay" class="startup-overlay hidden">
+      <div class="startup-dialog" role="dialog" aria-labelledby="startupDialogTitle">
+        <div class="startup-titlebar">
+          <span class="startup-title-icon" aria-hidden="true">⚙</span>
+          <span class="startup-title-text" id="startupDialogTitle">New/Open Plant HMI Application</span>
+        </div>
+        <div class="startup-body">
+          <div class="startup-tabs" role="tablist">
+            <button type="button" class="startup-tab active" data-startup-tab="new" role="tab">New</button>
+            <button type="button" class="startup-tab" data-startup-tab="existing" role="tab">Existing</button>
+          </div>
+          <div class="startup-tab-panel active" data-startup-panel="new" role="tabpanel">
+            <div class="startup-form">
+              <label class="startup-field">
+                <span class="startup-label">Application name:</span>
+                <input type="text" id="startupAppName" maxlength="60" autocomplete="off" />
+              </label>
+              <label class="startup-field startup-field-area">
+                <span class="startup-label">Description:</span>
+                <textarea id="startupDescription" rows="4" maxlength="200"></textarea>
+              </label>
+              <label class="startup-field">
+                <span class="startup-label">Language:</span>
+                <select id="startupLanguage"></select>
+              </label>
+              <label class="startup-field">
+                <span class="startup-label">Resolution:</span>
+                <select id="startupResolution"></select>
+              </label>
+              <p class="dialog-error hidden" id="startupNameError"></p>
+            </div>
+          </div>
+          <div class="startup-tab-panel" data-startup-panel="existing" role="tabpanel">
+            <div class="startup-list-wrap">
+              <div class="startup-list-header">Application Name</div>
+              <ul id="startupProjectList" class="startup-project-list"></ul>
+            </div>
+            <div class="startup-meta">
+              <label class="startup-meta-field">
+                <span class="startup-label">Last Opened With:</span>
+                <input type="text" id="startupMetaOpenedWith" readonly />
+              </label>
+              <label class="startup-meta-field">
+                <span class="startup-label">Resolution:</span>
+                <input type="text" id="startupMetaResolution" readonly />
+              </label>
+              <label class="startup-meta-field">
+                <span class="startup-label">Language:</span>
+                <select id="startupMetaLanguage" disabled></select>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="startup-footer" id="startupFooterNew">
+          <button type="button" class="dialog-btn primary" id="startupCreateBtn" disabled>Create</button>
+          <button type="button" class="dialog-btn" id="startupImportBtn" disabled title="Planned">Import...</button>
+          <button type="button" class="dialog-btn" id="startupCancelNewBtn">Cancel</button>
+          <button type="button" class="dialog-btn" id="startupHelpNewBtn">Help</button>
+        </div>
+        <div class="startup-footer hidden" id="startupFooterExisting">
+          <button type="button" class="dialog-btn primary" id="startupOpenBtn" disabled>Open</button>
+          <button type="button" class="dialog-btn" id="startupCancelExistingBtn">Cancel</button>
+          <button type="button" class="dialog-btn" id="startupHelpExistingBtn">Help</button>
+        </div>
+      </div>
+    </div>
 
-    <script src="studio-objects-menu.js"></script>
-    <script src="studio.js"></script>
+    <dialog id="imagePropertiesDialog" class="dialog dialog-ft dialog-image-props">
+      <h3 id="imagePropsTitle" class="dialog-drag-handle">Image</h3>
+      <div class="image-props-body">
+        <img id="imagePropsThumb" class="image-props-thumb" alt="">
+        <fieldset class="image-props-attrs">
+          <legend>Image attributes</legend>
+          <dl class="image-props-list">
+            <dt>Type:</dt>
+            <dd id="imagePropsType">True color</dd>
+            <dt>Width x Height:</dt>
+            <dd id="imagePropsSize">0 x 0</dd>
+            <dt>Format:</dt>
+            <dd id="imagePropsFormat">PNG</dd>
+          </dl>
+        </fieldset>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="dialog-btn" id="closeImageProps">Close</button>
+        <button type="button" class="dialog-btn" id="helpImageProps">Help</button>
+      </div>
+    </dialog>
+
+    <div id="explorerContextMenu" class="context-menu hidden"></div>
+    <div id="workspaceContextMenu" class="context-menu hidden"></div>
+    <input type="file" id="imageImportInput" accept=".png,.jpg,.jpeg,.gif,.bmp,.ico,.webp,.svg,image/*" hidden>
+
+    <script src="studio-objects-menu.js?v=0.2.2"></script>
+    <script src="studio.js?v=0.2.2"></script>
   </body>
 </html>

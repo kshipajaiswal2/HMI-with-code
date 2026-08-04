@@ -1,0 +1,8 @@
+{
+  "id": "402_Alarm_Remedies_Popup",
+  "title": "Alarm Remedies",
+  "navGroup": "alarms",
+  "layout": "popup",
+  "securityLevel": 0,
+  "components": []
+}

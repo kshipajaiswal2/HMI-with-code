@@ -1,0 +1,8 @@
+{
+  "id": "500_Recipe",
+  "title": "Recipe",
+  "navGroup": "recipe",
+  "layout": "standard",
+  "securityLevel": 1,
+  "components": []
+}

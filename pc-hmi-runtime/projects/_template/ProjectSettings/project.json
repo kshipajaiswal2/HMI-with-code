@@ -1,0 +1,283 @@
+{
+  "name": "Plant HMI",
+  "subtitle": "Processing System",
+  "startupScreen": "100_Overview",
+  "runtime": {
+    "windowProfile": "800x600",
+    "width": 800,
+    "height": 600,
+    "executionTarget": "panel-performance"
+  },
+  "inactivity": {
+    "enabled": true,
+    "timeoutMinutes": 15,
+    "action": "logout"
+  },
+  "communication": {
+    "driver": "simulator",
+    "opcua": {
+      "endpoint": "opc.tcp://localhost:4840",
+      "securityMode": "None",
+      "securityPolicy": "None"
+    },
+    "pollIntervalMs": 200,
+    "reconnectIntervalMs": 5000
+  },
+  "users": [
+    {
+      "username": "operator",
+      "password": "operator",
+      "role": "operator",
+      "level": 1
+    },
+    {
+      "username": "engineer",
+      "password": "engineer",
+      "role": "engineer",
+      "level": 5
+    },
+    {
+      "username": "admin",
+      "password": "admin",
+      "role": "admin",
+      "level": 10
+    }
+  ],
+  "tags": [
+    {
+      "name": "System.AutoMode",
+      "type": "bool",
+      "description": "1=Auto, 0=Manual"
+    },
+    {
+      "name": "System.Healthy",
+      "type": "bool",
+      "description": "1=Healthy, 0=Fault"
+    },
+    {
+      "name": "System.Running",
+      "type": "bool",
+      "description": "Line running status"
+    },
+    {
+      "name": "Production.Count",
+      "type": "int",
+      "description": "Total production count"
+    },
+    {
+      "name": "Production.Rate",
+      "type": "float",
+      "description": "Units per hour"
+    },
+    {
+      "name": "Production.Efficiency",
+      "type": "float",
+      "description": "OEE percentage"
+    },
+    {
+      "name": "Production.Target",
+      "type": "int",
+      "description": "Shift production target"
+    },
+    {
+      "name": "Production.Rejects",
+      "type": "int",
+      "description": "Reject count"
+    },
+    {
+      "name": "Recipe.Active",
+      "type": "string",
+      "description": "Current recipe name"
+    },
+    {
+      "name": "Recipe.Number",
+      "type": "int",
+      "description": "Active recipe number"
+    },
+    {
+      "name": "Recipe.DownloadReady",
+      "type": "bool",
+      "description": "Recipe ready to download"
+    },
+    {
+      "name": "Settings.SpeedSetpoint",
+      "type": "float",
+      "description": "Line speed setpoint"
+    },
+    {
+      "name": "Settings.TempSetpoint",
+      "type": "float",
+      "description": "Temperature setpoint"
+    },
+    {
+      "name": "Settings.AutoStart",
+      "type": "bool",
+      "description": "Auto start enabled"
+    },
+    {
+      "name": "Manual.ConveyorRun",
+      "type": "bool",
+      "description": "Manual conveyor run"
+    },
+    {
+      "name": "Manual.PumpRun",
+      "type": "bool",
+      "description": "Manual pump run"
+    },
+    {
+      "name": "Manual.VFD_Speed",
+      "type": "float",
+      "description": "Manual VFD speed"
+    },
+    {
+      "name": "Safety.EStopOK",
+      "type": "bool",
+      "description": "E-stop circuit OK"
+    },
+    {
+      "name": "Safety.DoorClosed",
+      "type": "bool",
+      "description": "Safety doors closed"
+    },
+    {
+      "name": "Safety.LightCurtainOK",
+      "type": "bool",
+      "description": "Light curtain clear"
+    },
+    {
+      "name": "Prestart.PowerOK",
+      "type": "bool",
+      "description": "Power check"
+    },
+    {
+      "name": "Prestart.AirOK",
+      "type": "bool",
+      "description": "Air pressure check"
+    },
+    {
+      "name": "Prestart.SafetyOK",
+      "type": "bool",
+      "description": "Safety check"
+    },
+    {
+      "name": "Prestart.Ready",
+      "type": "bool",
+      "description": "Prestart complete"
+    },
+    {
+      "name": "Comm.PLCConnected",
+      "type": "bool",
+      "description": "PLC communication"
+    },
+    {
+      "name": "Comm.ScanRate",
+      "type": "float",
+      "description": "PLC scan rate ms"
+    },
+    {
+      "name": "CycleTime.Last",
+      "type": "float",
+      "description": "Last cycle time sec"
+    },
+    {
+      "name": "CycleTime.Average",
+      "type": "float",
+      "description": "Average cycle time sec"
+    },
+    {
+      "name": "CycleTime.Best",
+      "type": "float",
+      "description": "Best cycle time sec"
+    },
+    {
+      "name": "IO.DI_001",
+      "type": "bool",
+      "description": "Start button"
+    },
+    {
+      "name": "IO.DI_002",
+      "type": "bool",
+      "description": "Stop button"
+    },
+    {
+      "name": "IO.DI_003",
+      "type": "bool",
+      "description": "Reset button"
+    },
+    {
+      "name": "IO.DO_001",
+      "type": "bool",
+      "description": "Run lamp"
+    },
+    {
+      "name": "IO.DO_002",
+      "type": "bool",
+      "description": "Fault lamp"
+    },
+    {
+      "name": "IO.AI_001",
+      "type": "float",
+      "description": "Tank level %"
+    },
+    {
+      "name": "Alarm.EStop",
+      "type": "bool",
+      "description": "E-stop alarm"
+    },
+    {
+      "name": "Alarm.DoorOpen",
+      "type": "bool",
+      "description": "Door open alarm"
+    },
+    {
+      "name": "Alarm.LowAir",
+      "type": "bool",
+      "description": "Low air alarm"
+    },
+    {
+      "name": "Alarm.MotorFault",
+      "type": "bool",
+      "description": "Motor fault alarm"
+    },
+    {
+      "name": "Alarm.HighTemp",
+      "type": "bool",
+      "description": "High temp alarm"
+    }
+  ],
+  "alarms": [
+    {
+      "tag": "Alarm.EStop",
+      "message": "Emergency stop activated",
+      "priority": 1
+    },
+    {
+      "tag": "Alarm.DoorOpen",
+      "message": "Safety door open",
+      "priority": 2
+    },
+    {
+      "tag": "Alarm.LowAir",
+      "message": "Low air pressure",
+      "priority": 3
+    },
+    {
+      "tag": "Alarm.MotorFault",
+      "message": "Motor M01 fault",
+      "priority": 2
+    },
+    {
+      "tag": "Alarm.HighTemp",
+      "message": "High temperature detected",
+      "priority": 3
+    }
+  ],
+  "studio": {
+    "globalObjectDefaults": {
+      "linkAnimation": "linkWithExpressions",
+      "linkConnections": true,
+      "linkSize": true
+    },
+    "keyAssignments": {}
+  }
+}

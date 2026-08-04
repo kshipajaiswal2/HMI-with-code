@@ -55,14 +55,42 @@ Defined in `config/standard-screens.json`.
 
 ## Project structure
 
+Each application gets its own folder under `projects/`, laid out like **FactoryTalk View** on disk:
+
 ```
 projects/
-  _template/           ← master library (do not edit)
   MyProject/
-    project.json       ← tags, alarms, users, PLC settings
-    navigation.json    ← nav bar config
-    screens/*.json     ← display definitions
+    project.json              ← master config (tags, alarms, users, runtime)
+    navigation.json           ← runtime nav bar
+    Gfx/                      ← all displays (like FactoryTalk .gfx files)
+      100_Overview.json
+      200_Settings.json
+      ...
+    Tag/
+      MyProject-Tags.CSV      ← exported tag list (auto-synced)
+    M_Alarms/
+      alarms.json             ← alarm definitions (auto-synced)
+    ProjectSettings/
+      project.json            ← settings snapshot (auto-synced)
+    Images/                   ← bitmap assets (planned)
+    Macros/                   ← macro scripts (planned)
+    RecipePlus/               ← recipe data (planned)
+    Global Objects/           ← shared faceplates (planned)
+    Accounts/ ActivityLog/ AuditTrail/ ...   ← other FT folders (ready)
 ```
+
+| FactoryTalk folder | Plant HMI Studio |
+|--------------------|------------------|
+| `Gfx/*.gfx` | `Gfx/*.json` — one JSON file per display/screen |
+| `Tag/*-Tags.CSV` | `Tag/{projectId}-Tags.CSV` — auto-exported from `project.json` |
+| `M_Alarms/` | `M_Alarms/alarms.json` — synced from `project.json` |
+| `ProjectSettings/` | `ProjectSettings/project.json` — copy of project settings |
+| `Images/` | Reserved for imported images |
+| Other folders | Created empty on new project; wired as features are added |
+
+Legacy projects with a `screens/` folder are migrated automatically to `Gfx/` on first open.
+
+The shared screen library lives in `screens/` at repo root and is copied into each new project's `Gfx/` folder.
 
 ## Features (Rockwell parity)
 

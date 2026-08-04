@@ -1,3 +1,5 @@
+const DEFAULT_DISPLAY_SIZE = { width: 800, height: 600, backgroundColor: '#EBEBEB' };
+
 const state = {
   activeProject: null,
   projects: [],
@@ -10,7 +12,11 @@ const state = {
   openDisplays: [],
   activeObjectTool: 'select',
   explorerFilter: '',
-  contextMenuNode: null
+  contextMenuNode: null,
+  previewCanvas: { width: 800, height: 600 },
+  previewLoadToken: 0,
+  previewKind: 'display',
+  startupSelectedProjectId: null
 };
 
 const MENU_IDS = ['fileMenu', 'editMenu', 'viewMenu', 'objectsMenu', 'applicationMenu', 'toolsMenu'];
@@ -40,7 +46,8 @@ const DEFAULT_VIEW_PREFS = {
   snapOn: false,
   gridSize: 10,
   snapDistance: 5,
-  zoom: 100
+  zoom: 100,
+  explorerWidth: 300
 };
 
 const TOOLBAR_GROUPS = {
@@ -68,6 +75,16 @@ const WINDOW_SIZE_PRESETS = [
   { id: 'custom', label: 'Custom size', width: null, height: null }
 ];
 
+const LANGUAGE_OPTIONS = [
+  { id: 'en', label: 'English (United States), en-US' },
+  { id: 'de', label: 'German, de-DE' },
+  { id: 'fr', label: 'French, fr-FR' },
+  { id: 'es', label: 'Spanish, es-ES' },
+  { id: 'hi', label: 'Hindi, hi-IN' }
+];
+
+const STUDIO_PRODUCT_NAME = 'Plant HMI Studio 1.0';
+
 const DISPLAY_FOLDER_IDS = [
   '100_Overview', '200_Settings', '300_Manual_Operation',
   '400_Active_Alarms', '500_Recipe', '600_Legends', '700_User_Management'
@@ -84,7 +101,9 @@ const explorerTree = document.getElementById('explorerTree');
 const explorerProject = document.getElementById('explorerProject');
 const projectSelect = document.getElementById('projectSelect');
 const workspaceWelcome = document.getElementById('workspaceWelcome');
+const workspace = document.getElementById('workspace');
 const previewFrame = document.getElementById('previewFrame');
+const previewStage = document.getElementById('previewStage');
 const panelView = document.getElementById('panelView');
 const statusMsg = document.getElementById('statusMsg');
 const newProjectDialog = document.getElementById('newProjectDialog');
@@ -253,11 +272,10 @@ function applyViewPrefs() {
   workspaceGrid.classList.toggle('hidden', !v.showGrid);
   workspaceGrid.style.setProperty('--grid-size', `${v.gridSize}px`);
 
+  applyExplorerWidth(v.explorerWidth || DEFAULT_VIEW_PREFS.explorerWidth);
+
   previewFrame.classList.toggle('grayscale', v.showGrayscale);
-  const scale = v.zoom / 100;
-  previewFrame.style.transform = scale === 1 ? '' : `scale(${scale})`;
-  previewFrame.style.width = scale === 1 ? '' : `${100 / scale}%`;
-  previewFrame.style.height = scale === 1 ? '' : `${100 / scale}%`;
+  applyPreviewZoom();
 
   document.querySelectorAll('#viewMenu [data-view-toggle]').forEach((el) => {
     const val = getViewPref(el.dataset.viewToggle);
@@ -315,20 +333,14 @@ function renderWorkbookTabs() {
 function closeWorkbookTab(screenId) {
   if (!screenId) return;
   const idx = state.openDisplays.indexOf(screenId);
-  if (idx === -1) return;
-  state.openDisplays.splice(idx, 1);
+  if (idx !== -1) state.openDisplays.splice(idx, 1);
 
   if (state.selectedScreenId === screenId) {
     const next = state.openDisplays[idx] || state.openDisplays[idx - 1] || null;
     if (next) {
       openDisplayPreview(next, next);
     } else {
-      state.selectedScreenId = null;
-      workspaceWelcome.classList.remove('hidden');
-      previewFrame.classList.add('hidden');
-      panelView.classList.add('hidden');
-      updateEditMenuState();
-      updateViewMenuState();
+      closeDisplayWorkspace();
       setStatus('Display closed');
     }
   }
@@ -341,6 +353,18 @@ function trackOpenDisplay(screenId) {
   renderWorkbookTabs();
 }
 
+function resolveDisplaySize(screen, projectRuntime) {
+  const rt = projectRuntime || {};
+  const ds = screen?.displaySettings || {};
+  const useProject = ds.useProjectSize || (!ds.width && !ds.height);
+  return {
+    width: useProject ? (rt.width || DEFAULT_DISPLAY_SIZE.width) : (ds.width || rt.width || DEFAULT_DISPLAY_SIZE.width),
+    height: useProject ? (rt.height || DEFAULT_DISPLAY_SIZE.height) : (ds.height || rt.height || DEFAULT_DISPLAY_SIZE.height),
+    backgroundColor: ds.backgroundColor || rt.displayBackground || DEFAULT_DISPLAY_SIZE.backgroundColor,
+    useProjectSize: useProject
+  };
+}
+
 async function refreshPropertyPanel() {
   const body = document.getElementById('propertyPanelBody');
   if (!body || document.getElementById('propertyPanel').classList.contains('hidden')) return;
@@ -350,13 +374,17 @@ async function refreshPropertyPanel() {
   }
   try {
     const screen = await fetchJson(`/api/runtime/screens/${encodeURIComponent(state.selectedScreenId)}?project=${state.activeProject}`);
-    const ds = screen.displaySettings || {};
+    const rt = state.projectConfig?.runtime || {};
+    const size = resolveDisplaySize(screen, rt);
+    const sizeText = size.useProjectSize
+      ? `${size.width} × ${size.height} (project)`
+      : `${size.width} × ${size.height}`;
     body.innerHTML = `
       <p><strong>ID:</strong> ${escapeHtml(screen.id)}</p>
       <p><strong>Title:</strong> ${escapeHtml(screen.title || '')}</p>
       <p><strong>Layout:</strong> ${escapeHtml(screen.layout || 'standard')}</p>
       <p><strong>Security:</strong> ${screen.securityLevel ?? 0}</p>
-      <p><strong>Size:</strong> ${ds.width || 1024} × ${ds.height || 768}</p>
+      <p><strong>Size:</strong> ${sizeText}</p>
       <p><strong>Components:</strong> ${(screen.components || []).length}</p>
       <p class="side-hint">Full property editor planned.</p>`;
   } catch {
@@ -435,8 +463,44 @@ function handleViewAction(action, togglePath) {
   }
 }
 
+function hidePreviewStage() {
+  previewStage?.classList.add('hidden');
+  previewFrame?.classList.add('hidden');
+}
+
+function clearPreviewFrame() {
+  if (previewFrame) {
+    previewFrame.src = 'about:blank';
+    previewFrame.removeAttribute('src');
+    previewFrame.style.width = '';
+    previewFrame.style.height = '';
+    previewFrame.style.transform = '';
+  }
+}
+
+function closeDisplayWorkspace() {
+  hideWorkspaceContextMenu();
+  state.previewLoadToken += 1;
+  state.selectedScreenId = null;
+  state.selectedNode = null;
+  workspaceWelcome.classList.remove('hidden');
+  hidePreviewStage();
+  clearPreviewFrame();
+  panelView.classList.add('hidden');
+  explorerTree.querySelectorAll('.tree-row').forEach((r) => r.classList.remove('selected'));
+  updateEditMenuState();
+  updateViewMenuState();
+  refreshPropertyPanel();
+  refreshObjectExplorer();
+}
+
+function showPreviewStage() {
+  previewStage?.classList.remove('hidden');
+  previewFrame?.classList.remove('hidden');
+}
+
 function displayIsOpen() {
-  return Boolean(state.selectedScreenId && !previewFrame.classList.contains('hidden'));
+  return Boolean(state.selectedScreenId && !previewStage?.classList.contains('hidden'));
 }
 
 function updateEditMenuState() {
@@ -500,17 +564,22 @@ function handleMenuAction(action) {
       else setStatus('No application open');
       break;
     case 'close-display':
-      if (state.selectedScreenId) closeWorkbookTab(state.selectedScreenId);
-      else setStatus('No display open');
+      if (state.selectedScreenId) {
+        closeWorkbookTab(state.selectedScreenId);
+      } else if (!previewStage?.classList.contains('hidden')) {
+        closeDisplayWorkspace();
+        setStatus('Display closed');
+      } else {
+        setStatus('No display open');
+      }
       break;
     case 'close-app':
       state.activeProject = null;
       state.projectConfig = null;
+      state.openDisplays = [];
       explorerTree.innerHTML = '';
       explorerProject.textContent = '—';
-      workspaceWelcome.classList.remove('hidden');
-      previewFrame.classList.add('hidden');
-      panelView.classList.add('hidden');
+      closeDisplayWorkspace();
       setStatus('Application closed');
       updateEditMenuState();
       break;
@@ -600,27 +669,70 @@ async function showDisplaySettingsDialog() {
     setStatus('Open a display first');
     return;
   }
+  await refreshProjectConfig();
   const screen = await fetchJson(`/api/runtime/screens/${encodeURIComponent(state.selectedScreenId)}?project=${state.activeProject}`);
   const ds = screen.displaySettings || {};
-  document.getElementById('displaySettingsTitle').value = screen.title || '';
-  document.getElementById('displaySettingsWidth').value = ds.width || 1024;
-  document.getElementById('displaySettingsHeight').value = ds.height || 768;
-  document.getElementById('displaySettingsBg').value = ds.backgroundColor || '#2a2a2a';
+  const rt = state.projectConfig?.runtime || {};
+  const size = resolveDisplaySize(screen, rt);
+
+  document.querySelector(`#displaySettingsForm input[name="displayType"][value="${ds.displayType || 'replace'}"]`)?.click()
+    || document.querySelector('#displaySettingsForm input[name="displayType"][value="replace"]')?.click();
+  document.querySelector(`#displaySettingsForm input[name="sizeMode"][value="${size.useProjectSize ? 'project' : 'custom'}"]`)?.click();
+  document.getElementById('displaySettingsWidth').value = size.useProjectSize ? size.width : (ds.width || size.width);
+  document.getElementById('displaySettingsHeight').value = size.useProjectSize ? size.height : (ds.height || size.height);
+  document.getElementById('displaySettingsX').value = ds.positionX ?? 0;
+  document.getElementById('displaySettingsY').value = ds.positionY ?? 0;
+  document.getElementById('displaySettingsBg').value = ds.backgroundColor || rt.displayBackground || DEFAULT_DISPLAY_SIZE.backgroundColor;
+  document.getElementById('displaySettingsNumber').value = ds.displayNumber ?? 1;
   document.getElementById('displaySettingsSecurity').value = screen.securityLevel ?? 0;
+  document.getElementById('displaySettingsTitleBar').checked = Boolean(ds.showTitleBar);
+  document.getElementById('displaySettingsTitle').value = screen.title || '';
+  document.getElementById('displaySettingsDisableFocus').checked = Boolean(ds.disableInitialFocus);
+  document.getElementById('displaySettingsTagRate').value = ds.maxTagUpdateRate ?? 1;
+  syncDisplaySettingsSizeFields();
+  switchDisplaySettingsTab('general');
   document.getElementById('displaySettingsDialog').showModal();
+}
+
+function switchDisplaySettingsTab(tabId) {
+  document.querySelectorAll('#displaySettingsDialog .dialog-tab').forEach((el) => {
+    el.classList.toggle('active', el.dataset.dsTab === tabId);
+  });
+  document.querySelectorAll('#displaySettingsDialog .dialog-tab-panel').forEach((el) => {
+    el.classList.toggle('active', el.dataset.dsTabPanel === tabId);
+  });
+}
+
+function syncDisplaySettingsSizeFields() {
+  const useProject = document.querySelector('#displaySettingsForm input[name="sizeMode"]:checked')?.value === 'project';
+  document.getElementById('displaySettingsWidth').disabled = useProject;
+  document.getElementById('displaySettingsHeight').disabled = useProject;
 }
 
 async function saveDisplaySettings(e) {
   e.preventDefault();
   if (!state.activeProject || !state.selectedScreenId) return;
+  const useProjectSize = document.querySelector('#displaySettingsForm input[name="sizeMode"]:checked')?.value === 'project';
+  const displayType = document.querySelector('#displaySettingsForm input[name="displayType"]:checked')?.value || 'replace';
+  const displaySettings = {
+    useProjectSize,
+    displayType,
+    positionX: Number(document.getElementById('displaySettingsX').value) || 0,
+    positionY: Number(document.getElementById('displaySettingsY').value) || 0,
+    backgroundColor: document.getElementById('displaySettingsBg').value,
+    displayNumber: Number(document.getElementById('displaySettingsNumber').value) || 1,
+    showTitleBar: document.getElementById('displaySettingsTitleBar').checked,
+    disableInitialFocus: document.getElementById('displaySettingsDisableFocus').checked,
+    maxTagUpdateRate: Number(document.getElementById('displaySettingsTagRate').value) || 1
+  };
+  if (!useProjectSize) {
+    displaySettings.width = Number(document.getElementById('displaySettingsWidth').value) || 800;
+    displaySettings.height = Number(document.getElementById('displaySettingsHeight').value) || 600;
+  }
   const patch = {
     title: document.getElementById('displaySettingsTitle').value.trim(),
     securityLevel: Number(document.getElementById('displaySettingsSecurity').value) || 0,
-    displaySettings: {
-      width: Number(document.getElementById('displaySettingsWidth').value) || 1024,
-      height: Number(document.getElementById('displaySettingsHeight').value) || 768,
-      backgroundColor: document.getElementById('displaySettingsBg').value
-    }
+    displaySettings
   };
   await fetchJson(`/api/projects/${state.activeProject}/screens/${encodeURIComponent(state.selectedScreenId)}`, {
     method: 'PATCH',
@@ -629,7 +741,7 @@ async function saveDisplaySettings(e) {
   });
   document.getElementById('displaySettingsDialog').close();
   await loadExplorer(state.activeProject);
-  openDisplayPreview(state.selectedScreenId, patch.title);
+  await reloadDisplayPreview();
   setStatus(`Display settings saved: ${state.selectedScreenId}`);
 }
 
@@ -688,14 +800,16 @@ async function setWallpaper(mode, value) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ displaySettings })
   });
-  openDisplayPreview(state.selectedScreenId, state.selectedScreenId);
+  await reloadDisplayPreview();
   setStatus(`Wallpaper set to ${mode}`);
 }
 
 function handleEditAction(action) {
   closeAllMenus();
   switch (action) {
-    case 'display-settings': showDisplaySettingsDialog(); break;
+    case 'display-settings':
+      showDisplaySettingsDialog().catch((err) => setStatus(`Error: ${err.message}`));
+      break;
     case 'key-assignments': showKeyAssignmentsDialog(); break;
     case 'global-object-defaults': showGlobalObjectDefaultsDialog(); break;
     case 'wallpaper-none': setWallpaper('none'); break;
@@ -712,10 +826,9 @@ function handleEditAction(action) {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ components: [] })
-        }).then(() => {
-          openDisplayPreview(state.selectedScreenId, state.selectedScreenId);
-          setStatus('Display cleared');
-        }).catch((err) => setStatus(`Error: ${err.message}`));
+        }).then(() => reloadDisplayPreview())
+          .then(() => setStatus('Display cleared'))
+          .catch((err) => setStatus(`Error: ${err.message}`));
       }
       break;
     default: setStatus(`${action.replace(/-/g, ' ')} — available when visual editor is added`); break;
@@ -736,16 +849,24 @@ async function loadProjects() {
   await refreshProjectConfig();
 }
 
+function projectDisplayLabel(project) {
+  const dupes = state.projects.filter((p) => p.name === project.name).length > 1;
+  const name = dupes ? `${project.name} [${project.id}]` : project.name;
+  return `${name} (${project.screenCount} screens)`;
+}
+
 function renderProjectSelect() {
   projectSelect.innerHTML = state.projects.map((p) =>
-    `<option value="${p.id}" ${p.id === state.activeProject ? 'selected' : ''}>${escapeHtml(p.name)} (${p.screenCount} screens)</option>`
+    `<option value="${escapeHtml(p.id)}" ${p.id === state.activeProject ? 'selected' : ''}>${escapeHtml(projectDisplayLabel(p))}</option>`
   ).join('');
+  const deleteBtn = document.getElementById('deleteProjectBtn');
+  if (deleteBtn) deleteBtn.disabled = !state.activeProject;
 }
 
 async function loadExplorer(projectId) {
   const id = projectId || state.activeProject;
   if (!id) return;
-  const data = await fetchJson(`/api/projects/${id}/explorer`);
+  const data = await fetchJson(`/api/projects/${id}/explorer?_=${Date.now()}`);
   explorerProject.textContent = `: ${data.projectName}`;
   explorerTree.innerHTML = '';
   for (const node of data.tree) {
@@ -755,20 +876,57 @@ async function loadExplorer(projectId) {
   setStatus(`Project loaded: ${data.projectName}`);
 }
 
+function expandExplorerNode(nodeId) {
+  const row = explorerTree.querySelector(`.tree-row[data-node-id="${CSS.escape(nodeId)}"]`);
+  if (!row) return;
+  const nodeEl = row.closest('.tree-node');
+  const children = nodeEl?.querySelector(':scope > .tree-children');
+  const toggle = row.querySelector('.tree-toggle');
+  if (children?.classList.contains('collapsed')) {
+    children.classList.remove('collapsed');
+    if (toggle?.textContent === '+') toggle.textContent = '−';
+  }
+}
+
+function expandDefaultExplorerFolders() {
+  for (const id of ['project-root', 'application', 'graphics', 'displays', 'global-objects', 'images']) {
+    expandExplorerNode(id);
+  }
+}
+
+async function bootstrapOpenedProject(id) {
+  state.activeProject = id;
+  state.openDisplays = [];
+  closeDisplayWorkspace();
+  renderWorkbookTabs();
+  await loadProjects();
+  await loadExplorer(id);
+  expandDefaultExplorerFolders();
+  workspaceWelcome.classList.add('hidden');
+  hideStartupDialog();
+  updateEditMenuState();
+  updateViewMenuState();
+  await refreshProjectConfig();
+}
+
 function renderTreeNode(node, depth) {
   const el = document.createElement('div');
   el.className = 'tree-node';
-  el.style.paddingLeft = `${depth * 14 + 4}px`;
+  el.dataset.depth = String(depth);
 
   const row = document.createElement('div');
   row.className = 'tree-row';
+  if (node.type === 'folder') row.classList.add('tree-row-folder');
+  if (node.id === 'project-root' || node.id === 'application') row.classList.add('tree-row-root');
   row.dataset.nodeId = node.id || '';
   row.dataset.nodeType = node.type;
 
-  const hasChildren = node.children?.length;
+  const hasChildren = Boolean(node.children?.length);
+  const startCollapsed = hasChildren && isDisplayCategoryFolder(node);
+
   const toggle = document.createElement('span');
-  toggle.className = 'tree-toggle';
-  toggle.textContent = hasChildren ? '▼' : ' ';
+  toggle.className = hasChildren ? 'tree-toggle' : 'tree-toggle tree-toggle-leaf';
+  toggle.textContent = hasChildren ? (startCollapsed ? '+' : '−') : '';
   row.appendChild(toggle);
 
   const icon = document.createElement('span');
@@ -779,11 +937,20 @@ function renderTreeNode(node, depth) {
   const label = document.createElement('span');
   label.className = 'tree-label';
   label.textContent = node.label;
+  label.title = node.label;
   row.appendChild(label);
 
   if (node.type === 'display') {
     row.dataset.screenId = node.id;
     row.classList.add('display-node');
+  }
+  if (node.type === 'global-object') {
+    row.dataset.globalObjectId = node.id;
+    row.classList.add('global-object-node');
+  }
+  if (node.type === 'image') {
+    row.dataset.imageFile = node.fileName || node.id;
+    row.classList.add('image-node');
   }
   if (node.action) row.dataset.action = node.action;
 
@@ -804,6 +971,7 @@ function renderTreeNode(node, depth) {
   if (hasChildren) {
     const children = document.createElement('div');
     children.className = 'tree-children';
+    if (startCollapsed) children.classList.add('collapsed');
     for (const child of node.children) {
       children.appendChild(renderTreeNode(child, depth + 1));
     }
@@ -812,47 +980,251 @@ function renderTreeNode(node, depth) {
     toggle.addEventListener('click', (e) => {
       e.stopPropagation();
       children.classList.toggle('collapsed');
-      toggle.textContent = children.classList.contains('collapsed') ? '▶' : '▼';
+      toggle.textContent = children.classList.contains('collapsed') ? '+' : '−';
     });
   }
 
   return el;
 }
 
+function applyExplorerWidth(width) {
+  if (!explorerPanel) return;
+  const w = Math.min(520, Math.max(200, Number(width) || DEFAULT_VIEW_PREFS.explorerWidth));
+  explorerPanel.style.width = `${w}px`;
+  document.documentElement.style.setProperty('--explorer-width', `${w}px`);
+}
+
+function initExplorerResizer() {
+  const resizer = document.getElementById('explorerResizer');
+  if (!resizer || !explorerPanel) return;
+
+  applyExplorerWidth(state.viewPrefs?.explorerWidth);
+
+  resizer.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = explorerPanel.offsetWidth;
+    resizer.classList.add('dragging');
+    document.body.classList.add('explorer-resize-active');
+
+    const onMove = (ev) => {
+      applyExplorerWidth(startW + ev.clientX - startX);
+    };
+    const onUp = () => {
+      resizer.classList.remove('dragging');
+      document.body.classList.remove('explorer-resize-active');
+      state.viewPrefs.explorerWidth = explorerPanel.offsetWidth;
+      saveViewPrefs();
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
 function iconFor(node) {
   const icons = {
-    system: '⚙', tags: '🏷', alarm: '🔔', graphics: '🖼',
-    displays: '📺', folder: '📁', display: '📄',
-    settings: '🔧', lock: '🔒', diag: '📊', comm: '📡', play: '▶'
+    system: '⚙',
+    tags: '🏷',
+    alarm: '🔔',
+    'alarm-setup': '🔧',
+    graphics: '🖼',
+    displays: '📺',
+    folder: '📁',
+    display: '📄',
+    settings: '🔧',
+    lock: '🔒',
+    diag: '📊',
+    comm: '📡',
+    play: '▶',
+    'global-objects': '🌐',
+    'global-object': '📄',
+    'symbol-factory': '⚗',
+    libraries: '📚',
+    images: '🖼',
+    'image-file': '📄',
+    parameters: '#',
+    'local-messages': '💬',
+    information: 'ℹ',
+    'information-setup': '🔧',
+    'information-messages': '📝',
+    logic: '⚡',
+    macros: '📜',
+    'data-log': '📊',
+    'data-log-models': '🗄',
+    recipeplus: '📋',
+    'recipeplus-setup': '🔧',
+    'recipeplus-editor': '✎',
+    linx: '🔗',
+    project: '📦',
+    application: '📁',
+    audit: '📋',
+    csv: '📄',
+    'global-conn': '🔗'
   };
   return icons[node.icon] || icons[node.type] || '•';
+}
+
+function handleExplorerAction(node) {
+  if (!node) return;
+  const action = node.action || node.id;
+  switch (action) {
+    case 'tags':
+      openTagsPanel();
+      break;
+    case 'alarms':
+    case 'local-messages':
+      openAlarmsPanel();
+      break;
+    case 'global-object-defaults':
+      showGlobalObjectDefaultsDialog();
+      break;
+    case 'communications':
+      showProjectSettingsDialog('runtime');
+      break;
+    case 'recipeplus-setup':
+    case 'recipeplus-editor':
+      openRecipePanel(action);
+      break;
+    case 'data-log':
+      openDataLogPanel();
+      break;
+    case 'parameters':
+    case 'symbol-factory':
+    case 'libraries':
+    case 'images':
+    case 'information-setup':
+    case 'information-messages':
+    case 'macros':
+      openSystemPanel(node);
+      break;
+    default:
+      break;
+  }
+}
+
+function openRecipePanel(mode) {
+  workspaceWelcome.classList.add('hidden');
+  hidePreviewStage();
+  panelView.classList.remove('hidden');
+  const title = mode === 'recipeplus-editor' ? 'RecipePlus Editor' : 'RecipePlus Setup';
+  panelView.innerHTML = `
+    <div class="panel-content">
+      <h2>${escapeHtml(title)}</h2>
+      <p>Configure recipes for project <strong>${escapeHtml(state.activeProject)}</strong>.</p>
+      <p class="hint">Recipe screens are under <strong>Graphics → Displays → 500 Recipe</strong>.</p>
+    </div>`;
+  setStatus(title);
+}
+
+function openDataLogPanel() {
+  openSystemPanel({ label: 'Data Log Models', id: 'data-log-models' });
 }
 
 function selectNode(row, node) {
   explorerTree.querySelectorAll('.tree-row').forEach((r) => r.classList.remove('selected'));
   row.classList.add('selected');
   state.selectedNode = node;
-  state.selectedScreenId = node.type === 'display' ? node.id : null;
 
   if (node.type === 'display') {
+    state.selectedScreenId = node.id;
+    state.previewKind = 'display';
     openDisplayPreview(node.id, node.title);
-  } else if (node.action === 'tags') {
-    openTagsPanel();
-  } else if (node.action === 'alarms') {
-    openAlarmsPanel();
+  } else if (node.type === 'global-object') {
+    state.selectedScreenId = node.id;
+    state.previewKind = 'global-object';
+    openGlobalObjectPreview(node.id, node.title);
+  } else if (node.type === 'image') {
+    openImagePanel(node);
+  } else if (node.action) {
+    handleExplorerAction(node);
   } else if (node.type === 'item') {
     if (node.id === 'project-settings') showProjectSettingsDialog('general');
     else if (node.id === 'startup') showProjectSettingsDialog('runtime');
-    else if (node.id === 'communications') showProjectSettingsDialog('runtime');
+    else if (node.id === 'communications' || node.id === 'linx-communications') showProjectSettingsDialog('runtime');
     else openSystemPanel(node);
+  } else if (node.type === 'folder' && !node.children?.length) {
+    setStatus(`${node.label} — expand folder or select an item`);
   }
 }
 
+function getProjectSettingsWindowSize() {
+  const profileId = document.getElementById('psWindowProfile').value;
+  if (profileId === 'custom') {
+    return {
+      windowProfile: profileId,
+      width: Number(document.getElementById('psWidth').value) || 800,
+      height: Number(document.getElementById('psHeight').value) || 600
+    };
+  }
+  const preset = WINDOW_SIZE_PRESETS.find((p) => p.id === profileId) || WINDOW_SIZE_PRESETS[2];
+  return { windowProfile: profileId, width: preset.width, height: preset.height };
+}
+
+async function reloadDisplayPreview() {
+  if (!state.selectedScreenId || !state.activeProject || previewStage?.classList.contains('hidden')) return;
+  const loadToken = ++state.previewLoadToken;
+  const screenId = state.selectedScreenId;
+  await applyPreviewCanvasSize(screenId);
+  if (loadToken !== state.previewLoadToken || state.selectedScreenId !== screenId) return;
+  const { width, height } = state.previewCanvas;
+  const objectParam = state.previewKind === 'global-object'
+    ? `globalObject=${encodeURIComponent(screenId)}`
+    : `screen=${encodeURIComponent(screenId)}`;
+  previewFrame.src =
+    `/runtime.html?embed=1&${objectParam}` +
+    `&project=${encodeURIComponent(state.activeProject)}` +
+    `&w=${width}&h=${height}&_=${Date.now()}`;
+}
+
+function applyPreviewZoom() {
+  if (!previewFrame || previewStage?.classList.contains('hidden')) return;
+  const scale = (state.viewPrefs?.zoom || 100) / 100;
+  const { width, height } = state.previewCanvas;
+  previewFrame.style.width = `${width}px`;
+  previewFrame.style.height = `${height}px`;
+  previewFrame.style.transform = scale === 1 ? '' : `scale(${scale})`;
+}
+
+async function applyPreviewCanvasSize(screenId) {
+  await refreshProjectConfig();
+  const rt = state.projectConfig?.runtime || {};
+  let size = { ...DEFAULT_DISPLAY_SIZE, useProjectSize: true };
+  if (screenId && state.activeProject) {
+    try {
+      const endpoint = state.previewKind === 'global-object'
+        ? `/api/runtime/global-objects/${encodeURIComponent(screenId)}`
+        : `/api/runtime/screens/${encodeURIComponent(screenId)}`;
+      const screen = await fetchJson(`${endpoint}?project=${state.activeProject}`);
+      size = resolveDisplaySize(screen, rt);
+    } catch { /* use project default */ }
+  } else {
+    size.width = rt.width || DEFAULT_DISPLAY_SIZE.width;
+    size.height = rt.height || DEFAULT_DISPLAY_SIZE.height;
+  }
+  state.previewCanvas = size;
+  if (previewFrame) previewFrame.style.background = size.backgroundColor;
+  applyPreviewZoom();
+}
+
 function openDisplayPreview(screenId, title) {
+  state.previewKind = 'display';
   workspaceWelcome.classList.add('hidden');
   panelView.classList.add('hidden');
-  previewFrame.classList.remove('hidden');
-  previewFrame.src = `/runtime.html?embed=1&screen=${encodeURIComponent(screenId)}&project=${encodeURIComponent(state.activeProject)}`;
+  showPreviewStage();
+  const loadToken = ++state.previewLoadToken;
+  applyPreviewCanvasSize(screenId).then(() => {
+    if (loadToken !== state.previewLoadToken) return;
+    if (state.selectedScreenId !== screenId) return;
+    const { width, height } = state.previewCanvas;
+    previewFrame.src =
+      `/runtime.html?embed=1&screen=${encodeURIComponent(screenId)}` +
+      `&project=${encodeURIComponent(state.activeProject)}` +
+      `&w=${width}&h=${height}`;
+  });
   state.selectedScreenId = screenId;
   trackOpenDisplay(screenId);
   setStatus(`Editing display: ${title || screenId}`);
@@ -862,9 +1234,118 @@ function openDisplayPreview(screenId, title) {
   refreshObjectExplorer();
 }
 
+function openGlobalObjectPreview(objectId, title) {
+  state.previewKind = 'global-object';
+  workspaceWelcome.classList.add('hidden');
+  panelView.classList.add('hidden');
+  showPreviewStage();
+  const loadToken = ++state.previewLoadToken;
+  applyPreviewCanvasSize(objectId).then(() => {
+    if (loadToken !== state.previewLoadToken) return;
+    if (state.selectedScreenId !== objectId) return;
+    const { width, height } = state.previewCanvas;
+    previewFrame.src =
+      `/runtime.html?embed=1&globalObject=${encodeURIComponent(objectId)}` +
+      `&project=${encodeURIComponent(state.activeProject)}` +
+      `&w=${width}&h=${height}`;
+  });
+  state.selectedScreenId = objectId;
+  setStatus(`Editing global object: ${title || objectId}`);
+  updateEditMenuState();
+  updateViewMenuState();
+  refreshPropertyPanel();
+  refreshObjectExplorer();
+}
+
+async function showImagePropertiesDialog(node) {
+  if (!state.activeProject || !node) return;
+  const fileName = node.fileName || node.id;
+  const dialog = document.getElementById('imagePropertiesDialog');
+  if (!dialog) return;
+
+  try {
+    const info = await fetchJson(
+      `/api/projects/${encodeURIComponent(state.activeProject)}/images/${encodeURIComponent(fileName)}/info`
+    );
+    document.getElementById('imagePropsTitle').textContent =
+      `${info.label} - /${info.projectName}/ (Images)`;
+    document.getElementById('imagePropsType').textContent = info.typeLabel || 'True color';
+    document.getElementById('imagePropsSize').textContent =
+      `${info.width || 0} x ${info.height || 0}`;
+    document.getElementById('imagePropsFormat').textContent = info.format || 'Unknown';
+    const thumb = document.getElementById('imagePropsThumb');
+    thumb.src = `${info.url}?_=${Date.now()}`;
+    thumb.alt = info.label;
+    dialog.showModal();
+    setStatus(`Image: ${info.label}`);
+  } catch (err) {
+    setStatus(`Error: ${err.message}`);
+  }
+}
+
+function openImagePanel(node) {
+  showImagePropertiesDialog(node);
+}
+
+async function importProjectImage() {
+  if (!state.activeProject) {
+    setStatus('Open a project first');
+    return;
+  }
+  const input = document.getElementById('imageImportInput');
+  if (!input) {
+    alert('Image import is unavailable. Hard refresh the page (Ctrl+F5) and try again.');
+    return;
+  }
+  input.value = '';
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      setStatus(`Uploading ${file.name}…`);
+      const dataBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = String(reader.result || '');
+          const comma = result.indexOf(',');
+          resolve(comma >= 0 ? result.slice(comma + 1) : result);
+        };
+        reader.onerror = () => reject(new Error('Could not read image file'));
+        reader.readAsDataURL(file);
+      });
+      const data = await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/images`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, dataBase64 })
+      });
+      await loadExplorer(state.activeProject);
+      setStatus(`Added image: ${data.image?.fileName || file.name}`);
+    } catch (err) {
+      setStatus(`Error: ${err.message}`);
+      alert(`Image upload failed: ${err.message}`);
+    } finally {
+      input.value = '';
+    }
+  };
+  input.click();
+}
+
+async function deleteSelectedImage(node) {
+  if (!state.activeProject || !node?.fileName) return;
+  const label = node.label || node.fileName;
+  if (!confirm(`Delete image "${label}" from this project?`)) return;
+  await fetchJson(
+    `/api/projects/${encodeURIComponent(state.activeProject)}/images/${encodeURIComponent(node.fileName)}`,
+    { method: 'DELETE' }
+  );
+  panelView.classList.add('hidden');
+  await loadExplorer(state.activeProject);
+  setStatus(`Deleted image: ${label}`);
+}
+
 async function openTagsPanel() {
   workspaceWelcome.classList.add('hidden');
-  previewFrame.classList.add('hidden');
+  hidePreviewStage();
   panelView.classList.remove('hidden');
   const tags = await fetchJson(`/api/runtime/tags?project=${state.activeProject}`);
   const rows = Object.entries(tags).map(([name, t]) =>
@@ -881,7 +1362,7 @@ async function openTagsPanel() {
 
 async function openAlarmsPanel() {
   workspaceWelcome.classList.add('hidden');
-  previewFrame.classList.add('hidden');
+  hidePreviewStage();
   panelView.classList.remove('hidden');
   const active = await fetchJson('/api/projects/active');
   const alarms = active.config?.alarms || [];
@@ -896,7 +1377,7 @@ async function openAlarmsPanel() {
 
 function openSystemPanel(node) {
   workspaceWelcome.classList.add('hidden');
-  previewFrame.classList.add('hidden');
+  hidePreviewStage();
   panelView.classList.remove('hidden');
   panelView.innerHTML = `
     <div class="panel-content">
@@ -913,11 +1394,15 @@ function runRuntime() {
     return;
   }
   const url = `/runtime.html?project=${encodeURIComponent(state.activeProject)}`;
+  const rt = state.projectConfig?.runtime || {};
+  const w = rt.width || 800;
+  const h = rt.height || 600;
+  const features = `width=${w},height=${h}`;
   if (state.runtimeWindow && !state.runtimeWindow.closed) {
     state.runtimeWindow.location.href = url;
     state.runtimeWindow.focus();
   } else {
-    state.runtimeWindow = window.open(url, 'planthmi-runtime', 'width=1024,height=768');
+    state.runtimeWindow = window.open(url, 'planthmi-runtime', features);
   }
   setStatus('Runtime started — Test Application');
 }
@@ -999,17 +1484,23 @@ function switchProjectSettingsTab(tabId) {
   });
 }
 
+function previewProjectWindowSize() {
+  const { width, height } = getProjectSettingsWindowSize();
+  state.previewCanvas = { width, height };
+  applyPreviewZoom();
+}
+
 async function saveProjectSettings(e) {
   e.preventDefault();
   if (!state.activeProject) return;
   const appName = document.getElementById('psAppName').value.trim();
-  if (isProjectNameTaken(appName, state.activeProject)) {
+  const currentName = (state.projectConfig?.name || '').trim();
+  if (appName.toLowerCase() !== currentName.toLowerCase() && isProjectNameTaken(appName, state.activeProject)) {
+    alert(`A project named "${appName}" already exists. Choose a different application name.`);
     setStatus(`Error: A project named "${appName}" already exists`);
     return;
   }
-  const profileId = document.getElementById('psWindowProfile').value;
-  const width = Number(document.getElementById('psWidth').value) || 800;
-  const height = Number(document.getElementById('psHeight').value) || 600;
+  const { width, height, windowProfile } = getProjectSettingsWindowSize();
   const executionTarget = document.querySelector('#projectSettingsForm input[name="executionTarget"]:checked')?.value || 'panel-performance';
 
   const patch = {
@@ -1022,7 +1513,7 @@ async function saveProjectSettings(e) {
       pollIntervalMs: Number(document.getElementById('psPoll').value) || 200
     },
     runtime: {
-      windowProfile: profileId,
+      windowProfile,
       width,
       height,
       executionTarget,
@@ -1035,16 +1526,26 @@ async function saveProjectSettings(e) {
     }
   };
 
-  const result = await fetchJson(`/api/projects/${state.activeProject}/config`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(patch)
-  });
-  state.projectConfig = result.config;
-  document.getElementById('projectSettingsDialog').close();
-  await loadProjects();
-  await loadExplorer(state.activeProject);
-  setStatus('Project settings saved');
+  try {
+    const result = await fetchJson(`/api/projects/${state.activeProject}/config`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    });
+    state.projectConfig = result.config;
+    document.getElementById('projectSettingsDialog').close();
+    await loadProjects();
+    await loadExplorer(state.activeProject);
+    if (state.selectedScreenId) {
+      await reloadDisplayPreview();
+      setStatus(`Project settings saved — display ${state.previewCanvas.width}×${state.previewCanvas.height}`);
+    } else {
+      setStatus(`Project settings saved — window size ${width}×${height}`);
+    }
+  } catch (err) {
+    alert(`Could not save project settings: ${err.message}`);
+    setStatus(`Error: ${err.message}`);
+  }
 }
 
 function showApplicationPropertiesDialog() {
@@ -1134,7 +1635,7 @@ async function openDiagnosticsViewer() {
     return;
   }
   workspaceWelcome.classList.add('hidden');
-  previewFrame.classList.add('hidden');
+  hidePreviewStage();
   panelView.classList.remove('hidden');
   const [status, tags] = await Promise.all([
     fetchJson(`/api/runtime/status?project=${state.activeProject}`),
@@ -1367,10 +1868,204 @@ function handleToolsAction(action) {
 }
 
 function showNewProjectDialog() {
-  document.getElementById('newProjectName').value = '';
-  clearNewProjectNameError();
-  newProjectDialog.showModal();
-  validateNewProjectName(false);
+  showStartupDialog('new');
+}
+
+function getWindowProfileLabel(profileId) {
+  const preset = WINDOW_SIZE_PRESETS.find((p) => p.id === profileId);
+  return preset?.label || profileId;
+}
+
+function fillStartupSelects() {
+  const langSel = document.getElementById('startupLanguage');
+  const resSel = document.getElementById('startupResolution');
+  const metaLang = document.getElementById('startupMetaLanguage');
+  if (langSel && !langSel.options.length) {
+    langSel.innerHTML = LANGUAGE_OPTIONS.map((l) =>
+      `<option value="${escapeHtml(l.id)}">${escapeHtml(l.label)}</option>`
+    ).join('');
+  }
+  if (metaLang && !metaLang.options.length) {
+    metaLang.innerHTML = LANGUAGE_OPTIONS.map((l) =>
+      `<option value="${escapeHtml(l.id)}">${escapeHtml(l.label)}</option>`
+    ).join('');
+  }
+  if (resSel && !resSel.options.length) {
+    resSel.innerHTML = WINDOW_SIZE_PRESETS.filter((p) => p.id !== 'custom').map((p) =>
+      `<option value="${escapeHtml(p.id)}">${escapeHtml(p.label)}</option>`
+    ).join('');
+  }
+}
+
+function switchStartupTab(tabId) {
+  document.querySelectorAll('.startup-tab').forEach((el) => {
+    el.classList.toggle('active', el.dataset.startupTab === tabId);
+  });
+  document.querySelectorAll('.startup-tab-panel').forEach((el) => {
+    el.classList.toggle('active', el.dataset.startupPanel === tabId);
+  });
+  document.getElementById('startupFooterNew')?.classList.toggle('hidden', tabId !== 'new');
+  document.getElementById('startupFooterExisting')?.classList.toggle('hidden', tabId !== 'existing');
+}
+
+function validateStartupNewForm(showError = true) {
+  const name = document.getElementById('startupAppName')?.value.trim() || '';
+  const err = document.getElementById('startupNameError');
+  const btn = document.getElementById('startupCreateBtn');
+  if (!name) {
+    if (err) {
+      err.textContent = '';
+      err.classList.add('hidden');
+    }
+    if (btn) btn.disabled = true;
+    return false;
+  }
+  if (isProjectNameTaken(name)) {
+    if (showError && err) {
+      err.textContent = `A project named "${name}" already exists. Choose a different name.`;
+      err.classList.remove('hidden');
+    }
+    if (btn) btn.disabled = true;
+    return false;
+  }
+  if (err) err.classList.add('hidden');
+  if (btn) btn.disabled = false;
+  return true;
+}
+
+function renderStartupProjectList() {
+  const list = document.getElementById('startupProjectList');
+  if (!list) return;
+
+  if (!state.projects.length) {
+    list.innerHTML = '<li class="startup-list-empty">No applications found. Switch to the New tab to create one.</li>';
+    state.startupSelectedProjectId = null;
+    updateStartupExistingMeta();
+    return;
+  }
+
+  if (!state.startupSelectedProjectId || !state.projects.some((p) => p.id === state.startupSelectedProjectId)) {
+    state.startupSelectedProjectId = state.activeProject || state.projects[0].id;
+  }
+
+  list.innerHTML = state.projects.map((p) => {
+    const dupes = state.projects.filter((x) => x.name === p.name).length > 1;
+    const label = dupes ? `${p.name} [${p.id}]` : p.name;
+    const selected = p.id === state.startupSelectedProjectId ? ' selected' : '';
+    return `<li data-project-id="${escapeHtml(p.id)}" class="${selected.trim()}">${escapeHtml(label)}</li>`;
+  }).join('');
+
+  list.querySelectorAll('li[data-project-id]').forEach((li) => {
+    li.addEventListener('click', () => {
+      list.querySelectorAll('li.selected').forEach((el) => el.classList.remove('selected'));
+      li.classList.add('selected');
+      state.startupSelectedProjectId = li.dataset.projectId;
+      updateStartupExistingMeta();
+    });
+    li.addEventListener('dblclick', () => {
+      state.startupSelectedProjectId = li.dataset.projectId;
+      startupOpenSelectedProject();
+    });
+  });
+  updateStartupExistingMeta();
+}
+
+function updateStartupExistingMeta() {
+  const project = state.projects.find((p) => p.id === state.startupSelectedProjectId);
+  const openedWith = document.getElementById('startupMetaOpenedWith');
+  const resolution = document.getElementById('startupMetaResolution');
+  const metaLang = document.getElementById('startupMetaLanguage');
+  const openBtn = document.getElementById('startupOpenBtn');
+  if (openedWith) openedWith.value = project?.lastOpenedWith || STUDIO_PRODUCT_NAME;
+  if (resolution) resolution.value = project ? getWindowProfileLabel(project.windowProfile) : '';
+  if (metaLang) metaLang.value = project?.language || 'en';
+  if (openBtn) openBtn.disabled = !project;
+}
+
+function resetStartupNewForm() {
+  const nameEl = document.getElementById('startupAppName');
+  const descEl = document.getElementById('startupDescription');
+  const langEl = document.getElementById('startupLanguage');
+  const resEl = document.getElementById('startupResolution');
+  if (nameEl) nameEl.value = '';
+  if (descEl) descEl.value = '';
+  if (langEl) langEl.value = 'en';
+  if (resEl) resEl.value = '640x480';
+  document.getElementById('startupNameError')?.classList.add('hidden');
+  validateStartupNewForm(false);
+}
+
+function showStartupDialog(tab = 'existing') {
+  fillStartupSelects();
+  resetStartupNewForm();
+  state.startupSelectedProjectId = state.activeProject || state.projects[0]?.id || null;
+  renderStartupProjectList();
+  switchStartupTab(tab);
+  document.getElementById('startupOverlay')?.classList.remove('hidden');
+  if (tab === 'new') document.getElementById('startupAppName')?.focus();
+}
+
+function hideStartupDialog() {
+  document.getElementById('startupOverlay')?.classList.add('hidden');
+}
+
+async function startupCreateProject() {
+  if (!validateStartupNewForm(true)) return;
+  const name = document.getElementById('startupAppName').value.trim();
+  const subtitle = document.getElementById('startupDescription').value.trim();
+  const language = document.getElementById('startupLanguage').value;
+  const windowProfile = document.getElementById('startupResolution').value;
+  try {
+    await createProject(name, { subtitle, language, windowProfile });
+    hideStartupDialog();
+  } catch (err) {
+    setStatus(`Error: ${err.message}`);
+    const errEl = document.getElementById('startupNameError');
+    if (errEl) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+    }
+  }
+}
+
+async function startupOpenSelectedProject() {
+  if (!state.startupSelectedProjectId) return;
+  try {
+    await openProject(state.startupSelectedProjectId);
+  } catch (err) {
+    setStatus(`Error: ${err.message}`);
+    alert(`Could not open application: ${err.message}`);
+  }
+}
+
+function initStartupDialog() {
+  document.querySelectorAll('.startup-tab').forEach((tab) => {
+    tab.addEventListener('click', () => switchStartupTab(tab.dataset.startupTab));
+  });
+  document.getElementById('startupAppName')?.addEventListener('input', () => validateStartupNewForm(false));
+  document.getElementById('startupCreateBtn')?.addEventListener('click', () => {
+    startupCreateProject().catch((err) => setStatus(`Error: ${err.message}`));
+  });
+  document.getElementById('startupOpenBtn')?.addEventListener('click', () => {
+    startupOpenSelectedProject().catch((err) => setStatus(`Error: ${err.message}`));
+  });
+  document.getElementById('startupCancelNewBtn')?.addEventListener('click', hideStartupDialog);
+  document.getElementById('startupCancelExistingBtn')?.addEventListener('click', async () => {
+    hideStartupDialog();
+    if (state.startupSelectedProjectId) {
+      try {
+        await openProject(state.startupSelectedProjectId);
+      } catch (err) {
+        setStatus(`Error: ${err.message}`);
+      }
+    }
+  });
+  document.getElementById('startupHelpNewBtn')?.addEventListener('click', () => {
+    alert('Create a new Plant HMI application with 18 standard displays. Choose resolution to match your target panel size.');
+  });
+  document.getElementById('startupHelpExistingBtn')?.addEventListener('click', () => {
+    alert('Select an application from the list and click Open, or double-click a name to open it.');
+  });
 }
 
 function isProjectNameTaken(name, excludeId = null) {
@@ -1413,34 +2108,40 @@ function validateNewProjectName(showError = true) {
 
 async function deleteProjectById(id) {
   const project = state.projects.find((p) => p.id === id);
-  const label = project?.name || id;
+  const dupes = project && state.projects.filter((p) => p.name === project.name).length > 1;
+  const label = project
+    ? (dupes ? `${project.name} (${project.id})` : project.name)
+    : id;
   if (!confirm(`Delete project "${label}"?\n\nThis permanently removes the project folder and cannot be undone.`)) {
     return false;
   }
 
-  const result = await fetchJson(`/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' });
-  state.activeProject = result.activeId || null;
-  state.openDisplays = [];
-  state.selectedScreenId = null;
+  try {
+    const result = await fetchJson(`/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    state.activeProject = result.activeId || null;
+    state.openDisplays = [];
+    closeDisplayWorkspace();
 
-  if (!state.activeProject) {
-    explorerTree.innerHTML = '';
-    explorerProject.textContent = '—';
-    workspaceWelcome.classList.remove('hidden');
-    previewFrame.classList.add('hidden');
-    panelView.classList.add('hidden');
-    state.projectConfig = null;
-  } else {
-    workspaceWelcome.classList.add('hidden');
-    await loadExplorer(state.activeProject);
+    if (!state.activeProject) {
+      explorerTree.innerHTML = '';
+      explorerProject.textContent = '—';
+      state.projectConfig = null;
+    } else {
+      workspaceWelcome.classList.add('hidden');
+      await loadExplorer(state.activeProject);
+    }
+
+    await loadProjects();
+    renderWorkbookTabs();
+    updateEditMenuState();
+    updateViewMenuState();
+    setStatus(`Deleted project: ${label}`);
+    return true;
+  } catch (err) {
+    setStatus(`Error: ${err.message}`);
+    alert(`Could not delete project: ${err.message}\n\nRestart the server (npm start) if delete was recently added.`);
+    return false;
   }
-
-  await loadProjects();
-  renderWorkbookTabs();
-  updateEditMenuState();
-  updateViewMenuState();
-  setStatus(`Deleted project: ${label}`);
-  return true;
 }
 
 async function deleteActiveProject() {
@@ -1455,16 +2156,13 @@ async function deleteActiveProject() {
   }
 }
 
-async function createProject(name) {
+async function createProject(name, options = {}) {
   const result = await fetchJson('/api/projects', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name })
+    body: JSON.stringify({ name, ...options })
   });
-  state.activeProject = result.project.id;
-  workspaceWelcome.classList.add('hidden');
-  await loadProjects();
-  await loadExplorer(state.activeProject);
+  await openProject(result.project.id);
   setStatus(`Created project: ${result.project.name} (${result.project.screenCount || 18} standard displays)`);
 }
 
@@ -1491,8 +2189,11 @@ function isDisplayCategoryFolder(node) {
 }
 
 function isGraphicsTreeNode(node) {
-  return node?.id === 'displays'
-    || node?.id === 'graphics'
+  const graphicsIds = [
+    'displays', 'graphics', 'global-objects', 'symbol-factory', 'libraries',
+    'images', 'parameters', 'local-messages', 'image-library'
+  ];
+  return graphicsIds.includes(node?.id)
     || isDisplayCategoryFolder(node)
     || node?.type === 'display';
 }
@@ -1500,7 +2201,7 @@ function isGraphicsTreeNode(node) {
 function getExplorerContextMenuItems(node) {
   if (!node) return [];
 
-  if (node.id === 'displays' || node.id === 'graphics' || isDisplayCategoryFolder(node)) {
+  if (node.id === 'displays' || node.id === 'graphics' || node.id === 'global-objects' || isDisplayCategoryFolder(node)) {
     return [
       { action: 'new-display', label: 'New' },
       { action: 'add-component', label: 'Add Component into Project...' },
@@ -1528,7 +2229,15 @@ function getExplorerContextMenuItems(node) {
     ];
   }
 
-  if (node.id === 'hmi-tags') {
+  if (node.id === 'images' || node.type === 'image') {
+    return [
+      { action: 'add-image', label: 'Add Component into Project...' },
+      { action: 'delete', label: 'Delete', disabled: node.id === 'images' },
+      { action: 'remove', label: 'Remove', disabled: node.id === 'images' }
+    ];
+  }
+
+  if (node.id === 'hmi-tags' || node.id === 'hmi-tags-list') {
     return [
       { action: 'new-tag', label: 'New' },
       { action: 'add-component', label: 'Add Component into Project...', disabled: true },
@@ -1542,9 +2251,37 @@ function getExplorerContextMenuItems(node) {
     ];
   }
 
-  if (node.id === 'alarms') {
+  if (node.id === 'alarms' || node.id === 'alarm-setup') {
     return [
       { action: 'new-alarm', label: 'New' },
+      { action: 'add-component', label: 'Add Component into Project...', disabled: true },
+      { action: 'new-folder', label: 'New Folder', disabled: true },
+      { separator: true },
+      { action: 'delete', label: 'Delete', disabled: true },
+      { action: 'remove', label: 'Remove', disabled: true },
+      { separator: true },
+      { action: 'import-export', label: 'Import and Export...', disabled: true },
+      { action: 'filter', label: 'Filter...' }
+    ];
+  }
+
+  if (node.id === 'information' || node.id === 'information-setup' || node.id === 'information-messages') {
+    return [
+      { action: 'new', label: 'New', disabled: true },
+      { action: 'add-component', label: 'Add Component into Project...', disabled: true },
+      { action: 'new-folder', label: 'New Folder', disabled: true },
+      { separator: true },
+      { action: 'delete', label: 'Delete', disabled: true },
+      { action: 'remove', label: 'Remove', disabled: true },
+      { separator: true },
+      { action: 'import-export', label: 'Import and Export...', disabled: true },
+      { action: 'filter', label: 'Filter...' }
+    ];
+  }
+
+  if (node.id === 'recipeplus' || node.id === 'recipeplus-setup' || node.id === 'recipeplus-editor') {
+    return [
+      { action: 'new', label: 'New', disabled: true },
       { action: 'add-component', label: 'Add Component into Project...', disabled: true },
       { action: 'new-folder', label: 'New Folder', disabled: true },
       { separator: true },
@@ -1613,12 +2350,57 @@ function showExplorerContextMenu(event, node) {
     });
   });
 
-  menu.classList.remove('hidden');
+  positionContextMenu(menu, event.clientX, event.clientY);
+  hideWorkspaceContextMenu();
+}
+
+function hideExplorerContextMenu() {
+  const menu = document.getElementById('explorerContextMenu');
+  if (menu) menu.classList.add('hidden');
+  state.contextMenuNode = null;
+}
+
+function getWorkspaceContextMenuItems() {
+  if (!displayIsOpen()) return [];
+  const zoomDefault = state.viewPrefs.zoom === 100;
+  return [
+    { action: 'display-settings', label: 'Display Settings...' },
+    { action: 'key-assignments', label: 'Key Assignments' },
+    { separator: true },
+    { action: 'paste', label: 'Paste', disabled: true },
+    { action: 'paste-no-strings', label: 'Paste without localized strings', disabled: true },
+    { separator: true },
+    { action: 'show-grid', label: 'Show Grid', checkable: true, checked: state.viewPrefs.showGrid },
+    { action: 'snap-on', label: 'Snap On', checkable: true, checked: state.viewPrefs.snapOn },
+    { action: 'grid-settings', label: 'Grid Settings...' },
+    { separator: true },
+    { action: 'zoom-in', label: 'Zoom In' },
+    { action: 'zoom-out', label: 'Zoom Out' },
+    { action: 'cancel-zoom', label: 'Cancel Zoom', disabled: zoomDefault },
+    { separator: true },
+    { action: 'unlock-wallpaper', label: 'Unlock All Wallpaper', disabled: true }
+  ];
+}
+
+function renderContextMenuButton(item) {
+  if (item.separator) return '<div class="menu-sep"></div>';
+  let cls = 'menu-entry';
+  if (item.disabled) cls += ' disabled';
+  if (item.checkable) {
+    cls += ' checkable';
+    if (item.checked) cls += ' checked';
+    return `<button type="button" class="${cls}" data-ctx-action="${escapeHtml(item.action)}"><span class="check"></span><span>${escapeHtml(item.label)}</span></button>`;
+  }
+  return `<button type="button" class="${cls}" data-ctx-action="${escapeHtml(item.action)}">${escapeHtml(item.label)}</button>`;
+}
+
+function positionContextMenu(menu, clientX, clientY) {
   const pad = 4;
-  let left = event.clientX;
-  let top = event.clientY;
+  let left = clientX;
+  let top = clientY;
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
+  menu.classList.remove('hidden');
 
   const rect = menu.getBoundingClientRect();
   if (left + rect.width > window.innerWidth - pad) {
@@ -1631,10 +2413,88 @@ function showExplorerContextMenu(event, node) {
   menu.style.top = `${top}px`;
 }
 
-function hideExplorerContextMenu() {
-  const menu = document.getElementById('explorerContextMenu');
-  if (menu) menu.classList.add('hidden');
-  state.contextMenuNode = null;
+function showWorkspaceContextMenu(event) {
+  if (!displayIsOpen()) return;
+  event.preventDefault();
+  hideExplorerContextMenu();
+
+  const menu = document.getElementById('workspaceContextMenu');
+  if (!menu) return;
+
+  const items = getWorkspaceContextMenuItems();
+  menu.innerHTML = items.map(renderContextMenuButton).join('');
+  menu.querySelectorAll('[data-ctx-action]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      runWorkspaceContextAction(btn.dataset.ctxAction);
+      hideWorkspaceContextMenu();
+    });
+  });
+  positionContextMenu(menu, event.clientX, event.clientY);
+}
+
+function showWorkspaceContextMenuFromFrame(clientX, clientY) {
+  if (!displayIsOpen() || !previewFrame) return;
+  const rect = previewFrame.getBoundingClientRect();
+  const scale = (state.viewPrefs?.zoom || 100) / 100;
+  showWorkspaceContextMenu({
+    preventDefault() {},
+    clientX: rect.left + clientX * scale,
+    clientY: rect.top + clientY * scale
+  });
+}
+
+function hideWorkspaceContextMenu() {
+  document.getElementById('workspaceContextMenu')?.classList.add('hidden');
+}
+
+function runWorkspaceContextAction(action) {
+  switch (action) {
+    case 'display-settings':
+      showDisplaySettingsDialog().catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'key-assignments':
+      showKeyAssignmentsDialog();
+      break;
+    case 'show-grid':
+      handleViewAction('show-grid', 'showGrid');
+      break;
+    case 'snap-on':
+      handleViewAction('snap-on', 'snapOn');
+      break;
+    case 'grid-settings':
+      handleViewAction('grid-settings');
+      break;
+    case 'zoom-in':
+      handleViewAction('zoom-in');
+      break;
+    case 'zoom-out':
+      handleViewAction('zoom-out');
+      break;
+    case 'cancel-zoom':
+      handleViewAction('cancel-zoom');
+      break;
+    default:
+      break;
+  }
+}
+
+function initWorkspaceContextMenu() {
+  // Menu only from right-clicks inside the display canvas (embed iframe posts message).
+  window.addEventListener('message', (e) => {
+    if (e.origin !== window.location.origin) return;
+    if (e.data?.type === 'planthmi-embed-contextmenu') {
+      showWorkspaceContextMenuFromFrame(e.data.x, e.data.y);
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#workspaceContextMenu')) hideWorkspaceContextMenu();
+  });
+  document.addEventListener('contextmenu', () => {
+    hideWorkspaceContextMenu();
+  });
+  window.addEventListener('scroll', hideWorkspaceContextMenu, true);
+  window.addEventListener('resize', hideWorkspaceContextMenu);
 }
 
 function runExplorerContextAction(action, node) {
@@ -1650,8 +2510,12 @@ function runExplorerContextAction(action, node) {
       showAddDisplayDialog(folder);
       break;
     }
+    case 'add-image':
+      importProjectImage();
+      break;
     case 'add-component':
-      if (isGraphicsTreeNode(node)) showAddDisplayDialog(isDisplayCategoryFolder(node) ? node.id : undefined);
+      if (node.id === 'images') importProjectImage();
+      else if (isGraphicsTreeNode(node)) showAddDisplayDialog(isDisplayCategoryFolder(node) ? node.id : undefined);
       else setStatus('Add Component — select a display folder or display');
       break;
     case 'new-tag':
@@ -1666,9 +2530,10 @@ function runExplorerContextAction(action, node) {
     case 'delete':
     case 'remove':
       if (node.type === 'display') deleteSelectedDisplay();
+      else if (node.type === 'image') deleteSelectedImage(node);
       break;
     case 'import-export':
-      if (node.id === 'hmi-tags') showTagWizardDialog();
+      if (node.id === 'hmi-tags' || node.id === 'hmi-tags-list') showTagWizardDialog();
       else document.getElementById('transferDialog').showModal();
       break;
     case 'filter':
@@ -1720,6 +2585,7 @@ function initExplorerContextMenu() {
   });
   document.addEventListener('contextmenu', (e) => {
     if (!e.target.closest('#explorerTree')) hideExplorerContextMenu();
+    else hideWorkspaceContextMenu();
   });
   window.addEventListener('scroll', hideExplorerContextMenu, true);
   window.addEventListener('resize', hideExplorerContextMenu);
@@ -1768,10 +2634,9 @@ async function deleteSelectedDisplay() {
   await fetchJson(`/api/projects/${state.activeProject}/screens/${encodeURIComponent(id)}`, {
     method: 'DELETE'
   });
-  state.selectedScreenId = null;
-  workspaceWelcome.classList.remove('hidden');
-  previewFrame.classList.add('hidden');
-  panelView.classList.add('hidden');
+  state.openDisplays = state.openDisplays.filter((d) => d !== id);
+  closeDisplayWorkspace();
+  renderWorkbookTabs();
   await loadExplorer(state.activeProject);
   await loadProjects();
   setStatus(`Deleted display: ${id}`);
@@ -1779,10 +2644,9 @@ async function deleteSelectedDisplay() {
 
 async function openProject(id) {
   await fetchJson(`/api/projects/${id}/open`, { method: 'POST' });
-  state.activeProject = id;
-  await loadProjects();
-  await loadExplorer(id);
+  await bootstrapOpenedProject(id);
   openProjectDialog.close();
+  setStatus(`Opened application: ${id}`);
 }
 
 function renderOpenProjectList() {
@@ -1794,7 +2658,7 @@ function renderOpenProjectList() {
   list.innerHTML = state.projects.map((p) =>
     `<li>
       <button type="button" class="project-open-btn" data-id="${escapeHtml(p.id)}">
-        <strong>${escapeHtml(p.name)}</strong>
+        <strong>${escapeHtml(p.name)}${state.projects.filter((x) => x.name === p.name).length > 1 ? ` [${escapeHtml(p.id)}]` : ''}</strong>
         <span>${p.screenCount} screens · ${escapeHtml(p.id)}${p.id === state.activeProject ? ' · active' : ''}</span>
       </button>
       <button type="button" class="project-delete-btn" data-delete-id="${escapeHtml(p.id)}" title="Delete project">Delete</button>
@@ -1819,8 +2683,7 @@ function renderOpenProjectList() {
 }
 
 function showOpenProjectDialog() {
-  renderOpenProjectList();
-  openProjectDialog.showModal();
+  showStartupDialog('existing');
 }
 
 function escapeHtml(str) {
@@ -1920,6 +2783,7 @@ document.querySelectorAll('[data-tb]').forEach((el) => {
 document.querySelector('.toolbar [data-action="save"]')?.addEventListener('click', () => handleMenuAction('save'));
 
 projectSelect.addEventListener('change', () => openProject(projectSelect.value));
+document.getElementById('deleteProjectBtn')?.addEventListener('click', () => deleteActiveProject());
 
 document.getElementById('newProjectForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -1999,6 +2863,14 @@ document.getElementById('displaySettingsForm').addEventListener('submit', (e) =>
   saveDisplaySettings(e).catch((err) => setStatus(`Error: ${err.message}`));
 });
 
+document.querySelectorAll('#displaySettingsForm input[name="sizeMode"]').forEach((el) => {
+  el.addEventListener('change', syncDisplaySettingsSizeFields);
+});
+
+document.querySelectorAll('#displaySettingsDialog .dialog-tab').forEach((tab) => {
+  tab.addEventListener('click', () => switchDisplaySettingsTab(tab.dataset.dsTab));
+});
+
 document.getElementById('cancelDisplaySettings').addEventListener('click', () => {
   document.getElementById('displaySettingsDialog').close();
 });
@@ -2051,6 +2923,13 @@ document.getElementById('helpProjectSettings').addEventListener('click', () => {
 });
 document.getElementById('psWindowProfile').addEventListener('change', (e) => {
   applyWindowProfile(e.target.value);
+  previewProjectWindowSize();
+});
+document.getElementById('psWidth')?.addEventListener('input', () => {
+  if (document.getElementById('psWindowProfile').value === 'custom') previewProjectWindowSize();
+});
+document.getElementById('psHeight')?.addEventListener('input', () => {
+  if (document.getElementById('psWindowProfile').value === 'custom') previewProjectWindowSize();
 });
 document.querySelectorAll('#projectSettingsDialog .dialog-tab').forEach((tab) => {
   tab.addEventListener('click', () => switchProjectSettingsTab(tab.dataset.tab));
@@ -2120,21 +2999,34 @@ document.addEventListener('keydown', (e) => {
 
 async function init() {
   try {
+    loadViewPrefs();
     initDraggableDialogs();
     initExplorerContextMenu();
+    initExplorerResizer();
+    initWorkspaceContextMenu();
+    initStartupDialog();
+    initImagePropertiesDialog();
     if (typeof renderObjectsMenu === 'function') {
       renderObjectsMenu(document.getElementById('objectsMenu'));
     }
-    loadViewPrefs();
     applyViewPrefs();
     await loadProjects();
-    if (state.activeProject) await loadExplorer(state.activeProject);
+    showStartupDialog('existing');
   } catch (err) {
     setStatus(`Startup error: ${err.message}`);
   }
 }
 
 init();
+
+function initImagePropertiesDialog() {
+  document.getElementById('closeImageProps')?.addEventListener('click', () => {
+    document.getElementById('imagePropertiesDialog')?.close();
+  });
+  document.getElementById('helpImageProps')?.addEventListener('click', () => {
+    alert('Image properties show the bitmap type, pixel size, and file format stored under Graphics → Images.');
+  });
+}
 
 function initDraggableDialogs() {
   document.querySelectorAll('dialog.dialog').forEach((dialog) => {

@@ -1,0 +1,14 @@
+{
+  "id": "Template",
+  "title": "Template",
+  "kind": "global-object",
+  "layout": "global",
+  "securityLevel": 0,
+  "displaySettings": {
+    "useProjectSize": false,
+    "width": 1024,
+    "height": 768,
+    "backgroundColor": "#EBEBEB"
+  },
+  "components": []
+}

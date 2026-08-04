@@ -1,0 +1,8 @@
+{
+  "id": "700_User_Management",
+  "title": "User Management",
+  "navGroup": "users",
+  "layout": "standard",
+  "securityLevel": 0,
+  "components": []
+}

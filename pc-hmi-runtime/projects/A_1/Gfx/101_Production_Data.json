@@ -1,0 +1,19 @@
+{
+  "id": "101_Production_Data",
+  "title": "Production Data",
+  "navGroup": "overview",
+  "layout": "standard",
+  "securityLevel": 0,
+  "components": [],
+  "displaySettings": {
+    "useProjectSize": true,
+    "displayType": "replace",
+    "positionX": 0,
+    "positionY": 0,
+    "backgroundColor": "#ebebeb",
+    "displayNumber": 1,
+    "showTitleBar": false,
+    "disableInitialFocus": false,
+    "maxTagUpdateRate": 1
+  }
+}

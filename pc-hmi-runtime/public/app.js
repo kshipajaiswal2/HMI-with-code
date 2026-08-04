@@ -4,6 +4,9 @@ const urlParams = new URLSearchParams(window.location.search);
 const EMBED_MODE = urlParams.get('embed') === '1';
 const PROJECT_ID = urlParams.get('project') || '';
 const START_SCREEN = urlParams.get('screen') || '';
+const GLOBAL_OBJECT = urlParams.get('globalObject') || '';
+const EMBED_WIDTH = Number(urlParams.get('w')) || null;
+const EMBED_HEIGHT = Number(urlParams.get('h')) || null;
 
 const state = {
   tags: {},
@@ -12,7 +15,9 @@ const state = {
   currentUser: null,
   navigation: null,
   userCallbacks: [],
-  projectId: PROJECT_ID
+  projectId: PROJECT_ID,
+  projectRuntime: { width: 800, height: 600 },
+  displaySize: { width: 800, height: 600 }
 };
 
 function apiUrl(path) {
@@ -30,6 +35,50 @@ const alarmBannerText = document.getElementById('alarmBannerText');
 const navUser = document.getElementById('navUser');
 const headerIndicators = document.getElementById('headerIndicators');
 const navBar = document.getElementById('navBar');
+
+function applyDisplayCanvasSize(width, height, backgroundColor) {
+  const bg = backgroundColor || '#EBEBEB';
+
+  if (EMBED_MODE) {
+    document.documentElement.classList.add('embed-root');
+    document.body.classList.add('embed-body');
+    const app = document.getElementById('app');
+    if (app) {
+      app.style.width = '100%';
+      app.style.height = '100%';
+    }
+    screenContent.style.background = bg;
+    screenContent.style.padding = '0';
+    screenContent.style.overflow = 'hidden';
+    screenContent.style.width = '100%';
+    screenContent.style.height = '100%';
+    if (width && height) state.displaySize = { width, height };
+    return;
+  }
+
+  const w = width || state.displaySize.width || 800;
+  const h = height || state.displaySize.height || 600;
+  state.displaySize = { width: w, height: h };
+
+  const app = document.getElementById('app');
+  if (app) {
+    app.style.width = `${w}px`;
+    app.style.height = `${h}px`;
+  }
+
+  screenContent.style.background = bg;
+}
+
+function resolveScreenSize(screen) {
+  const rt = state.projectRuntime || {};
+  const ds = screen?.displaySettings || {};
+  const useProject = ds.useProjectSize || (!ds.width && !ds.height);
+  return {
+    width: useProject ? (rt.width || 800) : (ds.width || rt.width || 800),
+    height: useProject ? (rt.height || 600) : (ds.height || rt.height || 600),
+    backgroundColor: ds.backgroundColor || rt.displayBackground || '#EBEBEB'
+  };
+}
 
 function createContext() {
   const bindings = new Map();
@@ -136,29 +185,52 @@ async function loadScreen(screenId) {
     const res = await fetch(apiUrl(`/api/runtime/screens/${screenId}`));
     if (!res.ok) throw new Error('not found');
     const screen = await res.json();
-
-    const userLevel = state.currentUser?.level ?? 0;
-    if (screen.securityLevel && userLevel < screen.securityLevel) {
-      renderAccessDenied(screen);
-      state.currentScreen = screenId;
-      updateNav(screen.navGroup);
-      screenTitle.textContent = screen.title;
-      return;
-    }
-
-    state.currentScreen = screenId;
-    renderScreen(screen);
-    updateNav(screen.navGroup);
-    screenTitle.textContent = screen.title;
-
-    const tagNames = collectTags(screen.components);
-    if (tagNames.length) socket.emit('subscribe', tagNames);
+    await renderLoadedScreen(screen, screenId);
   } catch {
     renderPlaceholder(screenId);
     state.currentScreen = screenId;
     updateNav(null);
     screenTitle.textContent = screenId.replace(/^\d+_/, '').replace(/_/g, ' ');
   }
+}
+
+async function loadGlobalObject(objectId) {
+  state.tagBindings = [];
+  state.alarmCallbacks = [];
+  state.userCallbacks = [];
+
+  try {
+    const res = await fetch(apiUrl(`/api/runtime/global-objects/${objectId}`));
+    if (!res.ok) throw new Error('not found');
+    const screen = await res.json();
+    await renderLoadedScreen(screen, objectId);
+  } catch {
+    renderPlaceholder(objectId);
+    state.currentScreen = objectId;
+    updateNav(null);
+    screenTitle.textContent = objectId.replace(/_/g, ' ');
+  }
+}
+
+async function renderLoadedScreen(screen, screenId) {
+  const userLevel = state.currentUser?.level ?? 0;
+  if (screen.securityLevel && userLevel < screen.securityLevel) {
+    const size = resolveScreenSize(screen);
+    applyDisplayCanvasSize(size.width, size.height, size.backgroundColor);
+    renderAccessDenied(screen);
+    state.currentScreen = screenId;
+    updateNav(screen.navGroup);
+    screenTitle.textContent = screen.title;
+    return;
+  }
+
+  state.currentScreen = screenId;
+  renderScreen(screen);
+  updateNav(screen.navGroup);
+  screenTitle.textContent = screen.title;
+
+  const tagNames = collectTags(screen.components);
+  if (tagNames.length) socket.emit('subscribe', tagNames);
 }
 
 function collectTags(components) {
@@ -172,10 +244,12 @@ function collectTags(components) {
 }
 
 function renderScreen(screen) {
+  const size = resolveScreenSize(screen);
+  applyDisplayCanvasSize(size.width, size.height, size.backgroundColor);
   screenContent.innerHTML = '';
   const ctx = createContext();
   state.activeContext = ctx;
-  for (const comp of screen.components) {
+  for (const comp of screen.components || []) {
     screenContent.appendChild(ComponentRegistry.render(comp, ctx));
   }
 }
@@ -202,32 +276,13 @@ function updateNav(activeGroup) {
 
 function updateTagBindings(tagName, value) {
   state.activeContext?._bindings?.get(tagName)?.(value);
-  updateHeaderIndicators();
-}
-
-function updateHeaderIndicators() {
-  headerIndicators.innerHTML = '';
-  const mode = state.tags['System.AutoMode'];
-  const health = state.tags['System.Healthy'];
-  if (mode) {
-    const el = document.createElement('div');
-    el.className = 'header-indicator';
-    const isAuto = mode.value === true || mode.value === 1;
-    el.textContent = isAuto ? 'Auto' : 'Manual';
-    el.style.backgroundColor = isAuto ? '#00c000' : '#0066cc';
-    headerIndicators.appendChild(el);
-  }
-  if (health) {
-    const el = document.createElement('div');
-    el.className = 'header-indicator';
-    const isOk = health.value === true || health.value === 1;
-    el.textContent = isOk ? 'Healthy' : 'Fault';
-    el.style.backgroundColor = isOk ? '#00c000' : '#cc0000';
-    headerIndicators.appendChild(el);
-  }
 }
 
 function updateAlarmBanner() {
+  if (EMBED_MODE) {
+    alarmBanner?.classList.add('hidden');
+    return;
+  }
   const unacked = state.alarms.active?.filter((a) => !a.acknowledged) || [];
   if (unacked.length) {
     alarmBannerText.textContent = unacked.sort((a, b) => a.priority - b.priority)[0].message;
@@ -270,7 +325,6 @@ socket.on('init', (data) => {
     commStatus.querySelector('span:last-child').textContent = 'Simulator';
   }
   updateUserUI();
-  updateHeaderIndicators();
   updateAlarmBanner();
 });
 
@@ -292,10 +346,16 @@ socket.on('user-changed', (user) => {
 
 async function init() {
   if (EMBED_MODE) {
+    document.documentElement.classList.add('embed-root');
     document.getElementById('runtimeHeader')?.classList.add('hidden');
     document.getElementById('navBar')?.classList.add('hidden');
     document.getElementById('alarmBanner')?.classList.add('hidden');
     document.getElementById('app')?.classList.add('embed-mode');
+    applyDisplayCanvasSize(EMBED_WIDTH, EMBED_HEIGHT);
+    document.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      window.parent.postMessage({ type: 'planthmi-embed-contextmenu', x: e.clientX, y: e.clientY }, '*');
+    });
   }
 
   document.getElementById('clock').textContent = new Date().toLocaleString();
@@ -308,12 +368,23 @@ async function init() {
     ]);
     const status = await statusRes.json();
     state.projectId = status.projectId || state.projectId;
+    state.projectRuntime = status.runtime || { width: 800, height: 600 };
+    if (EMBED_MODE && EMBED_WIDTH && EMBED_HEIGHT) {
+      state.projectRuntime = { ...state.projectRuntime, width: EMBED_WIDTH, height: EMBED_HEIGHT };
+    }
     state.navigation = await navRes.json();
     projectName.textContent = status.projectName || 'Plant HMI';
     if (!EMBED_MODE) buildNavBar();
     updateUserUI();
-    const screen = START_SCREEN || status.startupScreen || '100_Overview';
-    await loadScreen(screen);
+    if (!EMBED_MODE) {
+      applyDisplayCanvasSize(state.projectRuntime.width, state.projectRuntime.height);
+    }
+    if (GLOBAL_OBJECT) {
+      await loadGlobalObject(GLOBAL_OBJECT);
+    } else {
+      const screen = START_SCREEN || status.startupScreen || '100_Overview';
+      await loadScreen(screen);
+    }
   } catch {
     screenTitle.textContent = 'Connection error';
   }

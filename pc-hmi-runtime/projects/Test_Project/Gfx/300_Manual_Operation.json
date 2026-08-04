@@ -1,0 +1,8 @@
+{
+  "id": "300_Manual_Operation",
+  "title": "Manual Operation",
+  "navGroup": "manual",
+  "layout": "standard",
+  "securityLevel": 1,
+  "components": []
+}

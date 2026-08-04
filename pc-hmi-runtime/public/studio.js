@@ -106,8 +106,6 @@ const previewFrame = document.getElementById('previewFrame');
 const previewStage = document.getElementById('previewStage');
 const panelView = document.getElementById('panelView');
 const statusMsg = document.getElementById('statusMsg');
-const newProjectDialog = document.getElementById('newProjectDialog');
-const openProjectDialog = document.getElementById('openProjectDialog');
 
 function setStatus(msg) {
   statusMsg.textContent = msg;
@@ -249,7 +247,6 @@ function applyViewPrefs() {
   studioApp.classList.toggle('no-status-bar', !v.statusBar);
 
   explorerPanel.classList.toggle('hidden', !v.explorerWindow);
-  studioBody.classList.toggle('no-explorer', !v.explorerWindow);
 
   renderWorkbookTabs();
 
@@ -1138,7 +1135,7 @@ function selectNode(row, node) {
     state.previewKind = 'global-object';
     openGlobalObjectPreview(node.id, node.title);
   } else if (node.type === 'image') {
-    openImagePanel(node);
+    showImagePropertiesDialog(node);
   } else if (node.action) {
     handleExplorerAction(node);
   } else if (node.type === 'item') {
@@ -1274,6 +1271,12 @@ async function showImagePropertiesDialog(node) {
       `${info.width || 0} x ${info.height || 0}`;
     document.getElementById('imagePropsFormat').textContent = info.format || 'Unknown';
     const thumb = document.getElementById('imagePropsThumb');
+    thumb.onload = () => {
+      if (!info.width || !info.height) {
+        document.getElementById('imagePropsSize').textContent =
+          `${thumb.naturalWidth} x ${thumb.naturalHeight}`;
+      }
+    };
     thumb.src = `${info.url}?_=${Date.now()}`;
     thumb.alt = info.label;
     dialog.showModal();
@@ -1281,10 +1284,6 @@ async function showImagePropertiesDialog(node) {
   } catch (err) {
     setStatus(`Error: ${err.message}`);
   }
-}
-
-function openImagePanel(node) {
-  showImagePropertiesDialog(node);
 }
 
 async function importProjectImage() {
@@ -1789,6 +1788,181 @@ function showTagWizardDialog() {
   document.getElementById('tagWizardDialog').showModal();
 }
 
+const gfxWizardState = { step: 0, preselect: null, targets: [], scope: 'all' };
+
+const GFX_WIZARD_TITLES = {
+  operation: 'Graphics Import Export Wizard - Operation Type',
+  targets: 'Graphics Import Export Wizard - Displays to Export',
+  'folder-export': 'Graphics Import Export Wizard - Export Folder',
+  'folder-import': 'Graphics Import Export Wizard - Import Folder'
+};
+
+function gfxWizardOperation() {
+  return document.querySelector('#graphicsImportExportDialog input[name="gfxOperation"]:checked')?.value || 'export';
+}
+
+function gfxWizardStepIds() {
+  return gfxWizardOperation() === 'import' ? ['operation', 'folder'] : ['operation', 'targets', 'folder'];
+}
+
+function gfxWizardVisibleTargets() {
+  if (gfxWizardState.scope === 'global-object') {
+    return gfxWizardState.targets.filter((t) => t.kind === 'global-object');
+  }
+  if (gfxWizardState.scope === 'display') {
+    return gfxWizardState.targets.filter((t) => t.kind === 'display');
+  }
+  return gfxWizardState.targets;
+}
+
+function renderGfxExportTargetList() {
+  const list = document.getElementById('gfxExportTargetList');
+  if (!list) return;
+  const visible = gfxWizardVisibleTargets();
+  list.innerHTML = visible.map((t) => {
+    const key = `${t.kind}:${t.id}`;
+    const checked = gfxWizardState.preselect
+      ? (gfxWizardState.preselect.kind === t.kind && gfxWizardState.preselect.id === t.id)
+      : true;
+    return `<li><label><input type="checkbox" data-gfx-target="${escapeHtml(key)}" ${checked ? 'checked' : ''} /><span>${escapeHtml(t.label)}</span></label></li>`;
+  }).join('');
+}
+
+function updateGfxWizardUi() {
+  const steps = gfxWizardStepIds();
+  const stepId = steps[gfxWizardState.step];
+  document.getElementById('gfxWizardTitle').textContent = stepId === 'folder'
+    ? GFX_WIZARD_TITLES[gfxWizardOperation() === 'import' ? 'folder-import' : 'folder-export']
+    : (GFX_WIZARD_TITLES[stepId] || GFX_WIZARD_TITLES.operation);
+
+  document.querySelectorAll('#graphicsImportExportDialog .gfx-wizard-step').forEach((el) => {
+    el.classList.toggle('hidden', el.dataset.gfxStep !== stepId);
+  });
+
+  const backBtn = document.getElementById('gfxWizardBack');
+  const nextBtn = document.getElementById('gfxWizardNext');
+  if (backBtn) backBtn.disabled = gfxWizardState.step === 0;
+  if (nextBtn) nextBtn.textContent = gfxWizardState.step >= steps.length - 1 ? 'Finish' : 'Next >';
+
+  const isImport = gfxWizardOperation() === 'import';
+  const prompt = document.getElementById('gfxFolderPrompt');
+  const naming = document.getElementById('gfxNamingHint');
+  if (prompt) {
+    prompt.textContent = isImport
+      ? 'Select the folder to import graphic information from:'
+      : 'Select the folder to export the graphic information to:';
+  }
+  if (naming) {
+    naming.innerHTML = isImport
+      ? 'Import reads <code>&lt;display name&gt;.json</code> files from the folder above into this project.'
+      : 'The export files will be named according to the following naming convention: <code>&lt;display name&gt;.json</code>';
+  }
+}
+
+async function showGraphicsImportExportWizard(contextNode = null) {
+  if (!state.activeProject) {
+    setStatus('Open a project first');
+    return;
+  }
+  gfxWizardState.step = 0;
+  gfxWizardState.preselect = null;
+  gfxWizardState.scope = 'all';
+  if (contextNode?.type === 'display') {
+    gfxWizardState.scope = 'display';
+    gfxWizardState.preselect = { id: contextNode.id, kind: 'display' };
+  } else if (contextNode?.type === 'global-object') {
+    gfxWizardState.scope = 'global-object';
+    gfxWizardState.preselect = { id: contextNode.id, kind: 'global-object' };
+  } else if (contextNode?.id === 'global-objects') {
+    gfxWizardState.scope = 'global-object';
+  } else if (contextNode?.id === 'displays' || contextNode?.id === 'graphics' || isDisplayCategoryFolder(contextNode)) {
+    gfxWizardState.scope = 'display';
+  }
+
+  const data = await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/graphics/export-targets`);
+  gfxWizardState.targets = data.targets || [];
+  document.getElementById('gfxTransferFolder').value = data.defaultFolder || '';
+  document.querySelector('#graphicsImportExportDialog input[name="gfxOperation"][value="export"]')?.click();
+  renderGfxExportTargetList();
+  updateGfxWizardUi();
+  document.getElementById('graphicsImportExportDialog').showModal();
+}
+
+async function finishGraphicsImportExportWizard() {
+  const folder = document.getElementById('gfxTransferFolder')?.value.trim();
+  if (!folder) {
+    alert('Enter a folder path.');
+    return;
+  }
+  if (gfxWizardOperation() === 'import') {
+    const result = await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/graphics/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder })
+    });
+    document.getElementById('graphicsImportExportDialog').close();
+    await loadExplorer(state.activeProject);
+    setStatus(`Imported ${result.imported?.length || 0} graphic file(s) from ${folder}`);
+    return;
+  }
+
+  const items = [];
+  document.querySelectorAll('#gfxExportTargetList input[data-gfx-target]:checked').forEach((el) => {
+    const [kind, ...rest] = el.dataset.gfxTarget.split(':');
+    items.push({ kind, id: rest.join(':') });
+  });
+  if (!items.length) {
+    alert('Select at least one display or global object to export.');
+    return;
+  }
+  const result = await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/graphics/export`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ folder, items })
+  });
+  document.getElementById('graphicsImportExportDialog').close();
+  setStatus(`Exported ${result.exported?.length || 0} file(s) to ${result.folder}`);
+}
+
+function initGraphicsImportExportWizard() {
+  document.querySelectorAll('#graphicsImportExportDialog input[name="gfxOperation"]').forEach((el) => {
+    el.addEventListener('change', () => {
+      gfxWizardState.step = 0;
+      updateGfxWizardUi();
+    });
+  });
+  document.getElementById('gfxSelectAllBtn')?.addEventListener('click', () => {
+    document.querySelectorAll('#gfxExportTargetList input[data-gfx-target]').forEach((el) => { el.checked = true; });
+  });
+  document.getElementById('gfxClearAllBtn')?.addEventListener('click', () => {
+    document.querySelectorAll('#gfxExportTargetList input[data-gfx-target]').forEach((el) => { el.checked = false; });
+  });
+  document.getElementById('gfxWizardBack')?.addEventListener('click', () => {
+    if (gfxWizardState.step > 0) {
+      gfxWizardState.step -= 1;
+      updateGfxWizardUi();
+    }
+  });
+  document.getElementById('gfxWizardNext')?.addEventListener('click', () => {
+    const steps = gfxWizardStepIds();
+    if (gfxWizardState.step >= steps.length - 1) {
+      finishGraphicsImportExportWizard().catch((err) => {
+        setStatus(`Error: ${err.message}`);
+        alert(err.message);
+      });
+      return;
+    }
+    gfxWizardState.step += 1;
+    updateGfxWizardUi();
+  });
+  document.getElementById('gfxWizardCancel')?.addEventListener('click', () => {
+    document.getElementById('graphicsImportExportDialog').close();
+  });
+  document.getElementById('gfxWizardHelp')?.addEventListener('click', () => {
+    alert('Export copies display and global object JSON files to a folder. Import reads JSON files from a folder into the active project, replacing same-named files.');
+  });
+}
+
 async function exportProjectTags() {
   await refreshProjectConfig();
   const tags = state.projectConfig?.tags || [];
@@ -2076,34 +2250,12 @@ function isProjectNameTaken(name, excludeId = null) {
   );
 }
 
-function clearNewProjectNameError() {
-  const err = document.getElementById('newProjectNameError');
-  if (!err) return;
-  err.textContent = '';
-  err.classList.add('hidden');
-}
-
-function validateNewProjectName(showError = true) {
-  const name = document.getElementById('newProjectName').value.trim();
-  const err = document.getElementById('newProjectNameError');
-  const submitBtn = document.querySelector('#newProjectForm button[type="submit"]');
-  const taken = isProjectNameTaken(name);
-  if (!name) {
-    if (showError) clearNewProjectNameError();
-    if (submitBtn) submitBtn.disabled = true;
-    return false;
-  }
-  if (taken) {
-    if (showError && err) {
-      err.textContent = `A project named "${name}" already exists. Choose a different name.`;
-      err.classList.remove('hidden');
-    }
-    if (submitBtn) submitBtn.disabled = true;
-    return false;
-  }
-  clearNewProjectNameError();
-  if (submitBtn) submitBtn.disabled = false;
-  return true;
+function isProjectNameTaken(name, excludeId = null) {
+  const target = String(name || '').trim().toLowerCase();
+  if (!target) return false;
+  return state.projects.some((p) =>
+    p.id !== excludeId && (p.name || '').trim().toLowerCase() === target
+  );
 }
 
 async function deleteProjectById(id) {
@@ -2152,7 +2304,7 @@ async function deleteActiveProject() {
   closeAllMenus();
   const deleted = await deleteProjectById(state.activeProject);
   if (deleted && !state.activeProject) {
-    openProjectDialog.close();
+    showStartupDialog('existing');
   }
 }
 
@@ -2224,8 +2376,17 @@ function getExplorerContextMenuItems(node) {
       { action: 'delete', label: 'Delete' },
       { action: 'remove', label: 'Remove' },
       { separator: true },
-      { action: 'import-export', label: 'Import and Export...', disabled: true },
+      { action: 'import-export', label: 'Import and Export...' },
       { action: 'filter', label: 'Filter...', disabled: true }
+    ];
+  }
+
+  if (node.type === 'global-object') {
+    return [
+      { action: 'import-export', label: 'Import and Export...' },
+      { separator: true },
+      { action: 'delete', label: 'Delete', disabled: true },
+      { action: 'remove', label: 'Remove', disabled: true }
     ];
   }
 
@@ -2534,7 +2695,7 @@ function runExplorerContextAction(action, node) {
       break;
     case 'import-export':
       if (node.id === 'hmi-tags' || node.id === 'hmi-tags-list') showTagWizardDialog();
-      else document.getElementById('transferDialog').showModal();
+      else showGraphicsImportExportWizard(node).catch((err) => setStatus(`Error: ${err.message}`));
       break;
     case 'filter':
       showExplorerFilterDialog();
@@ -2645,41 +2806,7 @@ async function deleteSelectedDisplay() {
 async function openProject(id) {
   await fetchJson(`/api/projects/${id}/open`, { method: 'POST' });
   await bootstrapOpenedProject(id);
-  openProjectDialog.close();
   setStatus(`Opened application: ${id}`);
-}
-
-function renderOpenProjectList() {
-  const list = document.getElementById('projectList');
-  if (!state.projects.length) {
-    list.innerHTML = '<li class="project-list-empty">No projects yet. Use File → New Application to create one.</li>';
-    return;
-  }
-  list.innerHTML = state.projects.map((p) =>
-    `<li>
-      <button type="button" class="project-open-btn" data-id="${escapeHtml(p.id)}">
-        <strong>${escapeHtml(p.name)}${state.projects.filter((x) => x.name === p.name).length > 1 ? ` [${escapeHtml(p.id)}]` : ''}</strong>
-        <span>${p.screenCount} screens · ${escapeHtml(p.id)}${p.id === state.activeProject ? ' · active' : ''}</span>
-      </button>
-      <button type="button" class="project-delete-btn" data-delete-id="${escapeHtml(p.id)}" title="Delete project">Delete</button>
-    </li>`
-  ).join('');
-  list.querySelectorAll('.project-open-btn').forEach((btn) => {
-    btn.addEventListener('click', () => openProject(btn.dataset.id));
-  });
-  list.querySelectorAll('.project-delete-btn').forEach((btn) => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      try {
-        await deleteProjectById(btn.dataset.deleteId);
-        renderOpenProjectList();
-        if (!state.projects.length) openProjectDialog.close();
-      } catch (err) {
-        setStatus(`Error: ${err.message}`);
-        alert(`Could not delete project: ${err.message}`);
-      }
-    });
-  });
 }
 
 function showOpenProjectDialog() {
@@ -2784,36 +2911,6 @@ document.querySelector('.toolbar [data-action="save"]')?.addEventListener('click
 
 projectSelect.addEventListener('change', () => openProject(projectSelect.value));
 document.getElementById('deleteProjectBtn')?.addEventListener('click', () => deleteActiveProject());
-
-document.getElementById('newProjectForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const name = document.getElementById('newProjectName').value.trim();
-  if (!name || !validateNewProjectName()) return;
-  const btn = e.target.querySelector('button[type="submit"]');
-  try {
-    if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
-    await createProject(name);
-    newProjectDialog.close();
-  } catch (err) {
-    setStatus(`Error: ${err.message}`);
-    const errEl = document.getElementById('newProjectNameError');
-    if (errEl) {
-      errEl.textContent = err.message;
-      errEl.classList.remove('hidden');
-    }
-  } finally {
-    if (btn) {
-      btn.disabled = !validateNewProjectName(false);
-      btn.textContent = 'Create';
-    }
-  }
-});
-
-document.getElementById('newProjectName')?.addEventListener('input', () => validateNewProjectName());
-document.getElementById('newProjectName')?.addEventListener('blur', () => validateNewProjectName());
-
-document.getElementById('cancelNewProject').addEventListener('click', () => newProjectDialog.close());
-document.getElementById('closeOpenProject').addEventListener('click', () => openProjectDialog.close());
 
 document.getElementById('addDisplayForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -3006,6 +3103,7 @@ async function init() {
     initWorkspaceContextMenu();
     initStartupDialog();
     initImagePropertiesDialog();
+    initGraphicsImportExportWizard();
     if (typeof renderObjectsMenu === 'function') {
       renderObjectsMenu(document.getElementById('objectsMenu'));
     }

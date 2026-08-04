@@ -395,7 +395,6 @@ body.explorer-resize-active {
   background: #EBEBEB;
   overflow: hidden;
 }
-.preview-frame.hidden { display: none !important; }
 .preview-frame.grayscale { filter: grayscale(100%); }
 .workspace-welcome {
   position: absolute; inset: 0;
@@ -420,15 +419,6 @@ body.explorer-resize-active {
 .panel-content { padding: 16px; }
 .panel-content h2 { font-size: 14px; margin-bottom: 12px; color: #003; }
 .panel-content .hint { margin-top: 8px; color: #666; font-size: 11px; }
-.image-panel .image-preview {
-  display: block;
-  max-width: 100%;
-  max-height: calc(100vh - 220px);
-  margin-top: 12px;
-  border: 1px solid #ccc;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-}
 
 .dialog-image-props {
   min-width: 420px;
@@ -491,6 +481,86 @@ body.explorer-resize-active {
 .image-props-list dd {
   margin: 0 0 4px 96px;
   color: #000;
+}
+
+.dialog-gfx-wizard {
+  min-width: 520px;
+  max-width: 620px;
+  background: #ece9d8;
+}
+
+.gfx-wizard-fieldset {
+  border: 1px solid #808080;
+  padding: 10px 12px;
+  margin: 8px 0 0;
+}
+
+.gfx-wizard-list-wrap {
+  border: 1px solid #808080;
+  background: #fff;
+  height: 220px;
+  overflow: auto;
+  margin-top: 8px;
+}
+
+.gfx-wizard-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.gfx-wizard-list li {
+  padding: 2px 8px;
+}
+
+.gfx-wizard-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: normal;
+  cursor: pointer;
+}
+
+.gfx-wizard-list-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.gfx-folder-row {
+  display: block;
+  margin-top: 8px;
+}
+
+.gfx-folder-row input {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.gfx-wizard-warning {
+  display: flex;
+  gap: 10px;
+  border: 1px solid #808080;
+  background: #fff;
+  padding: 10px 12px;
+  margin-top: 12px;
+  min-height: 90px;
+}
+
+.gfx-wizard-warning-icon {
+  font-size: 28px;
+  line-height: 1;
+  color: #c09800;
+}
+
+.gfx-wizard-warning p {
+  margin: 4px 0 0;
+  font-size: 11px;
+}
+
+.gfx-wizard-actions {
+  margin-top: 12px;
 }
 .hidden { display: none !important; }
 
@@ -569,35 +639,6 @@ body.explorer-resize-active {
   cursor: pointer;
 }
 .dialog-btn.primary { font-weight: 700; }
-.project-list { list-style: none; max-height: 240px; overflow: auto; margin-bottom: 12px; }
-.project-list li {
-  display: flex;
-  align-items: stretch;
-  gap: 4px;
-  border-bottom: 1px solid #eee;
-}
-.project-list li .project-open-btn {
-  display: flex; flex-direction: column; align-items: flex-start;
-  flex: 1; padding: 8px 10px; border: none;
-  background: #fff; cursor: pointer; text-align: left;
-}
-.project-list li .project-open-btn:hover { background: #e8f0fe; }
-.project-list li .project-open-btn span { font-size: 10px; color: #666; }
-.project-list li .project-delete-btn {
-  padding: 0 12px;
-  border: none;
-  border-left: 1px solid #eee;
-  background: #fff;
-  cursor: pointer;
-  color: #800;
-  font-size: 11px;
-}
-.project-list li .project-delete-btn:hover { background: #fde8e8; }
-.project-list-empty {
-  padding: 12px 10px;
-  color: #666;
-  font-size: 11px;
-}
 .dialog-error {
   color: #a00;
   font-size: 11px;

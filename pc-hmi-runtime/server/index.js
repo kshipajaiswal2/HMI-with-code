@@ -74,12 +74,35 @@ app.get('/', (_req, res) => {
   res.sendFile(path.join(ROOT, 'public', 'studio.html'));
 });
 
-app.get('/api/studio/version', (_req, res) => {
-  res.json({ version: '0.2.2', build: 'startup-open-bootstrap' });
+app.get('/api/projects/:id/graphics/export-targets', (req, res) => {
+  try {
+    res.json({
+      defaultFolder: projectService.defaultGraphicsTransferFolder(),
+      targets: projectService.listGraphicExportTargets(req.params.id)
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
-app.get('/api/projects/standard-library', (_req, res) => {
-  res.json(projectService.readStandardLibrary());
+app.post('/api/projects/:id/graphics/export', (req, res) => {
+  try {
+    const { folder, items } = req.body || {};
+    const result = projectService.exportGraphicsToFolder(req.params.id, folder, items);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/projects/:id/graphics/import', (req, res) => {
+  try {
+    const { folder } = req.body || {};
+    const result = projectService.importGraphicsFromFolder(req.params.id, folder);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.post('/api/projects/:id/screens', (req, res) => {
@@ -119,14 +142,6 @@ app.patch('/api/projects/:id/screens/:screenId', (req, res) => {
   }
 });
 
-app.get('/api/projects/:id/images', (req, res) => {
-  try {
-    res.json(projectService.listImages(req.params.id));
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
 app.post('/api/projects/:id/images', (req, res) => {
   try {
     let fileName;
@@ -142,17 +157,6 @@ app.post('/api/projects/:id/images', (req, res) => {
     }
     if (!buffer?.length) return res.status(400).json({ error: 'Empty image upload' });
     const saved = projectService.saveImage(req.params.id, fileName, buffer);
-    res.json({ success: true, image: saved });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-app.post('/api/projects/:id/images/raw', express.raw({ type: '*/*', limit: '25mb' }), (req, res) => {
-  try {
-    if (!req.body?.length) return res.status(400).json({ error: 'Empty image upload' });
-    const fileName = req.headers['x-image-filename'] || req.query.name || 'upload.png';
-    const saved = projectService.saveImage(req.params.id, fileName, req.body);
     res.json({ success: true, image: saved });
   } catch (err) {
     res.status(400).json({ error: err.message });

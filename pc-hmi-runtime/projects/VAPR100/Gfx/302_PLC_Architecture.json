@@ -4,5 +4,9 @@
   "navGroup": "manual",
   "layout": "standard",
   "securityLevel": 1,
-  "components": []
+  "components": [],
+  "displaySettings": {
+    "backgroundColor": "#EBEBEB",
+    "useProjectSize": true
+  }
 }

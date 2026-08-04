@@ -261,5 +261,8 @@
       "priority": 3
     }
   ],
-  "createdAt": "2026-08-03T05:59:04.544Z"
+  "createdAt": "2026-08-03T05:59:04.544Z",
+  "runtime": {
+    "displayBackground": "#EBEBEB"
+  }
 }

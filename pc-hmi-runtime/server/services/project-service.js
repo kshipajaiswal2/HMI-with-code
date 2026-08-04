@@ -37,55 +37,144 @@ const IMAGE_FORMAT_LABELS = {
   '.svg': 'SVG'
 };
 
+function detectImageFormat(buf, ext) {
+  if (buf.length >= 8 && buf[0] === 0x89 && buf.toString('ascii', 1, 4) === 'PNG') return 'png';
+  if (buf.length >= 2 && buf.readUInt16LE(0) === 0x4D42) return 'bmp';
+  if (buf.length >= 6 && buf.toString('ascii', 0, 3) === 'GIF') return 'gif';
+  if (buf.length >= 2 && buf[0] === 0xFF && buf[1] === 0xD8) return 'jpeg';
+  if (buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'webp';
+  if (buf.length >= 6 && buf.readUInt16LE(0) === 0 && buf.readUInt16LE(2) === 1) return 'ico';
+  const head = buf.slice(0, Math.min(buf.length, 256)).toString('utf8').trimStart();
+  if (head.startsWith('<svg') || (ext === '.svg' && head.includes('<svg'))) return 'svg';
+  return ext.replace(/^\./, '').toLowerCase() || 'unknown';
+}
+
+function readPngDimensions(buf) {
+  if (buf.length < 24 || buf.toString('ascii', 1, 4) !== 'PNG') return null;
+  return {
+    width: buf.readUInt32BE(16),
+    height: buf.readUInt32BE(20),
+    bitDepth: buf[24],
+    colorType: buf[25]
+  };
+}
+
+function readBmpDimensions(buf) {
+  if (buf.length < 28 || buf.readUInt16LE(0) !== 0x4D42) return null;
+  const headerSize = buf.readUInt32LE(14);
+  if (headerSize < 12) return null;
+  const width = buf.readInt32LE(18);
+  const height = Math.abs(buf.readInt32LE(22));
+  const bitDepth = headerSize >= 16 ? buf.readUInt16LE(28) : null;
+  return {
+    width,
+    height,
+    bitDepth,
+    colorType: bitDepth != null && bitDepth <= 8 ? 3 : 2
+  };
+}
+
+function readGifDimensions(buf) {
+  if (buf.length < 10 || buf.toString('ascii', 0, 3) !== 'GIF') return null;
+  return { width: buf.readUInt16LE(6), height: buf.readUInt16LE(8), bitDepth: 8, colorType: 3 };
+}
+
+function readJpegDimensions(buf) {
+  if (buf.length < 4 || buf[0] !== 0xFF || buf[1] !== 0xD8) return null;
+  let offset = 2;
+  while (offset < buf.length - 8) {
+    if (buf[offset] !== 0xFF) break;
+    const marker = buf[offset + 1];
+    const len = buf.readUInt16BE(offset + 2);
+    if (len < 2 || offset + 2 + len > buf.length) break;
+    if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+      return {
+        width: buf.readUInt16BE(offset + 7),
+        height: buf.readUInt16BE(offset + 5),
+        bitDepth: buf[offset + 4] * (marker === 0xC2 || marker === 0xC6 || marker === 0xCA || marker === 0xCE ? 3 : 1),
+        colorType: 2
+      };
+    }
+    offset += 2 + len;
+  }
+  return null;
+}
+
+function readWebpDimensions(buf) {
+  if (buf.length < 30 || buf.toString('ascii', 0, 4) !== 'RIFF' || buf.toString('ascii', 8, 12) !== 'WEBP') return null;
+  const chunk = buf.toString('ascii', 12, 16);
+  if (chunk === 'VP8X' && buf.length >= 30) {
+    return {
+      width: 1 + (buf[24] | (buf[25] << 8) | (buf[26] << 16)),
+      height: 1 + (buf[27] | (buf[28] << 8) | (buf[29] << 16)),
+      bitDepth: 8,
+      colorType: 2
+    };
+  }
+  if (chunk === 'VP8 ' && buf.length >= 30) {
+    return {
+      width: buf.readUInt16LE(26) & 0x3fff,
+      height: buf.readUInt16LE(28) & 0x3fff,
+      bitDepth: 8,
+      colorType: 2
+    };
+  }
+  return null;
+}
+
+function readIcoDimensions(buf) {
+  if (buf.length < 22 || buf.readUInt16LE(0) !== 0 || buf.readUInt16LE(2) !== 1) return null;
+  const width = buf[6] === 0 ? 256 : buf[6];
+  const height = buf[7] === 0 ? 256 : buf[7];
+  return { width, height, bitDepth: buf[8], colorType: buf[8] <= 8 ? 3 : 2 };
+}
+
+function readSvgDimensions(buf) {
+  const text = buf.toString('utf8');
+  const tagMatch = text.match(/<svg\b[^>]*>/i);
+  if (!tagMatch) return null;
+  const tag = tagMatch[0];
+  const widthMatch = tag.match(/\bwidth=["']([\d.]+)/i);
+  const heightMatch = tag.match(/\bheight=["']([\d.]+)/i);
+  const viewMatch = tag.match(/\bviewBox=["'][\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)/i);
+  const width = widthMatch ? Math.round(Number(widthMatch[1])) : (viewMatch ? Math.round(Number(viewMatch[1])) : 0);
+  const height = heightMatch ? Math.round(Number(heightMatch[1])) : (viewMatch ? Math.round(Number(viewMatch[2])) : 0);
+  if (!width || !height) return null;
+  return { width, height, bitDepth: 8, colorType: 2 };
+}
+
 function readImageFileMeta(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   const buf = fs.readFileSync(filePath);
-  let width = null;
-  let height = null;
-  let bitDepth = null;
-  let colorType = null;
+  const kind = detectImageFormat(buf, ext);
 
-  if (ext === '.png' && buf.length >= 26 && buf.toString('ascii', 1, 4) === 'PNG') {
-    width = buf.readUInt32BE(16);
-    height = buf.readUInt32BE(20);
-    bitDepth = buf[24];
-    colorType = buf[25];
-  } else if (ext === '.bmp' && buf.length >= 28 && buf.readUInt16LE(0) === 0x4D42) {
-    width = buf.readInt32LE(18);
-    height = Math.abs(buf.readInt32LE(22));
-    bitDepth = buf.readUInt16LE(28);
-    colorType = bitDepth <= 8 ? 3 : 2;
-  } else if (ext === '.gif' && buf.length >= 10 && buf.toString('ascii', 0, 3) === 'GIF') {
-    width = buf.readUInt16LE(6);
-    height = buf.readUInt16LE(8);
-    bitDepth = 8;
-    colorType = 3;
-  } else if ((ext === '.jpg' || ext === '.jpeg') && buf.length > 4) {
-    let offset = 2;
-    while (offset < buf.length - 8) {
-      if (buf[offset] !== 0xFF) break;
-      const marker = buf[offset + 1];
-      const len = buf.readUInt16BE(offset + 2);
-      if (marker === 0xC0 || marker === 0xC2) {
-        height = buf.readUInt16BE(offset + 5);
-        width = buf.readUInt16BE(offset + 7);
-        bitDepth = buf[offset + 4] * (marker === 0xC2 ? 3 : 1);
-        colorType = 2;
-        break;
-      }
-      offset += 2 + len;
-    }
+  let parsed = null;
+  switch (kind) {
+    case 'png': parsed = readPngDimensions(buf); break;
+    case 'bmp': parsed = readBmpDimensions(buf); break;
+    case 'gif': parsed = readGifDimensions(buf); break;
+    case 'jpeg': parsed = readJpegDimensions(buf); break;
+    case 'webp': parsed = readWebpDimensions(buf); break;
+    case 'ico': parsed = readIcoDimensions(buf); break;
+    case 'svg': parsed = readSvgDimensions(buf); break;
+    default: break;
   }
 
-  const format = IMAGE_FORMAT_LABELS[ext] || ext.replace(/^\./, '').toUpperCase() || 'Unknown';
+  const width = parsed?.width || 0;
+  const height = parsed?.height || 0;
+  const bitDepth = parsed?.bitDepth ?? null;
+  const colorType = parsed?.colorType ?? null;
+
+  const formatKey = kind === 'jpeg' ? '.jpg' : `.${kind}`;
+  const format = IMAGE_FORMAT_LABELS[formatKey] || kind.toUpperCase() || ext.replace(/^\./, '').toUpperCase() || 'Unknown';
   let typeLabel = 'True color';
   if (bitDepth === 1) typeLabel = 'Monochrome';
-  else if (colorType === 3 || bitDepth === 8) typeLabel = '256 color';
-  else if (colorType === 0) typeLabel = 'Grayscale';
+  else if (colorType === 3) typeLabel = '256 color';
+  else if (colorType === 0 || colorType === 4) typeLabel = 'Grayscale';
 
   return {
-    width: width || 0,
-    height: height || 0,
+    width,
+    height,
     bitDepth,
     colorType,
     format,
@@ -1027,6 +1116,73 @@ class ProjectService {
       screens: this.listScreens(id),
       explorer: this.buildExplorerTree(id)
     };
+  }
+
+  defaultGraphicsTransferFolder() {
+    return path.join(this.rootDir, '..', 'hmi', 'import_templates');
+  }
+
+  listGraphicExportTargets(projectId) {
+    const displays = this.listScreens(projectId).map((s) => ({
+      id: s.id,
+      label: s.title || s.id,
+      kind: 'display'
+    }));
+    const globalObjects = this.listGlobalObjects(projectId).map((g) => ({
+      id: g.id,
+      label: g.title || g.id,
+      kind: 'global-object'
+    }));
+    return [...globalObjects, ...displays];
+  }
+
+  exportGraphicsToFolder(projectId, folder, items) {
+    if (!this.projectExists(projectId)) throw new Error('Project not found');
+    if (!folder?.trim()) throw new Error('Export folder required');
+    const dest = path.resolve(folder.trim());
+    fs.mkdirSync(dest, { recursive: true });
+
+    const exported = [];
+    for (const item of items || []) {
+      let src;
+      let fileName;
+      if (item.kind === 'global-object') {
+        src = this.globalObjectFilePath(projectId, item.id);
+        fileName = `${item.id}.json`;
+      } else {
+        src = this.screenFilePath(projectId, item.id);
+        fileName = `${item.id}.json`;
+      }
+      if (!fs.existsSync(src)) continue;
+      fs.copyFileSync(src, path.join(dest, fileName));
+      exported.push({ id: item.id, kind: item.kind, fileName });
+    }
+    return { folder: dest, exported };
+  }
+
+  importGraphicsFromFolder(projectId, folder) {
+    if (!this.projectExists(projectId)) throw new Error('Project not found');
+    if (!folder?.trim()) throw new Error('Import folder required');
+    const srcDir = path.resolve(folder.trim());
+    if (!fs.existsSync(srcDir)) throw new Error('Import folder not found');
+
+    const gfxDir = this.gfxDir(projectId);
+    const goDir = path.join(this.projectPath(projectId), 'Global Objects');
+    fs.mkdirSync(goDir, { recursive: true });
+
+    const imported = [];
+    for (const f of fs.readdirSync(srcDir)) {
+      if (!f.endsWith('.json')) continue;
+      const full = path.join(srcDir, f);
+      if (!fs.statSync(full).isFile()) continue;
+      const data = JSON.parse(fs.readFileSync(full, 'utf8'));
+      const dest = (data.kind === 'global-object')
+        ? path.join(goDir, f)
+        : path.join(gfxDir, f);
+      fs.copyFileSync(full, dest);
+      imported.push({ fileName: f, kind: data.kind === 'global-object' ? 'global-object' : 'display' });
+    }
+    return { folder: srcDir, imported };
   }
 }
 

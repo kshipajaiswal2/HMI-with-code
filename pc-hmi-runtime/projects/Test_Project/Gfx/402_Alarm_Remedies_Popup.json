@@ -4,5 +4,9 @@
   "navGroup": "alarms",
   "layout": "popup",
   "securityLevel": 0,
-  "components": []
+  "components": [],
+  "displaySettings": {
+    "backgroundColor": "#EBEBEB",
+    "useProjectSize": true
+  }
 }

@@ -1,8 +1,0 @@
-{
-  "id": "401_Alarm_History",
-  "title": "Alarm History",
-  "navGroup": "alarms",
-  "layout": "standard",
-  "securityLevel": 0,
-  "components": []
-}

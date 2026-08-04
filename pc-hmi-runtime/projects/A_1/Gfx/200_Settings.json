@@ -1,8 +1,0 @@
-{
-  "id": "200_Settings",
-  "title": "Settings",
-  "navGroup": "settings",
-  "layout": "standard",
-  "securityLevel": 1,
-  "components": []
-}

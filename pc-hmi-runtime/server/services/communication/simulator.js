@@ -1,7 +1,8 @@
 class SimulatorDriver {
-  constructor(tagService, alarmService) {
+  constructor(tagService, alarmService, tagLogicService) {
     this.tagService = tagService;
     this.alarmService = alarmService;
+    this.tagLogicService = tagLogicService;
     this.connected = false;
     this.interval = null;
     this.tick = 0;
@@ -25,7 +26,6 @@ class SimulatorDriver {
   seedValues() {
     const seeds = {
       'System.AutoMode': true,
-      'System.Healthy': true,
       'System.Running': true,
       'Production.Count': 1247,
       'Production.Rate': 342.5,
@@ -44,10 +44,25 @@ class SimulatorDriver {
       'Safety.EStopOK': true,
       'Safety.DoorClosed': true,
       'Safety.LightCurtainOK': true,
-      'Prestart.PowerOK': true,
-      'Prestart.AirOK': true,
-      'Prestart.SafetyOK': true,
-      'Prestart.Ready': true,
+      'Safety.S_All_E_Stop_Healthy': true,
+      'Safety.RIO01_SDI_01': true,
+      'Safety.RIO01_SDI_02': true,
+      'Safety.RIO01_SDI_03': true,
+      'Safety.RIO01_SDI_04': true,
+      'Safety.RIO01_SDI_07': true,
+      'Safety.RIO01_SDI_08': true,
+      'Safety.RIO01_SDI_11': true,
+      'Safety.RIO01_SDI_12': true,
+      'Safety.RIO01_SDI_15': true,
+      'Safety.RIO01_SDI_16': true,
+      'Safety.RIO01_SDI_17': true,
+      'Safety.RIO01_SDI_18': true,
+      'Safety.RIO01_SDI_19': true,
+      'Safety.RIO01_SDI_20': true,
+      'Prestart.PowerOK': false,
+      'Prestart.AirOK': false,
+      'Prestart.SafetyOK': false,
+      'Prestart.Ready': false,
       'Comm.PLCConnected': true,
       'Comm.ScanRate': 10.2,
       'CycleTime.Last': 4.2,
@@ -101,6 +116,10 @@ class SimulatorDriver {
     if (this.tick % 60 === 0) {
       this.tagService.set('Alarm.MotorFault', Math.random() > 0.85);
       setTimeout(() => this.tagService.set('Alarm.MotorFault', false), 12000);
+    }
+
+    if (this.tagLogicService) {
+      this.tagLogicService.evaluate();
     }
 
     this.alarmService.evaluate();

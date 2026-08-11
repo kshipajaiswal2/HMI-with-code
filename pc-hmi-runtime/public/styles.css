@@ -90,6 +90,132 @@ html.embed-root body {
   padding: 0;
   overflow: hidden;
   background: #EBEBEB;
+  position: relative;
+}
+
+.hmi-app.template-mode {
+  grid-template-rows: 1fr;
+}
+
+.hmi-app.template-mode .hmi-header,
+.hmi-app.template-mode .hmi-nav,
+.hmi-app.template-mode .alarm-banner {
+  display: none !important;
+}
+
+.hmi-app.template-mode .hmi-content {
+  padding: 0;
+  overflow: hidden;
+}
+
+.ft-content-area {
+  box-sizing: border-box;
+}
+
+.ft-graphic {
+  position: absolute;
+  box-sizing: border-box;
+  z-index: 2;
+}
+.ft-text {
+  box-sizing: border-box;
+  padding: 2px 4px;
+  overflow: hidden;
+  line-height: 1.2;
+}
+.ft-image {
+  overflow: hidden;
+}
+.ft-image-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+}
+.ft-image-placeholder {
+  background-color: #c0c0c0;
+  background-image:
+    linear-gradient(to top right, transparent calc(50% - 0.5px), #000 calc(50% - 0.5px), #000 calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    linear-gradient(to bottom right, transparent calc(50% - 0.5px), #000 calc(50% - 0.5px), #000 calc(50% + 0.5px), transparent calc(50% + 0.5px));
+}
+.ft-rectangle {
+  box-sizing: border-box;
+  pointer-events: none;
+}
+@keyframes ft-blink {
+  50% { opacity: 0.35; }
+}
+.ft-blink {
+  animation: ft-blink 1s step-start infinite;
+}
+.ft-goto-btn {
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  color: #000;
+  text-align: center;
+}
+body.studio-edit-mode .ft-goto-btn {
+  cursor: default;
+}
+body.studio-edit-mode .ft-graphic.studio-selected {
+  outline: 2px dashed #0078d7;
+  outline-offset: 1px;
+}
+.ft-goto-btn-icon {
+  flex: 0 1 auto;
+  width: 62%;
+  max-height: 58%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.ft-goto-btn-caption {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  pointer-events: none;
+}
+.ft-time-date,
+.ft-string-display,
+.ft-alarm-ticker {
+  box-sizing: border-box;
+  background: #ffffff;
+}
+.ft-alarm-ticker-text {
+  overflow: hidden;
+  white-space: nowrap;
+  flex: 1 1 auto;
+}
+.ft-alarm-ticker-time {
+  white-space: nowrap;
+  flex: 0 0 auto;
+  margin-right: 4px;
+}
+.hmi-app.embed-mode .ft-text:empty {
+  background: rgba(255, 255, 255, 0.85);
+  outline: 1px solid #000;
+}
+.ft-momentary-btn,
+.ft-maintained-btn {
+  box-sizing: border-box;
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.ft-momentary-btn:focus,
+.ft-maintained-btn:focus {
+  outline: none;
+}
+.ft-btn-caption {
+  pointer-events: none;
+  padding: 0 2px;
 }
 
 body.embed-body {
@@ -261,3 +387,463 @@ body.embed-body {
 }
 .access-denied h2, .placeholder-screen h2 { color: var(--text); font-size: 18px; }
 .hidden { display: none !important; }
+
+/* FactoryTalk-style display shell (Global Object Template) */
+.ft-display-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: #EBEBEB;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+}
+.ft-shell-header {
+  display: flex;
+  align-items: center;
+  height: 80px;
+  padding: 0 10px;
+  background: #fff;
+  border-bottom: 1px solid #c6c6c6;
+  flex-shrink: 0;
+}
+.ft-shell-logo {
+  height: 42px;
+  width: auto;
+  max-width: 226px;
+  object-fit: contain;
+}
+.ft-shell-title {
+  flex: 1;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #000;
+}
+.ft-shell-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ft-shell-clock {
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 160px;
+  text-align: right;
+}
+.ft-multistate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #666;
+  border-radius: 2px;
+  box-sizing: border-box;
+  background: #888;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.ft-multistate-circle {
+  border: none;
+}
+.ft-multistate-led {
+  border-radius: 50%;
+}
+
+/* FT status LED spheres (Ellipse + MultistateIndicator circles) */
+.ft-status-led {
+  border-radius: 50%;
+  border: none;
+  box-sizing: border-box;
+}
+.ft-graphic.ft-status-led {
+  position: absolute;
+}
+.ft-status-led::before {
+  content: '';
+  position: absolute;
+  top: 8%;
+  left: 14%;
+  width: 44%;
+  height: 44%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0) 68%);
+  pointer-events: none;
+}
+.ft-status-led--green {
+  background: radial-gradient(circle at 50% 60%, #10eb10 0%, #0cb80c 40%, #067806 100%);
+  box-shadow:
+    0 0 3px #10eb10,
+    0 0 9px rgba(16, 235, 16, 0.9),
+    0 0 20px rgba(16, 235, 16, 0.55);
+}
+.ft-status-led--red {
+  background: radial-gradient(circle at 50% 60%, #ff8080 0%, #f83d3d 38%, #901010 100%);
+  box-shadow:
+    0 0 3px #f83d3d,
+    0 0 9px rgba(248, 61, 61, 0.9),
+    0 0 20px rgba(248, 61, 61, 0.55);
+}
+.ft-status-led--error {
+  background: radial-gradient(circle at 50% 60%, #6060ff 0%, navy 100%);
+  box-shadow: 0 0 6px rgba(0, 0, 128, 0.6);
+}
+
+/* FT-style prestart / checklist table (102 Prestart reference) */
+.ft-checklist-table {
+  position: absolute;
+  display: block;
+  overflow: visible;
+  border: none;
+  font-family: Arial, sans-serif;
+  color: #000;
+  background: transparent;
+}
+.ft-checklist-table__body {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+.ft-checklist-table__row {
+  display: grid;
+  grid-template-columns: 166px 46px 50px;
+  flex: 0 0 34px;
+  height: 34px;
+  background: linear-gradient(to bottom, #e8e8e8 0%, #d4d4d4 45%, #c6c6c6 100%);
+  border: 2px solid #c6c6c6;
+  box-sizing: border-box;
+  margin-top: -2px;
+  position: relative;
+  z-index: 1;
+}
+.ft-checklist-table__row:first-child {
+  margin-top: 0;
+  flex: 0 0 35px;
+  height: 35px;
+}
+.ft-checklist-table__row--header {
+  font-size: 13px;
+  font-weight: 700;
+}
+.ft-checklist-table__cell {
+  display: flex;
+  align-items: center;
+  padding: 0 0 0 7px;
+  font-size: 12px;
+  font-weight: 400;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ft-checklist-table__cell--center {
+  justify-content: center;
+  padding: 0;
+}
+.ft-checklist-table__divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #000;
+  z-index: 2;
+  pointer-events: none;
+}
+.ft-checklist-table__divider--req { left: 166px; }
+.ft-checklist-table__divider--act { left: 212px; }
+.ft-checklist-table__led {
+  position: relative;
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ft-checklist-table__led::before {
+  content: '';
+  position: absolute;
+  top: 8%;
+  left: 14%;
+  width: 44%;
+  height: 44%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0) 68%);
+  z-index: 1;
+  pointer-events: none;
+}
+.ft-checklist-table__led--green {
+  background: radial-gradient(circle at 50% 60%, #10eb10 0%, #0cb80c 40%, #067806 100%);
+  box-shadow:
+    0 0 3px #10eb10,
+    0 0 9px rgba(16, 235, 16, 0.9),
+    0 0 20px rgba(16, 235, 16, 0.55);
+}
+.ft-checklist-table__led--red {
+  background: radial-gradient(circle at 50% 60%, #ff8080 0%, #f83d3d 38%, #901010 100%);
+  box-shadow:
+    0 0 3px #f83d3d,
+    0 0 9px rgba(248, 61, 61, 0.9),
+    0 0 20px rgba(248, 61, 61, 0.55);
+}
+
+/* FT Safety E-Stop ladder diagram (103_Safety) */
+.ft-safety-ladder {
+  box-sizing: border-box;
+  overflow: visible;
+  font-family: Arial, sans-serif;
+  color: #000;
+}
+.ft-safety-ladder__body {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding-left: 18px;
+}
+.ft-safety-ladder__rail {
+  position: absolute;
+  left: 0;
+  top: 48px;
+  bottom: 48px;
+  width: 2px;
+  background: #c6c6c6;
+}
+.ft-safety-ladder__rungs {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  gap: 0;
+}
+.ft-safety-ladder__rung {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) 76px;
+  align-items: end;
+  min-height: 72px;
+  padding-top: 30px;
+}
+.ft-safety-ladder__rung-line {
+  position: absolute;
+  left: -18px;
+  right: 0;
+  bottom: 16.5px;
+  height: 2px;
+  background: #c6c6c6;
+  z-index: 0;
+  pointer-events: none;
+}
+.ft-safety-ladder__rung--bus-end::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 16.5px;
+  width: 2px;
+  height: 22px;
+  background: #c6c6c6;
+  z-index: 0;
+}
+.ft-safety-ladder__serpentine-bus {
+  position: relative;
+  height: 24px;
+  flex-shrink: 0;
+}
+.ft-safety-ladder__serpentine-drop {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 2px;
+  height: 22px;
+  background: #c6c6c6;
+}
+.ft-safety-ladder__serpentine-line {
+  position: absolute;
+  left: -18px;
+  right: 0;
+  top: 21px;
+  height: 2px;
+  background: #c6c6c6;
+}
+.ft-safety-ladder__serpentine-rise {
+  position: absolute;
+  left: -18px;
+  top: 22px;
+  width: 2px;
+  bottom: 0;
+  background: #c6c6c6;
+}
+.ft-safety-ladder__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+.ft-safety-ladder__cell--wire {
+  min-height: 1px;
+  pointer-events: none;
+}
+.ft-safety-ladder__cell--coil {
+  grid-column: 7;
+  align-self: end;
+}
+.ft-safety-ladder__label {
+  font-size: 12px;
+  line-height: 1.15;
+  text-align: center;
+  white-space: pre-line;
+  min-height: 30px;
+  margin-bottom: 4px;
+}
+.ft-safety-ladder__symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 33px;
+}
+.ft-safety-ladder__bar {
+  width: 2px;
+  height: 33px;
+  background: #c6c6c6;
+  flex-shrink: 0;
+}
+.ft-safety-ladder__indicator {
+  width: 30px;
+  height: 33px;
+  margin: 0 1px;
+  border: 1px solid #888;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.45), inset -1px -1px 0 rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+.ft-safety-ladder__indicator--green {
+  background: #10eb10;
+  border-color: #10eb10;
+}
+.ft-safety-ladder__indicator--red {
+  background: #f83d3d;
+  border-color: #f83d3d;
+}
+.ft-safety-ladder__coil {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 33px;
+  gap: 0;
+}
+.ft-safety-ladder__coil-paren {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 33px;
+  color: #000;
+  font-family: 'Arial Unicode MS', Arial, sans-serif;
+  flex: 0 0 auto;
+}
+
+.ft-multistate-caption {
+  font-family: Arial, sans-serif;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1;
+  padding: 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ft-shell-badge {
+  min-width: 71px;
+  height: 33px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  border: 2px inset #ccc;
+  border-radius: 2px;
+}
+.ft-shell-badge.manual { background: #0066cc; }
+.ft-shell-badge.auto { background: #00c000; }
+.ft-shell-badge.fault { background: #cc0000; }
+.ft-shell-badge.healthy { background: #00c000; }
+.ft-shell-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+.ft-shell-body .sub-nav {
+  flex-direction: column;
+  width: 140px;
+  padding: 8px 6px;
+  margin: 0;
+  background: #f4f4f4;
+  border-right: 1px solid #ccc;
+  flex-shrink: 0;
+}
+.ft-shell-body .sub-nav-btn {
+  width: 100%;
+  text-align: left;
+}
+.ft-shell-content {
+  flex: 1;
+  overflow: auto;
+  background: #EBEBEB;
+}
+.ft-shell-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 80px;
+  padding: 4px 8px;
+  background: #fff;
+  border-top: 1px solid #c6c6c6;
+  flex-shrink: 0;
+}
+.ft-shell-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  width: 70px;
+  height: 70px;
+  padding: 4px 2px 2px;
+  background: #dcdcdc;
+  border: 3px ridge #e0e0e0;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+.ft-shell-nav-btn img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  margin-bottom: 2px;
+}
+.ft-shell-nav-btn:hover { background: #c8daf0; }
+.ft-shell-user {
+  margin-left: auto;
+  min-width: 120px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #888;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.ft-shell-ticker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 24px;
+  padding: 0 8px;
+  background: #fff;
+  border-top: 1px solid #ccc;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.ft-shell-ticker-time { color: #cc0000; white-space: nowrap; }
+.ft-shell-ticker-text { color: #cc0000; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex: 1; }
+.ft-shell-ticker.alarm .ft-shell-ticker-text { color: #900; }

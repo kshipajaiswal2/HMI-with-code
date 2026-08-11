@@ -1,23 +1,167 @@
 {
   "id": "103_Safety",
   "title": "Safety",
+  "subtitle": "Safety",
   "navGroup": "overview",
   "securityLevel": 0,
   "components": [
-    { "type": "SubNav", "navKey": "overview" },
-    { "type": "SectionHeader", "label": "Safety Status" },
     {
-      "type": "Grid",
-      "style": { "className": "checklist-grid" },
-      "children": [
-        { "type": "StateIndicator", "tag": "Safety.EStopOK", "label": "E-Stop Circuit",
-          "states": { "true": { "text": "OK", "color": "#00c000" }, "false": { "text": "TRIPPED", "color": "#cc0000" } } },
-        { "type": "StateIndicator", "tag": "Safety.DoorClosed", "label": "Safety Doors",
-          "states": { "true": { "text": "Closed", "color": "#00c000" }, "false": { "text": "Open", "color": "#cc0000" } } },
-        { "type": "StateIndicator", "tag": "Safety.LightCurtainOK", "label": "Light Curtain",
-          "states": { "true": { "text": "Clear", "color": "#00c000" }, "false": { "text": "Blocked", "color": "#cc0000" } } }
-      ]
-    },
-    { "type": "NavButton", "label": "View Active Alarms", "target": "400_Active_Alarms" }
-  ]
+      "type": "SafetyLadderDiagram",
+      "name": "SafetyEStopLadder",
+      "left": 92,
+      "top": 88,
+      "width": 700,
+      "height": 300,
+      "columns": 6,
+      "rows": [
+        [
+          {
+            "label": "All E-Stop\nHealthy (Safety)",
+            "tag": "Safety.S_All_E_Stop_Healthy",
+            "defaultValue": 0
+          },
+          {
+            "label": "HMI\nE-Stop 01",
+            "tag": "Safety.RIO01_SDI_01",
+            "defaultValue": 0
+          },
+          {
+            "label": "HMI\nE-Stop 02",
+            "tag": "Safety.RIO01_SDI_02",
+            "defaultValue": 1
+          },
+          {
+            "label": "Door Switch 01\nE-Stop 01",
+            "tag": "Safety.RIO01_SDI_03",
+            "defaultValue": 1
+          },
+          {
+            "label": "Door Switch 01\nE-Stop 02",
+            "tag": "Safety.RIO01_SDI_04",
+            "defaultValue": 1
+          },
+          {
+            "label": "Door Switch 02\nE-Stop 01",
+            "tag": "Safety.RIO01_SDI_07",
+            "defaultValue": 1
+          }
+        ],
+        [
+          {
+            "label": "Door Switch 02\nE-Stop 02",
+            "tag": "Safety.RIO01_SDI_08",
+            "defaultValue": 0
+          },
+          {
+            "label": "Door Switch 03\nE-Stop 01",
+            "tag": "Safety.RIO01_SDI_11",
+            "defaultValue": 0
+          },
+          {
+            "label": "Door Switch 03\nE-Stop 02",
+            "tag": "Safety.RIO01_SDI_12",
+            "defaultValue": 1
+          },
+          {
+            "label": "BIC01\nE-Stop 01",
+            "tag": "Safety.RIO01_SDI_15",
+            "defaultValue": 1
+          },
+          {
+            "label": "BIC01\nE-Stop 02",
+            "tag": "Safety.RIO01_SDI_16",
+            "defaultValue": 1
+          },
+          {
+            "label": "CWC01\nE-Stop 01",
+            "tag": "Safety.RIO01_SDI_17",
+            "defaultValue": 1
+          }
+        ],
+        [
+          {
+            "label": "CWC01\nE-Stop 02",
+            "tag": "Safety.RIO01_SDI_18",
+            "defaultValue": 0
+          },
+          {
+            "label": "LAC01\nE-Stop 01",
+            "tag": "Safety.RIO01_SDI_19",
+            "defaultValue": 0
+          },
+          {
+            "label": "LAC01\nE-Stop 02",
+            "tag": "Safety.RIO01_SDI_20",
+            "defaultValue": 1
+          }
+        ]
+      ],
+      "coil": {
+        "label": "All E-Stop\nHealthy",
+        "tag": "System.All_E_Stop_Healthy",
+        "defaultValue": 0
+      }
+    }
+  ],
+  "displaySettings": {
+    "backgroundColor": "#EBEBEB",
+    "useProjectSize": true
+  },
+  "template": {
+    "enabled": true,
+    "globalObjectId": "Template",
+    "replace": {
+      "NavSettings": {
+        "caption": "Settings",
+        "imageScaled": false,
+        "italic": false,
+        "underline": false,
+        "foreColor": "#000000",
+        "useForeColor": true,
+        "captionBackStyle": "transparent",
+        "useCaptionBackColor": false,
+        "captionBackColor": "#002952",
+        "captionBlink": false,
+        "audio": true,
+        "shape": "rectangle",
+        "patternStyle": "none",
+        "useVariableDisplay": false,
+        "parameterType": "file",
+        "parameterFile": "",
+        "parameterList": "",
+        "displayPosition": false,
+        "displayTop": 0,
+        "displayLeft": 0,
+        "useVariableDisplayPosition": false,
+        "horizontalMargin": 0,
+        "verticalMargin": 0
+      },
+      "NavOverview": {
+        "caption": "Overview",
+        "image": "select_home.jpg",
+        "imageScaled": false,
+        "italic": false,
+        "underline": false,
+        "foreColor": "#000000",
+        "useForeColor": true,
+        "captionBackStyle": "transparent",
+        "useCaptionBackColor": false,
+        "captionBackColor": "#002952",
+        "captionBlink": false,
+        "audio": true,
+        "shape": "rectangle",
+        "patternStyle": "none",
+        "useVariableDisplay": false,
+        "parameterType": "file",
+        "parameterFile": "",
+        "parameterList": "",
+        "displayPosition": false,
+        "displayTop": 0,
+        "displayLeft": 0,
+        "useVariableDisplayPosition": false,
+        "horizontalMargin": 0,
+        "verticalMargin": 0
+      }
+    }
+  }
 }

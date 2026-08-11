@@ -1,45 +1,100 @@
-# Plant HMI — Windows PC Platform
+# Plant HMI — Studio + Runtime
 
-Our own HMI software for Windows, equivalent to Rockwell FactoryTalk View.
+Windows PC HMI platform — engineering studio and operator runtime, equivalent to Rockwell FactoryTalk View Studio + View Runtime.
 
-## Two apps in one platform
+Projects are stored as **JSON on disk**. No compile step. The runtime reads those files directly and renders live screens on a panel PC.
 
-| App | Purpose | Launch |
-|-----|---------|--------|
-| **Studio** | Engineering — new projects, explorer, display editing | `npm run desktop` |
-| **Runtime** | Operator — live HMI on panel PC | `npm run desktop:runtime` |
+---
 
-## Quick start (Windows)
+## Quick start
 
 ```powershell
-cd pc-hmi-runtime
-npm install
+cd "D:\Kshipa\Trial hmi\pc-hmi-runtime"
+npm install    # first time only
 npm start
 ```
 
-Open **http://127.0.0.1:8080** — Studio IDE with project explorer.
+Open **http://127.0.0.1:8080**
 
-### Windows desktop app
+> Run all npm commands from **`pc-hmi-runtime/`**, not the repo root.
+
+### Desktop apps (Electron)
 
 ```powershell
-npm install
-npm run desktop          # Studio (like View Studio)
-npm run desktop:runtime  # Operator runtime (like View Runtime)
+npm run desktop          # Studio window
+npm run desktop:runtime  # Operator runtime
 npm run desktop:kiosk    # Full-screen operator mode
 ```
 
+First `npm install` may take several minutes while Electron downloads.
+
+---
+
+## Two applications
+
+| App | Role | URL / launch |
+|-----|------|--------------|
+| **Studio** | Engineering — projects, explorer, display preview, settings | http://127.0.0.1:8080 |
+| **Runtime** | Operator — live tags, alarms, navigation, login | http://127.0.0.1:8080/runtime.html |
+
+Click **▶ Run** in Studio to open runtime for the active project.
+
+Default port: **8080** (override with `PORT` env variable).
+
+Default users: `operator/operator` · `engineer/engineer` · `admin/admin`
+
+---
+
 ## New project workflow
 
-1. Open Studio → **New Project** → enter name
-2. All **18 standard displays** are created automatically (Overview, Settings, Manual, Alarms, Recipe, etc.)
-3. Click displays in explorer to preview
-4. **＋ Display** to add custom screens
-5. **✕ Display** to remove screens
-6. **▶ Run** to launch operator runtime
+1. Launch Studio → **New/Open Application** dialog appears
+2. **New** tab → enter application name → **Create**
+3. **18 standard displays** are created automatically (Overview, Settings, Manual, Alarms, Recipe, etc.)
+4. Explorer tree: **Graphics → Displays**, **Global Objects → Template**, **Images**
+5. Click a display to preview in the workspace
+6. Right-click → **Import and Export...** for graphics transfer (JSON)
+7. **▶ Run** to test operator runtime
 
-## Standard display library
+---
 
-Every new project includes:
+## Project folder structure
+
+Each application lives under `projects/<id>/`:
+
+```
+projects/MyPlant/
+  project.json              ← tags, alarms, users, runtime & comm settings
+  navigation.json           ← bottom nav bar
+  Gfx/                      ← displays (one JSON file per screen)
+    100_Overview.json
+    200_Settings.json
+    ...
+  Global Objects/
+    Template.json           ← global object defaults
+  Images/                   ← bitmap assets
+  Tag/
+    MyPlant-Tags.CSV        ← auto-synced tag export
+  M_Alarms/
+    alarms.json             ← auto-synced alarm definitions
+  ProjectSettings/
+    project.json            ← settings snapshot
+```
+
+| FactoryTalk | Plant HMI |
+|-------------|-----------|
+| `Gfx/*.gfx` | `Gfx/*.json` |
+| `Tag/*-Tags.CSV` | `Tag/{projectId}-Tags.CSV` |
+| `M_Alarms/` | `M_Alarms/alarms.json` |
+| `Images/` | `Images/` |
+| `Global Objects/` | `Global Objects/Template.json` |
+
+Legacy `screens/` folders are migrated to `Gfx/` automatically on open.
+
+The shared screen library is in `screens/` at this folder root and is copied into every new project.
+
+---
+
+## Standard displays (every new project)
 
 | Folder | Screens |
 |--------|---------|
@@ -53,66 +108,107 @@ Every new project includes:
 
 Defined in `config/standard-screens.json`.
 
-## Project structure
+---
 
-Each application gets its own folder under `projects/`, laid out like **FactoryTalk View** on disk:
+## How JSON reaches a real HMI
 
 ```
-projects/
-  MyProject/
-    project.json              ← master config (tags, alarms, users, runtime)
-    navigation.json           ← runtime nav bar
-    Gfx/                      ← all displays (like FactoryTalk .gfx files)
-      100_Overview.json
-      200_Settings.json
-      ...
-    Tag/
-      MyProject-Tags.CSV      ← exported tag list (auto-synced)
-    M_Alarms/
-      alarms.json             ← alarm definitions (auto-synced)
-    ProjectSettings/
-      project.json            ← settings snapshot (auto-synced)
-    Images/                   ← bitmap assets (planned)
-    Macros/                   ← macro scripts (planned)
-    RecipePlus/               ← recipe data (planned)
-    Global Objects/           ← shared faceplates (planned)
-    Accounts/ ActivityLog/ AuditTrail/ ...   ← other FT folders (ready)
+Studio saves JSON  →  projects/MyPlant/  →  Runtime on panel PC  →  PLC (tags)
 ```
 
-| FactoryTalk folder | Plant HMI Studio |
-|--------------------|------------------|
-| `Gfx/*.gfx` | `Gfx/*.json` — one JSON file per display/screen |
-| `Tag/*-Tags.CSV` | `Tag/{projectId}-Tags.CSV` — auto-exported from `project.json` |
-| `M_Alarms/` | `M_Alarms/alarms.json` — synced from `project.json` |
-| `ProjectSettings/` | `ProjectSettings/project.json` — copy of project settings |
-| `Images/` | Reserved for imported images |
-| Other folders | Created empty on new project; wired as features are added |
+1. **JSON = blueprint** — screens, tag names, alarm definitions, images
+2. **Panel PC runs Plant HMI Runtime** — reads JSON and draws the operator UI
+3. **Communication driver** reads/writes live values to the PLC (simulator today; OPC UA planned)
+4. **Deploy** — copy `projects/MyPlant/` to the panel and run `npm start` or `npm run desktop:runtime`
 
-Legacy projects with a `screens/` folder are migrated automatically to `Gfx/` on first open.
+JSON does **not** go to the PLC. Only tag read/write traffic crosses the network.
 
-The shared screen library lives in `screens/` at repo root and is copied into each new project's `Gfx/` folder.
+---
 
-## Features (Rockwell parity)
+## Features
 
 | Feature | Status |
 |---------|--------|
-| Project Studio + explorer | Done |
-| 18 standard displays / new project | Done |
+| Project Studio + explorer tree | Done |
+| New/Open application dialog | Done |
+| 18 standard displays per project | Done |
 | Add / delete displays | Done |
-| Runtime navigation | Done |
+| Global Objects → Template | Done |
+| Images folder + upload + properties | Done |
+| Graphics Import/Export wizard | Done |
+| Display settings (size, background `#EBEBEB`) | Done |
+| Runtime navigation + live tags | Done |
 | Alarms (active, ack, history) | Done |
 | User login / security | Done |
-| IO diagnostics screens | Done |
 | Windows desktop (Electron) | Done |
+| PLC simulator (offline dev) | Done |
 | OPC UA live PLC | Planned |
+| Automated FTP/USB transfer | Planned |
+| Packaged `.exe` installer | Planned |
 | Faceplate library | Planned |
 | Trending + historian | Planned |
 | Recipe PLC download | Planned |
 
-Full architecture: `docs/pc_hmi_platform.md`
+Architecture details: [../docs/pc_hmi_platform.md](../docs/pc_hmi_platform.md)
 
-## Port
+---
 
-Default **8080** (Chrome blocks 5060). Override with `PORT` env variable.
+## Key Studio menus
 
-Login: operator/operator · engineer/engineer · admin/admin
+| Menu | Action |
+|------|--------|
+| File → New / Open Application | Create or open project |
+| File → Save | Save project settings |
+| View → Explorer / Status Bar | Toggle panels |
+| Application → Create Runtime Application | Launch operator runtime |
+| Tools → Transfer Utility | Deploy project to panel PC (manual copy today) |
+| Explorer right-click → Import and Export | Graphics JSON export/import |
+
+Hard refresh after updates: **Ctrl+F5**
+
+---
+
+## API overview (for developers)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/projects` | List projects |
+| `POST /api/projects` | Create project |
+| `POST /api/projects/:id/open` | Open + migrate project |
+| `GET /api/projects/:id/explorer` | Explorer tree |
+| `POST /api/projects/:id/graphics/export` | Export displays to folder |
+| `POST /api/projects/:id/graphics/import` | Import displays from folder |
+| `POST /api/projects/:id/images` | Upload image (base64 JSON) |
+| `GET /api/runtime/screens/:id` | Screen JSON for runtime |
+| `GET /api/runtime/tags` | Live tag values |
+| `POST /api/runtime/tags/write` | Write tag to PLC/simulator |
+
+Static project files are served at `/projects/<id>/`.
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `package.json` not found | `cd pc-hmi-runtime` before npm commands |
+| `npm install` stuck on spinner | Wait — Electron download is slow on first run |
+| Port 8080 already in use | Stop the old server process and restart |
+| Blank Studio / old UI | Hard refresh **Ctrl+F5** |
+| Image size shows 0×0 | Restart server after updates; images may be PNG with `.bmp` extension (now detected by content) |
+| Changes not visible | Restart `npm start` after server-side code changes |
+
+---
+
+## Folder map
+
+```
+pc-hmi-runtime/
+├── public/           studio.html, studio.js, runtime.html, app.js
+├── server/           Express API, tag/alarm/user services
+├── projects/         application data (JSON + images)
+├── screens/          shared display library (seed for new projects)
+├── config/           standard-screens.json, navigation template
+├── electron/         desktop app wrapper
+└── scripts/          dev utilities
+```

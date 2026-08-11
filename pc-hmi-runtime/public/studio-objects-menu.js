@@ -5,8 +5,8 @@ window.OBJECTS_MENU = [
   { sep: true },
   {
     id: 'drawing', label: 'Drawing', children: [
-      { id: 'draw-text', label: 'Text', component: { type: 'Text', label: 'Text' } },
-      { id: 'draw-image', label: 'Image', planned: true },
+      { id: 'draw-text', label: 'Text', action: 'text-properties' },
+      { id: 'draw-image', label: 'Image', action: 'image-properties' },
       { id: 'draw-panel', label: 'Panel', component: { type: 'Panel', style: { className: 'panel-box' }, children: [] } },
       { sep: true },
       { id: 'draw-arc', label: 'Arc', planned: true },
@@ -22,8 +22,8 @@ window.OBJECTS_MENU = [
   },
   {
     id: 'push-button', label: 'Push Button', children: [
-      { id: 'btn-momentary', label: 'Momentary', component: { type: 'MomentaryButton', tag: 'Manual.ConveyorRun', label: 'Momentary', value: true, releaseValue: false } },
-      { id: 'btn-maintained', label: 'Maintained', component: { type: 'ToggleButton', tag: 'Manual.PumpRun', label: 'Maintained' } },
+      { id: 'btn-momentary', label: 'Momentary', action: 'momentary-button-properties' },
+      { id: 'btn-maintained', label: 'Maintained', action: 'maintained-button-properties' },
       { id: 'btn-latched', label: 'Latched', planned: true },
       { id: 'btn-multistate', label: 'Multistate', planned: true },
       { id: 'btn-interlocked', label: 'Interlocked', planned: true },
@@ -36,13 +36,13 @@ window.OBJECTS_MENU = [
       { id: 'num-input-enable', label: 'Numeric Input Enable', planned: true },
       { id: 'num-input-cursor', label: 'Numeric Input Cursor Point', planned: true },
       { sep: true },
-      { id: 'str-display', label: 'String Display', component: { type: 'Text', label: 'NNN' } },
+      { id: 'str-display', label: 'String Display', action: 'text-properties', textDefaults: { caption: 'NNN' } },
       { id: 'str-input-enable', label: 'String Input Enable', planned: true }
     ]
   },
   {
     id: 'display-nav', label: 'Display Navigation', children: [
-      { id: 'nav-goto', label: 'Goto', component: { type: 'NavButton', label: 'Goto', target: '100_Overview' } },
+      { id: 'nav-goto', label: 'Goto Display Button', action: 'goto-button-properties' },
       { id: 'nav-return', label: 'Return To', planned: true },
       { id: 'nav-close', label: 'Close', planned: true },
       { id: 'nav-list', label: 'Display List Selector', planned: true }
@@ -50,7 +50,11 @@ window.OBJECTS_MENU = [
   },
   {
     id: 'indicator', label: 'Indicator', children: [
-      { id: 'ind-multistate', label: 'Multistate', component: { type: 'StateIndicator', tag: 'System.Healthy', label: 'Status', states: { true: { text: 'OK', color: '#00c000' }, false: { text: 'Fault', color: '#cc0000' } } } },
+      { id: 'ind-multistate', label: 'Multistate', component: { type: 'MultistateIndicator', tag: 'System.Healthy', width: 71, height: 33, states: [
+        { id: 'Error', caption: 'Error', backColor: '#001C38', borderColor: '#001C38', captionColor: '#fff' },
+        { id: '0', value: 0, caption: 'Fault', backColor: 'red', borderColor: '#ff8000', captionColor: '#fff' },
+        { id: '1', value: 1, caption: 'Healthy', backColor: '#00c000', borderColor: '#40ff10', captionColor: '#fff' }
+      ] } },
       { id: 'ind-symbol', label: 'Symbol', planned: true },
       { id: 'ind-list', label: 'List', planned: true }
     ]
@@ -187,7 +191,7 @@ function renderMenuItems(items) {
       </div>`;
     }
     const classes = ['menu-entry'];
-    if (item.tool || item.component || item.planned) classes.push('checkable');
+    if (item.tool || item.component || item.planned || item.action) classes.push('checkable');
     if (item.disabled) classes.push('disabled');
     if (item.id === 'select') classes.push('checked');
     return `<button type="button" class="${classes.join(' ')}" data-object-id="${item.id}">

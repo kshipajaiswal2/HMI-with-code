@@ -4,7 +4,17 @@
   "navGroup": "users",
   "securityLevel": 0,
   "components": [
-    { "type": "SectionHeader", "label": "User Login" },
-    { "type": "LoginPanel", "id": "login-panel" }
-  ]
+    {
+      "type": "SectionHeader",
+      "label": "User Login"
+    },
+    {
+      "type": "LoginPanel",
+      "id": "login-panel"
+    }
+  ],
+  "displaySettings": {
+    "backgroundColor": "#EBEBEB",
+    "useProjectSize": true
+  }
 }

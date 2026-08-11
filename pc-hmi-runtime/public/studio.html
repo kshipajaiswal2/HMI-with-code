@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Plant HMI Studio</title>
-    <link rel="stylesheet" href="studio.css?v=0.2.2" />
+    <link rel="stylesheet" href="studio.css?v=0.3.1" />
   </head>
   <body>
     <div class="studio-app">
@@ -114,7 +114,7 @@
             <button type="button" class="menu-entry checkable" data-view-action="grayscale" data-view-toggle="showGrayscale"><span class="check"></span><span>Show Displays in Grayscale</span></button>
             <div class="menu-sep"></div>
             <button type="button" class="menu-entry checkable" data-view-action="show-grid" data-view-toggle="showGrid"><span class="check"></span><span>Show Grid</span></button>
-            <button type="button" class="menu-entry checkable" data-view-action="snap-on" data-view-toggle="snapOn"><span class="check"></span><span>Snap On</span></button>
+            <button type="button" class="menu-entry checkable" data-view-action="snap-on" data-view-toggle="snapOn"><span class="check"></span><span>Snap To Grid</span></button>
             <button type="button" class="menu-entry" data-view-action="grid-settings">Grid Settings...</button>
             <div class="menu-sep"></div>
             <button type="button" class="menu-entry" data-view-action="zoom-in">Zoom In</button>
@@ -269,14 +269,15 @@
         </aside>
 
         <main class="workspace" id="workspace">
-          <div class="workspace-grid hidden" id="workspaceGrid"></div>
-          <div class="workspace-welcome" id="workspaceWelcome">
-            <h2>Plant HMI Studio</h2>
-            <p>Select a display from the explorer, or create a new project to get started.</p>
-            <button type="button" class="welcome-btn" data-action="new-project">New Project</button>
-          </div>
           <div class="preview-stage hidden" id="previewStage">
-            <iframe id="previewFrame" class="preview-frame" title="Display preview"></iframe>
+            <div class="preview-canvas-wrap" id="previewCanvasWrap">
+              <iframe id="previewFrame" class="preview-frame" title="Display preview"></iframe>
+              <div class="display-grid hidden" id="displayGrid" aria-hidden="true"></div>
+              <div class="object-placement-overlay hidden" id="objectPlacementOverlay" aria-hidden="true">
+                <div class="placement-rubberband hidden" id="placementRubberband"></div>
+              </div>
+              <div class="canvas-edit-overlay hidden" id="canvasEditOverlay" aria-hidden="true"></div>
+            </div>
           </div>
           <div id="panelView" class="panel-view hidden"></div>
         </main>
@@ -390,7 +391,7 @@
               <label>Y<input type="number" id="displaySettingsY" value="0" /></label>
             </div>
           </fieldset>
-          <label class="ds-color-row">Background color<input type="color" id="displaySettingsBg" value="#EBEBEB" /></label>
+          <label class="ds-color-row">Background color<input type="hidden" class="ft-color-input" id="displaySettingsBg" value="#EBEBEB" /></label>
           <label>Display Number<input type="number" id="displaySettingsNumber" min="1" max="9999" value="1" /></label>
           <label>Security code<input type="number" id="displaySettingsSecurity" min="0" max="10" value="0" /></label>
           <label class="radio-row"><input type="checkbox" id="displaySettingsTitleBar" /> Title Bar</label>
@@ -422,7 +423,7 @@
     <dialog id="wallpaperColorDialog" class="dialog">
       <form id="wallpaperColorForm">
         <h3>Wallpaper — Solid Color</h3>
-        <label>Color<input type="color" id="wallpaperColorPicker" value="#1a1a1a" /></label>
+        <label>Color<input type="hidden" class="ft-color-input" id="wallpaperColorPicker" value="#1a1a1a" /></label>
         <div class="dialog-actions">
           <button type="submit" class="dialog-btn primary">OK</button>
           <button type="button" class="dialog-btn" id="cancelWallpaperColor">Cancel</button>
@@ -430,14 +431,28 @@
       </form>
     </dialog>
 
-    <dialog id="gridSettingsDialog" class="dialog">
+    <dialog id="gridSettingsDialog" class="dialog dialog-ft dialog-grid-settings">
       <form id="gridSettingsForm">
         <h3>Grid Settings</h3>
-        <label>Grid spacing (px)<input type="number" id="gridSizeInput" min="4" max="100" value="10" /></label>
-        <label>Snap distance (px)<input type="number" id="snapDistanceInput" min="1" max="50" value="5" /></label>
-        <div class="dialog-actions">
-          <button type="submit" class="dialog-btn primary">OK</button>
-          <button type="button" class="dialog-btn" id="cancelGridSettings">Cancel</button>
+        <div class="grid-settings-body">
+          <fieldset class="ft-fieldset grid-settings-panel">
+            <legend>Attributes</legend>
+            <label class="radio-row"><input type="checkbox" id="gridShowGrid" /> Show Grid</label>
+            <label class="radio-row"><input type="checkbox" id="gridSnapToGrid" /> Snap To Grid</label>
+            <label class="grid-color-row">Grid Color
+              <input type="hidden" class="ft-color-input" id="gridColorPicker" value="#000000" />
+            </label>
+          </fieldset>
+          <fieldset class="ft-fieldset grid-settings-panel">
+            <legend>Spacing</legend>
+            <label>Horizontal (x)<input type="number" id="gridSizeXInput" min="1" max="200" value="10" /></label>
+            <label>Vertical (y)<input type="number" id="gridSizeYInput" min="1" max="200" value="10" /></label>
+          </fieldset>
+          <div class="grid-settings-actions">
+            <button type="submit" class="dialog-btn primary">OK</button>
+            <button type="button" class="dialog-btn" id="cancelGridSettings">Cancel</button>
+            <button type="button" class="dialog-btn" id="helpGridSettings">Help</button>
+          </div>
         </div>
       </form>
     </dialog>
@@ -579,17 +594,55 @@
       </form>
     </dialog>
 
-    <dialog id="tagWizardDialog" class="dialog dialog-wide">
+    <dialog id="tagWizardDialog" class="dialog dialog-wide dialog-tag-wizard">
       <h3>Tag Import and Export Wizard</h3>
       <p class="dialog-hint">Import or export HMI tag definitions for project <strong id="tagWizardProject">—</strong>.</p>
-      <div class="runtime-steps">
-        <p><strong>Export tags</strong> — downloads <code>tags.json</code> from the active project.</p>
-        <p><strong>Import tags</strong> — paste JSON array of tag definitions below and merge into project.</p>
+      <div class="dialog-tabs tag-wizard-tabs">
+        <button type="button" class="dialog-tab active" data-tag-tab="file">Import from file</button>
+        <button type="button" class="dialog-tab" data-tag-tab="paste">Paste JSON</button>
+        <button type="button" class="dialog-tab" data-tag-tab="export">Export</button>
       </div>
-      <label>Import tags (JSON array)<textarea id="tagImportJson" rows="8" placeholder='[{"name":"My.Tag","type":"bool","description":""}]'></textarea></label>
-      <div class="dialog-actions">
-        <button type="button" class="dialog-btn primary" id="exportTagsBtn">Export Tags</button>
-        <button type="button" class="dialog-btn" id="importTagsBtn">Import Tags</button>
+      <div class="dialog-tab-panel active" data-tag-panel="file">
+        <div class="runtime-steps tag-wizard-help">
+          <p><strong>Studio 5000 / RSLogix 5000</strong> — In Controller Organizer, right-click <em>Tags</em> → <em>Export</em> → CSV. Browse that file here.</p>
+          <p>Also accepts HMI <code>tags.json</code> or a simple CSV with <code>Tag Name, Type, Description</code> columns.</p>
+        </div>
+        <div class="tag-wizard-file-row">
+          <input type="file" id="tagImportFile" accept=".csv,.json,.txt" class="hidden" />
+          <button type="button" class="dialog-btn" id="tagBrowseBtn">Browse…</button>
+          <span id="tagImportFileName" class="tag-wizard-filename">No file selected</span>
+        </div>
+        <fieldset class="ft-fieldset tag-wizard-filters">
+          <legend>Import filters</legend>
+          <label class="radio-row"><input type="checkbox" id="tagFilterController" checked /> Controller tags only (skip program-scoped tags)</label>
+          <label class="radio-row"><input type="checkbox" id="tagFilterBoolOnly" /> Bool tags only</label>
+          <label class="radio-row"><input type="checkbox" id="tagFilterIoComments" checked /> Include I/O bit comments from RSLogix CSV</label>
+        </fieldset>
+        <p id="tagImportPreview" class="tag-wizard-preview">Select a file to preview tags before import.</p>
+        <div class="dialog-actions">
+          <button type="button" class="dialog-btn primary" id="importTagsFileBtn" disabled>Import Tags</button>
+        </div>
+      </div>
+      <div class="dialog-tab-panel" data-tag-panel="paste">
+        <div class="runtime-steps">
+          <p>Paste a JSON array of tag definitions. Tags are merged into the project by name (existing tags are updated).</p>
+        </div>
+        <label>Import tags (JSON array)<textarea id="tagImportJson" rows="8" placeholder='[{"name":"My.Tag","type":"bool","description":""}]'></textarea></label>
+        <p id="tagPastePreview" class="tag-wizard-preview hidden"></p>
+        <div class="dialog-actions">
+          <button type="button" class="dialog-btn primary" id="importTagsBtn">Import Tags</button>
+        </div>
+      </div>
+      <div class="dialog-tab-panel" data-tag-panel="export">
+        <div class="runtime-steps">
+          <p><strong>Export tags</strong> — downloads all tag definitions from the active project as <code>&lt;project&gt;_tags.json</code>.</p>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="dialog-btn primary" id="exportTagsBtn">Export Tags</button>
+        </div>
+      </div>
+      <p id="tagWizardStatus" class="tag-wizard-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions tag-wizard-footer">
         <button type="button" class="dialog-btn" id="closeTagWizard">Close</button>
       </div>
     </dialog>
@@ -744,6 +797,770 @@
       </div>
     </div>
 
+    <dialog id="textPropertiesDialog" class="dialog dialog-ft dialog-text-props">
+      <form id="textPropertiesForm">
+        <h3>Text Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-tp-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-tp-tab="common">Common</button>
+        </div>
+        <div class="dialog-tab-panel active" data-tp-tab-panel="general">
+          <label class="text-caption-label">Text
+            <textarea id="textPropsCaption" rows="5" class="text-props-caption"></textarea>
+          </label>
+          <div class="text-props-font-row">
+            <label>Font
+              <select id="textPropsFont">
+                <option>Arial Unicode MS</option>
+                <option>Arial</option>
+                <option>Segoe UI</option>
+                <option>Times New Roman</option>
+                <option>Courier New</option>
+              </select>
+            </label>
+            <label>Size
+              <select id="textPropsSize">
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10" selected>10</option>
+                <option value="11">11</option>
+                <option value="12">12</option>
+                <option value="14">14</option>
+                <option value="16">16</option>
+                <option value="18">18</option>
+                <option value="20">20</option>
+                <option value="24">24</option>
+              </select>
+            </label>
+            <div class="text-style-btns">
+              <button type="button" class="text-style-btn" id="textPropsBold" title="Bold">B</button>
+              <button type="button" class="text-style-btn" id="textPropsItalic" title="Italic"><em>I</em></button>
+              <button type="button" class="text-style-btn" id="textPropsUnderline" title="Underline"><u>U</u></button>
+            </div>
+          </div>
+          <div class="text-props-options">
+            <div class="text-props-left">
+              <label class="color-check-row">
+                <input type="checkbox" id="textPropsUseBackColor" /> Back color
+                <input type="hidden" class="ft-color-input" id="textPropsBackColor" value="#ffffff" />
+              </label>
+              <label class="color-check-row">
+                <input type="checkbox" id="textPropsUseForeColor" checked /> Fore color
+                <input type="hidden" class="ft-color-input" id="textPropsForeColor" value="#000000" />
+              </label>
+              <label class="radio-row"><input type="checkbox" id="textPropsSizeToFit" checked /> Size to fit</label>
+              <label class="radio-row"><input type="checkbox" id="textPropsWordWrap" checked /> Word wrap</label>
+            </div>
+            <div class="text-props-right">
+              <fieldset class="ft-fieldset text-align-fieldset">
+                <legend>Alignment</legend>
+                <div class="text-align-grid" id="textPropsAlignGrid">
+                  <label><input type="radio" name="textAlign" value="topLeft" /><span></span></label>
+                  <label><input type="radio" name="textAlign" value="topCenter" /><span></span></label>
+                  <label><input type="radio" name="textAlign" value="topRight" /><span></span></label>
+                  <label><input type="radio" name="textAlign" value="middleLeft" /><span></span></label>
+                  <label><input type="radio" name="textAlign" value="middleCenter" checked /><span></span></label>
+                  <label><input type="radio" name="textAlign" value="middleRight" /><span></span></label>
+                  <label><input type="radio" name="textAlign" value="bottomLeft" /><span></span></label>
+                  <label><input type="radio" name="textAlign" value="bottomCenter" /><span></span></label>
+                  <label><input type="radio" name="textAlign" value="bottomRight" /><span></span></label>
+                </div>
+              </fieldset>
+              <label>Back style
+                <select id="textPropsBackStyle">
+                  <option value="transparent" selected>Transparent</option>
+                  <option value="solid">Solid</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-tab-panel" data-tp-tab-panel="common">
+          <fieldset class="ft-fieldset">
+            <legend>Size</legend>
+            <div class="ps-size-row">
+              <label>Height<input type="number" id="textPropsHeight" min="1" max="4096" value="213" /></label>
+              <label>Width<input type="number" id="textPropsWidth" min="1" max="4096" value="352" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Position</legend>
+            <div class="ps-size-row">
+              <label>Top<input type="number" id="textPropsTop" min="0" max="4096" value="179" /></label>
+              <label>Left<input type="number" id="textPropsLeft" min="0" max="4096" value="215" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Other</legend>
+            <label>Name<input type="text" id="textPropsName" maxlength="40" value="Text1" /></label>
+            <label class="radio-row"><input type="checkbox" id="textPropsVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelTextProperties">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyTextProperties" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpTextProperties">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="momentaryButtonDialog" class="dialog dialog-ft dialog-momentary-props">
+      <form id="momentaryButtonForm">
+        <h3>Momentary Push Button Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-mb-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-mb-tab="states">States</button>
+          <button type="button" class="dialog-tab" data-mb-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-mb-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-mb-tab-panel="general">
+          <fieldset class="ft-fieldset">
+            <legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style
+                <select id="mbBorderStyle">
+                  <option value="line">Line</option>
+                  <option value="raisedInset" selected>RaisedInset</option>
+                  <option value="raised">Raised</option>
+                  <option value="none">None</option>
+                </select>
+              </label>
+              <label>Border width<input type="number" id="mbBorderWidth" min="0" max="20" value="1" /></label>
+              <label>Back style
+                <select id="mbBackStyle">
+                  <option value="transparent">Transparent</option>
+                  <option value="solid" selected>Solid</option>
+                </select>
+              </label>
+              <label>Shape
+                <select id="mbShape">
+                  <option value="rectangle" selected>Rectangle</option>
+                  <option value="roundedRectangle">Rounded Rectangle</option>
+                </select>
+              </label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="mbBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="mbUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="mbHighlightColor" value="#00ff00" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Button settings</legend>
+            <div class="mb-button-mode-row">
+              <label class="radio-row"><input type="radio" name="mbButtonMode" id="mbNormallyOpen" value="normallyOpen" checked /> Normally open</label>
+              <label class="radio-row"><input type="radio" name="mbButtonMode" id="mbNormallyClosed" value="normallyClosed" /> Normally closed</label>
+              <label class="radio-row"><input type="radio" name="mbButtonMode" id="mbButtonModeValue" value="value" /> Value</label>
+            </div>
+            <label>Hold time (ms)<input type="number" id="mbHoldTime" min="0" max="10000" value="250" /></label>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Touch margins</legend>
+            <div class="ps-size-row">
+              <label>Horizontal margin<input type="number" id="mbHorizontalMargin" min="0" max="100" value="0" /></label>
+              <label>Vertical margin<input type="number" id="mbVerticalMargin" min="0" max="100" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Caption font</legend>
+            <div class="text-props-font-row">
+              <label>Font
+                <select id="mbFont">
+                  <option>Arial Unicode MS</option>
+                  <option>Arial</option>
+                  <option>Segoe UI</option>
+                </select>
+              </label>
+              <label>Size
+                <select id="mbFontSize">
+                  <option value="8">8</option>
+                  <option value="9">9</option>
+                  <option value="10" selected>10</option>
+                  <option value="11">11</option>
+                  <option value="12">12</option>
+                  <option value="14">14</option>
+                </select>
+              </label>
+              <div class="text-style-btns">
+                <button type="button" class="text-style-btn" id="mbBold" title="Bold">B</button>
+                <button type="button" class="text-style-btn" id="mbItalic" title="Italic"><em>I</em></button>
+                <button type="button" class="text-style-btn" id="mbUnderline" title="Underline"><u>U</u></button>
+              </div>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Other</legend>
+            <label class="radio-row"><input type="checkbox" id="mbTouch" checked /> Touch</label>
+            <label class="radio-row"><input type="checkbox" id="mbAudio" checked /> Audio</label>
+            <label>Key assignment
+              <select id="mbKeyAssignment">
+                <option value="None" selected>None</option>
+                <option value="F1">F1</option>
+                <option value="F2">F2</option>
+                <option value="F3">F3</option>
+                <option value="F4">F4</option>
+              </select>
+            </label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-mb-tab-panel="states">
+          <label>State
+            <select id="mbStateSelect">
+              <option value="State0" selected>State0</option>
+              <option value="State1">State1</option>
+              <option value="Error">Error</option>
+            </select>
+          </label>
+          <fieldset class="ft-fieldset">
+            <legend>Colors</legend>
+            <label class="color-check-row"><input type="checkbox" id="mbStateUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="mbStateBackColor" value="#dcdcdc" /></label>
+            <label class="color-check-row"><input type="checkbox" id="mbStateUseBorderColor" /> Border color<input type="hidden" class="ft-color-input" id="mbStateBorderColor" value="#c0c0c0" /></label>
+            <label class="radio-row"><input type="checkbox" id="mbStateBlink" /> Blink</label>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Caption</legend>
+            <textarea id="mbStateCaption" rows="2" class="text-props-caption">Conveyor Run</textarea>
+            <label class="color-check-row">
+              <input type="checkbox" id="mbStateUseCaptionColor" checked /> Caption color
+              <input type="hidden" class="ft-color-input" id="mbStateCaptionColor" value="#000000" />
+            </label>
+            <label class="radio-row"><input type="checkbox" id="mbStateWordWrap" checked /> Word wrap</label>
+            <fieldset class="ft-fieldset text-align-fieldset">
+              <legend>Alignment</legend>
+              <div class="text-align-grid mb-state-align-grid">
+                <label><input type="radio" name="mbStateAlign" value="topLeft" /><span></span></label>
+                <label><input type="radio" name="mbStateAlign" value="topCenter" /><span></span></label>
+                <label><input type="radio" name="mbStateAlign" value="topRight" /><span></span></label>
+                <label><input type="radio" name="mbStateAlign" value="middleLeft" /><span></span></label>
+                <label><input type="radio" name="mbStateAlign" value="middleCenter" checked /><span></span></label>
+                <label><input type="radio" name="mbStateAlign" value="middleRight" /><span></span></label>
+                <label><input type="radio" name="mbStateAlign" value="bottomLeft" /><span></span></label>
+                <label><input type="radio" name="mbStateAlign" value="bottomCenter" /><span></span></label>
+                <label><input type="radio" name="mbStateAlign" value="bottomRight" /><span></span></label>
+              </div>
+            </fieldset>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-mb-tab-panel="common">
+          <fieldset class="ft-fieldset">
+            <legend>Size</legend>
+            <div class="ps-size-row">
+              <label>Height<input type="number" id="mbHeight" min="1" max="4096" value="38" /></label>
+              <label>Width<input type="number" id="mbWidth" min="1" max="4096" value="147" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Position</legend>
+            <div class="ps-size-row">
+              <label>Top<input type="number" id="mbTop" min="0" max="4096" value="79" /></label>
+              <label>Left<input type="number" id="mbLeft" min="0" max="4096" value="16" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Other</legend>
+            <label>Name<input type="text" id="mbName" maxlength="40" value="MomentaryButton1" /></label>
+            <label class="radio-row"><input type="checkbox" id="mbVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-mb-tab-panel="connections">
+          <fieldset class="ft-fieldset">
+            <legend>Connections</legend>
+            <label>Value tag<input type="text" id="mbTag" value="Manual.ConveyorRun" placeholder="e.g. Manual.ConveyorRun" /></label>
+            <label>Indicator tag<input type="text" id="mbIndicatorTag" placeholder="Optional — defaults to value tag" /></label>
+            <label>Value<input type="number" id="mbValue" value="1" /></label>
+            <label>Release Value<input type="number" id="mbReleaseValue" value="0" /></label>
+          </fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelMomentaryButton">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyMomentaryButton" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpMomentaryButton">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="maintainedButtonDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="maintainedButtonForm">
+        <h3>Maintained Push Button Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-mtn-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-mtn-tab="states">States</button>
+          <button type="button" class="dialog-tab" data-mtn-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-mtn-tab="connections">Connections</button>
+          <button type="button" class="dialog-tab" data-mtn-tab="esignature">E-Signature</button>
+        </div>
+        <div class="dialog-tab-panel active" data-mtn-tab-panel="general">
+          <fieldset class="ft-fieldset">
+            <legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style
+                <select id="mtnBorderStyle">
+                  <option value="line" selected>Line</option>
+                  <option value="raisedInset">RaisedInset</option>
+                  <option value="raised">Raised</option>
+                  <option value="none">None</option>
+                </select>
+              </label>
+              <label>Border width<input type="number" id="mtnBorderWidth" min="0" max="20" value="1" /></label>
+              <label>Back style
+                <select id="mtnBackStyle">
+                  <option value="transparent">Transparent</option>
+                  <option value="solid" selected>Solid</option>
+                </select>
+              </label>
+              <label>Shape
+                <select id="mtnShape">
+                  <option value="rectangle" selected>Rectangle</option>
+                  <option value="roundedRectangle">Rounded Rectangle</option>
+                </select>
+              </label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="mtnBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="mtnUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="mtnHighlightColor" value="#00ff00" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>State settings</legend>
+            <label>Next state based on:
+              <select id="mtnNextStateBasedOn">
+                <option value="currentState" selected>Current State</option>
+              </select>
+            </label>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Touch margins</legend>
+            <div class="ps-size-row">
+              <label>Horizontal margin<input type="number" id="mtnHorizontalMargin" min="0" max="100" value="0" /></label>
+              <label>Vertical margin<input type="number" id="mtnVerticalMargin" min="0" max="100" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Caption font</legend>
+            <div class="text-props-font-row">
+              <label>Font
+                <select id="mtnFont">
+                  <option>Arial Unicode MS</option>
+                  <option>Arial</option>
+                  <option>Segoe UI</option>
+                </select>
+              </label>
+              <label>Size
+                <select id="mtnFontSize">
+                  <option value="8">8</option>
+                  <option value="9">9</option>
+                  <option value="10" selected>10</option>
+                  <option value="11">11</option>
+                  <option value="12">12</option>
+                  <option value="14">14</option>
+                </select>
+              </label>
+              <div class="text-style-btns">
+                <button type="button" class="text-style-btn" id="mtnBold" title="Bold">B</button>
+                <button type="button" class="text-style-btn" id="mtnItalic" title="Italic"><em>I</em></button>
+                <button type="button" class="text-style-btn" id="mtnUnderline" title="Underline"><u>U</u></button>
+              </div>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Audio</legend>
+            <label class="radio-row"><input type="checkbox" id="mtnTouch" checked /> Touch</label>
+            <label class="radio-row"><input type="checkbox" id="mtnAudio" checked /> Audio</label>
+            <label>Key assignment
+              <select id="mtnKeyAssignment">
+                <option value="None" selected>None</option>
+                <option value="F1">F1</option>
+                <option value="F2">F2</option>
+                <option value="F3">F3</option>
+                <option value="F4">F4</option>
+              </select>
+            </label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-mtn-tab-panel="states">
+          <label>State
+            <select id="mtnStateSelect">
+              <option value="State0" selected>State0</option>
+              <option value="State1">State1</option>
+              <option value="Error">Error</option>
+            </select>
+          </label>
+          <label id="mtnStateValueRow">Value<input type="number" id="mtnStateValue" value="0" /></label>
+          <fieldset class="ft-fieldset">
+            <legend>Colors</legend>
+            <label class="color-check-row"><input type="checkbox" id="mtnStateUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="mtnStateBackColor" value="#dcdcdc" /></label>
+            <label class="color-check-row"><input type="checkbox" id="mtnStateUseBorderColor" /> Border color<input type="hidden" class="ft-color-input" id="mtnStateBorderColor" value="#c0c0c0" /></label>
+            <label class="radio-row"><input type="checkbox" id="mtnStateBlink" /> Blink</label>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Caption</legend>
+            <textarea id="mtnStateCaption" rows="2" class="text-props-caption">Pump Run</textarea>
+            <label class="color-check-row">
+              <input type="checkbox" id="mtnStateUseCaptionColor" checked /> Caption color
+              <input type="hidden" class="ft-color-input" id="mtnStateCaptionColor" value="#000000" />
+            </label>
+            <label class="radio-row"><input type="checkbox" id="mtnStateWordWrap" checked /> Word wrap</label>
+            <fieldset class="ft-fieldset text-align-fieldset">
+              <legend>Alignment</legend>
+              <div class="text-align-grid mtn-state-align-grid">
+                <label><input type="radio" name="mtnStateAlign" value="topLeft" /><span></span></label>
+                <label><input type="radio" name="mtnStateAlign" value="topCenter" /><span></span></label>
+                <label><input type="radio" name="mtnStateAlign" value="topRight" /><span></span></label>
+                <label><input type="radio" name="mtnStateAlign" value="middleLeft" /><span></span></label>
+                <label><input type="radio" name="mtnStateAlign" value="middleCenter" checked /><span></span></label>
+                <label><input type="radio" name="mtnStateAlign" value="middleRight" /><span></span></label>
+                <label><input type="radio" name="mtnStateAlign" value="bottomLeft" /><span></span></label>
+                <label><input type="radio" name="mtnStateAlign" value="bottomCenter" /><span></span></label>
+                <label><input type="radio" name="mtnStateAlign" value="bottomRight" /><span></span></label>
+              </div>
+            </fieldset>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-mtn-tab-panel="common">
+          <fieldset class="ft-fieldset">
+            <legend>Size</legend>
+            <div class="ps-size-row">
+              <label>Height<input type="number" id="mtnHeight" min="1" max="4096" value="38" /></label>
+              <label>Width<input type="number" id="mtnWidth" min="1" max="4096" value="147" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Position</legend>
+            <div class="ps-size-row">
+              <label>Top<input type="number" id="mtnTop" min="0" max="4096" value="79" /></label>
+              <label>Left<input type="number" id="mtnLeft" min="0" max="4096" value="16" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Other</legend>
+            <label>Name<input type="text" id="mtnName" maxlength="40" value="MaintainedButton1" /></label>
+            <label class="radio-row"><input type="checkbox" id="mtnVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-mtn-tab-panel="connections">
+          <fieldset class="ft-fieldset">
+            <legend>Connections</legend>
+            <label>Value tag<input type="text" id="mtnTag" value="Manual.PumpRun" placeholder="e.g. Manual.PumpRun" /></label>
+            <label>Indicator tag<input type="text" id="mtnIndicatorTag" placeholder="Optional — defaults to value tag" /></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-mtn-tab-panel="esignature">
+          <fieldset class="ft-fieldset">
+            <legend>Electronic signature</legend>
+            <label class="radio-row"><input type="checkbox" id="mtnRequireESignature" disabled /> Require electronic signature when value changes</label>
+            <label class="radio-row"><input type="checkbox" id="mtnRequireComment" disabled /> Require comment</label>
+            <label class="radio-row"><input type="checkbox" id="mtnRequireReason" disabled /> Require reason code</label>
+            <p class="ft-field-hint">E-Signature enforcement is not available in this runtime yet.</p>
+          </fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelMaintainedButton">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyMaintainedButton" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpMaintainedButton">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="gotoButtonDialog" class="dialog dialog-ft dialog-goto-props">
+      <form id="gotoButtonForm">
+        <h3>Goto Display Button Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-gb-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-gb-tab="label">Label</button>
+          <button type="button" class="dialog-tab" data-gb-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-gb-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-gb-tab-panel="general">
+          <fieldset class="ft-fieldset">
+            <legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style
+                <select id="gbBorderStyle">
+                  <option value="raised" selected>Raised</option>
+                  <option value="raisedInset">RaisedInset</option>
+                  <option value="line">Line</option>
+                  <option value="none">None</option>
+                </select>
+              </label>
+              <label>Back style
+                <select id="gbBackStyle">
+                  <option value="solid" selected>Solid</option>
+                  <option value="transparent">Transparent</option>
+                </select>
+              </label>
+              <label>Shape
+                <select id="gbShape">
+                  <option value="rectangle" selected>Rectangle</option>
+                  <option value="roundedRectangle">Rounded Rectangle</option>
+                </select>
+              </label>
+              <label>Border width<input type="number" id="gbBorderWidth" min="0" max="20" value="3" /></label>
+              <label>Pattern style
+                <select id="gbPatternStyle">
+                  <option value="none" selected>None</option>
+                </select>
+              </label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="gbBorderUsesBackColor" /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="gbUseBackColor" /> Back color<input type="hidden" class="ft-color-input" id="gbBackColor" value="#dcdcdc" /></label>
+              <label class="color-check-row"><input type="checkbox" id="gbUseBorderColor" /> Border color<input type="hidden" class="ft-color-input" id="gbBorderColor" value="#e0e0e0" /></label>
+              <label class="color-check-row"><input type="checkbox" id="gbUsePatternColor" /> Pattern color<input type="hidden" class="ft-color-input" id="gbPatternColor" value="#ffffff" /></label>
+              <label class="color-check-row"><input type="checkbox" id="gbUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="gbHighlightColor" value="#00ff00" /></label>
+              <label class="radio-row"><input type="checkbox" id="gbBlink" /> Blink</label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Display settings</legend>
+            <label class="browse-row">Display
+              <input type="text" id="gbTarget" placeholder="e.g. 102_Prestart" />
+              <button type="button" class="dialog-btn" id="gbBrowseDisplay">…</button>
+            </label>
+            <label class="radio-row"><input type="checkbox" id="gbUseVariableDisplay" /> Use variable Display</label>
+            <div class="goto-param-row">
+              <label class="radio-row"><input type="radio" name="gbParameterType" id="gbParameterFileRadio" value="file" checked /> Parameter file</label>
+              <input type="text" id="gbParameterFile" />
+              <button type="button" class="dialog-btn" id="gbBrowseParameterFile" disabled>…</button>
+            </div>
+            <div class="goto-param-row">
+              <label class="radio-row"><input type="radio" name="gbParameterType" id="gbParameterListRadio" value="list" /> Parameter list</label>
+              <input type="text" id="gbParameterList" disabled />
+              <button type="button" class="dialog-btn" id="gbBrowseParameterList" disabled>…</button>
+            </div>
+            <label class="radio-row"><input type="checkbox" id="gbDisplayPosition" /> Display position</label>
+            <div class="ps-size-row">
+              <label>Top position<input type="number" id="gbDisplayTop" min="0" max="4096" value="0" disabled /></label>
+              <label>Left position<input type="number" id="gbDisplayLeft" min="0" max="4096" value="0" disabled /></label>
+            </div>
+            <label class="radio-row"><input type="checkbox" id="gbUseVariableDisplayPosition" /> Use Variable Display Position</label>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Touch margins</legend>
+            <div class="ps-size-row">
+              <label>Horizontal margin<input type="number" id="gbHorizontalMargin" min="0" max="100" value="0" /></label>
+              <label>Vertical margin<input type="number" id="gbVerticalMargin" min="0" max="100" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Other</legend>
+            <label class="radio-row"><input type="checkbox" id="gbAudio" checked /> Audio</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-gb-tab-panel="label">
+          <fieldset class="ft-fieldset">
+            <legend>Caption</legend>
+            <textarea id="gbCaption" rows="3" class="text-props-caption">Production Data</textarea>
+            <div class="text-props-font-row">
+              <label>Font
+                <select id="gbFont">
+                  <option>Arial</option>
+                  <option>Arial Unicode MS</option>
+                  <option>Segoe UI</option>
+                </select>
+              </label>
+              <label>Size
+                <select id="gbFontSize">
+                  <option value="8">8</option>
+                  <option value="9">9</option>
+                  <option value="10" selected>10</option>
+                  <option value="11">11</option>
+                  <option value="12">12</option>
+                  <option value="14">14</option>
+                </select>
+              </label>
+              <div class="text-style-btns">
+                <button type="button" class="text-style-btn" id="gbBold" title="Bold">B</button>
+                <button type="button" class="text-style-btn" id="gbItalic" title="Italic"><em>I</em></button>
+                <button type="button" class="text-style-btn" id="gbUnderline" title="Underline"><u>U</u></button>
+              </div>
+            </div>
+            <div class="text-props-options">
+              <div class="text-props-left">
+                <label class="color-check-row">
+                  <input type="checkbox" id="gbUseCaptionColor" checked /> Caption color
+                  <input type="hidden" class="ft-color-input" id="gbCaptionColor" value="#000000" />
+                </label>
+                <label class="color-check-row">
+                  <input type="checkbox" id="gbUseCaptionBackColor" /> Caption back color
+                  <input type="hidden" class="ft-color-input" id="gbCaptionBackColor" value="#002952" />
+                </label>
+                <label class="radio-row"><input type="checkbox" id="gbCaptionBlink" /> Caption blink</label>
+                <label class="radio-row"><input type="checkbox" id="gbWordWrap" checked /> Word wrap</label>
+              </div>
+              <div class="text-props-right">
+                <fieldset class="ft-fieldset text-align-fieldset">
+                  <legend>Alignment</legend>
+                  <div class="text-align-grid">
+                    <label><input type="radio" name="gbAlign" value="topLeft" /><span></span></label>
+                    <label><input type="radio" name="gbAlign" value="topCenter" /><span></span></label>
+                    <label><input type="radio" name="gbAlign" value="topRight" /><span></span></label>
+                    <label><input type="radio" name="gbAlign" value="middleLeft" /><span></span></label>
+                    <label><input type="radio" name="gbAlign" value="middleCenter" checked /><span></span></label>
+                    <label><input type="radio" name="gbAlign" value="middleRight" /><span></span></label>
+                    <label><input type="radio" name="gbAlign" value="bottomLeft" /><span></span></label>
+                    <label><input type="radio" name="gbAlign" value="bottomCenter" /><span></span></label>
+                    <label><input type="radio" name="gbAlign" value="bottomRight" /><span></span></label>
+                  </div>
+                </fieldset>
+                <label>Caption back style
+                  <select id="gbCaptionBackStyle">
+                    <option value="transparent" selected>Transparent</option>
+                    <option value="solid">Solid</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Image settings</legend>
+            <label>Image<input type="text" id="gbImage" placeholder="Browse image…" /><button type="button" class="dialog-btn" id="gbBrowseImage">…</button></label>
+            <label class="radio-row"><input type="checkbox" id="gbImageScaled" /> Image scaled</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-gb-tab-panel="common">
+          <fieldset class="ft-fieldset">
+            <legend>Size</legend>
+            <div class="ps-size-row">
+              <label>Height<input type="number" id="gbHeight" min="1" max="4096" value="35" /></label>
+              <label>Width<input type="number" id="gbWidth" min="1" max="4096" value="66" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Position</legend>
+            <div class="ps-size-row">
+              <label>Top<input type="number" id="gbTop" min="0" max="4096" value="75" /></label>
+              <label>Left<input type="number" id="gbLeft" min="0" max="4096" value="8" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Other</legend>
+            <label>Name<input type="text" id="gbName" maxlength="40" value="GotoDisplayButton1" /></label>
+            <label class="radio-row"><input type="checkbox" id="gbVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-gb-tab-panel="connections">
+          <p class="side-hint">Goto Display buttons navigate to another display and do not use tag connections.</p>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelGotoButton">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyGotoButton" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpGotoButton">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="displayPickerDialog" class="dialog dialog-ft dialog-display-picker">
+      <h3>Select Display</h3>
+      <select id="displayPickerList" class="display-picker-list" size="14"></select>
+      <div class="dialog-actions">
+        <button type="button" class="dialog-btn primary" id="displayPickerOk">OK</button>
+        <button type="button" class="dialog-btn" id="displayPickerCancel">Cancel</button>
+      </div>
+    </dialog>
+
+    <dialog id="imageBrowserDialog" class="dialog dialog-ft dialog-image-browser">
+      <h3 class="dialog-drag-handle">Image Browser</h3>
+      <div class="image-browser-body">
+        <div class="image-browser-left">
+          <label class="image-browser-filter">Select image
+            <input type="text" id="imageBrowserFilter" placeholder="Filter images…" />
+          </label>
+          <select id="imageBrowserList" class="image-browser-list" size="14"></select>
+          <fieldset class="ft-fieldset image-browser-attrs">
+            <legend>Image attributes</legend>
+            <dl class="image-props-list">
+              <dt>Type:</dt><dd id="imageBrowserType">—</dd>
+              <dt>Width x Height:</dt><dd id="imageBrowserSize">—</dd>
+              <dt>Format:</dt><dd id="imageBrowserFormat">—</dd>
+            </dl>
+          </fieldset>
+        </div>
+        <div class="image-browser-preview-wrap">
+          <div class="image-browser-preview-label">Preview:</div>
+          <div class="image-browser-preview">
+            <img id="imageBrowserPreview" alt="" />
+          </div>
+        </div>
+        <div class="image-browser-actions">
+          <button type="button" class="dialog-btn" id="imageBrowserAddFile">Add from File…</button>
+          <button type="button" class="dialog-btn" id="imageBrowserLaunchLibrary" disabled title="Planned">Launch Library…</button>
+          <button type="button" class="dialog-btn" id="imageBrowserPasteLibrary" disabled title="Planned">Paste from Library</button>
+          <button type="button" class="dialog-btn" id="imageBrowserDelete">Delete</button>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="dialog-btn primary" id="imageBrowserOk" disabled>OK</button>
+        <button type="button" class="dialog-btn" id="imageBrowserCancel">Cancel</button>
+        <button type="button" class="dialog-btn" id="imageBrowserHelp">Help</button>
+      </div>
+    </dialog>
+
+    <dialog id="canvasImagePropertiesDialog" class="dialog dialog-ft dialog-canvas-image-props">
+      <form id="canvasImagePropertiesForm">
+        <h3>Image Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-ci-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-ci-tab="common">Common</button>
+        </div>
+        <div class="dialog-tab-panel active" data-ci-tab-panel="general">
+          <fieldset class="ft-fieldset">
+            <legend>Image settings</legend>
+            <div class="canvas-image-file-row">
+              <label>Image
+                <input type="text" id="canvasImageFile" readonly />
+              </label>
+              <button type="button" class="dialog-btn" id="canvasImageBrowse" title="Browse images">…</button>
+            </div>
+            <label>Image back style
+              <select id="canvasImageBackStyle">
+                <option value="transparent" selected>Transparent</option>
+                <option value="solid">Solid</option>
+                <option value="opaque">Opaque</option>
+              </select>
+            </label>
+            <label class="color-check-row">
+              <input type="checkbox" id="canvasImageUseColor" /> Image color
+              <input type="hidden" class="ft-color-input" id="canvasImageColor" value="#000080" disabled />
+            </label>
+            <label class="color-check-row">
+              <input type="checkbox" id="canvasImageUseBackColor" /> Image back color
+              <input type="hidden" class="ft-color-input" id="canvasImageBackColor" value="#c0c0c0" disabled />
+            </label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-ci-tab-panel="common">
+          <fieldset class="ft-fieldset">
+            <legend>Size</legend>
+            <div class="ps-size-row">
+              <label>Height<input type="number" id="canvasImageHeight" min="1" max="4096" value="64" /></label>
+              <label>Width<input type="number" id="canvasImageWidth" min="1" max="4096" value="64" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Position</legend>
+            <div class="ps-size-row">
+              <label>Top<input type="number" id="canvasImageTop" min="0" max="4096" value="0" /></label>
+              <label>Left<input type="number" id="canvasImageLeft" min="0" max="4096" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Other</legend>
+            <label>Name<input type="text" id="canvasImageName" maxlength="40" value="Image1" /></label>
+            <label class="radio-row"><input type="checkbox" id="canvasImageVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelCanvasImageProperties">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyCanvasImageProperties" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpCanvasImageProperties">Help</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="imagePropertiesDialog" class="dialog dialog-ft dialog-image-props">
       <h3 id="imagePropsTitle" class="dialog-drag-handle">Image</h3>
       <div class="image-props-body">
@@ -770,7 +1587,10 @@
     <div id="workspaceContextMenu" class="context-menu hidden"></div>
     <input type="file" id="imageImportInput" accept=".png,.jpg,.jpeg,.gif,.bmp,.ico,.webp,.svg,image/*" hidden>
 
-    <script src="studio-objects-menu.js?v=0.2.2"></script>
-    <script src="studio.js?v=0.2.4"></script>
+    <script src="template-compose.js?v=0.1.7"></script>
+    <script src="studio-objects-menu.js?v=0.2.7"></script>
+    <script src="studio-color-picker.js?v=0.1.0"></script>
+    <script src="rslogix-tags.js?v=0.1.0"></script>
+    <script src="studio.js?v=0.5.3"></script>
   </body>
 </html>

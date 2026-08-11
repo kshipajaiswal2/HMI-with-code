@@ -4,16 +4,81 @@
   "navGroup": "manual",
   "securityLevel": 1,
   "components": [
-    { "type": "SubNav", "navKey": "manual" },
-    { "type": "SectionHeader", "label": "Cycle Time Analysis" },
+    {
+      "type": "SubNav",
+      "navKey": "manual"
+    },
+    {
+      "type": "SectionHeader",
+      "label": "Cycle Time Analysis"
+    },
     {
       "type": "Grid",
-      "style": { "className": "metric-grid cols-3" },
+      "style": {
+        "className": "metric-grid cols-3"
+      },
       "children": [
-        { "type": "NumericDisplay", "tag": "CycleTime.Last", "label": "Last Cycle", "format": "float", "decimals": 1, "unit": "sec" },
-        { "type": "NumericDisplay", "tag": "CycleTime.Average", "label": "Average", "format": "float", "decimals": 1, "unit": "sec" },
-        { "type": "NumericDisplay", "tag": "CycleTime.Best", "label": "Best", "format": "float", "decimals": 1, "unit": "sec" }
+        {
+          "type": "NumericDisplay",
+          "tag": "CycleTime.Last",
+          "label": "Last Cycle",
+          "format": "float",
+          "decimals": 1,
+          "unit": "sec"
+        },
+        {
+          "type": "NumericDisplay",
+          "tag": "CycleTime.Average",
+          "label": "Average",
+          "format": "float",
+          "decimals": 1,
+          "unit": "sec"
+        },
+        {
+          "type": "NumericDisplay",
+          "tag": "CycleTime.Best",
+          "label": "Best",
+          "format": "float",
+          "decimals": 1,
+          "unit": "sec"
+        }
       ]
     }
-  ]
+  ],
+  "displaySettings": {
+    "backgroundColor": "#EBEBEB",
+    "useProjectSize": true
+  },
+  "template": {
+    "enabled": true,
+    "globalObjectId": "Template",
+    "replace": {
+      "NavManual": {
+        "caption": "Manual",
+        "image": "manual2.jpg",
+        "imageScaled": false,
+        "italic": false,
+        "underline": false,
+        "foreColor": "#000000",
+        "useForeColor": true,
+        "captionBackStyle": "transparent",
+        "useCaptionBackColor": false,
+        "captionBackColor": "#002952",
+        "captionBlink": false,
+        "audio": true,
+        "shape": "rectangle",
+        "patternStyle": "none",
+        "useVariableDisplay": false,
+        "parameterType": "file",
+        "parameterFile": "",
+        "parameterList": "",
+        "displayPosition": false,
+        "displayTop": 0,
+        "displayLeft": 0,
+        "useVariableDisplayPosition": false,
+        "horizontalMargin": 0,
+        "verticalMargin": 0
+      }
+    }
+  }
 }

@@ -4,8 +4,37 @@
   "navGroup": "alarms",
   "securityLevel": 0,
   "components": [
-    { "type": "SubNav", "navKey": "alarms" },
-    { "type": "SectionHeader", "label": "Alarm History" },
-    { "type": "AlarmHistory", "id": "alarm-history" }
-  ]
+    {
+      "type": "SubNav",
+      "navKey": "alarms"
+    },
+    {
+      "type": "SectionHeader",
+      "label": "Alarm History"
+    },
+    {
+      "type": "AlarmHistory",
+      "id": "alarm-history"
+    }
+  ],
+  "displaySettings": {
+    "backgroundColor": "#ebebeb",
+    "useProjectSize": true,
+    "displayType": "replace",
+    "positionX": 0,
+    "positionY": 0,
+    "displayNumber": 1,
+    "showTitleBar": false,
+    "disableInitialFocus": false,
+    "maxTagUpdateRate": 1
+  },
+  "template": {
+    "enabled": true,
+    "globalObjectId": "Template",
+    "replace": {
+      "NavAlarms": {
+        "image": "select_alarm.jpg"
+      }
+    }
+  }
 }

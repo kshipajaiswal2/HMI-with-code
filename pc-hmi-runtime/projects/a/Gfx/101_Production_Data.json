@@ -3,65 +3,95 @@
   "title": "Production Data",
   "navGroup": "overview",
   "securityLevel": 0,
-  "components": [
-    {
-      "type": "SubNav",
-      "navKey": "overview"
-    },
-    {
-      "type": "SectionHeader",
-      "label": "Production Data"
-    },
-    {
-      "type": "Grid",
-      "style": {
-        "className": "metric-grid cols-3"
-      },
-      "children": [
-        {
-          "type": "NumericDisplay",
-          "tag": "Production.Count",
-          "label": "Total Count",
-          "format": "integer"
-        },
-        {
-          "type": "NumericDisplay",
-          "tag": "Production.Target",
-          "label": "Shift Target",
-          "format": "integer"
-        },
-        {
-          "type": "NumericDisplay",
-          "tag": "Production.Rejects",
-          "label": "Rejects",
-          "format": "integer"
-        },
-        {
-          "type": "NumericDisplay",
-          "tag": "Production.Rate",
-          "label": "Rate",
-          "format": "float",
-          "decimals": 1,
-          "unit": "units/hr"
-        },
-        {
-          "type": "NumericDisplay",
-          "tag": "Production.Efficiency",
-          "label": "OEE",
-          "format": "percent",
-          "decimals": 1
-        },
-        {
-          "type": "NumericDisplay",
-          "tag": "Recipe.Active",
-          "label": "Recipe",
-          "format": "string"
-        }
-      ]
-    }
-  ],
+  "components": [],
   "displaySettings": {
     "backgroundColor": "#EBEBEB",
     "useProjectSize": true
+  },
+  "overviewShell": {
+    "OverviewNav_101_Production_Data": {
+      "type": "GotoButton",
+      "name": "OverviewNav_101_Production_Data",
+      "target": "101_Production_Data",
+      "label": "Production\nData",
+      "caption": "Production\nData",
+      "left": 8,
+      "top": 75,
+      "width": 72,
+      "height": 40,
+      "visible": true,
+      "borderStyle": "raised",
+      "borderWidth": 2,
+      "borderUsesBackColor": false,
+      "useBackColor": true,
+      "backColor": "#dcdcdc",
+      "useBorderColor": true,
+      "borderColor": "#f99746",
+      "usePatternColor": false,
+      "patternColor": "#ffffff",
+      "useHighlightColor": false,
+      "highlightColor": "#00ff00",
+      "backStyle": "solid",
+      "patternStyle": "none",
+      "shape": "rectangle",
+      "blink": false,
+      "useVariableDisplay": false,
+      "parameterType": "file",
+      "parameterFile": "",
+      "parameterList": "",
+      "displayPosition": false,
+      "displayTop": 0,
+      "displayLeft": 0,
+      "useVariableDisplayPosition": false,
+      "horizontalMargin": 0,
+      "verticalMargin": 0,
+      "audio": true,
+      "fontFamily": "Arial",
+      "fontSize": 9,
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "foreColor": "#000000",
+      "useForeColor": true,
+      "useCaptionBackColor": false,
+      "captionBackColor": "#002952",
+      "captionBlink": false,
+      "captionBackStyle": "transparent",
+      "wordWrap": true,
+      "alignment": "middleCenter",
+      "imageScaled": false
+    }
+  },
+  "template": {
+    "enabled": true,
+    "globalObjectId": "Template",
+    "replace": {
+      "NavOverview": {
+        "caption": "Overview",
+        "image": "select_home.jpg",
+        "imageScaled": false,
+        "italic": false,
+        "underline": false,
+        "foreColor": "#000000",
+        "useForeColor": true,
+        "captionBackStyle": "transparent",
+        "useCaptionBackColor": false,
+        "captionBackColor": "#002952",
+        "captionBlink": false,
+        "audio": true,
+        "shape": "rectangle",
+        "patternStyle": "none",
+        "useVariableDisplay": false,
+        "parameterType": "file",
+        "parameterFile": "",
+        "parameterList": "",
+        "displayPosition": false,
+        "displayTop": 0,
+        "displayLeft": 0,
+        "useVariableDisplayPosition": false,
+        "horizontalMargin": 0,
+        "verticalMargin": 0
+      }
+    }
   }
 }

@@ -8,6 +8,7 @@ const { TagService } = require('./services/tag-service');
 const { AlarmService } = require('./services/alarm-service');
 const { UserService } = require('./services/user-service');
 const { SimulatorDriver } = require('./services/communication/simulator');
+const { TagLogicService } = require('./services/tag-logic-service');
 const { ProjectService } = require('./services/project-service');
 
 const ROOT = path.join(__dirname, '..');
@@ -16,6 +17,7 @@ const PORT = process.env.PORT || 8080;
 const projectService = new ProjectService(ROOT);
 const tagService = new TagService();
 const alarmService = new AlarmService(tagService);
+const tagLogicService = new TagLogicService(tagService);
 let userService = new UserService([]);
 let navigationConfig = {};
 let projectConfig = {};
@@ -29,15 +31,18 @@ function loadProjectRuntime(projectId) {
   navigationConfig = projectService.readNavigation(id);
   userService = new UserService(projectConfig.users || []);
 
+  const runtimeTags = TagLogicService.mergeBuiltinSafetyTags(projectConfig.tags || []);
   tagService.tags.clear();
-  tagService.loadDefinitions(projectConfig.tags || []);
+  tagService.loadDefinitions(runtimeTags);
+  tagLogicService.loadRules(runtimeTags);
   alarmService.definitions = [];
   alarmService.active = [];
   alarmService.loadDefinitions(projectConfig.alarms || []);
 
   if (driver) driver.disconnect();
-  driver = new SimulatorDriver(tagService, alarmService);
+  driver = new SimulatorDriver(tagService, alarmService, tagLogicService);
   driver.connect();
+  tagLogicService.evaluate();
   loadedRuntimeProjectId = id;
 }
 
@@ -62,7 +67,7 @@ projectService.migrateAllProjects();
 
 app.use(express.json({ limit: '30mb' }));
 app.use((req, res, next) => {
-  if (/studio\.(js|css|html)$/.test(req.path)) {
+  if (/\.(html|js|css)$/.test(req.path) && !req.path.includes('node_modules')) {
     res.set('Cache-Control', 'no-store');
   }
   next();
@@ -142,6 +147,26 @@ app.patch('/api/projects/:id/screens/:screenId', (req, res) => {
   }
 });
 
+app.patch('/api/projects/:id/global-objects/:objectId', (req, res) => {
+  try {
+    const object = projectService.updateGlobalObject(req.params.id, req.params.objectId, req.body || {});
+    res.json({ success: true, object });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/projects/:id/images', (req, res) => {
+  try {
+    if (!projectService.projectExists(req.params.id)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    res.json(projectService.listImages(req.params.id));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/projects/:id/images', (req, res) => {
   try {
     let fileName;
@@ -188,7 +213,11 @@ app.get('/api/projects', (_req, res) => {
 });
 
 app.get('/api/projects/active', (_req, res) => {
-  res.json(projectService.getActiveProject());
+  try {
+    res.json(projectService.getActiveProject());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/projects/:id/explorer', (req, res) => {
@@ -255,6 +284,7 @@ app.get('/api/runtime/status', (req, res) => {
     currentUser: userService.getCurrentUser(),
     startupScreen: config.startupScreen || '100_Overview',
     projectName: config.name || pid,
+    projectSubtitle: config.subtitle || '',
     runtime: {
       width: config.runtime?.width ?? 800,
       height: config.runtime?.height ?? 600,
@@ -269,12 +299,21 @@ app.get('/api/runtime/screens', (req, res) => {
 });
 
 app.get('/api/runtime/screens/:id', (req, res) => {
-  const screen = projectService.getScreen(resolveProjectId(req), req.params.id);
+  res.set('Cache-Control', 'no-store');
+  const raw = req.query.raw === '1' || req.query.raw === 'true';
+  const screen = projectService.getScreen(resolveProjectId(req), req.params.id, { raw });
   if (!screen) return res.status(404).json({ error: 'Screen not found' });
   res.json(screen);
 });
 
+app.get('/api/runtime/overview-shell', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  // Per-screen overviewShell overrides live on each display JSON; merged project-wide shell is deprecated.
+  res.json({});
+});
+
 app.get('/api/runtime/global-objects/:id', (req, res) => {
+  res.set('Cache-Control', 'no-store');
   const obj = projectService.getGlobalObject(resolveProjectId(req), req.params.id);
   if (!obj) return res.status(404).json({ error: 'Global object not found' });
   res.json(obj);
@@ -302,9 +341,25 @@ app.post('/api/runtime/alarms/acknowledge', (req, res) => {
 app.post('/api/runtime/tags/write', (req, res) => {
   const { tag, value } = req.body || {};
   if (!tag) return res.status(400).json({ error: 'tag required' });
+  if (tagLogicService.isComputed(tag)) {
+    return res.status(400).json({ error: `${tag} is computed by Python logic and cannot be written directly` });
+  }
   const ok = tagService.set(tag, value);
+  tagLogicService.evaluate();
   alarmService.evaluate();
   res.json({ success: ok });
+});
+
+app.get('/api/runtime/tags/logic', (_req, res) => {
+  res.json({
+    engine: tagLogicService.lastEngine,
+    rules: tagLogicService.getRules()
+  });
+});
+
+app.post('/api/runtime/tags/logic/evaluate', (_req, res) => {
+  const result = tagLogicService.evaluate();
+  res.json({ success: true, ...result, tags: tagService.getAll() });
 });
 
 app.post('/api/runtime/login', (req, res) => {
@@ -345,7 +400,12 @@ alarmService.on('change', (state) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  const active = projectService.getActiveProject();
-  console.log(`Plant HMI Studio listening on http://localhost:${PORT}`);
-  console.log(`Active project: ${active?.name} | Screens: ${active?.screens?.length || 0}`);
+  try {
+    const active = projectService.getActiveProject();
+    console.log(`Plant HMI Studio listening on http://localhost:${PORT}`);
+    console.log(`Active project: ${active?.name || 'none'} | Screens: ${active?.screens?.length || 0}`);
+  } catch (err) {
+    console.log(`Plant HMI Studio listening on http://localhost:${PORT}`);
+    console.warn(`Startup project summary unavailable: ${err.message}`);
+  }
 });

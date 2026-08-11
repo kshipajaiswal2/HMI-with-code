@@ -33,5 +33,14 @@
   "displaySettings": {
     "backgroundColor": "#EBEBEB",
     "useProjectSize": true
+  },
+  "template": {
+    "enabled": true,
+    "globalObjectId": "Template",
+    "replace": {
+      "NavAlarms": {
+        "image": "select_alarm.jpg"
+      }
+    }
   }
 }

@@ -1,0 +1,14 @@
+{
+  "tags": {
+    "Safety.S_All_E_Stop_Healthy": true,
+    "Safety.RIO01_SDI_01": true,
+    "Safety.RIO01_SDI_02": true
+  },
+  "rules": [
+    {
+      "name": "System.All_E_Stop_Healthy",
+      "logic": "all(tags.get(n, False) for n in ['Safety.S_All_E_Stop_Healthy','Safety.RIO01_SDI_01','Safety.RIO01_SDI_02'])",
+      "type": "bool"
+    }
+  ]
+}

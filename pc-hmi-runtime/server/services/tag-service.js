@@ -13,6 +13,8 @@ class TagService extends EventEmitter {
         name: def.name,
         type: def.type,
         description: def.description || '',
+        logic: def.logic || '',
+        computed: def.computed === true,
         value: this.defaultValue(def.type),
         quality: 'good',
         timestamp: Date.now()
@@ -40,7 +42,9 @@ class TagService extends EventEmitter {
         value: tag.value,
         quality: tag.quality,
         type: tag.type,
-        timestamp: tag.timestamp
+        timestamp: tag.timestamp,
+        logic: tag.logic || undefined,
+        computed: tag.computed || undefined
       }])
     );
   }

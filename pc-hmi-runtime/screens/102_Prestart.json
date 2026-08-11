@@ -1,24 +1,400 @@
 {
   "id": "102_Prestart",
-  "title": "Prestart Checklist",
+  "title": "Prestart",
+  "subtitle": "Prestart",
   "navGroup": "overview",
   "securityLevel": 0,
   "components": [
-    { "type": "SubNav", "navKey": "overview" },
-    { "type": "SectionHeader", "label": "Prestart Checklist" },
     {
-      "type": "Grid",
-      "style": { "className": "checklist-grid" },
-      "children": [
-        { "type": "StateIndicator", "tag": "Prestart.PowerOK", "label": "Power Supply",
-          "states": { "true": { "text": "OK", "color": "#00c000" }, "false": { "text": "FAIL", "color": "#cc0000" } } },
-        { "type": "StateIndicator", "tag": "Prestart.AirOK", "label": "Air Pressure",
-          "states": { "true": { "text": "OK", "color": "#00c000" }, "false": { "text": "FAIL", "color": "#cc0000" } } },
-        { "type": "StateIndicator", "tag": "Prestart.SafetyOK", "label": "Safety Systems",
-          "states": { "true": { "text": "OK", "color": "#00c000" }, "false": { "text": "FAIL", "color": "#cc0000" } } },
-        { "type": "StateIndicator", "tag": "Prestart.Ready", "label": "Prestart Complete",
-          "states": { "true": { "text": "READY", "color": "#00c000" }, "false": { "text": "NOT READY", "color": "#ff8000" } } }
+      "type": "Rectangle",
+      "name": "PrestartHeaderRow",
+      "left": 274,
+      "top": 188,
+      "width": 262,
+      "height": 35,
+      "backStyle": "gradient",
+      "backColor": "#C6C6C6",
+      "endColor": "#E8E8E8",
+      "gradientStop": 95,
+      "gradientShadingStyle": "gradientHorizontalFromRight",
+      "foreColor": "#C6C6C6",
+      "lineWidth": 2
+    },
+    {
+      "type": "Rectangle",
+      "name": "PrestartRow1",
+      "left": 274,
+      "top": 222,
+      "width": 262,
+      "height": 34,
+      "backStyle": "gradient",
+      "backColor": "#C6C6C6",
+      "endColor": "#E8E8E8",
+      "gradientStop": 95,
+      "gradientShadingStyle": "gradientHorizontalFromRight",
+      "foreColor": "#C6C6C6",
+      "lineWidth": 2
+    },
+    {
+      "type": "Rectangle",
+      "name": "PrestartRow2",
+      "left": 274,
+      "top": 255,
+      "width": 262,
+      "height": 34,
+      "backStyle": "gradient",
+      "backColor": "#C6C6C6",
+      "endColor": "#E8E8E8",
+      "gradientStop": 95,
+      "gradientShadingStyle": "gradientHorizontalFromRight",
+      "foreColor": "#C6C6C6",
+      "lineWidth": 2
+    },
+    {
+      "type": "Rectangle",
+      "name": "PrestartRow3",
+      "left": 274,
+      "top": 288,
+      "width": 262,
+      "height": 34,
+      "backStyle": "gradient",
+      "backColor": "#C6C6C6",
+      "endColor": "#E8E8E8",
+      "gradientStop": 95,
+      "gradientShadingStyle": "gradientHorizontalFromRight",
+      "foreColor": "#C6C6C6",
+      "lineWidth": 2
+    },
+    {
+      "type": "Rectangle",
+      "name": "PrestartRow4",
+      "left": 274,
+      "top": 320,
+      "width": 262,
+      "height": 34,
+      "backStyle": "gradient",
+      "backColor": "#C6C6C6",
+      "endColor": "#E8E8E8",
+      "gradientStop": 95,
+      "gradientShadingStyle": "gradientHorizontalFromRight",
+      "foreColor": "#C6C6C6",
+      "lineWidth": 2
+    },
+    {
+      "type": "Rectangle",
+      "name": "PrestartColDividerReq",
+      "left": 440,
+      "top": 189,
+      "width": 2,
+      "height": 165,
+      "backStyle": "solid",
+      "backColor": "#000000",
+      "lineWidth": 0
+    },
+    {
+      "type": "Rectangle",
+      "name": "PrestartColDividerAct",
+      "left": 486,
+      "top": 189,
+      "width": 2,
+      "height": 165,
+      "backStyle": "solid",
+      "backColor": "#000000",
+      "lineWidth": 0
+    },
+    {
+      "type": "Text",
+      "name": "PrestartColDevice",
+      "caption": "Device",
+      "left": 281,
+      "top": 193,
+      "width": 155,
+      "height": 26,
+      "fontFamily": "Arial",
+      "fontSize": 13,
+      "bold": true,
+      "backStyle": "transparent",
+      "alignment": "middleLeft"
+    },
+    {
+      "type": "Text",
+      "name": "PrestartColReq",
+      "caption": "Req.",
+      "left": 441,
+      "top": 193,
+      "width": 44,
+      "height": 26,
+      "fontFamily": "Arial",
+      "fontSize": 13,
+      "bold": true,
+      "backStyle": "transparent",
+      "alignment": "middleCenter"
+    },
+    {
+      "type": "Text",
+      "name": "PrestartColAct",
+      "caption": "Act.",
+      "left": 487,
+      "top": 193,
+      "width": 44,
+      "height": 26,
+      "fontFamily": "Arial",
+      "fontSize": 13,
+      "bold": true,
+      "backStyle": "transparent",
+      "alignment": "middleCenter"
+    },
+    {
+      "type": "Text",
+      "name": "PrestartLabel1",
+      "caption": "All Safety Healthy",
+      "left": 276,
+      "top": 226,
+      "width": 155,
+      "height": 26,
+      "fontFamily": "Arial",
+      "fontSize": 12,
+      "backStyle": "transparent",
+      "alignment": "middleLeft"
+    },
+    {
+      "type": "Text",
+      "name": "PrestartLabel2",
+      "caption": "All MPCB Healthy",
+      "left": 281,
+      "top": 259,
+      "width": 155,
+      "height": 26,
+      "fontFamily": "Arial",
+      "fontSize": 12,
+      "backStyle": "transparent",
+      "alignment": "middleLeft"
+    },
+    {
+      "type": "Text",
+      "name": "PrestartLabel3",
+      "caption": "All Network Healthy",
+      "left": 281,
+      "top": 292,
+      "width": 155,
+      "height": 26,
+      "fontFamily": "Arial",
+      "fontSize": 12,
+      "backStyle": "transparent",
+      "alignment": "middleLeft"
+    },
+    {
+      "type": "Text",
+      "name": "PrestartLabel4",
+      "caption": "Air Pressure Healthy",
+      "left": 281,
+      "top": 323,
+      "width": 155,
+      "height": 26,
+      "fontFamily": "Arial",
+      "fontSize": 12,
+      "backStyle": "transparent",
+      "alignment": "middleLeft"
+    },
+    {
+      "type": "Ellipse",
+      "name": "PrestartReq1",
+      "left": 455,
+      "top": 230,
+      "width": 19,
+      "height": 19,
+      "backColor": "#10EB10"
+    },
+    {
+      "type": "Ellipse",
+      "name": "PrestartReq2",
+      "left": 455,
+      "top": 263,
+      "width": 19,
+      "height": 19,
+      "backColor": "#10EB10"
+    },
+    {
+      "type": "Ellipse",
+      "name": "PrestartReq3",
+      "left": 455,
+      "top": 295,
+      "width": 19,
+      "height": 19,
+      "backColor": "#10EB10"
+    },
+    {
+      "type": "Ellipse",
+      "name": "PrestartReq4",
+      "left": 455,
+      "top": 326,
+      "width": 19,
+      "height": 19,
+      "backColor": "#10EB10"
+    },
+    {
+      "type": "MultistateIndicator",
+      "name": "PrestartAct1",
+      "shape": "circle",
+      "tag": "Prestart.SafetyOK",
+      "left": 503,
+      "top": 230,
+      "width": 19,
+      "height": 19,
+      "states": [
+        {
+          "id": "Error",
+          "backColor": "navy",
+          "borderColor": "navy",
+          "caption": ""
+        },
+        {
+          "id": "0",
+          "value": 0,
+          "backColor": "#F83D3D",
+          "borderColor": "#F83D3D",
+          "caption": ""
+        },
+        {
+          "id": "1",
+          "value": 1,
+          "backColor": "#10EB10",
+          "borderColor": "#10EB10",
+          "caption": ""
+        }
+      ]
+    },
+    {
+      "type": "MultistateIndicator",
+      "name": "PrestartAct2",
+      "shape": "circle",
+      "tag": "Prestart.PowerOK",
+      "left": 503,
+      "top": 263,
+      "width": 19,
+      "height": 19,
+      "states": [
+        {
+          "id": "Error",
+          "backColor": "navy",
+          "borderColor": "navy",
+          "caption": ""
+        },
+        {
+          "id": "0",
+          "value": 0,
+          "backColor": "#F83D3D",
+          "borderColor": "#F83D3D",
+          "caption": ""
+        },
+        {
+          "id": "1",
+          "value": 1,
+          "backColor": "#10EB10",
+          "borderColor": "#10EB10",
+          "caption": ""
+        }
+      ]
+    },
+    {
+      "type": "MultistateIndicator",
+      "name": "PrestartAct3",
+      "shape": "circle",
+      "tag": "Prestart.Ready",
+      "left": 503,
+      "top": 295,
+      "width": 19,
+      "height": 19,
+      "states": [
+        {
+          "id": "Error",
+          "backColor": "navy",
+          "borderColor": "navy",
+          "caption": ""
+        },
+        {
+          "id": "0",
+          "value": 0,
+          "backColor": "#F83D3D",
+          "borderColor": "#F83D3D",
+          "caption": ""
+        },
+        {
+          "id": "1",
+          "value": 1,
+          "backColor": "#10EB10",
+          "borderColor": "#10EB10",
+          "caption": ""
+        }
+      ]
+    },
+    {
+      "type": "MultistateIndicator",
+      "name": "PrestartAct4",
+      "shape": "circle",
+      "tag": "Prestart.AirOK",
+      "left": 503,
+      "top": 326,
+      "width": 19,
+      "height": 19,
+      "states": [
+        {
+          "id": "Error",
+          "backColor": "navy",
+          "borderColor": "navy",
+          "caption": ""
+        },
+        {
+          "id": "0",
+          "value": 0,
+          "backColor": "#F83D3D",
+          "borderColor": "#F83D3D",
+          "caption": ""
+        },
+        {
+          "id": "1",
+          "value": 1,
+          "backColor": "#10EB10",
+          "borderColor": "#10EB10",
+          "caption": ""
+        }
       ]
     }
-  ]
+  ],
+  "displaySettings": {
+    "backgroundColor": "#EBEBEB",
+    "useProjectSize": true
+  },
+  "template": {
+    "enabled": true,
+    "globalObjectId": "Template",
+    "replace": {
+      "NavOverview": {
+        "caption": "Overview",
+        "image": "select_home.jpg",
+        "imageScaled": false,
+        "italic": false,
+        "underline": false,
+        "foreColor": "#000000",
+        "useForeColor": true,
+        "captionBackStyle": "transparent",
+        "useCaptionBackColor": false,
+        "captionBackColor": "#002952",
+        "captionBlink": false,
+        "audio": true,
+        "shape": "rectangle",
+        "patternStyle": "none",
+        "useVariableDisplay": false,
+        "parameterType": "file",
+        "parameterFile": "",
+        "parameterList": "",
+        "displayPosition": false,
+        "displayTop": 0,
+        "displayLeft": 0,
+        "useVariableDisplayPosition": false,
+        "horizontalMargin": 0,
+        "verticalMargin": 0
+      }
+    }
+  }
 }

@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const { defaultTemplateComponents } = require('../../config/template-components');
+const { composeScreen } = require('../../config/template-compose');
 
 const DISPLAY_FOLDERS = [
   { id: '100_Overview', label: '100 Overview', navGroup: 'overview' },
@@ -21,6 +23,9 @@ const WINDOW_SIZE_PRESETS = [
 ];
 
 const STUDIO_VERSION = 'Plant HMI Studio 1.0';
+
+/** Canonical FT-style starter project — Gfx, Template.json, tags, and navigation are synced from here */
+const STARTER_REFERENCE_PROJECT = 'a';
 
 const DEFAULT_DISPLAY_BACKGROUND = '#EBEBEB';
 
@@ -208,6 +213,48 @@ const PROJECT_FOLDERS = [
   'Tag'
 ];
 
+function pauseMs(ms) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) { /* spin */ }
+}
+
+function readFileWithRetry(filePath, attempts = 5) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return fs.readFileSync(filePath, 'utf8');
+    } catch (err) {
+      lastErr = err;
+      const retryable = ['EBUSY', 'EPERM', 'EACCES', 'UNKNOWN'].includes(err.code)
+        || /unknown error/i.test(String(err.message));
+      if (i + 1 < attempts && retryable) pauseMs(30 * (i + 1));
+    }
+  }
+  throw lastErr;
+}
+
+function writeJsonFileSafe(filePath, data, attempts = 6) {
+  const payload = `${JSON.stringify(data, null, 2)}\n`;
+  const dir = path.dirname(filePath);
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    const tmp = path.join(dir, `.${path.basename(filePath)}.${process.pid}.${Date.now()}.${i}.tmp`);
+    try {
+      fs.writeFileSync(tmp, payload, 'utf8');
+      fs.copyFileSync(tmp, filePath);
+      try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+      return;
+    } catch (err) {
+      lastErr = err;
+      try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+      const retryable = ['EBUSY', 'EPERM', 'EACCES', 'UNKNOWN'].includes(err.code)
+        || /unknown error/i.test(String(err.message));
+      if (i + 1 < attempts && retryable) pauseMs(50 * (i + 1));
+    }
+  }
+  throw lastErr;
+}
+
 class ProjectService {
   constructor(rootDir) {
     this.rootDir = rootDir;
@@ -215,6 +262,8 @@ class ProjectService {
     this.templateDir = path.join(this.projectsDir, '_template');
     this.standardScreensPath = path.join(rootDir, 'config', 'standard-screens.json');
     this.activeFile = path.join(this.projectsDir, '.active.json');
+    this._displaySyncLocks = new Set();
+    this._layoutEnsured = new Set();
     if (!fs.existsSync(this.projectsDir)) {
       fs.mkdirSync(this.projectsDir, { recursive: true });
     }
@@ -228,23 +277,98 @@ class ProjectService {
 
   ensureTemplate() {
     this.ensureProjectLayout('_template');
-    const lib = this.readStandardLibrary();
-    const gfxDir = path.join(this.templateDir, 'Gfx');
-    if (!fs.existsSync(gfxDir)) fs.mkdirSync(gfxDir, { recursive: true });
-
-    for (const entry of lib.screens || []) {
-      const dest = path.join(gfxDir, `${entry.id}.json`);
-      const source = path.join(this.rootDir, 'screens', `${entry.id}.json`);
-      if (fs.existsSync(source)) {
-        fs.copyFileSync(source, dest);
-      }
-    }
+    this.syncStarterLibraryFromReference();
     this.syncProjectArtifacts('_template');
     this.copyImageSeedDir(this.sharedImageLibraryDir(), path.join(this.templateDir, 'Images'));
   }
 
+  /** Keep screens/, _template/Gfx/, Template.json, and project defaults aligned with the reference starter project */
+  syncStarterLibraryFromReference() {
+    const lib = this.readStandardLibrary();
+    const screensDir = path.join(this.rootDir, 'screens');
+    const templateGfxDir = path.join(this.templateDir, 'Gfx');
+    fs.mkdirSync(screensDir, { recursive: true });
+    fs.mkdirSync(templateGfxDir, { recursive: true });
+
+    const refGfxDir = this.gfxDir(STARTER_REFERENCE_PROJECT);
+    const useReference = fs.existsSync(refGfxDir);
+
+    for (const entry of lib.screens || []) {
+      const fileName = `${entry.id}.json`;
+      const refFile = useReference ? path.join(refGfxDir, fileName) : null;
+      const legacySource = path.join(screensDir, fileName);
+      const source = (refFile && fs.existsSync(refFile)) ? refFile : legacySource;
+      if (!fs.existsSync(source)) continue;
+
+      const srcMtime = fs.statSync(source).mtimeMs;
+      for (const destDir of [screensDir, templateGfxDir]) {
+        const dest = path.join(destDir, fileName);
+        if (!fs.existsSync(dest) || srcMtime > fs.statSync(dest).mtimeMs) {
+          fs.copyFileSync(source, dest);
+        }
+      }
+    }
+
+    if (useReference) {
+      const refTemplate = path.join(this.globalObjectsDir(STARTER_REFERENCE_PROJECT), 'Template.json');
+      const destTemplate = path.join(this.templateDir, 'Global Objects', 'Template.json');
+      if (fs.existsSync(refTemplate)) {
+        fs.mkdirSync(path.dirname(destTemplate), { recursive: true });
+        if (!fs.existsSync(destTemplate)
+          || fs.statSync(refTemplate).mtimeMs > fs.statSync(destTemplate).mtimeMs) {
+          fs.copyFileSync(refTemplate, destTemplate);
+        }
+      }
+
+      const refNav = path.join(this.projectPath(STARTER_REFERENCE_PROJECT), 'navigation.json');
+      const destNav = path.join(this.templateDir, 'navigation.json');
+      if (fs.existsSync(refNav)) {
+        if (!fs.existsSync(destNav) || fs.statSync(refNav).mtimeMs > fs.statSync(destNav).mtimeMs) {
+          fs.copyFileSync(refNav, destNav);
+        }
+      }
+
+      this.copyImageSeedDir(
+        path.join(this.projectPath(STARTER_REFERENCE_PROJECT), 'Images'),
+        path.join(this.templateDir, 'Images')
+      );
+      this.syncTemplateProjectDefaultsFromReference();
+    }
+  }
+
+  syncTemplateProjectDefaultsFromReference() {
+    if (!this.projectExists(STARTER_REFERENCE_PROJECT)) return;
+    const refCfg = this.readProjectConfig(STARTER_REFERENCE_PROJECT);
+    const tplPath = path.join(this.templateDir, 'project.json');
+    if (!fs.existsSync(tplPath)) return;
+
+    let tplCfg;
+    try {
+      tplCfg = JSON.parse(readFileWithRetry(tplPath));
+    } catch {
+      return;
+    }
+
+    const next = {
+      ...tplCfg,
+      startupScreen: refCfg.startupScreen || tplCfg.startupScreen || '100_Overview',
+      tags: refCfg.tags || tplCfg.tags,
+      alarms: refCfg.alarms || tplCfg.alarms,
+      studio: {
+        ...(tplCfg.studio || {}),
+        globalObjectDefaults: refCfg.studio?.globalObjectDefaults || tplCfg.studio?.globalObjectDefaults,
+        keyAssignments: refCfg.studio?.keyAssignments || tplCfg.studio?.keyAssignments
+      }
+    };
+
+    if (JSON.stringify(tplCfg) !== JSON.stringify(next)) {
+      writeJsonFileSafe(tplPath, next);
+    }
+  }
+
   /** Create FactoryTalk-style folder tree; migrate legacy screens/ → Gfx/ */
-  ensureProjectLayout(projectId) {
+  ensureProjectLayout(projectId, { force = false } = {}) {
+    if (!force && this._layoutEnsured.has(projectId)) return;
     const base = this.projectPath(projectId);
     if (!fs.existsSync(base)) return;
     for (const folder of PROJECT_FOLDERS) {
@@ -253,46 +377,75 @@ class ProjectService {
     this.migrateLegacyScreens(projectId);
     this.ensureDefaultGlobalObjects(projectId);
     this.seedDefaultImages(projectId);
-    this.applyProjectDisplayDefaults(projectId);
+    this._layoutEnsured.add(projectId);
   }
 
   applyProjectDisplayDefaults(projectId) {
+    this.syncAllDisplaySizesToProject(projectId);
+  }
+
+  syncAllDisplaySizesToProject(projectId) {
+    if (this._displaySyncLocks.has(projectId)) return;
+    this._displaySyncLocks.add(projectId);
+    try {
+      this._syncAllDisplaySizesToProjectImpl(projectId);
+    } finally {
+      this._displaySyncLocks.delete(projectId);
+    }
+  }
+
+  _syncAllDisplaySizesToProjectImpl(projectId) {
     const base = this.projectPath(projectId);
     if (!fs.existsSync(base)) return;
-    const configPath = path.join(base, 'project.json');
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const config = this.readProjectConfig(projectId);
     config.runtime = config.runtime || {};
     const defaultBg = config.runtime.displayBackground || DEFAULT_DISPLAY_BACKGROUND;
     if (!config.runtime.displayBackground) {
       config.runtime.displayBackground = defaultBg;
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+      writeJsonFileSafe(path.join(base, 'project.json'), config);
     }
+
+    const normalizeDisplayFile = (file) => {
+      try {
+        const data = JSON.parse(readFileWithRetry(file));
+        const next = {
+          ...data,
+          displaySettings: { ...(data.displaySettings || {}) }
+        };
+        next.displaySettings.useProjectSize = true;
+        delete next.displaySettings.width;
+        delete next.displaySettings.height;
+        const bg = next.displaySettings.backgroundColor;
+        if (!bg || bg === '#808080' || bg.toLowerCase() === '#efefef') {
+          next.displaySettings.backgroundColor = defaultBg;
+        }
+        if (JSON.stringify(data) !== JSON.stringify(next)) {
+          writeJsonFileSafe(file, next);
+        }
+      } catch (err) {
+        console.warn(`Display sync skipped ${path.basename(file)}: ${err.message}`);
+      }
+    };
 
     const gfxDir = path.join(base, 'Gfx');
-    if (!fs.existsSync(gfxDir)) return;
-    for (const f of fs.readdirSync(gfxDir)) {
-      if (!f.endsWith('.json')) continue;
-      const file = path.join(gfxDir, f);
-      const screen = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (!screen.displaySettings) screen.displaySettings = {};
-      const bg = screen.displaySettings.backgroundColor;
-      if (!bg || bg === '#808080' || bg.toLowerCase() === '#efefef') {
-        screen.displaySettings.backgroundColor = defaultBg;
-        screen.displaySettings.useProjectSize = screen.displaySettings.useProjectSize ?? true;
-        fs.writeFileSync(file, JSON.stringify(screen, null, 2));
+    if (fs.existsSync(gfxDir)) {
+      for (const f of fs.readdirSync(gfxDir)) {
+        if (f.endsWith('.json')) normalizeDisplayFile(path.join(gfxDir, f));
       }
     }
 
-    const templateGo = path.join(base, 'Global Objects', 'Template.json');
-    if (fs.existsSync(templateGo)) {
-      const go = JSON.parse(fs.readFileSync(templateGo, 'utf8'));
-      go.displaySettings = go.displaySettings || {};
-      if (!go.displaySettings.backgroundColor || go.displaySettings.backgroundColor === '#808080'
-        || go.displaySettings.backgroundColor === '#EFEFEF') {
-        go.displaySettings.backgroundColor = defaultBg;
-        fs.writeFileSync(templateGo, JSON.stringify(go, null, 2));
+    const goDir = path.join(base, 'Global Objects');
+    if (fs.existsSync(goDir)) {
+      for (const f of fs.readdirSync(goDir)) {
+        if (f.endsWith('.json')) normalizeDisplayFile(path.join(goDir, f));
       }
     }
+
+    this.ensureTemplateShell(projectId);
+  }
+
+  ensureTemplateShell(projectId) {
+    this.migrateTemplateIfNeeded(projectId);
   }
 
   isImageFile(name) {
@@ -317,13 +470,15 @@ class ProjectService {
     if (!fs.existsSync(this.projectsDir)) return;
     for (const entry of fs.readdirSync(this.projectsDir, { withFileTypes: true })) {
       if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-      this.ensureProjectLayout(entry.name);
+      this.ensureProjectLayout(entry.name, { force: true });
+      this.migrateTemplateIfNeeded(entry.name);
     }
   }
 
   imagesDir(projectId) {
-    this.ensureProjectLayout(projectId);
-    return path.join(this.projectPath(projectId), 'Images');
+    const dir = path.join(this.projectPath(projectId), 'Images');
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
   }
 
   sharedImageLibraryDir() {
@@ -404,7 +559,6 @@ class ProjectService {
   }
 
   globalObjectsDir(projectId) {
-    this.ensureProjectLayout(projectId);
     return path.join(this.projectPath(projectId), 'Global Objects');
   }
 
@@ -423,22 +577,45 @@ class ProjectService {
       if (fs.existsSync(templateFile)) {
         fs.copyFileSync(templateFile, destFile);
       } else {
-        fs.writeFileSync(destFile, JSON.stringify({
+        writeJsonFileSafe(destFile, {
           id: 'Template',
           title: 'Template',
           kind: 'global-object',
           layout: 'global',
           securityLevel: 0,
           displaySettings: {
-            useProjectSize: false,
-            width: 1024,
-            height: 768,
-            backgroundColor: '#EFEFEF'
+            useProjectSize: true,
+            backgroundColor: DEFAULT_DISPLAY_BACKGROUND
           },
-          components: []
-        }, null, 2));
+          components: defaultTemplateComponents()
+        });
       }
     }
+    this.migrateTemplateIfNeeded(projectId);
+  }
+
+  migrateTemplateIfNeeded(projectId) {
+    const templateFile = path.join(this.projectPath(projectId), 'Global Objects', 'Template.json');
+    if (!fs.existsSync(templateFile)) return;
+
+    let current;
+    try {
+      current = JSON.parse(readFileWithRetry(templateFile));
+    } catch {
+      return;
+    }
+
+    const hasShell = current?.components?.some((c) => c.type === 'DisplayShell');
+    if (!hasShell) return;
+
+    const userExtras = (current.components || []).filter((c) => {
+      if (c.type === 'DisplayShell') return false;
+      if (c.type === 'Panel' && (!c.children || c.children.length === 0)) return false;
+      return true;
+    });
+
+    current.components = [...defaultTemplateComponents(), ...userExtras];
+    writeJsonFileSafe(templateFile, current);
   }
 
   listGlobalObjects(projectId) {
@@ -447,7 +624,7 @@ class ProjectService {
     return fs.readdirSync(dir)
       .filter((f) => f.endsWith('.json'))
       .map((f) => {
-        const obj = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+        const obj = JSON.parse(readFileWithRetry(path.join(dir, f)));
         return { id: obj.id || f.replace(/\.json$/, ''), title: obj.title || obj.id, file: f };
       })
       .sort((a, b) => a.id.localeCompare(b.id));
@@ -456,7 +633,26 @@ class ProjectService {
   getGlobalObject(projectId, objectId) {
     const file = this.globalObjectFilePath(projectId, objectId);
     if (!fs.existsSync(file)) return null;
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
+    return JSON.parse(readFileWithRetry(file));
+  }
+
+  updateGlobalObject(projectId, objectId, patch) {
+    if (!this.projectExists(projectId)) throw new Error('Project not found');
+    const file = this.globalObjectFilePath(projectId, objectId);
+    if (!fs.existsSync(file)) throw new Error('Global object not found');
+    const obj = JSON.parse(readFileWithRetry(file));
+    if (patch.displaySettings) {
+      const ds = { ...(obj.displaySettings || {}), ...patch.displaySettings };
+      if (ds.useProjectSize) {
+        delete ds.width;
+        delete ds.height;
+      }
+      obj.displaySettings = ds;
+      delete patch.displaySettings;
+    }
+    Object.assign(obj, patch);
+    writeJsonFileSafe(file, obj);
+    return obj;
   }
 
   migrateLegacyScreens(projectId) {
@@ -492,7 +688,6 @@ class ProjectService {
   }
 
   gfxDir(projectId) {
-    this.ensureProjectLayout(projectId);
     return path.join(this.projectPath(projectId), 'Gfx');
   }
 
@@ -525,10 +720,9 @@ class ProjectService {
 
     const settingsDir = path.join(this.projectPath(projectId), 'ProjectSettings');
     fs.mkdirSync(settingsDir, { recursive: true });
-    fs.writeFileSync(
+    writeJsonFileSafe(
       path.join(settingsDir, 'project.json'),
-      JSON.stringify(config, null, 2),
-      'utf8'
+      config
     );
 
     if (config.alarms?.length) {
@@ -544,38 +738,66 @@ class ProjectService {
 
   seedProjectFromTemplate(projectId) {
     const lib = this.readStandardLibrary();
+    const refGfxDir = this.gfxDir(STARTER_REFERENCE_PROJECT);
+    const useReference = this.projectExists(STARTER_REFERENCE_PROJECT) && fs.existsSync(refGfxDir);
     const templateGfx = path.join(this.templateDir, 'Gfx');
     const projectGfx = this.gfxDir(projectId);
 
     for (const entry of lib.screens || []) {
-      const src = path.join(templateGfx, `${entry.id}.json`);
-      const legacySrc = path.join(this.templateDir, 'screens', `${entry.id}.json`);
-      const dest = path.join(projectGfx, `${entry.id}.json`);
-      const from = fs.existsSync(src) ? src : legacySrc;
+      const fileName = `${entry.id}.json`;
+      const refSrc = useReference ? path.join(refGfxDir, fileName) : null;
+      const templateSrc = path.join(templateGfx, fileName);
+      const legacySrc = path.join(this.templateDir, 'screens', fileName);
+      const from = (refSrc && fs.existsSync(refSrc))
+        ? refSrc
+        : fs.existsSync(templateSrc)
+          ? templateSrc
+          : legacySrc;
       if (fs.existsSync(from)) {
-        fs.copyFileSync(from, dest);
+        fs.copyFileSync(from, path.join(projectGfx, fileName));
       }
     }
 
-    const navSrc = path.join(this.templateDir, 'navigation.json');
+    const navFrom = useReference
+      ? path.join(this.projectPath(STARTER_REFERENCE_PROJECT), 'navigation.json')
+      : path.join(this.templateDir, 'navigation.json');
     const navDest = path.join(this.projectPath(projectId), 'navigation.json');
-    if (fs.existsSync(navSrc)) fs.copyFileSync(navSrc, navDest);
+    if (fs.existsSync(navFrom)) fs.copyFileSync(navFrom, navDest);
 
-    const templateGlobalDir = path.join(this.templateDir, 'Global Objects');
+    const globalFrom = useReference
+      ? this.globalObjectsDir(STARTER_REFERENCE_PROJECT)
+      : path.join(this.templateDir, 'Global Objects');
     const projectGlobalDir = this.globalObjectsDir(projectId);
-    if (fs.existsSync(templateGlobalDir)) {
-      for (const f of fs.readdirSync(templateGlobalDir)) {
+    if (fs.existsSync(globalFrom)) {
+      for (const f of fs.readdirSync(globalFrom)) {
         if (!f.endsWith('.json')) continue;
-        const dest = path.join(projectGlobalDir, f);
-        if (!fs.existsSync(dest)) {
-          fs.copyFileSync(path.join(templateGlobalDir, f), dest);
-        }
+        fs.copyFileSync(path.join(globalFrom, f), path.join(projectGlobalDir, f));
       }
+    }
+
+    if (useReference) {
+      this.copyImageSeedDir(
+        path.join(this.projectPath(STARTER_REFERENCE_PROJECT), 'Images'),
+        path.join(this.projectPath(projectId), 'Images')
+      );
     }
 
     const cfgPath = path.join(this.projectPath(projectId), 'project.json');
     const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
     cfg.startupScreen = lib.startupScreen || '100_Overview';
+
+    if (useReference) {
+      const refCfg = this.readProjectConfig(STARTER_REFERENCE_PROJECT);
+      cfg.startupScreen = refCfg.startupScreen || cfg.startupScreen;
+      cfg.tags = refCfg.tags || cfg.tags;
+      cfg.alarms = refCfg.alarms || cfg.alarms;
+      cfg.studio = {
+        ...(cfg.studio || {}),
+        globalObjectDefaults: refCfg.studio?.globalObjectDefaults || cfg.studio?.globalObjectDefaults,
+        keyAssignments: refCfg.studio?.keyAssignments || cfg.studio?.keyAssignments
+      };
+    }
+
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
     this.syncProjectArtifacts(projectId);
   }
@@ -660,7 +882,7 @@ class ProjectService {
   readProjectConfig(projectId) {
     const file = path.join(this.projectPath(projectId), 'project.json');
     if (!fs.existsSync(file)) return {};
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
+    return JSON.parse(readFileWithRetry(file));
   }
 
   readNavigation(projectId) {
@@ -677,16 +899,30 @@ class ProjectService {
     return fs.readdirSync(dir)
       .filter((f) => f.endsWith('.json'))
       .map((f) => {
-        const screen = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+        const screen = JSON.parse(readFileWithRetry(path.join(dir, f)));
         return { id: screen.id, title: screen.title, navGroup: screen.navGroup, file: f };
       })
       .sort((a, b) => a.id.localeCompare(b.id));
   }
 
-  getScreen(projectId, screenId) {
+  getScreen(projectId, screenId, options = {}) {
     const file = this.screenFilePath(projectId, screenId);
     if (!fs.existsSync(file)) return null;
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
+    const raw = JSON.parse(readFileWithRetry(file));
+    if (options.raw) return raw;
+    return this.composeScreenWithTemplate(projectId, raw);
+  }
+
+  composeScreenWithTemplate(projectId, rawScreen) {
+    this.ensureDefaultGlobalObjects(projectId);
+    const config = this.readProjectConfig(projectId);
+    const runtime = config.runtime || { width: 800, height: 600 };
+    const globalObjectId = rawScreen.template?.globalObjectId || 'Template';
+    let templateObject = this.getGlobalObject(projectId, globalObjectId);
+    if (!templateObject?.components?.length && projectId !== '_template') {
+      templateObject = this.getGlobalObject('_template', globalObjectId);
+    }
+    return composeScreen(rawScreen, templateObject, runtime);
   }
 
   getFolderForScreen(screenId) {
@@ -724,6 +960,10 @@ class ProjectService {
       navGroup,
       layout: 'standard',
       securityLevel: 0,
+      template: {
+        enabled: true,
+        globalObjectId: 'Template'
+      },
       displaySettings: {
         useProjectSize: true,
         backgroundColor: this.readProjectConfig(projectId).runtime?.displayBackground || DEFAULT_DISPLAY_BACKGROUND
@@ -779,7 +1019,10 @@ class ProjectService {
         config[key] = patch[key];
       }
     }
-    fs.writeFileSync(file, JSON.stringify(config, null, 2));
+    writeJsonFileSafe(file, config);
+    if (patch.runtime) {
+      this.syncAllDisplaySizesToProject(projectId);
+    }
     this.syncProjectArtifacts(projectId);
     return config;
   }
@@ -788,7 +1031,7 @@ class ProjectService {
     if (!this.projectExists(projectId)) throw new Error('Project not found');
     const file = this.screenFilePath(projectId, screenId);
     if (!fs.existsSync(file)) throw new Error('Screen not found');
-    const screen = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const screen = JSON.parse(readFileWithRetry(file));
     if (patch.displaySettings) {
       const ds = { ...(screen.displaySettings || {}), ...patch.displaySettings };
       if (ds.useProjectSize) {
@@ -798,8 +1041,33 @@ class ProjectService {
       screen.displaySettings = ds;
       delete patch.displaySettings;
     }
+    if (patch.components && Array.isArray(patch.components)) {
+      patch.components = patch.components.map((comp) => {
+        if (!comp || typeof comp !== 'object') return comp;
+        const clean = { ...comp };
+        delete clean._source;
+        delete clean._displayIndex;
+        delete clean._templateIndex;
+        delete clean._replacesTemplate;
+        return clean;
+      });
+    }
+    if (patch.template?.replace && typeof patch.template.replace === 'object') {
+      const replace = {};
+      for (const [key, value] of Object.entries(patch.template.replace)) {
+        if (!value || typeof value !== 'object') continue;
+        const clean = { ...value };
+        delete clean._source;
+        delete clean._displayIndex;
+        delete clean._templateIndex;
+        delete clean._replacesTemplate;
+        replace[key] = clean;
+      }
+      patch.template = { ...patch.template, replace };
+    }
     Object.assign(screen, patch);
-    fs.writeFileSync(file, JSON.stringify(screen, null, 2));
+    delete screen._composed;
+    writeJsonFileSafe(file, screen);
     return screen;
   }
 
@@ -818,7 +1086,6 @@ class ProjectService {
   }
 
   buildExplorerTree(projectId) {
-    this.ensureProjectLayout(projectId);
     const config = this.readProjectConfig(projectId);
     const screens = this.listScreens(projectId);
     const byFolder = {};
@@ -1029,6 +1296,8 @@ class ProjectService {
       throw new Error('Project template not found');
     }
 
+    this.ensureTemplate();
+
     const dest = this.projectPath(id);
     this.copyDir(templateDir, dest);
 
@@ -1057,6 +1326,7 @@ class ProjectService {
     this.seedProjectFromTemplate(id);
     this.ensureProjectLayout(id);
     this.removeLegacyScreensDir(id);
+    this.syncAllDisplaySizesToProject(id);
     this.syncProjectArtifacts(id);
 
     this.setActiveId(id);
@@ -1089,14 +1359,15 @@ class ProjectService {
   openProject(id) {
     if (!this.projectExists(id)) throw new Error('Project not found');
     const configPath = path.join(this.projectPath(id), 'project.json');
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const config = JSON.parse(readFileWithRetry(configPath));
     config.studio = {
       ...(config.studio || {}),
       lastOpenedWith: STUDIO_VERSION,
       lastOpenedAt: new Date().toISOString()
     };
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-    this.ensureProjectLayout(id);
+    writeJsonFileSafe(configPath, config);
+    this.ensureProjectLayout(id, { force: true });
+    this.migrateTemplateIfNeeded(id);
     this.syncProjectArtifacts(id);
     this.setActiveId(id);
     return this.getActiveProject();
@@ -1106,6 +1377,12 @@ class ProjectService {
     const id = this.getActiveId();
     if (!id) return null;
     const config = this.readProjectConfig(id);
+    let explorer = null;
+    try {
+      explorer = this.buildExplorerTree(id);
+    } catch (err) {
+      console.warn(`Explorer tree unavailable for ${id}: ${err.message}`);
+    }
     return {
       id,
       name: config.name || id,
@@ -1114,7 +1391,7 @@ class ProjectService {
       config,
       navigation: this.readNavigation(id),
       screens: this.listScreens(id),
-      explorer: this.buildExplorerTree(id)
+      explorer
     };
   }
 

@@ -4,117 +4,41 @@
   "navGroup": "overview",
   "layout": "standard",
   "securityLevel": 0,
-  "components": [
-    {
-      "type": "SubNav",
-      "navKey": "overview"
-    },
-    {
-      "type": "Panel",
-      "style": {
-        "className": "status-row"
-      },
-      "children": [
-        {
-          "type": "StateIndicator",
-          "tag": "System.AutoMode",
-          "label": "Mode",
-          "states": {
-            "true": {
-              "text": "Auto",
-              "color": "#00c000"
-            },
-            "false": {
-              "text": "Manual",
-              "color": "#0066cc"
-            }
-          }
-        },
-        {
-          "type": "StateIndicator",
-          "tag": "System.Healthy",
-          "label": "Health",
-          "states": {
-            "true": {
-              "text": "Healthy",
-              "color": "#00c000"
-            },
-            "false": {
-              "text": "Fault",
-              "color": "#cc0000"
-            }
-          }
-        },
-        {
-          "type": "StateIndicator",
-          "tag": "System.Running",
-          "label": "Line",
-          "states": {
-            "true": {
-              "text": "Running",
-              "color": "#00c000"
-            },
-            "false": {
-              "text": "Stopped",
-              "color": "#888"
-            }
-          }
-        },
-        {
-          "type": "StateIndicator",
-          "tag": "Prestart.Ready",
-          "label": "Prestart",
-          "states": {
-            "true": {
-              "text": "Ready",
-              "color": "#00c000"
-            },
-            "false": {
-              "text": "Not Ready",
-              "color": "#ff8000"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "type": "Grid",
-      "style": {
-        "className": "metric-grid cols-4"
-      },
-      "children": [
-        {
-          "type": "NumericDisplay",
-          "tag": "Production.Count",
-          "label": "Production Count",
-          "format": "integer"
-        },
-        {
-          "type": "NumericDisplay",
-          "tag": "Production.Rate",
-          "label": "Production Rate",
-          "format": "float",
-          "decimals": 1,
-          "unit": "units/hr"
-        },
-        {
-          "type": "NumericDisplay",
-          "tag": "Production.Efficiency",
-          "label": "Efficiency",
-          "format": "percent",
-          "decimals": 1
-        },
-        {
-          "type": "NumericDisplay",
-          "tag": "Recipe.Active",
-          "label": "Active Recipe",
-          "format": "string"
-        }
-      ]
-    }
-  ],
+  "components": [],
   "displaySettings": {
     "backgroundColor": "#EBEBEB",
     "useProjectSize": true
+  },
+  "template": {
+    "enabled": true,
+    "globalObjectId": "Template",
+    "replace": {
+      "NavOverview": {
+        "caption": "Overview",
+        "image": "select_home.jpg",
+        "imageScaled": false,
+        "italic": false,
+        "underline": false,
+        "foreColor": "#000000",
+        "useForeColor": true,
+        "captionBackStyle": "transparent",
+        "useCaptionBackColor": false,
+        "captionBackColor": "#002952",
+        "captionBlink": false,
+        "audio": true,
+        "shape": "rectangle",
+        "patternStyle": "none",
+        "useVariableDisplay": false,
+        "parameterType": "file",
+        "parameterFile": "",
+        "parameterList": "",
+        "displayPosition": false,
+        "displayTop": 0,
+        "displayLeft": 0,
+        "useVariableDisplayPosition": false,
+        "horizontalMargin": 0,
+        "verticalMargin": 0
+      }
+    }
   }
 }

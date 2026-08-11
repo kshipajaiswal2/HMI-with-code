@@ -42,7 +42,7 @@
           "type": "string",
           "enum": [
             "Text", "NavButton", "NumericDisplay", "StateIndicator",
-            "AlarmList", "AlarmBanner", "MomentaryButton", "ToggleButton",
+            "AlarmList", "AlarmBanner", "MomentaryButton", "MaintainedButton", "ToggleButton",
             "TrendChart", "RecipeSelector", "UserDisplay", "Panel", "Grid"
           ]
         },

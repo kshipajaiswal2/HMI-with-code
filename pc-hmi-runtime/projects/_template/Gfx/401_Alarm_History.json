@@ -18,7 +18,23 @@
     }
   ],
   "displaySettings": {
-    "backgroundColor": "#EBEBEB",
-    "useProjectSize": true
+    "backgroundColor": "#ebebeb",
+    "useProjectSize": true,
+    "displayType": "replace",
+    "positionX": 0,
+    "positionY": 0,
+    "displayNumber": 1,
+    "showTitleBar": false,
+    "disableInitialFocus": false,
+    "maxTagUpdateRate": 1
+  },
+  "template": {
+    "enabled": true,
+    "globalObjectId": "Template",
+    "replace": {
+      "NavAlarms": {
+        "image": "select_alarm.jpg"
+      }
+    }
   }
 }

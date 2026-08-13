@@ -725,15 +725,13 @@ class ProjectService {
       config
     );
 
-    if (config.alarms?.length) {
-      const alarmDir = path.join(this.projectPath(projectId), 'M_Alarms');
-      fs.mkdirSync(alarmDir, { recursive: true });
-      fs.writeFileSync(
-        path.join(alarmDir, 'alarms.json'),
-        JSON.stringify(config.alarms, null, 2),
-        'utf8'
-      );
-    }
+    const alarmDir = path.join(this.projectPath(projectId), 'M_Alarms');
+    fs.mkdirSync(alarmDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(alarmDir, 'alarms.json'),
+      JSON.stringify(config.alarms || [], null, 2),
+      'utf8'
+    );
   }
 
   seedProjectFromTemplate(projectId) {
@@ -1011,11 +1009,14 @@ class ProjectService {
     if (patch.inactivity) {
       config.inactivity = { ...(config.inactivity || {}), ...patch.inactivity };
     }
-    if (patch.tags) {
+    if (patch.tags !== undefined) {
       config.tags = patch.tags;
     }
+    if (patch.alarms !== undefined) {
+      config.alarms = patch.alarms;
+    }
     for (const key of Object.keys(patch)) {
-      if (!['studio', 'communication', 'tags', 'runtime', 'inactivity'].includes(key)) {
+      if (!['studio', 'communication', 'tags', 'alarms', 'runtime', 'inactivity'].includes(key)) {
         config[key] = patch[key];
       }
     }

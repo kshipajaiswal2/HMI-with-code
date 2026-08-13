@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Plant HMI Studio</title>
-    <link rel="stylesheet" href="studio.css?v=0.3.1" />
+    <link rel="stylesheet" href="studio.css?v=0.3.4" />
   </head>
   <body>
     <div class="studio-app">
@@ -145,6 +145,7 @@
             <button type="button" class="menu-entry" data-tools-action="diag-viewer">Diagnostics Viewer...</button>
             <button type="button" class="menu-entry" data-tools-action="transfer"><span class="mi">⇄</span> Transfer Utility...</button>
             <button type="button" class="menu-entry" data-tools-action="tag-wizard">Tag Import and Export Wizard...</button>
+            <button type="button" class="menu-entry" data-tools-action="alarm-wizard">Alarm Import and Export Wizard...</button>
             <button type="button" class="menu-entry" data-tools-action="app-manager">Application Manager...</button>
             <button type="button" class="menu-entry disabled" data-tools-action="firmware">Firmware Upgrade Wizard...</button>
             <button type="button" class="menu-entry" data-tools-action="languages">Languages...</button>
@@ -647,6 +648,100 @@
       </div>
     </dialog>
 
+    <dialog id="tagEditDialog" class="dialog dialog-ft">
+      <form id="tagEditForm">
+        <h3 id="tagEditTitle">New HMI Tag</h3>
+        <fieldset class="ft-fieldset">
+          <label>Tag name<input type="text" id="tagEditName" required maxlength="120" placeholder="e.g. Manual.PumpRun" /></label>
+          <label>Type
+            <select id="tagEditType">
+              <option value="bool" selected>bool</option>
+              <option value="int">int</option>
+              <option value="float">float</option>
+              <option value="string">string</option>
+            </select>
+          </label>
+          <label>Description<input type="text" id="tagEditDescription" maxlength="200" placeholder="Optional description" /></label>
+          <label class="radio-row"><input type="checkbox" id="tagEditComputed" /> Computed tag (Python expression)</label>
+          <label id="tagEditLogicWrap" class="hidden">Logic expression
+            <div class="ft-tag-expr-row">
+              <textarea id="tagEditLogic" rows="3" placeholder="tags.get('Other.Tag', False)"></textarea>
+              <button type="button" class="ft-mini-btn" id="tagEditLogicExpr" title="Expression editor">Exprn…</button>
+            </div>
+          </label>
+        </fieldset>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelTagEdit">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="alarmWizardDialog" class="dialog dialog-wide dialog-alarm-wizard">
+      <h3 id="alarmWizardTitle">Alarm Import Export Wizard — Select Operation</h3>
+      <p class="dialog-hint">Project: <strong id="alarmWizardProject">—</strong></p>
+
+      <div class="alarm-wizard-step" data-alarm-step="1">
+        <p>Select the operation to perform.</p>
+        <fieldset class="ft-fieldset alarm-wizard-ops">
+          <label class="radio-row"><input type="radio" name="alarmWizardOp" value="export" /> Export alarm configuration from application</label>
+          <label class="radio-row"><input type="radio" name="alarmWizardOp" value="import" checked /> Import alarm configuration into application</label>
+        </fieldset>
+      </div>
+
+      <div class="alarm-wizard-step hidden" data-alarm-step="2-import">
+        <div class="runtime-steps">
+          <p>Import alarm definitions as JSON. Each alarm needs a <strong>tag</strong> (bool), <strong>message</strong>, and optional <strong>priority</strong> (1 = highest).</p>
+          <p>Alarms merge by tag name — existing entries with the same tag are updated.</p>
+        </div>
+        <div class="tag-wizard-file-row">
+          <input type="file" id="alarmImportFile" accept=".json,.txt" class="hidden" />
+          <button type="button" class="dialog-btn" id="alarmBrowseBtn">Browse…</button>
+          <span id="alarmImportFileName" class="tag-wizard-filename">No file selected</span>
+        </div>
+        <label>Or paste JSON array<textarea id="alarmImportJson" rows="8" placeholder='[{"tag":"Alarm.EStop","message":"Emergency stop","priority":1}]'></textarea></label>
+        <p id="alarmImportPreview" class="tag-wizard-preview">Select a file or paste JSON to preview.</p>
+      </div>
+
+      <div class="alarm-wizard-step hidden" data-alarm-step="2-export">
+        <div class="runtime-steps">
+          <p><strong>Export alarms</strong> — downloads all alarm definitions from the active project as <code>&lt;project&gt;_alarms.json</code>.</p>
+          <p id="alarmExportCount" class="tag-wizard-preview">—</p>
+        </div>
+      </div>
+
+      <p id="alarmWizardStatus" class="tag-wizard-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions alarm-wizard-nav">
+        <button type="button" class="dialog-btn" id="alarmWizardBack" disabled>&lt; Back</button>
+        <button type="button" class="dialog-btn primary" id="alarmWizardNext">Next &gt;</button>
+        <button type="button" class="dialog-btn" id="alarmWizardFinish" hidden>Finish</button>
+        <button type="button" class="dialog-btn" id="alarmWizardCancel">Cancel</button>
+        <button type="button" class="dialog-btn" id="alarmWizardHelp">Help</button>
+      </div>
+    </dialog>
+
+    <dialog id="alarmEditDialog" class="dialog dialog-ft">
+      <form id="alarmEditForm">
+        <h3 id="alarmEditTitle">New Alarm Message</h3>
+        <fieldset class="ft-fieldset">
+          <div class="ft-connection-field">
+            <label for="alarmEditTag">Trigger tag</label>
+            <div class="ft-tag-expr-row">
+              <input type="text" id="alarmEditTag" required placeholder="e.g. Alarm.EStop" />
+              <button type="button" class="ft-mini-btn" data-tag-pick="alarmEditTag" title="Browse tags">Tag…</button>
+              <button type="button" class="ft-mini-btn" data-expr-pick="alarmEditTag" title="Expression editor">Exprn…</button>
+            </div>
+          </div>
+          <label>Message<input type="text" id="alarmEditMessage" required maxlength="200" placeholder="Alarm description shown to operator" /></label>
+          <label>Priority (1 = highest)<input type="number" id="alarmEditPriority" min="1" max="15" value="5" /></label>
+        </fieldset>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelAlarmEdit">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="optionsDialog" class="dialog">
       <form id="optionsForm">
         <h3>Options</h3>
@@ -1065,10 +1160,25 @@
         <div class="dialog-tab-panel" data-mb-tab-panel="connections">
           <fieldset class="ft-fieldset">
             <legend>Connections</legend>
-            <label>Value tag<input type="text" id="mbTag" value="Manual.ConveyorRun" placeholder="e.g. Manual.ConveyorRun" /></label>
-            <label>Indicator tag<input type="text" id="mbIndicatorTag" placeholder="Optional — defaults to value tag" /></label>
+            <div class="ft-connection-field">
+              <label for="mbTag">Value tag</label>
+              <div class="ft-tag-expr-row">
+                <input type="text" id="mbTag" value="Manual.ConveyorRun" placeholder="Tag name (writes require a plain tag)" />
+                <button type="button" class="ft-mini-btn" data-tag-pick="mbTag" title="Browse tags">Tag…</button>
+                <button type="button" class="ft-mini-btn" data-expr-pick="mbTag" title="Expression editor">Exprn…</button>
+              </div>
+            </div>
+            <div class="ft-connection-field">
+              <label for="mbIndicatorTag">Indicator tag</label>
+              <div class="ft-tag-expr-row">
+                <input type="text" id="mbIndicatorTag" placeholder="Optional — tag or expression" />
+                <button type="button" class="ft-mini-btn" data-tag-pick="mbIndicatorTag" title="Browse tags">Tag…</button>
+                <button type="button" class="ft-mini-btn" data-expr-pick="mbIndicatorTag" title="Expression editor">Exprn…</button>
+              </div>
+            </div>
             <label>Value<input type="number" id="mbValue" value="1" /></label>
             <label>Release Value<input type="number" id="mbReleaseValue" value="0" /></label>
+            <p class="ft-field-hint">Value tag must be a plain tag name for write. Indicator supports expressions (Python-style, e.g. <code>tags.get('Tag', False)</code>).</p>
           </fieldset>
         </div>
         <div class="dialog-actions">
@@ -1086,9 +1196,9 @@
         <div class="dialog-tabs" role="tablist">
           <button type="button" class="dialog-tab active" data-mtn-tab="general">General</button>
           <button type="button" class="dialog-tab" data-mtn-tab="states">States</button>
+          <button type="button" class="dialog-tab" data-mtn-tab="esignature">E-Signature</button>
           <button type="button" class="dialog-tab" data-mtn-tab="common">Common</button>
           <button type="button" class="dialog-tab" data-mtn-tab="connections">Connections</button>
-          <button type="button" class="dialog-tab" data-mtn-tab="esignature">E-Signature</button>
         </div>
         <div class="dialog-tab-panel active" data-mtn-tab-panel="general">
           <fieldset class="ft-fieldset">
@@ -1137,85 +1247,118 @@
             </div>
           </fieldset>
           <fieldset class="ft-fieldset">
-            <legend>Caption font</legend>
-            <div class="text-props-font-row">
-              <label>Font
-                <select id="mtnFont">
-                  <option>Arial Unicode MS</option>
-                  <option>Arial</option>
-                  <option>Segoe UI</option>
-                </select>
-              </label>
-              <label>Size
-                <select id="mtnFontSize">
-                  <option value="8">8</option>
-                  <option value="9">9</option>
-                  <option value="10" selected>10</option>
-                  <option value="11">11</option>
-                  <option value="12">12</option>
-                  <option value="14">14</option>
-                </select>
-              </label>
-              <div class="text-style-btns">
-                <button type="button" class="text-style-btn" id="mtnBold" title="Bold">B</button>
-                <button type="button" class="text-style-btn" id="mtnItalic" title="Italic"><em>I</em></button>
-                <button type="button" class="text-style-btn" id="mtnUnderline" title="Underline"><u>U</u></button>
-              </div>
-            </div>
-          </fieldset>
-          <fieldset class="ft-fieldset">
-            <legend>Audio</legend>
-            <label class="radio-row"><input type="checkbox" id="mtnTouch" checked /> Touch</label>
+            <legend>Other</legend>
             <label class="radio-row"><input type="checkbox" id="mtnAudio" checked /> Audio</label>
-            <label>Key assignment
-              <select id="mtnKeyAssignment">
-                <option value="None" selected>None</option>
-                <option value="F1">F1</option>
-                <option value="F2">F2</option>
-                <option value="F3">F3</option>
-                <option value="F4">F4</option>
-              </select>
-            </label>
           </fieldset>
         </div>
         <div class="dialog-tab-panel" data-mtn-tab-panel="states">
-          <label>State
-            <select id="mtnStateSelect">
-              <option value="State0" selected>State0</option>
-              <option value="State1">State1</option>
-              <option value="Error">Error</option>
-            </select>
-          </label>
-          <label id="mtnStateValueRow">Value<input type="number" id="mtnStateValue" value="0" /></label>
-          <fieldset class="ft-fieldset">
-            <legend>Colors</legend>
-            <label class="color-check-row"><input type="checkbox" id="mtnStateUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="mtnStateBackColor" value="#dcdcdc" /></label>
-            <label class="color-check-row"><input type="checkbox" id="mtnStateUseBorderColor" /> Border color<input type="hidden" class="ft-color-input" id="mtnStateBorderColor" value="#c0c0c0" /></label>
-            <label class="radio-row"><input type="checkbox" id="mtnStateBlink" /> Blink</label>
-          </fieldset>
-          <fieldset class="ft-fieldset">
-            <legend>Caption</legend>
-            <textarea id="mtnStateCaption" rows="2" class="text-props-caption">Pump Run</textarea>
-            <label class="color-check-row">
-              <input type="checkbox" id="mtnStateUseCaptionColor" checked /> Caption color
-              <input type="hidden" class="ft-color-input" id="mtnStateCaptionColor" value="#000000" />
-            </label>
-            <label class="radio-row"><input type="checkbox" id="mtnStateWordWrap" checked /> Word wrap</label>
-            <fieldset class="ft-fieldset text-align-fieldset">
-              <legend>Alignment</legend>
-              <div class="text-align-grid mtn-state-align-grid">
-                <label><input type="radio" name="mtnStateAlign" value="topLeft" /><span></span></label>
-                <label><input type="radio" name="mtnStateAlign" value="topCenter" /><span></span></label>
-                <label><input type="radio" name="mtnStateAlign" value="topRight" /><span></span></label>
-                <label><input type="radio" name="mtnStateAlign" value="middleLeft" /><span></span></label>
-                <label><input type="radio" name="mtnStateAlign" value="middleCenter" checked /><span></span></label>
-                <label><input type="radio" name="mtnStateAlign" value="middleRight" /><span></span></label>
-                <label><input type="radio" name="mtnStateAlign" value="bottomLeft" /><span></span></label>
-                <label><input type="radio" name="mtnStateAlign" value="bottomCenter" /><span></span></label>
-                <label><input type="radio" name="mtnStateAlign" value="bottomRight" /><span></span></label>
+          <div class="ft-states-layout">
+            <div class="ft-states-sidebar">
+              <label class="ft-states-list-label">Select state:</label>
+              <select id="mtnStateSelect" class="ft-states-list" size="3">
+                <option value="State0" selected>State0</option>
+                <option value="State1">State1</option>
+                <option value="Error">Error</option>
+              </select>
+              <div class="ft-states-copy-row">
+                <button type="button" class="dialog-btn" id="mtnStateCopy">Copy…</button>
+                <button type="button" class="dialog-btn" id="mtnStatePaste" disabled>Paste…</button>
               </div>
-            </fieldset>
+            </div>
+            <div class="ft-states-editor">
+              <fieldset class="ft-fieldset">
+                <legend>General</legend>
+                <label id="mtnStateValueRow">Value<input type="number" id="mtnStateValue" value="0" /></label>
+                <label class="color-check-row"><input type="checkbox" id="mtnStateUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="mtnStateBackColor" value="#dcdcdc" /></label>
+                <label class="color-check-row"><input type="checkbox" id="mtnStateUseBorderColor" /> Border color<input type="hidden" class="ft-color-input" id="mtnStateBorderColor" value="#c0c0c0" /></label>
+                <label class="radio-row"><input type="checkbox" id="mtnStateBlink" /> Blink</label>
+                <label>Pattern style
+                  <select id="mtnStatePatternStyle">
+                    <option value="none" selected>None</option>
+                    <option value="solid">Solid</option>
+                  </select>
+                </label>
+              </fieldset>
+              <fieldset class="ft-fieldset">
+                <legend>Caption</legend>
+                <textarea id="mtnStateCaption" rows="3" class="text-props-caption">Pump Run</textarea>
+                <button type="button" class="dialog-btn ft-insert-var-btn" id="mtnInsertVariable" disabled>Insert Variable…</button>
+                <div class="text-props-font-row">
+                  <label>Font
+                    <select id="mtnFont">
+                      <option>Arial Unicode MS</option>
+                      <option>Arial</option>
+                      <option>Segoe UI</option>
+                    </select>
+                  </label>
+                  <label>Size
+                    <select id="mtnFontSize">
+                      <option value="8">8</option>
+                      <option value="9">9</option>
+                      <option value="10" selected>10</option>
+                      <option value="11">11</option>
+                      <option value="12">12</option>
+                      <option value="14">14</option>
+                    </select>
+                  </label>
+                  <div class="text-style-btns">
+                    <button type="button" class="text-style-btn" id="mtnBold" title="Bold">B</button>
+                    <button type="button" class="text-style-btn" id="mtnItalic" title="Italic"><em>I</em></button>
+                    <button type="button" class="text-style-btn" id="mtnUnderline" title="Underline"><u>U</u></button>
+                  </div>
+                </div>
+                <label class="color-check-row">
+                  <input type="checkbox" id="mtnStateUseCaptionColor" checked /> Caption color
+                  <input type="hidden" class="ft-color-input" id="mtnStateCaptionColor" value="#000000" />
+                </label>
+                <label class="radio-row"><input type="checkbox" id="mtnStateWordWrap" checked /> Word wrap</label>
+                <label>Caption back style
+                  <select id="mtnCaptionBackStyle">
+                    <option value="transparent" selected>Transparent</option>
+                    <option value="solid">Solid</option>
+                  </select>
+                </label>
+                <fieldset class="ft-fieldset text-align-fieldset">
+                  <legend>Alignment</legend>
+                  <div class="text-align-grid mtn-state-align-grid">
+                    <label><input type="radio" name="mtnStateAlign" value="topLeft" /><span></span></label>
+                    <label><input type="radio" name="mtnStateAlign" value="topCenter" /><span></span></label>
+                    <label><input type="radio" name="mtnStateAlign" value="topRight" /><span></span></label>
+                    <label><input type="radio" name="mtnStateAlign" value="middleLeft" /><span></span></label>
+                    <label><input type="radio" name="mtnStateAlign" value="middleCenter" checked /><span></span></label>
+                    <label><input type="radio" name="mtnStateAlign" value="middleRight" /><span></span></label>
+                    <label><input type="radio" name="mtnStateAlign" value="bottomLeft" /><span></span></label>
+                    <label><input type="radio" name="mtnStateAlign" value="bottomCenter" /><span></span></label>
+                    <label><input type="radio" name="mtnStateAlign" value="bottomRight" /><span></span></label>
+                  </div>
+                </fieldset>
+              </fieldset>
+              <fieldset class="ft-fieldset">
+                <legend>Image settings</legend>
+                <label>Image<input type="text" id="mtnStateImage" placeholder="Optional image file" /><button type="button" class="dialog-btn" disabled>…</button></label>
+                <label>Image back style
+                  <select id="mtnImageBackStyle">
+                    <option value="transparent" selected>Transparent</option>
+                    <option value="solid">Solid</option>
+                  </select>
+                </label>
+              </fieldset>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-tab-panel" data-mtn-tab-panel="esignature">
+          <label class="radio-row"><input type="checkbox" id="mtnRequireESignature" disabled /> Require electronic signature</label>
+          <label class="radio-row"><input type="checkbox" id="mtnAllowBlankComment" disabled /> Allow blank comment</label>
+          <fieldset class="ft-fieldset">
+            <legend>Single signatory</legend>
+            <label class="radio-row"><input type="checkbox" disabled /> Require re-authentication</label>
           </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Counter signatory</legend>
+            <label class="radio-row"><input type="checkbox" disabled /> Require counter signature</label>
+            <label>Authorized group<select disabled><option>Administrators</option></select></label>
+          </fieldset>
+          <p class="ft-field-hint">E-Signature enforcement is planned — options shown for FactoryTalk parity.</p>
         </div>
         <div class="dialog-tab-panel" data-mtn-tab-panel="common">
           <fieldset class="ft-fieldset">
@@ -1236,22 +1379,43 @@
             <legend>Other</legend>
             <label>Name<input type="text" id="mtnName" maxlength="40" value="MaintainedButton1" /></label>
             <label class="radio-row"><input type="checkbox" id="mtnVisible" checked /> Visible</label>
+            <label class="radio-row"><input type="checkbox" id="mtnTouch" checked /> Touch</label>
+            <label>Key assignment
+              <select id="mtnKeyAssignment">
+                <option value="None" selected>None</option>
+                <option value="F1">F1</option>
+                <option value="F2">F2</option>
+                <option value="F3">F3</option>
+                <option value="F4">F4</option>
+              </select>
+            </label>
           </fieldset>
         </div>
         <div class="dialog-tab-panel" data-mtn-tab-panel="connections">
           <fieldset class="ft-fieldset">
             <legend>Connections</legend>
-            <label>Value tag<input type="text" id="mtnTag" value="Manual.PumpRun" placeholder="e.g. Manual.PumpRun" /></label>
-            <label>Indicator tag<input type="text" id="mtnIndicatorTag" placeholder="Optional — defaults to value tag" /></label>
-          </fieldset>
-        </div>
-        <div class="dialog-tab-panel" data-mtn-tab-panel="esignature">
-          <fieldset class="ft-fieldset">
-            <legend>Electronic signature</legend>
-            <label class="radio-row"><input type="checkbox" id="mtnRequireESignature" disabled /> Require electronic signature when value changes</label>
-            <label class="radio-row"><input type="checkbox" id="mtnRequireComment" disabled /> Require comment</label>
-            <label class="radio-row"><input type="checkbox" id="mtnRequireReason" disabled /> Require reason code</label>
-            <p class="ft-field-hint">E-Signature enforcement is not available in this runtime yet.</p>
+            <table class="ft-connections-table">
+              <thead>
+                <tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="conn-dir" title="Read/Write">↔</td>
+                  <td>Value</td>
+                  <td><input type="text" id="mtnTag" value="Manual.PumpRun" placeholder="Tag name for toggle write" /></td>
+                  <td><button type="button" class="ft-mini-btn" data-tag-pick="mtnTag" title="Browse tags">…</button></td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td class="conn-dir" title="Read">←</td>
+                  <td>Indicator</td>
+                  <td><input type="text" id="mtnIndicatorTag" placeholder="Optional tag or expression" /></td>
+                  <td><button type="button" class="ft-mini-btn" data-tag-pick="mtnIndicatorTag" title="Browse tags">…</button></td>
+                  <td><button type="button" class="ft-mini-btn" data-expr-pick="mtnIndicatorTag" title="Expression editor">…</button></td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="ft-field-hint">Value is read/write (plain tag name). Indicator is read-only and supports expressions for display state.</p>
           </fieldset>
         </div>
         <div class="dialog-actions">
@@ -1587,10 +1751,55 @@
     <div id="workspaceContextMenu" class="context-menu hidden"></div>
     <input type="file" id="imageImportInput" accept=".png,.jpg,.jpeg,.gif,.bmp,.ico,.webp,.svg,image/*" hidden>
 
+    <dialog id="tagBrowserDialog" class="dialog dialog-ft dialog-tag-browser">
+      <h3>Tag Browser</h3>
+      <p class="ft-field-hint">Select a tag from the active project. Double-click a row or click OK.</p>
+      <label>Filter<input type="text" id="tagBrowserFilter" placeholder="Search name or description" /></label>
+      <div class="tag-browser-table-wrap">
+        <table class="tag-browser-table">
+          <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody id="tagBrowserList"></tbody>
+        </table>
+      </div>
+      <p class="tag-browser-selected">Selected: <strong id="tagBrowserSelected">—</strong></p>
+      <div class="dialog-actions">
+        <button type="button" class="dialog-btn primary" id="tagBrowserOk">OK</button>
+        <button type="button" class="dialog-btn" id="tagBrowserCancel">Cancel</button>
+      </div>
+    </dialog>
+
+    <dialog id="expressionEditorDialog" class="dialog dialog-ft dialog-expression-editor">
+      <h3>Expression Editor</h3>
+      <fieldset class="ft-fieldset expr-editor-toolbar">
+        <legend>Expression</legend>
+        <div class="expr-editor-btns">
+          <button type="button" class="dialog-btn" id="exprEditorTags">Tags…</button>
+          <button type="button" class="dialog-btn" id="exprEditorFunctions">Functions…</button>
+          <button type="button" class="dialog-btn" id="exprEditorIf">If</button>
+          <button type="button" class="dialog-btn" id="exprEditorLogicalAnd">Logical ▾</button>
+          <button type="button" class="dialog-btn" id="exprEditorRelEq">Relational ▾</button>
+          <button type="button" class="dialog-btn" id="exprEditorArithAdd">Arithmetic ▾</button>
+        </div>
+        <textarea id="exprEditorText" rows="8" spellcheck="false" placeholder="=tags.get('Manual.ConveyorRun', False)"></textarea>
+        <div class="expr-editor-check-row">
+          <button type="button" class="dialog-btn" id="exprEditorCheck">Check Syntax</button>
+          <span id="exprEditorStatus" class="expr-editor-status"></span>
+        </div>
+        <div class="expr-editor-cursor">Line: <span id="exprEditorLine">1</span> &nbsp; Column: <span id="exprEditorColumn">1</span></div>
+      </fieldset>
+      <p class="ft-field-hint">Python-style expressions. Prefix with <code>=</code> optional. Example: <code>1 if tags.get('System.AutoMode', False) else 0</code></p>
+      <div class="dialog-actions">
+        <button type="button" class="dialog-btn primary" id="exprEditorOk">OK</button>
+        <button type="button" class="dialog-btn" id="exprEditorCancel">Cancel</button>
+      </div>
+    </dialog>
+
     <script src="template-compose.js?v=0.1.7"></script>
     <script src="studio-objects-menu.js?v=0.2.7"></script>
     <script src="studio-color-picker.js?v=0.1.0"></script>
     <script src="rslogix-tags.js?v=0.1.0"></script>
-    <script src="studio.js?v=0.5.3"></script>
+    <script src="expression-eval.js?v=0.1.0"></script>
+    <script src="studio-tag-tools.js?v=0.1.0"></script>
+    <script src="studio.js?v=0.5.8"></script>
   </body>
 </html>

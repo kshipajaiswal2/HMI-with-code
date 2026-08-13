@@ -904,13 +904,63 @@ body.explorer-resize-active {
 .dialog-momentary-props .color-check-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .dialog-momentary-props .mb-button-mode-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
 .dialog-momentary-props .mb-state-align-grid { margin-top: 6px; }
-.dialog-maintained-props { min-width: 500px; max-width: 560px; }
-.dialog-maintained-props .dialog-tab-panel { max-height: 460px; overflow-y: auto; }
+.dialog-maintained-props { min-width: 620px; max-width: 720px; }
+.dialog-maintained-props .dialog-tab-panel { max-height: 520px; overflow-y: auto; }
 .dialog-maintained-props .goto-props-grid,
 .dialog-maintained-props .goto-props-colors { margin-bottom: 8px; }
 .dialog-maintained-props .color-check-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .dialog-maintained-props .mtn-state-align-grid { margin-top: 6px; }
 .dialog-maintained-props .ft-field-hint { font-size: 11px; color: #666; margin: 8px 0 0; }
+
+.ft-states-layout {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.ft-states-sidebar { display: flex; flex-direction: column; gap: 6px; }
+.ft-states-list-label { font-size: 12px; font-weight: 600; }
+.ft-states-list {
+  width: 100%;
+  min-height: 72px;
+  font-size: 12px;
+}
+.ft-states-copy-row { display: flex; gap: 4px; flex-wrap: wrap; }
+.ft-states-copy-row .dialog-btn { flex: 1; min-width: 0; padding: 2px 6px; font-size: 11px; }
+.ft-states-editor fieldset { margin-bottom: 8px; }
+.ft-insert-var-btn { margin: 4px 0 8px; font-size: 11px; }
+
+.ft-connections-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.ft-connections-table th,
+.ft-connections-table td {
+  border: 1px solid #c0c0c0;
+  padding: 4px 6px;
+  vertical-align: middle;
+}
+.ft-connections-table th {
+  background: #ece9d8;
+  font-weight: 600;
+  text-align: left;
+}
+.ft-connections-table .conn-dir {
+  text-align: center;
+  width: 28px;
+  font-size: 14px;
+  color: #333;
+}
+.ft-connections-table input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+}
+.ft-connections-table .ft-mini-btn {
+  min-width: 28px;
+  padding: 2px 6px;
+}
 .dialog-goto-props { min-width: 500px; max-width: 560px; }
 .dialog-goto-props .dialog-tab-panel { max-height: 460px; overflow-y: auto; }
 .dialog-goto-props .color-check-row { display: flex; align-items: center; gap: 8px; }
@@ -1382,3 +1432,88 @@ body.explorer-resize-active {
   width: 28px;
   height: 22px;
 }
+
+/* Tag / expression pickers (Connections tab) */
+.ft-connection-field {
+  margin-bottom: 10px;
+}
+.ft-connection-field > label {
+  display: block;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.ft-tag-expr-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.ft-tag-expr-row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+.ft-mini-btn {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  min-width: 44px;
+}
+
+.dialog-tag-browser {
+  width: min(640px, 92vw);
+  max-height: 80vh;
+}
+.tag-browser-table-wrap {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid #a0a0a0;
+  margin: 8px 0;
+}
+.tag-browser-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.tag-browser-table th,
+.tag-browser-table td {
+  border: 1px solid #d0d0d0;
+  padding: 4px 6px;
+  text-align: left;
+}
+.tag-browser-table th { background: #ece9d8; }
+.tag-browser-row { cursor: pointer; }
+.tag-browser-row:hover { background: #fff8dc; }
+.tag-browser-row.selected { background: #0078d7; color: #fff; }
+.tag-browser-empty { text-align: center; color: #666; padding: 12px; }
+.tag-browser-selected { font-size: 11px; margin: 4px 0; }
+
+.dialog-expression-editor {
+  width: min(560px, 92vw);
+}
+.expr-editor-toolbar textarea {
+  width: 100%;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  margin-top: 6px;
+  box-sizing: border-box;
+}
+.expr-editor-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.expr-editor-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.expr-editor-status { font-size: 11px; color: #333; }
+.expr-editor-status.ok { color: #006400; }
+.expr-editor-status.error { color: #b00000; }
+.expr-editor-cursor { font-size: 11px; color: #555; margin-top: 4px; }
+
+.dialog-alarm-wizard .alarm-wizard-ops { margin: 12px 0; }
+.dialog-alarm-wizard .alarm-wizard-ops label { display: block; margin: 8px 0; }
+.alarm-wizard-nav { justify-content: flex-end; gap: 6px; }
+.alarm-panel-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+

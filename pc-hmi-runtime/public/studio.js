@@ -23,6 +23,8 @@ const state = {
   canvasEditDrag: null
 };
 
+window.StudioState = state;
+
 const MENU_IDS = ['fileMenu', 'editMenu', 'viewMenu', 'objectsMenu', 'applicationMenu', 'toolsMenu'];
 
 const DEFAULT_VIEW_PREFS = {
@@ -242,6 +244,7 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       fillMaintainedButtonForm(comp);
       resetPropsDialogState('maintained', readMaintainedButtonForm, 'applyMaintainedButton', null, ref);
       switchMaintainedButtonTab('general');
+      wireMaintainedButtonDialogTools();
       document.getElementById('maintainedButtonDialog')?.showModal();
     } else if (comp.type === 'Image') {
       fillCanvasImagePropertiesForm(comp);
@@ -1181,6 +1184,15 @@ function defaultMaintainedButtonStates(caption = 'Pump Run') {
 
 let mtnStatesDraft = null;
 let mtnActiveStateId = 'State0';
+let mtnStateClipboard = null;
+
+function wireMaintainedButtonDialogTools() {
+  if (window.StudioTagTools) StudioTagTools.wirePickButtons();
+  if (window.FtColorPicker) {
+    window.FtColorPicker.initAll(document.getElementById('maintainedButtonDialog'));
+  }
+  syncMaintainedButtonGeneralFields();
+}
 
 function cloneMaintainedStates(states) {
   return (states || []).map((s) => ({ ...s }));
@@ -1238,6 +1250,7 @@ async function showMaintainedButtonDialog(overrides = {}) {
   fillMaintainedButtonForm(comp);
   resetPropsDialogState('maintained', readMaintainedButtonForm, 'applyMaintainedButton');
   switchMaintainedButtonTab('general');
+  wireMaintainedButtonDialogTools();
   document.getElementById('maintainedButtonDialog')?.showModal();
 }
 
@@ -1311,6 +1324,9 @@ function switchMtnState(stateId) {
 function fillMaintainedButtonForm(comp) {
   mtnStatesDraft = cloneMaintainedStates(comp.states?.length ? comp.states : defaultMaintainedButtonStates(comp.caption ?? comp.label));
   mtnActiveStateId = 'State0';
+  mtnStateClipboard = null;
+  const pasteBtn = document.getElementById('mtnStatePaste');
+  if (pasteBtn) pasteBtn.disabled = true;
 
   document.getElementById('mtnBorderStyle').value = comp.borderStyle || 'line';
   document.getElementById('mtnBorderWidth').value = comp.borderWidth ?? 1;
@@ -1439,6 +1455,25 @@ function initMaintainedButtonDialog() {
   });
   document.getElementById('mtnStateSelect')?.addEventListener('change', (e) => {
     switchMtnState(e.target.value);
+    updatePropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
+  });
+  document.getElementById('mtnStateCopy')?.addEventListener('click', () => {
+    saveMtnStateFieldsToDraft();
+    const state = mtnStatesDraft?.find((s) => s.id === mtnActiveStateId);
+    if (state) {
+      mtnStateClipboard = { ...state };
+      const pasteBtn = document.getElementById('mtnStatePaste');
+      if (pasteBtn) pasteBtn.disabled = false;
+    }
+  });
+  document.getElementById('mtnStatePaste')?.addEventListener('click', () => {
+    if (!mtnStateClipboard || !mtnStatesDraft) return;
+    saveMtnStateFieldsToDraft();
+    const idx = mtnStatesDraft.findIndex((s) => s.id === mtnActiveStateId);
+    if (idx < 0) return;
+    const keep = { id: mtnStatesDraft[idx].id, value: mtnStatesDraft[idx].value };
+    mtnStatesDraft[idx] = { ...mtnStateClipboard, ...keep };
+    loadMtnStateFieldsFromDraft(mtnActiveStateId);
     updatePropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
   });
   for (const id of ['mtnUseHighlightColor', 'mtnStateUseBackColor', 'mtnStateUseBorderColor', 'mtnStateUseCaptionColor']) {
@@ -2458,6 +2493,7 @@ async function openPropertiesForComponent(index) {
       fillMaintainedButtonForm(comp);
       resetPropsDialogState('maintained', readMaintainedButtonForm, 'applyMaintainedButton', index, entry.ref);
       switchMaintainedButtonTab('general');
+      wireMaintainedButtonDialogTools();
       document.getElementById('maintainedButtonDialog')?.showModal();
     } else if (comp.type === 'GotoButton') {
       fillGotoButtonForm(comp);
@@ -3996,45 +4032,487 @@ async function clearAllTagsFromProject() {
   setStatus(`Cleared ${tagCount} tag(s) from project`);
 }
 
+let tagEditOriginalName = null;
+
+function normalizeTagEntry(raw) {
+  const name = String(raw.name || '').trim();
+  if (!name) return null;
+  const type = ['bool', 'int', 'float', 'string'].includes(raw.type) ? raw.type : 'bool';
+  const description = String(raw.description || '').trim();
+  const entry = { name, type, description };
+  if (raw.computed) {
+    entry.computed = true;
+    entry.logic = String(raw.logic || '').trim();
+    if (!entry.logic) return null;
+  }
+  return entry;
+}
+
+function showTagEditDialog(existingName) {
+  if (!state.activeProject) {
+    setStatus('Open an application first');
+    return;
+  }
+  refreshProjectConfig().then(() => {
+    const tags = state.projectConfig?.tags || [];
+    const existing = existingName ? tags.find((t) => t.name === existingName) : null;
+    tagEditOriginalName = existing?.name || null;
+    document.getElementById('tagEditTitle').textContent = existing ? 'Edit HMI Tag' : 'New HMI Tag';
+    const nameEl = document.getElementById('tagEditName');
+    nameEl.value = existing?.name || '';
+    nameEl.readOnly = Boolean(existing);
+    document.getElementById('tagEditType').value = existing?.type || 'bool';
+    document.getElementById('tagEditDescription').value = existing?.description || '';
+    const computed = Boolean(existing?.computed);
+    document.getElementById('tagEditComputed').checked = computed;
+    document.getElementById('tagEditLogic').value = existing?.logic || '';
+    document.getElementById('tagEditLogicWrap').classList.toggle('hidden', !computed);
+    document.getElementById('tagEditDialog').showModal();
+    nameEl.focus();
+  });
+}
+
+async function saveTagEdit(e) {
+  e.preventDefault();
+  const entry = normalizeTagEntry({
+    name: document.getElementById('tagEditName').value,
+    type: document.getElementById('tagEditType').value,
+    description: document.getElementById('tagEditDescription').value,
+    computed: document.getElementById('tagEditComputed').checked,
+    logic: document.getElementById('tagEditLogic').value
+  });
+  if (!entry) {
+    alert('Tag name is required. Computed tags also need a logic expression.');
+    return;
+  }
+  await refreshProjectConfig();
+  let tags = [...(state.projectConfig?.tags || [])];
+  if (tagEditOriginalName) {
+    const idx = tags.findIndex((t) => t.name === tagEditOriginalName);
+    if (idx >= 0) tags[idx] = entry;
+    else tags.push(entry);
+  } else {
+    if (tags.some((t) => t.name === entry.name)) {
+      if (!confirm(`Tag "${entry.name}" already exists. Replace it?`)) return;
+      tags = tags.filter((t) => t.name !== entry.name);
+    }
+    tags.push(entry);
+  }
+  tags.sort((a, b) => a.name.localeCompare(b.name));
+  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tags })
+  });
+  document.getElementById('tagEditDialog').close();
+  await refreshProjectConfig();
+  await openTagsPanel();
+  setStatus(`Saved tag: ${entry.name}`);
+}
+
+function initTagEditDialog() {
+  document.getElementById('tagEditComputed')?.addEventListener('change', (e) => {
+    document.getElementById('tagEditLogicWrap').classList.toggle('hidden', !e.target.checked);
+  });
+  document.getElementById('tagEditForm')?.addEventListener('submit', (e) => {
+    saveTagEdit(e).catch((err) => setStatus(`Error: ${err.message}`));
+  });
+  document.getElementById('cancelTagEdit')?.addEventListener('click', () => {
+    document.getElementById('tagEditDialog').close();
+  });
+  document.getElementById('tagEditLogicExpr')?.addEventListener('click', () => {
+    const input = document.getElementById('tagEditLogic');
+    if (window.StudioTagTools?.openExpressionEditor) {
+      StudioTagTools.openExpressionEditor(input, input.value);
+    }
+  });
+}
+
 async function openTagsPanel() {
   hidePreviewStage();
   panelView.classList.remove('hidden');
-  const [tags, logicInfo] = await Promise.all([
+  await refreshProjectConfig();
+  const defs = state.projectConfig?.tags || [];
+  const [runtimeTags, logicInfo] = await Promise.all([
     fetchJson(`/api/runtime/tags?project=${state.activeProject}`),
     fetchJson(`/api/runtime/tags/logic?project=${state.activeProject}`).catch(() => ({ engine: 'unknown', rules: [] }))
   ]);
   const logicByName = Object.fromEntries((logicInfo.rules || []).map((rule) => [rule.name, rule.logic]));
-  const rows = Object.entries(tags).map(([name, t]) =>
-    `<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(t.type || '')}</td><td class="mono">${escapeHtml(String(t.value))}</td><td>${escapeHtml(t.quality || '')}</td><td class="mono tag-logic-cell">${escapeHtml(logicByName[name] || (t.computed ? 'computed' : '—'))}</td><td><button type="button" class="btn-link tag-delete-btn" data-tag-name="${escapeHtml(name)}" title="Remove from project.json">Remove</button></td></tr>`
-  ).join('');
+  const rows = defs.map((def) => {
+    const live = runtimeTags[def.name] || {};
+    const value = live.value !== undefined ? live.value : '—';
+    const quality = live.quality || '—';
+    return `<tr><td>${escapeHtml(def.name)}</td><td>${escapeHtml(def.type || '')}</td><td class="mono">${escapeHtml(String(value))}</td><td>${escapeHtml(quality)}</td><td class="mono tag-logic-cell">${escapeHtml(logicByName[def.name] || (def.computed ? def.logic || 'computed' : '—'))}</td><td>`
+    + `<button type="button" class="btn-link tag-edit-btn" data-tag-name="${escapeHtml(def.name)}">Edit</button> `
+    + `<button type="button" class="btn-link tag-delete-btn" data-tag-name="${escapeHtml(def.name)}" title="Remove from project.json">Remove</button></td></tr>`;
+  }).join('');
   panelView.innerHTML = `
     <div class="panel-content">
       <h2>HMI Tags</h2>
-      <p class="hint">Tags are stored in <code>project.json</code>. The <code>Tag/*-Tags.CSV</code> file is an auto-generated export (FactoryTalk-style) and is recreated whenever the project is saved — do not delete CSV files manually.</p>
-      <p class="hint">Logic engine: <strong>${escapeHtml(logicInfo.engine || 'none')}</strong>. Computed tags use Python expressions in <code>project.json</code>.</p>
+      <p class="hint">Tags are stored in <code>project.json</code> (${defs.length} defined). The <code>Tag/*-Tags.CSV</code> file is an auto-generated export and is recreated on save.</p>
+      <p class="hint">Logic engine: <strong>${escapeHtml(logicInfo.engine || 'none')}</strong>.</p>
+      <div class="alarm-panel-toolbar">
+        <button type="button" class="dialog-btn" id="tagPanelNew">New Tag…</button>
+        <button type="button" class="dialog-btn" id="tagPanelImportExport">Import and Export…</button>
+        <button type="button" class="dialog-btn" id="tagPanelClear" ${defs.length ? '' : 'disabled'}>Clear All Tags…</button>
+      </div>
       <table class="data-table"><thead><tr><th>Tag Name</th><th>Type</th><th>Value</th><th>Quality</th><th>Logic</th><th></th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="6">No tags</td></tr>'}</tbody></table>
+      <tbody>${rows || '<tr><td colspan="6">No tags — click New Tag or Import</td></tr>'}</tbody></table>
     </div>`;
+  document.getElementById('tagPanelNew')?.addEventListener('click', () => showTagEditDialog(null));
+  document.getElementById('tagPanelImportExport')?.addEventListener('click', () => showTagWizardDialog());
+  document.getElementById('tagPanelClear')?.addEventListener('click', () => {
+    clearAllTagsFromProject().catch((err) => setStatus(`Error: ${err.message}`));
+  });
+  panelView.querySelectorAll('.tag-edit-btn').forEach((btn) => {
+    btn.addEventListener('click', () => showTagEditDialog(btn.dataset.tagName));
+  });
   panelView.querySelectorAll('.tag-delete-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       deleteTagFromProject(btn.dataset.tagName).catch((err) => setStatus(`Error: ${err.message}`));
     });
   });
-  setStatus('HMI Tags');
+  setStatus(defs.length ? `HMI Tags (${defs.length})` : 'HMI Tags — none defined');
 }
 
 async function openAlarmsPanel() {
   hidePreviewStage();
   panelView.classList.remove('hidden');
-  const active = await fetchJson('/api/projects/active');
-  const alarms = active.config?.alarms || [];
+  await refreshProjectConfig();
+  const alarms = state.projectConfig?.alarms || [];
+  const rows = alarms.map((a, i) =>
+    `<tr><td>${escapeHtml(a.tag)}</td><td>${escapeHtml(a.message)}</td><td>P${a.priority ?? 5}</td>`
+    + `<td><button type="button" class="btn-link alarm-edit-btn" data-alarm-index="${i}">Edit</button> `
+    + `<button type="button" class="btn-link alarm-remove-btn" data-alarm-index="${i}">Remove</button></td></tr>`
+  ).join('');
   panelView.innerHTML = `
     <div class="panel-content">
-      <h2>Alarm Definitions</h2>
-      <table class="data-table"><thead><tr><th>Tag</th><th>Message</th><th>Priority</th></tr></thead>
-      <tbody>${alarms.map((a) => `<tr><td>${escapeHtml(a.tag)}</td><td>${escapeHtml(a.message)}</td><td>P${a.priority}</td></tr>`).join('')}</tbody></table>
+      <h2>Alarm Setup</h2>
+      <p class="hint">Alarms are stored in <code>project.json</code> and synced to <code>M_Alarms/alarms.json</code>. Each alarm triggers when its tag is true (1).</p>
+      <div class="alarm-panel-toolbar">
+        <button type="button" class="dialog-btn" id="alarmPanelNew">New Alarm…</button>
+        <button type="button" class="dialog-btn" id="alarmPanelImportExport">Import and Export…</button>
+        <button type="button" class="dialog-btn" id="alarmPanelClear" ${alarms.length ? '' : 'disabled'}>Clear All Alarms…</button>
+      </div>
+      <table class="data-table"><thead><tr><th>Trigger Tag</th><th>Message</th><th>Priority</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4">No alarm definitions — use New Alarm or Import</td></tr>'}</tbody></table>
     </div>`;
-  setStatus('Alarms');
+  document.getElementById('alarmPanelNew')?.addEventListener('click', () => showAlarmEditDialog(-1));
+  document.getElementById('alarmPanelImportExport')?.addEventListener('click', () => showAlarmWizardDialog());
+  document.getElementById('alarmPanelClear')?.addEventListener('click', () => {
+    clearAllAlarmsFromProject().catch((err) => setStatus(`Error: ${err.message}`));
+  });
+  panelView.querySelectorAll('.alarm-edit-btn').forEach((btn) => {
+    btn.addEventListener('click', () => showAlarmEditDialog(Number(btn.dataset.alarmIndex)));
+  });
+  panelView.querySelectorAll('.alarm-remove-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      removeAlarmAtIndex(Number(btn.dataset.alarmIndex)).catch((err) => setStatus(`Error: ${err.message}`));
+    });
+  });
+  if (window.StudioTagTools) StudioTagTools.wirePickButtons();
+  setStatus(alarms.length ? `Alarm Setup (${alarms.length})` : 'Alarm Setup — none defined');
+}
+
+const alarmWizardState = { step: 1, parsedAlarms: [], fileName: '' };
+let alarmEditIndex = -1;
+
+function setAlarmWizardStatus(msg, kind = '') {
+  const el = document.getElementById('alarmWizardStatus');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.className = `tag-wizard-status${kind ? ` ${kind}` : ''}`;
+}
+
+function getAlarmWizardOp() {
+  return document.querySelector('input[name="alarmWizardOp"]:checked')?.value || 'import';
+}
+
+function showAlarmWizardStep(step) {
+  alarmWizardState.step = step;
+  document.querySelectorAll('#alarmWizardDialog [data-alarm-step]').forEach((el) => {
+    el.classList.add('hidden');
+  });
+  const op = getAlarmWizardOp();
+  if (step === 1) {
+    document.querySelector('#alarmWizardDialog [data-alarm-step="1"]')?.classList.remove('hidden');
+    document.getElementById('alarmWizardTitle').textContent = 'Alarm Import Export Wizard — Select Operation';
+  } else if (op === 'export') {
+    document.querySelector('#alarmWizardDialog [data-alarm-step="2-export"]')?.classList.remove('hidden');
+    document.getElementById('alarmWizardTitle').textContent = 'Alarm Import Export Wizard — Export';
+    const count = (state.projectConfig?.alarms || []).length;
+    document.getElementById('alarmExportCount').textContent = count
+      ? `Ready to export ${count} alarm definition(s).`
+      : 'No alarms defined in this project.';
+  } else {
+    document.querySelector('#alarmWizardDialog [data-alarm-step="2-import"]')?.classList.remove('hidden');
+    document.getElementById('alarmWizardTitle').textContent = 'Alarm Import Export Wizard — Import';
+    updateAlarmImportPreview();
+  }
+  document.getElementById('alarmWizardBack').disabled = step === 1;
+  document.getElementById('alarmWizardNext').hidden = step !== 1;
+  document.getElementById('alarmWizardFinish').hidden = step === 1;
+  document.getElementById('alarmWizardFinish').textContent = op === 'export' ? 'Export' : 'Import';
+}
+
+function normalizeAlarmEntry(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const tag = String(raw.tag || raw.Tag || '').trim();
+  const message = String(raw.message || raw.Message || raw.text || '').trim();
+  if (!tag || !message) return null;
+  let priority = Number(raw.priority ?? raw.Priority ?? 5);
+  if (!Number.isFinite(priority)) priority = 5;
+  priority = Math.min(15, Math.max(1, Math.round(priority)));
+  return { tag, message, priority };
+}
+
+function parseAlarmImportJson(text) {
+  const data = JSON.parse(text);
+  const list = Array.isArray(data) ? data : (data.alarms || []);
+  if (!Array.isArray(list)) throw new Error('Expected a JSON array of alarm objects');
+  const alarms = [];
+  for (const item of list) {
+    const norm = normalizeAlarmEntry(item);
+    if (norm) alarms.push(norm);
+  }
+  if (!alarms.length) throw new Error('No valid alarms found (each needs tag and message)');
+  return alarms;
+}
+
+function updateAlarmImportPreview() {
+  const el = document.getElementById('alarmImportPreview');
+  if (!el) return;
+  const pasted = document.getElementById('alarmImportJson')?.value?.trim();
+  let alarms = alarmWizardState.parsedAlarms;
+  if (pasted) {
+    try {
+      alarms = parseAlarmImportJson(pasted);
+    } catch (err) {
+      el.textContent = err.message;
+      el.className = 'tag-wizard-preview error';
+      return;
+    }
+  }
+  if (!alarms.length) {
+    el.textContent = 'Select a file or paste JSON to preview.';
+    el.className = 'tag-wizard-preview';
+    return;
+  }
+  el.textContent = `Found ${alarms.length} alarm(s)${alarmWizardState.fileName ? ` in ${alarmWizardState.fileName}` : ''} — click Import to merge.`;
+  el.className = 'tag-wizard-preview ok';
+}
+
+function showAlarmWizardDialog() {
+  if (!state.activeProject) {
+    setStatus('Open an application first');
+    return;
+  }
+  refreshProjectConfig().then(() => {
+    document.getElementById('alarmWizardProject').textContent = state.activeProject;
+    document.querySelector('input[name="alarmWizardOp"][value="import"]').checked = true;
+    document.getElementById('alarmImportJson').value = '';
+    document.getElementById('alarmImportFile').value = '';
+    document.getElementById('alarmImportFileName').textContent = 'No file selected';
+    alarmWizardState.parsedAlarms = [];
+    alarmWizardState.fileName = '';
+    setAlarmWizardStatus('');
+    showAlarmWizardStep(1);
+    document.getElementById('alarmWizardDialog').showModal();
+  });
+}
+
+async function exportProjectAlarms() {
+  if (!state.activeProject) return;
+  await refreshProjectConfig();
+  const alarms = state.projectConfig?.alarms || [];
+  const blob = new Blob([JSON.stringify(alarms, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${state.activeProject}_alarms.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setAlarmWizardStatus(`Exported ${alarms.length} alarm(s)`, 'ok');
+  setStatus(`Exported ${alarms.length} alarms`);
+}
+
+async function importProjectAlarms(alarms) {
+  if (!state.activeProject || !alarms?.length) return;
+  await refreshProjectConfig();
+  const byTag = new Map((state.projectConfig?.alarms || []).map((a) => [a.tag, { ...a }]));
+  let added = 0;
+  let updated = 0;
+  for (const a of alarms) {
+    if (byTag.has(a.tag)) updated += 1;
+    else added += 1;
+    byTag.set(a.tag, a);
+  }
+  const merged = [...byTag.values()].sort((x, y) => x.priority - y.priority || x.tag.localeCompare(y.tag));
+  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alarms: merged })
+  });
+  await refreshProjectConfig();
+  setAlarmWizardStatus(`Imported ${alarms.length} alarm(s) — ${added} new, ${updated} updated`, 'ok');
+  setStatus(`Imported ${alarms.length} alarms`);
+  await openAlarmsPanel();
+}
+
+async function removeAlarmAtIndex(index) {
+  await refreshProjectConfig();
+  const alarms = [...(state.projectConfig?.alarms || [])];
+  const alarm = alarms[index];
+  if (!alarm) return;
+  if (!confirm(`Remove alarm "${alarm.message}" (${alarm.tag})?`)) return;
+  alarms.splice(index, 1);
+  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alarms })
+  });
+  await refreshProjectConfig();
+  await openAlarmsPanel();
+  setStatus(`Removed alarm: ${alarm.tag}`);
+}
+
+async function clearAllAlarmsFromProject() {
+  if (!state.activeProject) return;
+  await refreshProjectConfig();
+  const count = (state.projectConfig?.alarms || []).length;
+  if (!count) return;
+  if (!confirm(`Clear all ${count} alarm definition(s) from this project?`)) return;
+  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alarms: [] })
+  });
+  await refreshProjectConfig();
+  await openAlarmsPanel();
+  setStatus(`Cleared ${count} alarm(s)`);
+}
+
+function showAlarmEditDialog(index) {
+  alarmEditIndex = index;
+  refreshProjectConfig().then(() => {
+    const alarms = state.projectConfig?.alarms || [];
+    const existing = index >= 0 ? alarms[index] : null;
+    document.getElementById('alarmEditTitle').textContent = existing ? 'Edit Alarm Message' : 'New Alarm Message';
+    document.getElementById('alarmEditTag').value = existing?.tag || '';
+    document.getElementById('alarmEditMessage').value = existing?.message || '';
+    document.getElementById('alarmEditPriority').value = existing?.priority ?? 5;
+    if (window.StudioTagTools) StudioTagTools.wirePickButtons();
+    document.getElementById('alarmEditDialog').showModal();
+  });
+}
+
+async function saveAlarmEdit(e) {
+  e.preventDefault();
+  const entry = normalizeAlarmEntry({
+    tag: document.getElementById('alarmEditTag').value,
+    message: document.getElementById('alarmEditMessage').value,
+    priority: document.getElementById('alarmEditPriority').value
+  });
+  if (!entry) {
+    alert('Tag and message are required.');
+    return;
+  }
+  await refreshProjectConfig();
+  const alarms = [...(state.projectConfig?.alarms || [])];
+  if (alarmEditIndex >= 0) {
+    alarms[alarmEditIndex] = entry;
+  } else {
+    const dup = alarms.findIndex((a) => a.tag === entry.tag);
+    if (dup >= 0) {
+      if (!confirm(`Alarm for tag "${entry.tag}" already exists. Replace it?`)) return;
+      alarms[dup] = entry;
+    } else {
+      alarms.push(entry);
+    }
+  }
+  alarms.sort((a, b) => a.priority - b.priority || a.tag.localeCompare(b.tag));
+  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alarms })
+  });
+  document.getElementById('alarmEditDialog').close();
+  await refreshProjectConfig();
+  await openAlarmsPanel();
+  setStatus(`Saved alarm: ${entry.tag}`);
+}
+
+function initAlarmWizardDialog() {
+  document.getElementById('alarmWizardNext')?.addEventListener('click', () => showAlarmWizardStep(2));
+  document.getElementById('alarmWizardBack')?.addEventListener('click', () => showAlarmWizardStep(1));
+  document.getElementById('alarmWizardCancel')?.addEventListener('click', () => {
+    document.getElementById('alarmWizardDialog').close();
+  });
+  document.getElementById('alarmWizardHelp')?.addEventListener('click', () => {
+    alert('Alarm Import Export Wizard\n\nExport: download all alarm definitions as JSON.\n\nImport: browse or paste JSON array with tag, message, and priority fields.\n\nAlarms trigger at runtime when the trigger tag value is true (1).');
+  });
+  document.getElementById('alarmWizardFinish')?.addEventListener('click', () => {
+    const op = getAlarmWizardOp();
+    if (op === 'export') {
+      exportProjectAlarms().catch((err) => setAlarmWizardStatus(err.message, 'error'));
+      return;
+    }
+    const pasted = document.getElementById('alarmImportJson')?.value?.trim();
+    let alarms = alarmWizardState.parsedAlarms;
+    if (pasted) {
+      try {
+        alarms = parseAlarmImportJson(pasted);
+      } catch (err) {
+        setAlarmWizardStatus(err.message, 'error');
+        return;
+      }
+    }
+    if (!alarms.length) {
+      setAlarmWizardStatus('No alarms to import', 'error');
+      return;
+    }
+    if (!confirm(`Import ${alarms.length} alarm(s) into project "${state.activeProject}"?`)) return;
+    importProjectAlarms(alarms)
+      .then(() => document.getElementById('alarmWizardDialog').close())
+      .catch((err) => setAlarmWizardStatus(err.message, 'error'));
+  });
+  document.getElementById('alarmBrowseBtn')?.addEventListener('click', () => {
+    document.getElementById('alarmImportFile')?.click();
+  });
+  document.getElementById('alarmImportFile')?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      alarmWizardState.parsedAlarms = [];
+      alarmWizardState.fileName = '';
+      document.getElementById('alarmImportFileName').textContent = 'No file selected';
+      updateAlarmImportPreview();
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        alarmWizardState.parsedAlarms = parseAlarmImportJson(reader.result);
+        alarmWizardState.fileName = file.name;
+        document.getElementById('alarmImportFileName').textContent = file.name;
+        document.getElementById('alarmImportJson').value = '';
+        updateAlarmImportPreview();
+      } catch (err) {
+        alarmWizardState.parsedAlarms = [];
+        setAlarmWizardStatus(err.message, 'error');
+      }
+    };
+    reader.readAsText(file);
+  });
+  document.getElementById('alarmImportJson')?.addEventListener('input', () => {
+    alarmWizardState.parsedAlarms = [];
+    alarmWizardState.fileName = '';
+    updateAlarmImportPreview();
+  });
+  document.getElementById('alarmEditForm')?.addEventListener('submit', (e) => {
+    saveAlarmEdit(e).catch((err) => setStatus(`Error: ${err.message}`));
+  });
+  document.getElementById('cancelAlarmEdit')?.addEventListener('click', () => {
+    document.getElementById('alarmEditDialog').close();
+  });
 }
 
 function openSystemPanel(node) {
@@ -4836,6 +5314,7 @@ function handleToolsAction(action) {
     case 'diag-viewer': openDiagnosticsViewer(); break;
     case 'transfer': document.getElementById('transferDialog').showModal(); break;
     case 'tag-wizard': showTagWizardDialog(); break;
+    case 'alarm-wizard': showAlarmWizardDialog(); break;
     case 'app-manager': showOpenProjectDialog(); break;
     case 'languages': showApplicationLanguageDialog(); break;
     case 'find': showFindDialog(); break;
@@ -5224,7 +5703,7 @@ function getExplorerContextMenuItems(node) {
       { action: 'delete', label: 'Delete', disabled: true },
       { action: 'remove', label: 'Remove', disabled: true },
       { separator: true },
-      { action: 'import-export', label: 'Import and Export...', disabled: true },
+      { action: 'import-export', label: 'Import and Export...' },
       { action: 'filter', label: 'Filter...' }
     ];
   }
@@ -5483,14 +5962,13 @@ function runExplorerContextAction(action, node) {
       else setStatus('Add Component — select a display folder or display');
       break;
     case 'new-tag':
-      showTagWizardDialog();
+      showTagEditDialog(null);
       break;
     case 'clear-all-tags':
       clearAllTagsFromProject().catch((err) => setStatus(`Error: ${err.message}`));
       break;
     case 'new-alarm':
-      openAlarmsPanel();
-      setStatus('New alarm message — edit in Alarms panel');
+      showAlarmEditDialog(-1);
       break;
     case 'new':
       break;
@@ -5501,6 +5979,7 @@ function runExplorerContextAction(action, node) {
       break;
     case 'import-export':
       if (node.id === 'hmi-tags' || node.id === 'hmi-tags-list') showTagWizardDialog();
+      else if (node.id === 'alarms' || node.id === 'alarm-setup') showAlarmWizardDialog();
       else showGraphicsImportExportWizard(node).catch((err) => setStatus(`Error: ${err.message}`));
       break;
     case 'filter':
@@ -5970,6 +6449,9 @@ async function init() {
     initMomentaryButtonDialog();
     initMaintainedButtonDialog();
     initGotoButtonDialog();
+    initAlarmWizardDialog();
+    initTagEditDialog();
+    if (window.StudioTagTools) StudioTagTools.wirePickButtons();
     initDisplayPickerDialog();
     initObjectPlacement();
     initStudioEmbedBridge();

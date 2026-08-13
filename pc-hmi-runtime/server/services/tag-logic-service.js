@@ -138,9 +138,12 @@ class TagLogicService {
     return this.rules.some((rule) => rule.name === name && rule.computed);
   }
 
-  /** Inject Safety ladder + header tags when missing from project.json (reference project uses RSLogix import only). */
+  /** Inject Safety ladder + header tags when missing from project.json (not when tags were cleared). */
   static mergeBuiltinSafetyTags(tagDefinitions) {
-    const byName = new Map((tagDefinitions || []).map((t) => [t.name, { ...t }]));
+    const list = tagDefinitions || [];
+    if (!list.length) return [];
+
+    const byName = new Map(list.map((t) => [t.name, { ...t }]));
     for (const name of ESTOP_CHAIN) {
       if (!byName.has(name)) {
         byName.set(name, { name, type: 'bool', description: name });

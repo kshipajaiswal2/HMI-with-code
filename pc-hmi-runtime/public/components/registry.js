@@ -133,7 +133,7 @@ const ComponentRegistry = {
     const defaultState = ComponentRegistry.resolveMultistateState(states, comp.releaseValue ?? 0);
 
     if (indicatorTag && !studioEdit) {
-      ctx.bindTag(indicatorTag, showTagState);
+      ComponentRegistry.bindIndicatorRef(indicatorTag, showTagState, ctx);
     } else {
       renderState(defaultState);
     }
@@ -172,7 +172,10 @@ const ComponentRegistry = {
       }
       pressed = true;
       if (state1) renderState(state1);
-      if (comp.tag) ctx.writeTag(comp.tag, pressValue);
+      if (comp.tag) {
+        const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+        if (writeTag) ctx.writeTag(writeTag, pressValue);
+      }
     };
 
     const release = () => {
@@ -180,8 +183,13 @@ const ComponentRegistry = {
       const finish = () => {
         pressed = false;
         releaseTimer = null;
-        if (comp.tag) ctx.writeTag(comp.tag, releaseValue);
-        const val = indicatorTag ? ctx.getTagValue(indicatorTag) : releaseValue;
+        if (comp.tag) {
+          const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+          if (writeTag) ctx.writeTag(writeTag, releaseValue);
+        }
+        const val = indicatorTag
+          ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
+          : releaseValue;
         showTagState(val !== undefined ? val : releaseValue);
       };
       if (releaseTimer) clearTimeout(releaseTimer);
@@ -260,7 +268,7 @@ const ComponentRegistry = {
     const defaultState = ComponentRegistry.resolveMultistateState(states, state0Val);
 
     if (indicatorTag && !studioEdit) {
-      ctx.bindTag(indicatorTag, showTagState);
+      ComponentRegistry.bindIndicatorRef(indicatorTag, showTagState, ctx);
     } else {
       renderState(defaultState);
     }
@@ -294,10 +302,13 @@ const ComponentRegistry = {
     };
 
     const toggle = () => {
-      if (!comp.tag) return;
-      const current = indicatorTag ? ctx.getTagValue(indicatorTag) : ctx.getTagValue(comp.tag);
+      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+      if (!writeTag) return;
+      const current = indicatorTag
+        ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
+        : ctx.getTagValue(comp.tag);
       const nextVal = isState1(current) ? state0Val : state1Val;
-      ctx.writeTag(comp.tag, nextVal);
+      ctx.writeTag(writeTag, nextVal);
     };
 
     btn.addEventListener('click', (e) => {
@@ -1284,6 +1295,39 @@ const ComponentRegistry = {
     el.style.alignItems = align.align;
 
     return el;
+  },
+
+  resolveWriteTagName(ref) {
+    const s = String(ref || '').trim();
+    if (!s) return null;
+    if (typeof ExpressionEval !== 'undefined' && ExpressionEval.isExpression(s)) return null;
+    return s;
+  },
+
+  readIndicatorRef(ref, ctx) {
+    const s = String(ref || '').trim();
+    if (!s) return undefined;
+    if (typeof ExpressionEval !== 'undefined' && ExpressionEval.isExpression(s)) {
+      const refs = ExpressionEval.extractTagRefs(s);
+      const snap = {};
+      refs.forEach((name) => { snap[name] = ctx.getTagValue(name); });
+      try {
+        return ExpressionEval.evaluate(s, snap);
+      } catch {
+        return undefined;
+      }
+    }
+    return ctx.getTagValue(s);
+  },
+
+  bindIndicatorRef(ref, callback, ctx) {
+    const s = String(ref || '').trim();
+    if (!s) return;
+    if (typeof ExpressionEval !== 'undefined' && ExpressionEval.isExpression(s)) {
+      ExpressionEval.bindExpression(s, callback, ctx);
+    } else {
+      ctx.bindTag(s, callback);
+    }
   },
 
   applyGraphicsObject(el, comp) {

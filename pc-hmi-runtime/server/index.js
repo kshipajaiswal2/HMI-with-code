@@ -7,7 +7,8 @@ const { Server } = require('socket.io');
 const { TagService } = require('./services/tag-service');
 const { AlarmService } = require('./services/alarm-service');
 const { UserService } = require('./services/user-service');
-const { SimulatorDriver } = require('./services/communication/simulator');
+const { createCommunicationDriver } = require('./services/communication/driver-factory');
+const { seedDemoTagValues } = require('./services/communication/demo-tag-seeds');
 const { TagLogicService } = require('./services/tag-logic-service');
 const { ProjectService } = require('./services/project-service');
 
@@ -26,12 +27,14 @@ let loadedRuntimeProjectId = null;
 
 function loadProjectRuntime(projectId) {
   const id = projectId || projectService.getActiveId();
-  if (!id) return;
+  if (!id) return Promise.resolve();
   projectConfig = projectService.readProjectConfig(id);
   navigationConfig = projectService.readNavigation(id);
   userService = new UserService(projectConfig.users || []);
 
-  const runtimeTags = TagLogicService.mergeBuiltinSafetyTags(projectConfig.tags || []);
+  const runtimeTags = TagLogicService.mergeBuiltinRuntimeTags(
+    TagLogicService.mergeBuiltinSafetyTags(projectConfig.tags || [])
+  );
   tagService.tags.clear();
   tagService.loadDefinitions(runtimeTags);
   tagLogicService.loadRules(runtimeTags);
@@ -40,10 +43,20 @@ function loadProjectRuntime(projectId) {
   alarmService.loadDefinitions(projectConfig.alarms || []);
 
   if (driver) driver.disconnect();
-  driver = new SimulatorDriver(tagService, alarmService, tagLogicService);
-  driver.connect();
-  tagLogicService.evaluate();
-  loadedRuntimeProjectId = id;
+  driver = createCommunicationDriver(projectConfig.communication || {}, tagService, alarmService, tagLogicService);
+
+  return Promise.resolve(driver.connect())
+    .then(() => {
+      seedDemoTagValues(tagService);
+      tagLogicService.evaluate();
+      loadedRuntimeProjectId = id;
+    })
+    .catch((err) => {
+      console.error('Communication driver connect failed:', err.message);
+      seedDemoTagValues(tagService);
+      tagLogicService.evaluate();
+      loadedRuntimeProjectId = id;
+    });
 }
 
 function ensureRuntimeLoaded() {
@@ -57,7 +70,7 @@ function resolveProjectId(req) {
   return req.query.project || req.body?.projectId || projectService.getActiveId();
 }
 
-loadProjectRuntime();
+loadProjectRuntime().catch((err) => console.error('Initial runtime load failed:', err.message));
 
 const app = express();
 const server = http.createServer(app);
@@ -280,7 +293,7 @@ app.get('/api/runtime/status', (req, res) => {
     platform: 'Plant HMI Studio',
     version: '0.2.0',
     projectId: pid,
-    communication: driver.getStatus(),
+    communication: driver?.getStatus?.() ?? { connected: false, driver: 'none', quality: 'bad' },
     currentUser: userService.getCurrentUser(),
     startupScreen: config.startupScreen || '100_Overview',
     projectName: config.name || pid,
@@ -362,6 +375,27 @@ app.post('/api/runtime/tags/logic/evaluate', (_req, res) => {
   res.json({ success: true, ...result, tags: tagService.getAll() });
 });
 
+app.post('/api/runtime/communication/test', async (req, res) => {
+  ensureRuntimeLoaded();
+  const { driver, plcIpAddress, path } = req.body || {};
+  if (driver === 'simulator') {
+    return res.json({ ok: true, message: 'Simulator does not require a live PLC' });
+  }
+  const { probePlc, isValidIpv4 } = require('./services/communication/ethernet-ip');
+  if (!plcIpAddress || !isValidIpv4(plcIpAddress)) {
+    return res.status(400).json({ ok: false, error: 'Valid PLC IP address is required' });
+  }
+  const port = driver === 'opcua' ? (req.body?.opcuaPort || 4840) : 44818;
+  const result = await probePlc(plcIpAddress, port);
+  res.json({
+    ok: result.ok,
+    error: result.error,
+    plcIpAddress,
+    path: path || '0',
+    port
+  });
+});
+
 app.post('/api/runtime/login', (req, res) => {
   const { username, password } = req.body || {};
   const result = userService.login(username, password);
@@ -380,7 +414,7 @@ io.on('connection', (socket) => {
     tags: tagService.getAll(),
     alarms: alarmService.getState(),
     user: userService.getCurrentUser(),
-    communication: driver.getStatus(),
+    communication: driver?.getStatus?.() ?? { connected: false, driver: 'none', quality: 'bad' },
     project: projectService.getActiveProject()
   });
 

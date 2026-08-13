@@ -75,6 +75,31 @@ const ComponentRegistry = {
   },
 
   MomentaryButton(comp, ctx) {
+    if (!ComponentRegistry.isPlacedGraphic(comp)) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'momentary-btn';
+      btn.textContent = comp.label || comp.caption || '';
+      if (ctx.studioEdit) return btn;
+      const pressValue = comp.value ?? 1;
+      const releaseValue = comp.releaseValue ?? 0;
+      const writeTag = comp.tag ? ComponentRegistry.resolveWriteTagName(comp.tag) : null;
+      let held = false;
+      const press = () => {
+        held = true;
+        if (writeTag) ctx.writeTag(writeTag, pressValue);
+      };
+      const release = () => {
+        if (!held) return;
+        held = false;
+        if (writeTag) ctx.writeTag(writeTag, releaseValue);
+      };
+      btn.addEventListener('mousedown', (e) => { e.preventDefault(); press(); });
+      btn.addEventListener('mouseup', release);
+      btn.addEventListener('mouseleave', release);
+      return btn;
+    }
+
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'ft-momentary-btn ft-graphic';
@@ -319,6 +344,518 @@ const ComponentRegistry = {
     return btn;
   },
 
+  LatchedButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-latched-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    const states = comp.states?.length
+      ? comp.states
+      : ComponentRegistry.defaultMaintainedButtonStates(comp.caption ?? comp.label);
+    const caption = document.createElement('span');
+    caption.className = 'ft-btn-caption';
+    caption.style.pointerEvents = 'none';
+    btn.style.display = 'flex';
+    btn.style.padding = '0 4px';
+    btn.style.overflow = 'hidden';
+    btn.appendChild(caption);
+
+    const indicatorTag = comp.indicatorTag || comp.tag;
+    const state0 = states.find((s) => s.id === 'State0') || states[0];
+    const state1 = states.find((s) => s.id === 'State1') || states[1];
+    const state0Val = state0?.value ?? 0;
+    const latchVal = comp.latchValue ?? state1?.value ?? 1;
+
+    const renderState = (stateDef) => {
+      if (!stateDef) return;
+      const merged = ComponentRegistry.mergeMomentaryState(comp, stateDef);
+      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit });
+      caption.textContent = stateDef.caption ?? comp.caption ?? comp.label ?? '';
+      const alignId = stateDef.alignment || comp.alignment || 'middleCenter';
+      const align = ComponentRegistry.textAlignment(alignId);
+      btn.style.justifyContent = align.justify;
+      btn.style.alignItems = align.align;
+      ComponentRegistry.applyCaptionStyle(caption, {
+        fontFamily: comp.fontFamily,
+        fontSize: comp.fontSize,
+        bold: comp.bold,
+        italic: comp.italic,
+        underline: comp.underline,
+        foreColor: stateDef.captionColor || stateDef.foreColor || comp.foreColor,
+        useForeColor: stateDef.useCaptionColor !== false && comp.useForeColor !== false,
+        wordWrap: stateDef.wordWrap !== undefined ? stateDef.wordWrap : comp.wordWrap,
+        alignment: alignId
+      });
+      btn.classList.toggle('ft-blink', Boolean(stateDef.blink));
+    };
+
+    const showTagState = (val) => {
+      renderState(ComponentRegistry.resolveMultistateState(states, val));
+    };
+
+    if (indicatorTag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(indicatorTag, showTagState, ctx);
+    } else {
+      renderState(ComponentRegistry.resolveMultistateState(states, state0Val));
+    }
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'LatchedButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'LatchedButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      return btn;
+    }
+
+    const isLatched = (val) => {
+      const n = Number(val);
+      if (comp.latchResetType === 'zeroValue') return n !== 0;
+      return n !== 0 && n !== state0Val;
+    };
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+      if (!writeTag) return;
+      const current = indicatorTag
+        ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
+        : ctx.getTagValue(comp.tag);
+      if (!isLatched(current)) {
+        ctx.writeTag(writeTag, latchVal);
+      }
+    });
+
+    return btn;
+  },
+
+  MultistateButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-multistate-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    const userStateCount = comp.numberOfStates ?? (comp.states?.filter((s) => s.id !== 'Error').length || 2);
+    const states = comp.states?.length
+      ? comp.states
+      : ComponentRegistry.defaultMultistateButtonStates(userStateCount, comp.caption ?? comp.label);
+    const caption = document.createElement('span');
+    caption.className = 'ft-btn-caption';
+    caption.style.pointerEvents = 'none';
+    btn.style.display = 'flex';
+    btn.style.padding = '0 4px';
+    btn.style.overflow = 'hidden';
+    btn.appendChild(caption);
+
+    const indicatorTag = comp.indicatorTag || comp.tag;
+    const userStates = states.filter((s) => s.id !== 'Error');
+
+    const renderState = (stateDef) => {
+      if (!stateDef) return;
+      const merged = ComponentRegistry.mergeMomentaryState(comp, stateDef);
+      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit });
+      caption.textContent = stateDef.caption ?? comp.caption ?? comp.label ?? '';
+      const alignId = stateDef.alignment || comp.alignment || 'middleCenter';
+      const align = ComponentRegistry.textAlignment(alignId);
+      btn.style.justifyContent = align.justify;
+      btn.style.alignItems = align.align;
+      ComponentRegistry.applyCaptionStyle(caption, {
+        fontFamily: comp.fontFamily,
+        fontSize: comp.fontSize,
+        bold: comp.bold,
+        italic: comp.italic,
+        underline: comp.underline,
+        foreColor: stateDef.captionColor || stateDef.foreColor || comp.foreColor,
+        useForeColor: stateDef.useCaptionColor !== false && comp.useForeColor !== false,
+        wordWrap: stateDef.wordWrap !== undefined ? stateDef.wordWrap : comp.wordWrap,
+        alignment: alignId
+      });
+      btn.classList.toggle('ft-blink', Boolean(stateDef.blink));
+    };
+
+    const showTagState = (val) => {
+      renderState(ComponentRegistry.resolveMultistateState(states, val));
+    };
+
+    if (indicatorTag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(indicatorTag, showTagState, ctx);
+    } else {
+      renderState(ComponentRegistry.resolveMultistateState(states, userStates[0]?.value ?? 0));
+    }
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'MultistateButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'MultistateButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      return btn;
+    }
+
+    const advance = () => {
+      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+      if (!writeTag) return;
+      const current = indicatorTag
+        ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
+        : ctx.getTagValue(comp.tag);
+      const resolved = ComponentRegistry.resolveMultistateState(states, current);
+      const idx = userStates.findIndex((s) => s.id === resolved?.id);
+      const nextIdx = idx < 0 ? 0 : (idx + 1) % userStates.length;
+      ctx.writeTag(writeTag, userStates[nextIdx]?.value ?? nextIdx);
+    };
+
+    let repeatTimer = null;
+    let repeatDelayTimer = null;
+    const rate = comp.autoRepeatRate ?? 0;
+    const delay = comp.autoRepeatDelay ?? 400;
+
+    const stopRepeat = () => {
+      if (repeatDelayTimer) clearTimeout(repeatDelayTimer);
+      if (repeatTimer) clearInterval(repeatTimer);
+      repeatDelayTimer = null;
+      repeatTimer = null;
+    };
+
+    const startRepeat = () => {
+      advance();
+      if (rate <= 0) return;
+      repeatDelayTimer = setTimeout(() => {
+        repeatTimer = setInterval(advance, rate);
+      }, delay);
+    };
+
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
+    btn.addEventListener('mouseup', stopRepeat);
+    btn.addEventListener('mouseleave', stopRepeat);
+    btn.addEventListener('click', (e) => e.preventDefault());
+    if (comp.touch !== false) {
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
+      btn.addEventListener('touchend', stopRepeat);
+      btn.addEventListener('touchcancel', stopRepeat);
+    }
+
+    return btn;
+  },
+
+  defaultMultistateButtonStates(count = 2, caption = '') {
+    const states = [];
+    for (let i = 0; i < count; i++) {
+      states.push({
+        id: `State${i}`, value: i, backColor: '#001C38', borderColor: '#001C38',
+        useBackColor: true, useBorderColor: true, caption: i === 0 ? caption : '',
+        captionColor: '#ffffff', useCaptionColor: true,
+        wordWrap: true, alignment: 'middleCenter', blink: false
+      });
+    }
+    states.push({
+      id: 'Error', backColor: '#001C38', borderColor: '#001C38',
+      useBackColor: true, useBorderColor: true, caption: 'Error',
+      captionColor: '#ffffff', useCaptionColor: true,
+      wordWrap: true, alignment: 'middleCenter', blink: false
+    });
+    return states;
+  },
+
+  InterlockedButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-interlocked-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    const states = comp.states?.length
+      ? comp.states
+      : ComponentRegistry.defaultInterlockedButtonStates(comp.caption ?? comp.label);
+    const caption = document.createElement('span');
+    caption.className = 'ft-btn-caption';
+    caption.style.pointerEvents = 'none';
+    btn.style.display = 'flex';
+    btn.style.padding = '0 4px';
+    btn.style.overflow = 'hidden';
+    btn.appendChild(caption);
+
+    let pressed = false;
+    const buttonValue = comp.buttonValue ?? 1;
+    const releaseValue = 0;
+    const state1 = states.find((s) => s.id === 'State1') || states[1];
+
+    const renderState = (stateDef) => {
+      if (!stateDef) return;
+      const merged = ComponentRegistry.mergeMomentaryState(comp, stateDef);
+      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit });
+      caption.textContent = stateDef.caption ?? comp.caption ?? comp.label ?? '';
+      const alignId = stateDef.alignment || comp.alignment || 'middleLeft';
+      const align = ComponentRegistry.textAlignment(alignId);
+      btn.style.justifyContent = align.justify;
+      btn.style.alignItems = align.align;
+      ComponentRegistry.applyCaptionStyle(caption, {
+        fontFamily: comp.fontFamily,
+        fontSize: comp.fontSize,
+        bold: comp.bold,
+        italic: comp.italic,
+        underline: comp.underline,
+        foreColor: stateDef.captionColor || stateDef.foreColor || comp.foreColor,
+        useForeColor: stateDef.useCaptionColor !== false && comp.useForeColor !== false,
+        wordWrap: stateDef.wordWrap !== undefined ? stateDef.wordWrap : comp.wordWrap,
+        alignment: alignId
+      });
+      btn.classList.toggle('ft-blink', Boolean(stateDef.blink));
+    };
+
+    const showTagState = (val) => {
+      if (pressed) return;
+      renderState(ComponentRegistry.resolveMultistateState(states, val));
+    };
+
+    if (comp.tag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(comp.tag, showTagState, ctx);
+    } else {
+      renderState(ComponentRegistry.resolveMultistateState(states, releaseValue));
+    }
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'InterlockedButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'InterlockedButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      return btn;
+    }
+
+    const press = () => {
+      pressed = true;
+      if (state1) renderState(state1);
+      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+      if (writeTag) ctx.writeTag(writeTag, buttonValue);
+    };
+
+    const release = () => {
+      if (!pressed) return;
+      pressed = false;
+      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+      if (writeTag) ctx.writeTag(writeTag, releaseValue);
+      const val = comp.tag ? ctx.getTagValue(comp.tag) : releaseValue;
+      showTagState(val !== undefined ? val : releaseValue);
+    };
+
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); press(); });
+    btn.addEventListener('mouseup', release);
+    btn.addEventListener('mouseleave', release);
+    if (comp.touch !== false) {
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); press(); }, { passive: false });
+      btn.addEventListener('touchend', release);
+      btn.addEventListener('touchcancel', release);
+    }
+
+    return btn;
+  },
+
+  RampButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-ramp-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    const caption = document.createElement('span');
+    caption.className = 'ft-btn-caption';
+    caption.style.pointerEvents = 'none';
+    btn.style.display = 'flex';
+    btn.style.padding = '0 4px';
+    btn.style.overflow = 'hidden';
+    btn.appendChild(caption);
+
+    const renderAppearance = () => {
+      ComponentRegistry.applyButtonAppearance(btn, { ...comp, studioEdit });
+      caption.textContent = comp.caption ?? comp.label ?? '';
+      const alignId = comp.alignment || 'middleCenter';
+      const align = ComponentRegistry.textAlignment(alignId);
+      btn.style.justifyContent = align.justify;
+      btn.style.alignItems = align.align;
+      ComponentRegistry.applyCaptionStyle(caption, {
+        fontFamily: comp.fontFamily,
+        fontSize: comp.fontSize,
+        bold: comp.bold,
+        italic: comp.italic,
+        underline: comp.underline,
+        foreColor: comp.captionColor || comp.foreColor,
+        useForeColor: comp.useCaptionColor !== false && comp.useForeColor !== false,
+        wordWrap: comp.wordWrap !== false,
+        alignment: alignId
+      });
+    };
+    renderAppearance();
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'RampButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'RampButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      return btn;
+    }
+
+    const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+    if (!writeTag) return btn;
+
+    const rampUp = (comp.operationDirection || 'rampUp') === 'rampUp';
+    const rate = comp.autoRepeatRate ?? 0;
+    const delay = comp.autoRepeatDelay ?? 400;
+    let repeatTimer = null;
+    let delayTimer = null;
+
+    const getRampStep = () => {
+      if (comp.useVariableRamp && comp.rampTag) {
+        const v = ComponentRegistry.readIndicatorRef(comp.rampTag, ctx);
+        const n = Number(v);
+        if (!Number.isNaN(n) && n > 0) return n;
+      }
+      return comp.rampValue ?? 1;
+    };
+
+    const getLimit = () => {
+      if (comp.useVariableLimit && comp.limitTag) {
+        const v = ComponentRegistry.readIndicatorRef(comp.limitTag, ctx);
+        const n = Number(v);
+        if (!Number.isNaN(n)) return n;
+      }
+      return rampUp ? (comp.upperLimit ?? 100) : (comp.lowerLimit ?? 0);
+    };
+
+    const step = () => {
+      const current = Number(ctx.getTagValue(comp.tag)) || 0;
+      const stepVal = getRampStep();
+      const limit = getLimit();
+      let next = rampUp ? current + stepVal : current - stepVal;
+      if (rampUp) next = Math.min(next, limit);
+      else next = Math.max(next, limit);
+      if (next !== current) ctx.writeTag(writeTag, next);
+    };
+
+    const stop = () => {
+      if (delayTimer) clearTimeout(delayTimer);
+      if (repeatTimer) clearInterval(repeatTimer);
+      delayTimer = null;
+      repeatTimer = null;
+    };
+
+    const start = () => {
+      step();
+      if (rate <= 0) return;
+      delayTimer = setTimeout(() => {
+        repeatTimer = setInterval(step, rate);
+      }, delay);
+    };
+
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); start(); });
+    btn.addEventListener('mouseup', stop);
+    btn.addEventListener('mouseleave', stop);
+    btn.addEventListener('click', (e) => e.preventDefault());
+    if (comp.touch !== false) {
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); start(); }, { passive: false });
+      btn.addEventListener('touchend', stop);
+      btn.addEventListener('touchcancel', stop);
+    }
+
+    return btn;
+  },
+
+  defaultInterlockedButtonStates(caption = '') {
+    return [
+      {
+        id: 'State0', value: 0, backColor: '#001C38', borderColor: '#001C38',
+        useBackColor: true, useBorderColor: true, caption,
+        captionColor: '#ffffff', useCaptionColor: true,
+        wordWrap: true, alignment: 'middleLeft', blink: false
+      },
+      {
+        id: 'State1', value: 1, backColor: '#001C38', borderColor: '#001C38',
+        useBackColor: true, useBorderColor: true, caption,
+        captionColor: '#ffffff', useCaptionColor: true,
+        wordWrap: true, alignment: 'middleLeft', blink: false
+      }
+    ];
+  },
+
   defaultMaintainedButtonStates(caption = 'Pump Run') {
     return ComponentRegistry.defaultMomentaryButtonStates(caption);
   },
@@ -434,28 +971,400 @@ const ComponentRegistry = {
   },
 
   NumericDisplay(comp, ctx) {
-    const card = document.createElement('div');
-    card.className = 'metric-card';
-    const label = document.createElement('div');
-    label.className = 'metric-label';
-    label.textContent = comp.label || comp.tag;
-    const valueRow = document.createElement('div');
-    const valueEl = document.createElement('span');
-    valueEl.className = 'metric-value';
-    valueEl.textContent = '—';
-    valueRow.appendChild(valueEl);
-    if (comp.unit) {
-      const unit = document.createElement('span');
-      unit.className = 'metric-unit';
-      unit.textContent = comp.unit;
-      valueRow.appendChild(unit);
+    if (!ComponentRegistry.isPlacedGraphic(comp)) {
+      const card = document.createElement('div');
+      card.className = 'metric-card';
+      const labelEl = document.createElement('div');
+      labelEl.className = 'metric-label';
+      labelEl.textContent = comp.label || '';
+      card.appendChild(labelEl);
+      const valueEl = document.createElement('div');
+      valueEl.className = 'metric-value';
+      const showValue = (val) => {
+        valueEl.textContent = ComponentRegistry.formatNumericDisplayValue(val, comp);
+      };
+      if (comp.tag && !ctx.studioEdit) {
+        ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
+      } else {
+        showValue(comp.defaultValue ?? 0);
+      }
+      card.appendChild(valueEl);
+      if (comp.unit) {
+        const unitEl = document.createElement('span');
+        unitEl.className = 'metric-unit';
+        unitEl.textContent = comp.unit;
+        valueEl.appendChild(unitEl);
+      }
+      return card;
     }
-    card.appendChild(label);
-    card.appendChild(valueRow);
-    ctx.bindTag(comp.tag, (val) => {
-      valueEl.textContent = ComponentRegistry.formatValue(val, comp);
+
+    const el = document.createElement('div');
+    el.className = 'ft-numeric-display ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 4,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      studioEdit
     });
-    return card;
+
+    el.style.display = 'flex';
+    el.style.overflow = 'hidden';
+    el.style.padding = '0 4px';
+
+    const valueEl = document.createElement('span');
+    valueEl.className = 'ft-numeric-display-value';
+    valueEl.style.pointerEvents = 'none';
+    valueEl.style.width = '100%';
+    el.appendChild(valueEl);
+
+    const digits = comp.numberOfDigits ?? 5;
+    const placeholder = 'N'.repeat(Math.max(1, digits));
+    const alignId = comp.alignment || 'middleCenter';
+    const align = ComponentRegistry.textAlignment(alignId);
+    el.style.justifyContent = align.justify;
+    el.style.alignItems = align.align;
+
+    const applyTextStyle = () => {
+      ComponentRegistry.applyCaptionStyle(valueEl, {
+        fontFamily: comp.fontFamily,
+        fontSize: comp.fontSize,
+        bold: comp.bold,
+        italic: comp.italic,
+        underline: comp.underline,
+        foreColor: comp.foreColor || '#ffffff',
+        useForeColor: comp.useForeColor !== false,
+        wordWrap: false,
+        alignment: alignId
+      });
+      el.classList.toggle('ft-blink', Boolean(comp.blink));
+    };
+    applyTextStyle();
+
+    const showValue = (val) => {
+      valueEl.textContent = ComponentRegistry.formatNumericDisplayValue(val, comp);
+    };
+
+    if (comp.tag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
+    } else {
+      valueEl.textContent = placeholder;
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'NumericDisplay',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'NumericDisplay',
+          source: comp._source || ''
+        }, '*');
+      });
+    }
+
+    return el;
+  },
+
+  NumericInputEnable(comp, ctx) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'ft-numeric-input ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 4,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      studioEdit
+    });
+
+    el.style.display = 'flex';
+    el.style.overflow = 'hidden';
+    el.style.padding = '0 4px';
+    el.style.cursor = studioEdit ? 'default' : 'pointer';
+
+    const valueEl = document.createElement('span');
+    valueEl.className = 'ft-numeric-display-value';
+    valueEl.style.pointerEvents = 'none';
+    valueEl.style.width = '100%';
+    el.appendChild(valueEl);
+
+    const alignId = comp.alignment || 'middleCenter';
+    const align = ComponentRegistry.textAlignment(alignId);
+    el.style.justifyContent = align.justify;
+    el.style.alignItems = align.align;
+
+    const showValue = (val) => {
+      valueEl.textContent = ComponentRegistry.formatNumericDisplayValue(val, comp);
+    };
+
+    if (comp.tag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
+    } else {
+      valueEl.textContent = 'NNNNN';
+    }
+
+    if (comp.caption) {
+      ComponentRegistry.applyCaptionStyle(valueEl, {
+        fontFamily: comp.fontFamily,
+        fontSize: comp.fontSize,
+        bold: comp.bold,
+        italic: comp.italic,
+        underline: comp.underline,
+        foreColor: comp.captionColor || comp.foreColor || '#ffffff',
+        useForeColor: comp.useCaptionColor !== false && comp.useForeColor !== false,
+        wordWrap: comp.wordWrap !== false,
+        alignment: alignId
+      });
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'NumericInputEnable',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'NumericInputEnable',
+          source: comp._source || ''
+        }, '*');
+      });
+      return el;
+    }
+
+    const getMin = () => {
+      if (comp.useVariableMinMax && comp.minimumTag) {
+        const v = Number(ComponentRegistry.readIndicatorRef(comp.minimumTag, ctx));
+        if (!Number.isNaN(v)) return v;
+      }
+      return comp.minValue ?? 0;
+    };
+
+    const getMax = () => {
+      if (comp.useVariableMinMax && comp.maximumTag) {
+        const v = Number(ComponentRegistry.readIndicatorRef(comp.maximumTag, ctx));
+        if (!Number.isNaN(v)) return v;
+      }
+      return comp.maxValue ?? 2147483647;
+    };
+
+    const commitValue = (raw) => {
+      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+      if (!writeTag) return;
+      const n = Number(raw);
+      if (Number.isNaN(n)) return;
+      const min = getMin();
+      const max = getMax();
+      const clamped = Math.min(max, Math.max(min, n));
+      ctx.writeTag(writeTag, clamped);
+      if (comp.enterTag) {
+        const enterWrite = ComponentRegistry.resolveWriteTagName(comp.enterTag);
+        if (enterWrite) {
+          ctx.writeTag(enterWrite, 1);
+          setTimeout(() => ctx.writeTag(enterWrite, 0), comp.enterKeyHoldTime ?? 250);
+        }
+      }
+      showValue(clamped);
+    };
+
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      const current = comp.tag ? ctx.getTagValue(comp.tag) : '';
+      const input = window.prompt('Enter value:', current !== undefined && current !== null ? String(current) : '');
+      if (input === null) return;
+      commitValue(input);
+    });
+
+    return el;
+  },
+
+  NumericInputCursorPoint(comp, ctx) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'ft-numeric-input ft-numeric-input-cursor ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 4,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      studioEdit
+    });
+
+    el.style.display = 'flex';
+    el.style.overflow = 'hidden';
+    el.style.padding = '0 4px';
+    el.style.cursor = studioEdit ? 'default' : 'pointer';
+
+    const valueEl = document.createElement('span');
+    valueEl.className = 'ft-numeric-display-value';
+    valueEl.style.pointerEvents = 'none';
+    valueEl.style.width = '100%';
+    el.appendChild(valueEl);
+
+    const digits = comp.numberOfDigits ?? 5;
+    const placeholder = 'N'.repeat(Math.max(1, digits));
+    const alignId = comp.alignment || 'middleCenter';
+    const align = ComponentRegistry.textAlignment(alignId);
+    el.style.justifyContent = align.justify;
+    el.style.alignItems = align.align;
+
+    ComponentRegistry.applyCaptionStyle(valueEl, {
+      fontFamily: comp.fontFamily,
+      fontSize: comp.fontSize,
+      bold: comp.bold,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.foreColor || '#ffffff',
+      useForeColor: comp.useForeColor !== false,
+      wordWrap: false,
+      alignment: alignId
+    });
+
+    const showValue = (val) => {
+      valueEl.textContent = ComponentRegistry.formatNumericDisplayValue(val, comp);
+    };
+
+    const displayRef = comp.indicatorTag || comp.tag;
+    if (displayRef && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(displayRef, showValue, ctx);
+    } else {
+      valueEl.textContent = placeholder;
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'NumericInputCursorPoint',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'NumericInputCursorPoint',
+          source: comp._source || ''
+        }, '*');
+      });
+      return el;
+    }
+
+    const getMin = () => {
+      if (comp.useVariableMinMax && comp.minimumTag) {
+        const v = Number(ComponentRegistry.readIndicatorRef(comp.minimumTag, ctx));
+        if (!Number.isNaN(v)) return v;
+      }
+      return comp.minValue ?? 0;
+    };
+
+    const getMax = () => {
+      if (comp.useVariableMinMax && comp.maximumTag) {
+        const v = Number(ComponentRegistry.readIndicatorRef(comp.maximumTag, ctx));
+        if (!Number.isNaN(v)) return v;
+      }
+      return comp.maxValue ?? 2147483647;
+    };
+
+    const commitValue = (raw) => {
+      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+      if (!writeTag) return;
+      const n = Number(raw);
+      if (Number.isNaN(n)) return;
+      const min = getMin();
+      const max = getMax();
+      const clamped = Math.min(max, Math.max(min, n));
+      ctx.writeTag(writeTag, clamped);
+      if (comp.enterTag) {
+        const enterWrite = ComponentRegistry.resolveWriteTagName(comp.enterTag);
+        if (enterWrite) {
+          ctx.writeTag(enterWrite, 1);
+          setTimeout(() => ctx.writeTag(enterWrite, 0), comp.enterKeyHoldTime ?? 250);
+        }
+      }
+      if (!comp.indicatorTag) showValue(clamped);
+    };
+
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      const currentRef = comp.indicatorTag || comp.tag;
+      const current = currentRef ? ctx.getTagValue(currentRef) : '';
+      const caption = comp.keypadCaption ? `${comp.keypadCaption}\n` : '';
+      const input = window.prompt(`${caption}Enter value:`, current !== undefined && current !== null ? String(current) : '');
+      if (input === null) return;
+      commitValue(input);
+    });
+
+    return el;
+  },
+
+  formatNumericDisplayValue(val, comp) {
+    const digits = comp.numberOfDigits ?? 5;
+    if (val === null || val === undefined) return 'N'.repeat(Math.max(1, digits));
+    const n = Number(val);
+    if (Number.isNaN(n)) return String(val);
+    const decimalPlaces = comp.decimalPlaces ?? comp.decimals ?? 0;
+    let text = decimalPlaces > 0 ? n.toFixed(decimalPlaces) : String(Math.round(n));
+    const fill = (comp.fillLeftWith || 'none').toLowerCase();
+    if (fill === 'zero') text = text.padStart(digits, '0');
+    else if (fill === 'space') text = text.padStart(digits, ' ');
+    return text;
   },
 
   StateIndicator(comp, ctx) {
@@ -481,7 +1390,7 @@ const ComponentRegistry = {
 
   MultistateIndicator(comp, ctx) {
     const el = document.createElement('div');
-    el.className = 'ft-multistate ft-graphic';
+    el.className = 'ft-multistate ft-multistate-indicator ft-graphic';
     if (comp.name) el.dataset.name = comp.name;
     if (comp.visible === false) {
       el.style.display = 'none';
@@ -489,23 +1398,32 @@ const ComponentRegistry = {
     }
     ComponentRegistry.applyGraphicsObject(el, comp);
 
+    const studioEdit = Boolean(ctx.studioEdit);
+    const states = comp.states?.length
+      ? comp.states
+      : ComponentRegistry.defaultMultistateIndicatorStates(comp.numberOfStates ?? 4);
+
     if (comp.shape === 'circle') {
       el.classList.add('ft-multistate-circle', 'ft-status-led');
       el.style.borderRadius = '50%';
-      el.style.border = 'none';
     }
 
+    el.style.display = 'flex';
+    el.style.overflow = 'hidden';
+
+    let imgEl = null;
     const caption = document.createElement('span');
     caption.className = 'ft-multistate-caption';
+    caption.style.pointerEvents = 'none';
     el.appendChild(caption);
 
     const applyLedClass = (stateDef) => {
       if (comp.shape !== 'circle' || !stateDef) return;
       el.classList.remove('ft-status-led--green', 'ft-status-led--red', 'ft-status-led--error');
       const fill = (stateDef.backColor || stateDef.color || '').toLowerCase();
-      if (stateDef.id === 'Error' || fill === 'navy') {
+      if (stateDef.id === 'Error' || fill === 'navy' || fill === '#001c38') {
         el.classList.add('ft-status-led--error');
-      } else if (fill === '#10eb10' || stateDef.value === 1) {
+      } else if (fill === '#10eb10' || fill === '#00c000' || stateDef.value === 1) {
         el.classList.add('ft-status-led--green');
       } else {
         el.classList.add('ft-status-led--red');
@@ -514,38 +1432,538 @@ const ComponentRegistry = {
 
     const applyState = (stateDef) => {
       if (!stateDef) return;
+
+      if (imgEl) {
+        imgEl.remove();
+        imgEl = null;
+      }
+
+      const merged = {
+        ...comp,
+        backColor: stateDef.useBackColor !== false ? (stateDef.backColor || '#001C38') : 'transparent',
+        useBackColor: stateDef.useBackColor !== false,
+        borderColor: stateDef.useBorderColor !== false ? (stateDef.borderColor || stateDef.backColor || '#001C38') : 'transparent',
+        useBorderColor: stateDef.useBorderColor !== false,
+        borderStyle: comp.borderStyle || 'line',
+        borderWidth: comp.borderWidth ?? 4,
+        borderUsesBackColor: stateDef.useBorderColor === false && comp.borderUsesBackColor !== false,
+        backStyle: comp.backStyle || 'solid',
+        blink: stateDef.blink,
+        studioEdit
+      };
+
+      if (comp.shape === 'circle') {
+        applyLedClass(stateDef);
+      } else {
+        ComponentRegistry.applyButtonAppearance(el, merged);
+      }
+
+      if (stateDef.image) {
+        imgEl = document.createElement('img');
+        imgEl.className = 'ft-multistate-image';
+        imgEl.src = ComponentRegistry.imageUrl(stateDef.image, ctx);
+        imgEl.alt = '';
+        imgEl.draggable = false;
+        imgEl.style.pointerEvents = 'none';
+        if (stateDef.imageScaled) {
+          imgEl.style.maxWidth = '100%';
+          imgEl.style.maxHeight = '100%';
+          imgEl.style.objectFit = 'contain';
+        }
+        if (stateDef.useImageBackColor && stateDef.imageBackStyle === 'solid') {
+          imgEl.style.backgroundColor = stateDef.imageBackColor || '#001C38';
+        }
+        imgEl.classList.toggle('ft-blink', Boolean(stateDef.imageBlink));
+        el.insertBefore(imgEl, caption);
+      }
+
       const label = stateDef.caption || stateDef.text || '';
       caption.textContent = label;
       caption.style.display = label ? '' : 'none';
-      const fill = stateDef.backColor || stateDef.color || '#888';
-      applyLedClass(stateDef);
-      if (comp.shape !== 'circle') {
-        el.style.backgroundColor = fill;
-        const borderColor = stateDef.borderColor || stateDef.backColor || '#666';
-        el.style.border = `2px solid ${borderColor}`;
+
+      const alignId = stateDef.alignment || 'middleCenter';
+      const hasImage = Boolean(stateDef.image);
+      if (hasImage) {
+        const align = ComponentRegistry.textAlignment(alignId, 'column');
+        el.style.flexDirection = 'column';
+        el.style.justifyContent = align.justify;
+        el.style.alignItems = align.align;
+        caption.style.width = '100%';
+        caption.style.height = '';
+        caption.style.flex = '0 0 auto';
+        caption.style.display = '';
+      } else {
+        const align = ComponentRegistry.textAlignment(alignId, 'row');
+        el.style.flexDirection = 'row';
+        el.style.justifyContent = align.justify;
+        el.style.alignItems = align.align;
+        caption.style.width = '100%';
+        caption.style.height = '100%';
+        caption.style.flex = '1 1 auto';
+        caption.style.display = 'flex';
+        caption.style.alignItems = align.align;
+        caption.style.justifyContent = align.justify;
       }
-      caption.style.color = stateDef.captionColor || stateDef.textColor || '#fff';
+
+      ComponentRegistry.applyCaptionStyle(caption, {
+        fontFamily: comp.fontFamily || 'Arial Unicode MS',
+        fontSize: comp.fontSize ?? 10,
+        bold: comp.bold,
+        italic: comp.italic,
+        underline: comp.underline,
+        foreColor: stateDef.captionColor || stateDef.textColor || '#ffffff',
+        useForeColor: stateDef.useCaptionColor !== false,
+        wordWrap: stateDef.wordWrap !== false,
+        alignment: alignId
+      });
+      caption.style.whiteSpace = stateDef.wordWrap !== false ? 'pre-wrap' : 'nowrap';
+      if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid') {
+        caption.style.backgroundColor = stateDef.captionBackColor || '#001C38';
+      } else {
+        caption.style.backgroundColor = '';
+      }
+      caption.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
+      el.classList.toggle('ft-blink', Boolean(stateDef.blink));
     };
 
-    const boxH = comp.height || 33;
-    caption.style.fontSize = `${Math.min(12, Math.max(8, Math.round(boxH * 0.38)))}px`;
+    const showTagState = (val) => {
+      applyState(ComponentRegistry.resolveMultistateState(states, val));
+    };
 
-    const states = comp.states || [];
-    const studioEdit = Boolean(ctx.studioEdit);
-    if (comp.tag && !studioEdit) {
-      ctx.bindTag(comp.tag, (val) => {
-        applyState(ComponentRegistry.resolveMultistateState(states, val));
-      });
-      const current = ctx.getTagValue(comp.tag);
-      if (current !== undefined) {
-        applyState(ComponentRegistry.resolveMultistateState(states, current));
-      }
+    const tag = comp.tag || comp.indicatorTag;
+    if (tag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(tag, showTagState, ctx);
     } else {
-      const previewValue = studioEdit ? 1 : (comp.defaultValue ?? 0);
-      applyState(ComponentRegistry.resolveMultistateState(states, previewValue));
+      const previewValue = studioEdit ? 0 : (comp.defaultValue ?? 0);
+      showTagState(previewValue);
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'MultistateIndicator',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'MultistateIndicator',
+          source: comp._source || ''
+        }, '*');
+      });
     }
 
     return el;
+  },
+
+  SymbolIndicator(comp, ctx) {
+    const el = document.createElement('div');
+    el.className = 'ft-symbol-indicator ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    const states = comp.states?.length
+      ? comp.states
+      : ComponentRegistry.defaultSymbolIndicatorStates(comp.numberOfStates ?? 2);
+
+    el.style.display = 'flex';
+    el.style.overflow = 'hidden';
+    el.style.backgroundColor = 'transparent';
+
+    const img = document.createElement('img');
+    img.className = 'ft-symbol-indicator-image';
+    img.alt = comp.name || '';
+    img.draggable = false;
+    img.style.pointerEvents = 'none';
+    el.appendChild(img);
+
+    const applyState = (stateDef) => {
+      if (!stateDef) return;
+      const alignId = stateDef.imageAlignment || 'middleCenter';
+      const align = ComponentRegistry.textAlignment(alignId);
+      el.style.justifyContent = align.justify;
+      el.style.alignItems = align.align;
+
+      if (stateDef.image) {
+        img.src = ComponentRegistry.imageUrl(stateDef.image, ctx);
+        img.style.display = '';
+      } else {
+        img.removeAttribute('src');
+        img.style.display = 'none';
+      }
+
+      if (stateDef.imageScaled !== false) {
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '100%';
+        img.style.width = 'auto';
+        img.style.height = 'auto';
+        img.style.objectFit = 'contain';
+      } else {
+        img.style.maxWidth = '';
+        img.style.maxHeight = '';
+        img.style.width = '';
+        img.style.height = '';
+        img.style.objectFit = '';
+      }
+
+      if (stateDef.useImageBackColor && stateDef.imageBackStyle === 'solid') {
+        el.style.backgroundColor = stateDef.imageBackColor || '#001C38';
+      } else {
+        el.style.backgroundColor = 'transparent';
+      }
+
+      img.classList.toggle('ft-blink', Boolean(stateDef.imageBlink));
+      el.classList.toggle('ft-blink', Boolean(stateDef.imageBlink));
+    };
+
+    const showTagState = (val) => {
+      applyState(ComponentRegistry.resolveMultistateState(states, val));
+    };
+
+    const tag = comp.tag || comp.indicatorTag;
+    if (tag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(tag, showTagState, ctx);
+    } else {
+      showTagState(studioEdit ? 0 : (comp.defaultValue ?? 0));
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'SymbolIndicator',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'SymbolIndicator',
+          source: comp._source || ''
+        }, '*');
+      });
+    }
+
+    return el;
+  },
+
+  ListIndicator(comp, ctx) {
+    const el = document.createElement('div');
+    el.className = 'ft-list-indicator ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    const states = comp.states?.length
+      ? comp.states.filter((s) => s.id !== 'Error')
+      : ComponentRegistry.defaultListIndicatorStates(comp.numberOfStates ?? 5);
+
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 4,
+      borderUsesBackColor: comp.borderUsesBackColor,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      useBorderColor: comp.useBorderColor !== false,
+      borderColor: comp.borderColor || '#001C38',
+      blink: comp.blink,
+      studioEdit
+    });
+
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.overflow = 'hidden';
+    el.style.padding = '0';
+
+    const rows = states.map((stateDef) => {
+      const row = document.createElement('div');
+      row.className = 'ft-list-indicator-row';
+      row.style.flex = '1 1 0';
+      row.style.display = 'flex';
+      row.style.overflow = 'hidden';
+      row.style.minHeight = '0';
+      row.dataset.stateId = stateDef.id;
+
+      const cap = document.createElement('span');
+      cap.className = 'ft-list-indicator-caption';
+      cap.style.pointerEvents = 'none';
+      cap.style.width = '100%';
+      cap.style.padding = '0 4px';
+      row.appendChild(cap);
+      el.appendChild(row);
+      return { row, cap, stateDef };
+    });
+
+    const applyRowStyle = (entry, isActive) => {
+      const { row, cap, stateDef } = entry;
+      const alignId = stateDef.alignment || 'middleLeft';
+      const align = ComponentRegistry.textAlignment(alignId);
+      row.style.justifyContent = align.justify;
+      row.style.alignItems = align.align;
+
+      if (isActive) {
+        row.style.backgroundColor = comp.useSelectionBackColor !== false
+          ? (comp.selectionBackColor || '#0066cc')
+          : 'transparent';
+        ComponentRegistry.applyCaptionStyle(cap, {
+          fontFamily: comp.fontFamily || 'Arial Unicode MS',
+          fontSize: comp.fontSize ?? 10,
+          bold: comp.bold,
+          italic: comp.italic,
+          underline: comp.underline,
+          foreColor: comp.useSelectionForeColor !== false ? (comp.selectionForeColor || '#000000') : '#ffffff',
+          useForeColor: true,
+          wordWrap: comp.captionTruncate !== 'character',
+          alignment: alignId
+        });
+      } else {
+        if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid') {
+          row.style.backgroundColor = stateDef.captionBackColor || '#001C38';
+        } else {
+          row.style.backgroundColor = 'transparent';
+        }
+        ComponentRegistry.applyCaptionStyle(cap, {
+          fontFamily: comp.fontFamily || 'Arial Unicode MS',
+          fontSize: comp.fontSize ?? 10,
+          bold: comp.bold,
+          italic: comp.italic,
+          underline: comp.underline,
+          foreColor: stateDef.useCaptionColor ? (stateDef.captionColor || '#ffffff') : '#ffffff',
+          useForeColor: true,
+          wordWrap: comp.captionTruncate !== 'character',
+          alignment: alignId
+        });
+      }
+
+      cap.textContent = stateDef.caption || '';
+      cap.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
+      row.classList.toggle('ft-list-indicator-row--active', isActive);
+    };
+
+    const renderList = (val) => {
+      const active = ComponentRegistry.resolveMultistateState(states, val);
+      rows.forEach((entry) => applyRowStyle(entry, entry.stateDef.id === active?.id));
+      el.classList.toggle('ft-blink', Boolean(comp.blink));
+    };
+
+    const tag = comp.tag || comp.indicatorTag;
+    if (tag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(tag, renderList, ctx);
+    } else {
+      renderList(studioEdit ? 0 : (comp.defaultValue ?? 0));
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'ListIndicator',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'ListIndicator',
+          source: comp._source || ''
+        }, '*');
+      });
+    }
+
+    return el;
+  },
+
+  BarGraph(comp, ctx) {
+    const el = document.createElement('div');
+    el.className = 'ft-bar-graph ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 4,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      useBorderColor: comp.useBorderColor !== false,
+      borderColor: comp.borderColor || '#001C38',
+      studioEdit
+    });
+
+    el.style.overflow = 'hidden';
+    el.style.padding = '0';
+    el.style.boxSizing = 'border-box';
+
+    const track = document.createElement('div');
+    track.className = 'ft-bar-graph-track';
+    const fill = document.createElement('div');
+    fill.className = 'ft-bar-graph-fill';
+    track.appendChild(fill);
+    el.appendChild(track);
+
+    const resolveFillColor = (num) => {
+      const count = comp.numberOfThresholds ?? 0;
+      const thresholds = comp.thresholds || [];
+      if (count >= 2 && num >= (thresholds[1]?.value ?? 75) && thresholds[1]?.useFillColor) {
+        return thresholds[1].fillColor || '#ffb6c1';
+      }
+      if (count >= 1 && num >= (thresholds[0]?.value ?? 50) && thresholds[0]?.useFillColor) {
+        return thresholds[0].fillColor || '#ffff00';
+      }
+      return comp.useFillColor !== false ? (comp.fillColor || '#0066cc') : 'transparent';
+    };
+
+    const resolveBlink = (num) => {
+      const count = comp.numberOfThresholds ?? 0;
+      const thresholds = comp.thresholds || [];
+      if (count >= 2 && num >= (thresholds[1]?.value ?? 75) && thresholds[1]?.blink) return true;
+      if (count >= 1 && num >= (thresholds[0]?.value ?? 50) && thresholds[0]?.blink) return true;
+      return false;
+    };
+
+    const applyValue = (val) => {
+      const min = comp.minValue ?? 0;
+      const max = comp.maxValue ?? 100;
+      let num = val;
+      if (typeof num === 'string' && num.trim() !== '' && !Number.isNaN(Number(num))) num = Number(num);
+      if (typeof num !== 'number' || Number.isNaN(num)) num = min;
+      const pct = Math.max(0, Math.min(1, (num - min) / ((max - min) || 1)));
+      const dir = comp.fillDirection || 'bottomToTop';
+
+      fill.style.backgroundColor = resolveFillColor(num);
+      fill.classList.toggle('ft-blink', resolveBlink(num));
+
+      fill.style.top = '';
+      fill.style.bottom = '';
+      fill.style.left = '';
+      fill.style.right = '';
+      fill.style.width = '';
+      fill.style.height = '';
+
+      if (dir === 'bottomToTop') {
+        fill.style.left = '0';
+        fill.style.right = '0';
+        fill.style.bottom = '0';
+        fill.style.height = `${pct * 100}%`;
+      } else if (dir === 'topToBottom') {
+        fill.style.left = '0';
+        fill.style.right = '0';
+        fill.style.top = '0';
+        fill.style.height = `${pct * 100}%`;
+      } else if (dir === 'leftToRight') {
+        fill.style.top = '0';
+        fill.style.bottom = '0';
+        fill.style.left = '0';
+        fill.style.width = `${pct * 100}%`;
+      } else {
+        fill.style.top = '0';
+        fill.style.bottom = '0';
+        fill.style.right = '0';
+        fill.style.width = `${pct * 100}%`;
+      }
+    };
+
+    const tag = comp.tag;
+    if (tag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(tag, applyValue, ctx);
+    } else {
+      applyValue(studioEdit ? (comp.minValue ?? 0) + ((comp.maxValue ?? 100) - (comp.minValue ?? 0)) * 0.2 : (comp.defaultValue ?? 20));
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'BarGraph',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'BarGraph',
+          source: comp._source || ''
+        }, '*');
+      });
+    }
+
+    return el;
+  },
+
+  defaultListIndicatorStates(count = 5) {
+    const states = [];
+    for (let i = 0; i < count; i++) {
+      states.push({
+        id: `State${i}`,
+        value: i,
+        caption: '',
+        alignment: 'middleLeft'
+      });
+    }
+    return states;
+  },
+
+  defaultSymbolIndicatorStates(count = 2) {
+    const states = [];
+    for (let i = 0; i < count; i++) {
+      states.push({
+        id: `State${i}`,
+        value: i,
+        image: '',
+        imageScaled: true,
+        imageBackStyle: 'transparent',
+        imageAlignment: 'middleCenter'
+      });
+    }
+    states.push({
+      id: 'Error',
+      image: '',
+      imageScaled: true,
+      imageBackStyle: 'transparent',
+      imageAlignment: 'middleCenter'
+    });
+    return states;
   },
 
   resolveMultistateState(states, value) {
@@ -561,6 +1979,38 @@ const ComponentRegistry = {
 
     const match = states.find((s) => s.value !== undefined && s.value === num);
     return match || errorState || states.find((s) => s.value === 0) || states[0];
+  },
+
+  defaultMultistateIndicatorStates(count = 4) {
+    const states = [];
+    for (let i = 0; i < count; i++) {
+      states.push({
+        id: `State${i}`,
+        value: i,
+        useBackColor: true,
+        backColor: '#001C38',
+        useBorderColor: true,
+        borderColor: '#001C38',
+        caption: '',
+        useCaptionColor: true,
+        captionColor: '#ffffff',
+        wordWrap: true,
+        alignment: 'middleCenter'
+      });
+    }
+    states.push({
+      id: 'Error',
+      caption: 'Error',
+      useBackColor: true,
+      backColor: '#001C38',
+      useBorderColor: true,
+      borderColor: '#001C38',
+      useCaptionColor: true,
+      captionColor: '#ffffff',
+      wordWrap: true,
+      alignment: 'middleCenter'
+    });
+    return states;
   },
 
   defaultModeIndicator() {
@@ -736,7 +2186,9 @@ const ComponentRegistry = {
     area.style.padding = '8px';
     area.style.boxSizing = 'border-box';
     area.style.background = 'transparent';
-    area.style.zIndex = '1';
+    area.style.zIndex = '5';
+    area.style.display = 'flex';
+    area.style.flexDirection = 'column';
     for (const child of comp.children || []) {
       area.appendChild(ComponentRegistry.render(child, ctx));
     }
@@ -882,8 +2334,13 @@ const ComponentRegistry = {
     }
     ComponentRegistry.applyGraphicsObject(el, comp);
     const fill = (comp.backColor || '#10EB10').toLowerCase();
-    if (fill === '#f83d3d') el.classList.add('ft-status-led--red');
+    if (fill === '#f83d3d' || fill === 'red') el.classList.add('ft-status-led--red');
+    else if (fill === 'navy' || fill === '#000080') el.classList.add('ft-status-led--error');
     else el.classList.add('ft-status-led--green');
+    const lineW = comp.lineWidth ?? comp.borderWidth ?? 0;
+    if (lineW > 0 && comp.useForeColor !== false) {
+      el.style.border = `${lineW}px solid ${comp.foreColor || comp.borderColor || '#000000'}`;
+    }
     return el;
   },
 
@@ -1040,45 +2497,78 @@ const ComponentRegistry = {
     const studioEdit = Boolean(ctx.studioEdit);
     ComponentRegistry.applyButtonAppearance(btn, {
       ...comp,
-      borderStyle: comp.borderStyle || 'raised',
-      borderWidth: comp.borderWidth ?? 3,
-      borderUsesBackColor: comp.borderUsesBackColor ?? !comp.useBorderColor,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
       backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#dcdcdc',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
       studioEdit
     });
     btn.style.display = 'flex';
     btn.style.flexDirection = 'column';
-    btn.style.justifyContent = comp.alignment === 'middleCenter' ? 'center' : 'flex-end';
-    btn.style.alignItems = 'center';
-    btn.style.padding = '3px 2px 2px';
-    btn.style.gap = '1px';
+    const alignId = comp.alignment || 'middleCenter';
+    const align = ComponentRegistry.textAlignment(alignId, 'column');
+    btn.style.justifyContent = align.justify;
+    btn.style.alignItems = align.align;
+    btn.style.padding = '2px 3px 3px';
+    btn.style.gap = '0';
+    btn.style.overflow = 'hidden';
+
+    let imgEl = null;
     if (comp.image) {
-      const img = document.createElement('img');
-      img.className = 'ft-goto-btn-icon';
-      img.src = ComponentRegistry.imageUrl(comp.image, ctx);
-      img.alt = '';
-      img.draggable = false;
-      btn.appendChild(img);
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      btn.appendChild(imgEl);
     }
+
     const cap = document.createElement('span');
     cap.className = 'ft-goto-btn-caption';
     cap.textContent = comp.label || comp.caption || '';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : comp.useForeColor !== false;
     ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial',
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
       fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? true,
+      bold: comp.bold ?? false,
       italic: comp.italic,
       underline: comp.underline,
       foreColor: comp.foreColor || '#000000',
-      useForeColor: comp.useForeColor !== false,
-      wordWrap: comp.wordWrap === true,
-      alignment: comp.alignment || 'middleCenter'
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: alignId
     });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
     cap.style.width = '100%';
     cap.style.lineHeight = '1.15';
     cap.style.pointerEvents = 'none';
     btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    const resolveTarget = () => {
+      if (comp.useVariableDisplay && comp.displayNameTag) {
+        const val = ComponentRegistry.readIndicatorRef(comp.displayNameTag, ctx);
+        return val != null && val !== '' ? String(val) : '';
+      }
+      return comp.target || '';
+    };
+
+    const navigateToTarget = () => {
+      const target = resolveTarget();
+      if (target) ctx.navigate(target);
+    };
 
     if (studioEdit) {
       btn.addEventListener('dblclick', (e) => {
@@ -1100,63 +2590,626 @@ const ComponentRegistry = {
           source: comp._source || ''
         }, '*');
       });
-    } else if (comp.target) {
-      btn.addEventListener('click', () => ctx.navigate(comp.target));
+    } else {
+      if (comp.useVariableDisplay && comp.displayNameTag) {
+        ComponentRegistry.bindIndicatorRef(comp.displayNameTag, () => {}, ctx);
+      }
+      if (comp.target || comp.useVariableDisplay) {
+        btn.addEventListener('click', navigateToTarget);
+      }
     }
     return btn;
   },
 
-  TimeDateDisplay(comp) {
+  ReturnToButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-return-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      studioEdit
+    });
+    btn.style.display = 'flex';
+    btn.style.flexDirection = 'column';
+    const alignId = comp.alignment || 'middleCenter';
+    const align = ComponentRegistry.textAlignment(alignId, 'column');
+    btn.style.justifyContent = align.justify;
+    btn.style.alignItems = align.align;
+    btn.style.padding = '2px 3px 3px';
+    btn.style.gap = '0';
+    btn.style.overflow = 'hidden';
+
+    if (comp.image) {
+      const imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      btn.appendChild(imgEl);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    cap.textContent = comp.label || comp.caption || '';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : comp.useForeColor !== false;
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: alignId
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'ReturnToButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'ReturnToButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', () => {
+        if (typeof ctx.navigateBack === 'function') ctx.navigateBack();
+      });
+    }
+    return btn;
+  },
+
+  RecipePlusButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.action) btn.dataset.action = comp.action;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      studioEdit
+    });
+    btn.style.display = 'flex';
+    btn.style.flexDirection = 'column';
+    const alignId = comp.alignment || 'middleCenter';
+    const align = ComponentRegistry.textAlignment(alignId, 'column');
+    btn.style.justifyContent = align.justify;
+    btn.style.alignItems = align.align;
+    btn.style.padding = '2px 3px 3px';
+    btn.style.gap = '0';
+    btn.style.overflow = 'hidden';
+
+    if (comp.image) {
+      const imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      btn.appendChild(imgEl);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    cap.textContent = comp.label || comp.caption || '';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : comp.useForeColor !== false;
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: alignId
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    const runRecipeAction = () => {
+      ctx.navigate('500_Recipe');
+    };
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'RecipePlusButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'RecipePlusButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', runRecipeAction);
+    }
+    return btn;
+  },
+
+  RecipePlusSelector(comp, ctx) {
     const el = document.createElement('div');
-    el.className = 'ft-time-date ft-graphic';
+    el.className = 'ft-recipeplus-selector ft-graphic';
     if (comp.name) el.dataset.name = comp.name;
     if (comp.visible === false) {
       el.style.display = 'none';
       return el;
     }
+
     ComponentRegistry.applyGraphicsObject(el, comp);
-    el.style.fontFamily = comp.fontFamily || 'Arial';
-    el.style.fontSize = `${comp.fontSize || 12}px`;
-    el.style.fontWeight = comp.bold ? '700' : '400';
-    el.style.color = comp.foreColor || '#000';
-    el.style.display = 'flex';
-    el.style.alignItems = 'center';
-    el.style.justifyContent = 'center';
+    const studioEdit = Boolean(ctx.studioEdit);
+    const columns = comp.columns?.length
+      ? comp.columns
+      : ComponentRegistry.defaultRecipePlusColumns();
+    const activeCol = columns.find((c) => c.id === (comp.activeColumnId || 'recipe')) || columns[0];
+
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      useBorderColor: comp.useBorderColor !== false,
+      borderColor: comp.borderColor || '#000000',
+      studioEdit
+    });
+
+    el.style.padding = '0';
     el.style.overflow = 'hidden';
-    const tick = () => { el.textContent = new Date().toLocaleString(); };
-    tick();
-    setInterval(tick, 1000);
+
+    const fontBase = {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold,
+      italic: comp.italic,
+      underline: comp.underline
+    };
+
+    let headerEl = null;
+    if (comp.displayHeader !== false) {
+      headerEl = document.createElement('div');
+      headerEl.className = 'ft-recipeplus-selector-header';
+      headerEl.textContent = activeCol?.headerText || activeCol?.label || 'Recipe';
+      if (comp.useHeaderBackColor !== false) {
+        headerEl.style.backgroundColor = comp.headerBackColor || '#001C38';
+      }
+      ComponentRegistry.applyCaptionStyle(headerEl, {
+        ...fontBase,
+        foreColor: comp.useHeaderForeColor !== false ? (comp.headerForeColor || '#ffffff') : '#ffffff',
+        useForeColor: true,
+        wordWrap: false,
+        alignment: 'middleLeft'
+      });
+      el.appendChild(headerEl);
+    }
+
+    const body = document.createElement('div');
+    body.className = 'ft-recipeplus-selector-body';
+    el.appendChild(body);
+
+    const demoRows = ComponentRegistry.defaultRecipePlusSelectorRows();
+    let selectedIndex = studioEdit ? 1 : (comp.selectedIndex ?? 1);
+
+    const rows = demoRows.map((text, index) => {
+      const row = document.createElement('div');
+      row.className = 'ft-recipeplus-selector-row';
+      row.dataset.index = String(index);
+
+      const cell = document.createElement('span');
+      cell.className = 'ft-recipeplus-selector-cell';
+      cell.textContent = text;
+      row.appendChild(cell);
+      body.appendChild(row);
+      return { row, cell };
+    });
+
+    const applySelection = (index) => {
+      selectedIndex = index;
+      rows.forEach(({ row, cell }, i) => {
+        const isActive = i === selectedIndex;
+        if (isActive) {
+          row.style.backgroundColor = comp.useSelectionBackColor !== false
+            ? (comp.selectionBackColor || '#0066cc')
+            : 'transparent';
+          ComponentRegistry.applyCaptionStyle(cell, {
+            ...fontBase,
+            foreColor: comp.useSelectionForeColor !== false ? (comp.selectionForeColor || '#000000') : '#ffffff',
+            useForeColor: true,
+            wordWrap: comp.wordWrap !== false,
+            alignment: 'middleLeft'
+          });
+          if (comp.wordWrap === false) cell.style.whiteSpace = 'nowrap';
+          else cell.style.whiteSpace = 'normal';
+        } else {
+          row.style.backgroundColor = 'transparent';
+          ComponentRegistry.applyCaptionStyle(cell, {
+            ...fontBase,
+            foreColor: comp.useForeColor !== false ? (comp.foreColor || '#ffffff') : '#ffffff',
+            useForeColor: true,
+            wordWrap: comp.wordWrap !== false,
+            alignment: 'middleLeft'
+          });
+          if (comp.wordWrap === false) cell.style.whiteSpace = 'nowrap';
+          else cell.style.whiteSpace = 'normal';
+        }
+        row.classList.toggle('ft-recipeplus-selector-row--active', isActive);
+      });
+    };
+
+    applySelection(selectedIndex);
+
+    if (!studioEdit) {
+      rows.forEach(({ row }, index) => {
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', () => applySelection(index));
+      });
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'RecipePlusSelector',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'RecipePlusSelector',
+          source: comp._source || ''
+        }, '*');
+      });
+    }
+
     return el;
   },
 
-  StringDisplay(comp, ctx) {
-    const el = document.createElement('div');
-    el.className = 'ft-string-display ft-graphic';
-    if (comp.name) el.dataset.name = comp.name;
+  defaultRecipePlusColumns() {
+    return [
+      { id: 'recipe', label: 'Recipe', headerText: 'Recipe', width: 150 },
+      { id: 'unit', label: 'Unit', headerText: 'Unit', width: 100 }
+    ];
+  },
+
+  defaultRecipePlusSelectorRows() {
+    const sample = 'recipe recipe recipe rec';
+    return Array.from({ length: 6 }, () => sample);
+  },
+
+  CloseDisplayButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-close-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
     if (comp.visible === false) {
-      el.style.display = 'none';
-      return el;
+      btn.style.display = 'none';
+      return btn;
     }
-    ComponentRegistry.applyGraphicsObject(el, comp);
-    el.style.fontFamily = comp.fontFamily || 'Arial';
-    el.style.fontSize = `${comp.fontSize || 12}px`;
-    el.style.fontWeight = comp.bold ? '700' : '400';
-    el.style.color = comp.foreColor || '#fff';
-    el.style.backgroundColor = comp.backStyle === 'solid' ? (comp.backColor || '#808080') : 'transparent';
-    el.style.display = 'flex';
-    el.style.alignItems = 'center';
-    el.style.justifyContent = 'center';
-    el.style.overflow = 'hidden';
-    el.style.padding = '0 4px';
-    const render = (val) => {
-      el.textContent = val != null && val !== '' ? String(val) : (comp.caption || 'Guest');
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      studioEdit
+    });
+    btn.style.display = 'flex';
+    btn.style.flexDirection = 'column';
+    const alignId = comp.alignment || 'middleCenter';
+    const align = ComponentRegistry.textAlignment(alignId, 'column');
+    btn.style.justifyContent = align.justify;
+    btn.style.alignItems = align.align;
+    btn.style.padding = '2px 3px 3px';
+    btn.style.gap = '0';
+    btn.style.overflow = 'hidden';
+
+    if (comp.image) {
+      const imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      btn.appendChild(imgEl);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    cap.textContent = comp.label || comp.caption || '';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : comp.useForeColor !== false;
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: alignId
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'CloseDisplayButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'CloseDisplayButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', async () => {
+        if (comp.writeOnClose && comp.tag) {
+          const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+          if (writeTag) await ctx.writeTag(writeTag, comp.closeValue ?? 0);
+        }
+        if (typeof ctx.closeDisplay === 'function') ctx.closeDisplay();
+        else if (typeof ctx.navigateBack === 'function') ctx.navigateBack();
+      });
+    }
+    return btn;
+  },
+
+  DisplayListSelector(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-display-list-btn ft-multistate-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    const states = comp.states?.length
+      ? comp.states
+      : ComponentRegistry.defaultDisplayListSelectorStates(comp.numberOfStates ?? 5);
+
+    const caption = document.createElement('span');
+    caption.className = 'ft-btn-caption';
+    caption.style.pointerEvents = 'none';
+    btn.style.display = 'flex';
+    btn.style.padding = '0 4px';
+    btn.style.overflow = 'hidden';
+    btn.appendChild(caption);
+
+    const renderState = (stateDef) => {
+      if (!stateDef) return;
+      ComponentRegistry.applyButtonAppearance(btn, {
+        ...comp,
+        borderStyle: comp.borderStyle || 'line',
+        borderWidth: comp.borderWidth ?? 1,
+        borderUsesBackColor: comp.borderUsesBackColor !== false,
+        backStyle: comp.backStyle || 'solid',
+        backColor: comp.backColor || '#001C38',
+        useBackColor: comp.useBackColor !== false,
+        useHighlightColor: comp.useHighlightColor,
+        highlightColor: comp.highlightColor,
+        studioEdit
+      });
+
+      let capText = stateDef.caption ?? '';
+      if (stateDef.useDisplayName && stateDef.target) capText = stateDef.target;
+      caption.textContent = capText;
+
+      const alignId = stateDef.alignment || 'middleLeft';
+      const align = ComponentRegistry.textAlignment(alignId);
+      btn.style.justifyContent = align.justify;
+      btn.style.alignItems = align.align;
+
+      ComponentRegistry.applyCaptionStyle(caption, {
+        fontFamily: comp.fontFamily || 'Arial Unicode MS',
+        fontSize: comp.fontSize ?? 10,
+        bold: comp.bold,
+        italic: comp.italic,
+        underline: comp.underline,
+        foreColor: stateDef.captionColor || '#ffffff',
+        useForeColor: Boolean(stateDef.useCaptionColor),
+        alignment: alignId
+      });
+      if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid') {
+        caption.style.backgroundColor = stateDef.captionBackColor || '#001C38';
+      } else {
+        caption.style.backgroundColor = '';
+      }
+      caption.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
     };
-    if (comp.tag) ctx.bindTag(comp.tag, render);
-    else render(comp.caption);
-    if (comp.useCurrentUser) {
-      ctx.onUserChange((user) => render(user?.username || comp.caption || 'Guest'));
+
+    const showTagState = (val) => {
+      renderState(ComponentRegistry.resolveMultistateState(states, val));
+    };
+
+    if (comp.tag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(comp.tag, showTagState, ctx);
+    } else {
+      renderState(states[0]);
     }
-    return el;
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'DisplayListSelector',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'DisplayListSelector',
+          source: comp._source || ''
+        }, '*');
+      });
+      return btn;
+    }
+
+    const advance = () => {
+      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+      if (!writeTag) return;
+      const current = ctx.getTagValue(comp.tag);
+      const resolved = ComponentRegistry.resolveMultistateState(states, current);
+      const idx = states.findIndex((s) => s.id === resolved?.id);
+      const nextIdx = idx < 0 ? 0 : (idx + 1) % states.length;
+      const nextState = states[nextIdx];
+      const nextValue = nextState?.value ?? nextIdx;
+      ctx.writeTag(writeTag, nextValue);
+      if (nextState?.target) ctx.navigate(nextState.target);
+    };
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      advance();
+    });
+    return btn;
+  },
+
+  defaultDisplayListSelectorStates(count = 5) {
+    const states = [];
+    for (let i = 0; i < count; i++) {
+      states.push({
+        id: `State${i}`,
+        value: i,
+        target: '',
+        parameterType: 'file',
+        parameterFile: '',
+        parameterList: '',
+        displayPosition: false,
+        displayTop: 0,
+        displayLeft: 0,
+        useDisplayName: false,
+        caption: '',
+        useCaptionColor: false,
+        captionColor: '#ffffff',
+        useCaptionBackColor: false,
+        captionBackColor: '#001C38',
+        captionBlink: false,
+        captionBackStyle: 'transparent',
+        alignment: 'middleLeft'
+      });
+    }
+    return states;
   },
 
   formatFtShortDateTime(date = new Date()) {
@@ -1169,6 +3222,354 @@ const ComponentRegistry = {
       second: '2-digit',
       hour12: true
     }).replace(',', '');
+  },
+
+  formatFtEuroDateTime(date = new Date()) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  },
+
+  formatTimeDateDisplay(comp, date = new Date()) {
+    const fmt = comp?.dateFormat || 'locale';
+    if (fmt === 'short') {
+      return date.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+    }
+    if (fmt === 'long') {
+      return date.toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'medium' });
+    }
+    if (fmt === 'euro24') {
+      return ComponentRegistry.formatFtEuroDateTime(date);
+    }
+    return ComponentRegistry.formatFtShortDateTime(date);
+  },
+
+  TimeDateDisplay(comp, ctx) {
+    const el = document.createElement('div');
+    el.className = 'ft-time-date ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx?.studioEdit);
+
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'none',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'transparent',
+      backColor: comp.backColor || '#ffffff',
+      useBackColor: comp.useBackColor === true,
+      studioEdit
+    });
+
+    el.style.display = 'flex';
+    el.style.overflow = 'hidden';
+    el.style.padding = '0 1px';
+    el.style.boxSizing = 'border-box';
+
+    const valueEl = document.createElement('span');
+    valueEl.className = 'ft-time-date-value';
+    valueEl.style.pointerEvents = 'none';
+    el.appendChild(valueEl);
+
+    const alignId = comp.alignment || 'middleCenter';
+    const align = ComponentRegistry.textAlignment(alignId, 'row');
+    el.style.justifyContent = align.justify;
+    el.style.alignItems = align.align;
+
+    ComponentRegistry.applyCaptionStyle(valueEl, {
+      fontFamily: comp.fontFamily,
+      fontSize: comp.fontSize,
+      bold: comp.bold,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.foreColor || '#000000',
+      useForeColor: comp.useForeColor !== false,
+      wordWrap: false,
+      alignment: alignId
+    });
+    valueEl.style.width = '100%';
+    valueEl.style.lineHeight = '1.1';
+    el.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    const renderClock = () => {
+      valueEl.textContent = ComponentRegistry.formatTimeDateDisplay(comp);
+    };
+    renderClock();
+    if (!studioEdit) {
+      const timerId = setInterval(renderClock, 1000);
+      el.dataset.clockTimer = String(timerId);
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'TimeDateDisplay',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'TimeDateDisplay',
+          source: comp._source || ''
+        }, '*');
+      });
+    }
+    return el;
+  },
+
+  StringDisplay(comp, ctx) {
+    const el = document.createElement('div');
+    el.className = 'ft-string-display ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 4,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      studioEdit
+    });
+
+    el.style.display = 'flex';
+    el.style.overflow = 'hidden';
+    el.style.padding = '2px 4px';
+
+    const valueEl = document.createElement('span');
+    valueEl.className = 'ft-string-display-value';
+    valueEl.style.pointerEvents = 'none';
+    valueEl.style.width = '100%';
+    el.appendChild(valueEl);
+
+    const alignId = comp.alignment || 'middleLeft';
+    const align = ComponentRegistry.textAlignment(alignId);
+    el.style.justifyContent = align.justify;
+    el.style.alignItems = align.align;
+
+    const applyTextStyle = () => {
+      ComponentRegistry.applyCaptionStyle(valueEl, {
+        fontFamily: comp.fontFamily,
+        fontSize: comp.fontSize,
+        bold: comp.bold,
+        italic: comp.italic,
+        underline: comp.underline,
+        foreColor: comp.foreColor || '#ffffff',
+        useForeColor: comp.useForeColor !== false,
+        wordWrap: comp.wordWrap !== false,
+        alignment: alignId
+      });
+      el.classList.toggle('ft-blink', Boolean(comp.blink));
+    };
+    applyTextStyle();
+
+    const placeholder = ComponentRegistry.stringDisplayPlaceholder(comp);
+    const showValue = (val) => {
+      valueEl.textContent = val != null && val !== '' ? String(val) : (comp.caption || '');
+    };
+
+    if (comp.useCurrentUser && !studioEdit) {
+      const renderUser = (user) => showValue(user?.username || comp.caption || 'Guest');
+      renderUser(ctx.getCurrentUser?.());
+      ctx.onUserChange?.(renderUser);
+    } else if (comp.tag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
+    } else if (studioEdit) {
+      valueEl.textContent = comp.useCurrentUser
+        ? placeholder
+        : (comp.caption || placeholder);
+    } else {
+      showValue(comp.caption);
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'StringDisplay',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'StringDisplay',
+          source: comp._source || ''
+        }, '*');
+      });
+    }
+
+    return el;
+  },
+
+  StringInputEnable(comp, ctx) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'ft-string-input ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 4,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      studioEdit
+    });
+
+    el.style.display = 'flex';
+    el.style.overflow = 'hidden';
+    el.style.padding = '2px 4px';
+    el.style.cursor = studioEdit ? 'default' : 'pointer';
+
+    const valueEl = document.createElement('span');
+    valueEl.className = 'ft-string-input-value';
+    valueEl.style.pointerEvents = 'none';
+    valueEl.style.width = '100%';
+    el.appendChild(valueEl);
+
+    const alignId = comp.alignment || 'middleCenter';
+    const align = ComponentRegistry.textAlignment(alignId);
+    el.style.justifyContent = align.justify;
+    el.style.alignItems = align.align;
+
+    const applyTextStyle = () => {
+      ComponentRegistry.applyCaptionStyle(valueEl, {
+        fontFamily: comp.fontFamily,
+        fontSize: comp.fontSize,
+        bold: comp.bold,
+        italic: comp.italic,
+        underline: comp.underline,
+        foreColor: comp.captionColor || comp.foreColor || '#ffffff',
+        useForeColor: comp.useCaptionColor || comp.useForeColor !== false,
+        wordWrap: comp.wordWrap !== false,
+        alignment: alignId
+      });
+      if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+        valueEl.style.backgroundColor = comp.captionBackColor || '#001C38';
+      } else {
+        valueEl.style.backgroundColor = 'transparent';
+      }
+      el.classList.toggle('ft-blink', Boolean(comp.blink));
+      valueEl.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    };
+    applyTextStyle();
+
+    const showValue = (val) => {
+      if (studioEdit) return;
+      const text = ComponentRegistry.formatStringInputValue(val, comp);
+      valueEl.textContent = text || comp.caption || '';
+    };
+
+    if (comp.tag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
+    } else if (!studioEdit) {
+      showValue(comp.caption);
+    } else {
+      valueEl.textContent = '';
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'StringInputEnable',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'StringInputEnable',
+          source: comp._source || ''
+        }, '*');
+      });
+      return el;
+    }
+
+    const commitValue = (raw) => {
+      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+      if (!writeTag) return;
+      const maxLen = comp.numberOfInputCharacters ?? 8;
+      let text = String(raw ?? '').slice(0, maxLen);
+      if (comp.fillCharacter === 'space' && text.length < maxLen) {
+        text = text.padEnd(maxLen, ' ');
+      }
+      ctx.writeTag(writeTag, text);
+      if (comp.enterTag) {
+        const enterWrite = ComponentRegistry.resolveWriteTagName(comp.enterTag);
+        if (enterWrite) {
+          ctx.writeTag(enterWrite, 1);
+          setTimeout(() => ctx.writeTag(enterWrite, 0), comp.enterKeyHoldTime ?? 250);
+        }
+      }
+      showValue(text);
+    };
+
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      const current = comp.tag ? ctx.getTagValue(comp.tag) : '';
+      const input = window.prompt('Enter text:', current !== undefined && current !== null ? String(current) : '');
+      if (input === null) return;
+      commitValue(input);
+    });
+
+    return el;
+  },
+
+  formatStringInputValue(val, comp) {
+    let text = val != null && val !== '' ? String(val) : '';
+    const maxLen = comp.numberOfInputCharacters ?? 8;
+    text = text.slice(0, maxLen);
+    if (comp.fillCharacter === 'space' && text.length < maxLen) {
+      text = text.padEnd(maxLen, ' ');
+    }
+    if (comp.maskScratchpad && text) {
+      return '*'.repeat(text.length);
+    }
+    return text;
+  },
+
+  stringDisplayPlaceholder(comp) {
+    const line = 's'.repeat(14);
+    const lines = Math.max(2, Math.min(8, Math.round((comp?.height || 80) / 18)));
+    return Array(lines).fill(line).join('\n');
   },
 
   AlarmTicker(comp, ctx) {
@@ -1203,8 +3604,10 @@ const ComponentRegistry = {
       timeEl.textContent = ComponentRegistry.formatFtShortDateTime();
     };
     tickTime();
-    const timerId = setInterval(tickTime, 1000);
-    el.dataset.tickerTimer = String(timerId);
+    if (!studioEdit) {
+      const timerId = setInterval(tickTime, 1000);
+      el.dataset.tickerTimer = String(timerId);
+    }
     const render = (alarms) => {
       const active = alarms?.active?.filter((a) => !a.acknowledged) || [];
       textEl.textContent = active.length
@@ -1252,7 +3655,7 @@ const ComponentRegistry = {
 
   Text(comp) {
     const el = document.createElement('div');
-    el.className = 'ft-text';
+    el.className = 'ft-text ft-graphic';
     if (comp.name) el.dataset.name = comp.name;
     if (comp.visible === false) {
       el.style.display = 'none';
@@ -1331,17 +3734,24 @@ const ComponentRegistry = {
   },
 
   applyGraphicsObject(el, comp) {
+    if (!ComponentRegistry.isPlacedGraphic(comp)) return;
     if (comp.left != null) el.style.left = `${comp.left}px`;
     if (comp.top != null) el.style.top = `${comp.top}px`;
     if (comp.width != null) el.style.width = `${comp.width}px`;
     if (comp.height != null) el.style.height = `${comp.height}px`;
-    if (comp.left != null || comp.top != null || comp.width != null || comp.height != null) {
-      el.classList.add('ft-graphic');
-    }
+    el.classList.add('ft-graphic');
   },
 
-  textAlignment(id) {
-    const map = {
+  isPlacedGraphic(comp) {
+    return comp != null && (comp.left != null || comp.top != null);
+  },
+
+  graphicClass(baseClass, comp) {
+    return ComponentRegistry.isPlacedGraphic(comp) ? `${baseClass} ft-graphic` : baseClass;
+  },
+
+  textAlignment(id, flexDirection = 'row') {
+    const rowMap = {
       topLeft: { justify: 'flex-start', align: 'flex-start' },
       topCenter: { justify: 'center', align: 'flex-start' },
       topRight: { justify: 'flex-end', align: 'flex-start' },
@@ -1352,7 +3762,11 @@ const ComponentRegistry = {
       bottomCenter: { justify: 'center', align: 'flex-end' },
       bottomRight: { justify: 'flex-end', align: 'flex-end' }
     };
-    return map[id] || map.middleCenter;
+    const entry = rowMap[id] || rowMap.middleCenter;
+    if (flexDirection === 'column') {
+      return { justify: entry.align, align: entry.justify };
+    }
+    return entry;
   },
 
   defaultTextComponent(overrides = {}) {

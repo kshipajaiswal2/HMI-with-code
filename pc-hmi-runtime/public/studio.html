@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Plant HMI Studio</title>
-    <link rel="stylesheet" href="studio.css?v=0.3.4" />
+    <link rel="stylesheet" href="studio.css?v=0.3.8" />
   </head>
   <body>
     <div class="studio-app">
@@ -48,8 +48,8 @@
         <div class="menu-root">
           <button type="button" class="menu-item" id="editMenuBtn">Edit</button>
           <div class="menu-dropdown hidden" id="editMenu">
-            <button type="button" class="menu-entry disabled" data-edit-action="undo"><span>Undo</span><span class="shortcut">Alt+Backspace</span></button>
-            <button type="button" class="menu-entry disabled" data-edit-action="redo"><span>Redo</span><span class="shortcut">Ctrl+Backspace</span></button>
+            <button type="button" class="menu-entry disabled" data-edit-action="undo"><span>Undo</span><span class="shortcut">Ctrl+Z</span></button>
+            <button type="button" class="menu-entry disabled" data-edit-action="redo"><span>Redo</span><span class="shortcut">Ctrl+Y</span></button>
             <div class="menu-sep"></div>
             <button type="button" class="menu-entry disabled" data-edit-action="cut"><span>Cut</span><span class="shortcut">Ctrl+X</span></button>
             <button type="button" class="menu-entry disabled" data-edit-action="copy"><span>Copy</span><span class="shortcut">Ctrl+C</span></button>
@@ -458,6 +458,38 @@
       </form>
     </dialog>
 
+    <dialog id="communicationsSetupDialog" class="dialog dialog-ft dialog-comm-setup">
+      <form id="communicationsSetupForm">
+        <h3 id="communicationsSetupTitle">Communications Setup</h3>
+        <fieldset class="ft-fieldset">
+          <legend>PLC connection</legend>
+          <label>Communication driver
+            <select id="commDriver">
+              <option value="simulator">Simulator (offline development)</option>
+              <option value="ethernet-ip">Allen-Bradley ControlLogix / CompactLogix (EtherNet/IP)</option>
+              <option value="opcua">OPC UA</option>
+            </select>
+          </label>
+          <label id="commIpRow">PLC IP address<input type="text" id="commPlcIp" inputmode="decimal" placeholder="192.168.1.10" autocomplete="off" /></label>
+          <p class="dialog-hint comm-ip-hint" id="commIpHint">Enter the PLC Ethernet/IP address on your plant network.</p>
+          <label id="commPathRow">Path (slot)<input type="text" id="commPath" value="0" placeholder="0" /></label>
+          <label>Poll interval (ms)<input type="number" id="commPoll" min="50" max="10000" value="200" /></label>
+          <label>Reconnect interval (ms)<input type="number" id="commReconnect" min="1000" max="60000" value="5000" /></label>
+          <div class="comm-test-row">
+            <button type="button" class="dialog-btn" id="commTestConnection">Test Connection</button>
+            <p class="comm-status" id="commStatus"></p>
+          </div>
+        </fieldset>
+        <p class="dialog-hint">Runtime connects to the PLC using the IP address above. Tag read/write over EtherNet/IP CIP is in progress — connection status uses TCP reachability today.</p>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelCommunicationsSetup">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyCommunicationsSetup">Apply</button>
+          <button type="button" class="dialog-btn" id="helpCommunicationsSetup">Help</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="projectSettingsDialog" class="dialog dialog-ft dialog-settings">
       <form id="projectSettingsForm">
         <h3 id="projectSettingsTitle">Project Settings</h3>
@@ -487,13 +519,7 @@
             <label class="radio-row"><input type="radio" name="executionTarget" value="panel-performance" checked /> Execute on Panel PC (Performance)</label>
             <label class="radio-row"><input type="radio" name="executionTarget" value="browser" /> Execute in Browser / Desktop Runtime</label>
           </fieldset>
-          <label>Communication driver
-            <select id="psDriver">
-              <option value="simulator">Simulator (offline)</option>
-              <option value="opcua">OPC UA (planned)</option>
-            </select>
-          </label>
-          <label>Poll interval (ms)<input type="number" id="psPoll" min="50" max="10000" value="200" /></label>
+          <p class="dialog-hint">PLC communication is configured in <strong>FactoryTalk Linx → Communications Setup</strong>.</p>
           <label class="radio-row"><input type="checkbox" id="psFullscreen" /> Start runtime in full screen (kiosk)</label>
         </div>
         <div class="dialog-tab-panel" data-tab-panel="inactivity">
@@ -1000,6 +1026,566 @@
       </form>
     </dialog>
 
+    <dialog id="timeDateDisplayDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="timeDateDisplayForm">
+        <h3>Time Date Display Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-tdd-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-tdd-tab="common">Common</button>
+        </div>
+        <div class="dialog-tab-panel active" data-tdd-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="tddBorderStyle"><option value="none" selected>None</option><option value="line">Line</option><option value="raised">Raised</option></select></label>
+              <label>Border width<input type="number" id="tddBorderWidth" min="0" max="20" value="1" /></label>
+              <label>Back style<select id="tddBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
+              <label>Pattern style<select id="tddPatternStyle"><option value="none" selected>None</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="tddBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="tddUseBackColor" /> Back color<input type="hidden" class="ft-color-input" id="tddBackColor" value="#ffffff" /></label>
+              <label class="color-check-row"><input type="checkbox" id="tddUseBorderColor" /> Border color<input type="hidden" class="ft-color-input" id="tddBorderColor" value="#c0c0c0" /></label>
+              <label class="color-check-row"><input type="checkbox" id="tddUsePatternColor" /> Pattern color<input type="hidden" class="ft-color-input" id="tddPatternColor" value="#000000" /></label>
+              <label class="color-check-row"><input type="checkbox" id="tddUseForeColor" checked /> Fore color<input type="hidden" class="ft-color-input" id="tddForeColor" value="#000000" /></label>
+              <label class="radio-row"><input type="checkbox" id="tddBlink" /> Blink</label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Text</legend>
+            <div class="text-props-font-row">
+              <label>Font<select id="tddFont"><option>Arial</option><option>Arial Unicode MS</option></select></label>
+              <label>Size<select id="tddFontSize"><option value="10">10</option><option value="12" selected>12</option><option value="14">14</option></select></label>
+              <div class="text-style-btns"><button type="button" class="text-style-btn" id="tddBold">B</button><button type="button" class="text-style-btn" id="tddItalic"><em>I</em></button><button type="button" class="text-style-btn" id="tddUnderline"><u>U</u></button></div>
+            </div>
+            <label class="radio-row"><input type="checkbox" id="tddWordWrap" checked /> Word wrap</label>
+            <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+              <div class="text-align-grid tdd-align-grid">
+                <label><input type="radio" name="tddAlign" value="topLeft" /><span></span></label>
+                <label><input type="radio" name="tddAlign" value="topCenter" /><span></span></label>
+                <label><input type="radio" name="tddAlign" value="topRight" /><span></span></label>
+                <label><input type="radio" name="tddAlign" value="middleLeft" /><span></span></label>
+                <label><input type="radio" name="tddAlign" value="middleCenter" checked /><span></span></label>
+                <label><input type="radio" name="tddAlign" value="middleRight" /><span></span></label>
+                <label><input type="radio" name="tddAlign" value="bottomLeft" /><span></span></label>
+                <label><input type="radio" name="tddAlign" value="bottomCenter" /><span></span></label>
+                <label><input type="radio" name="tddAlign" value="bottomRight" /><span></span></label>
+              </div>
+            </fieldset>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Time and Date Format</legend>
+            <label>Format<select id="tddDateFormat"><option value="locale" selected>8/13/2026 2:43:59 PM (locale)</option><option value="euro24">13-08-2026 14:43:59 (24h)</option><option value="short">Short date/time</option><option value="long">Long date/time</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-tdd-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="tddHeight" value="16" /></label><label>Width<input type="number" id="tddWidth" value="138" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="tddTop" value="9" /></label><label>Left<input type="number" id="tddLeft" value="660" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend><label>Name<input type="text" id="tddName" value="Clock" /><label class="radio-row"><input type="checkbox" id="tddVisible" checked /> Visible</label></fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelTimeDateDisplay">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyTimeDateDisplay" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpTimeDateDisplay">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="numericDisplayDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="numericDisplayForm">
+        <h3>Numeric Display Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-nd-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-nd-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-nd-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-nd-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="ndBorderStyle"><option value="line" selected>Line</option><option value="raisedInset">RaisedInset</option><option value="none">None</option></select></label>
+              <label>Border width<input type="number" id="ndBorderWidth" min="0" max="20" value="4" /></label>
+              <label>Back style<select id="ndBackStyle"><option value="solid" selected>Solid</option><option value="transparent">Transparent</option></select></label>
+              <label>Pattern style<select id="ndPatternStyle"><option value="none" selected>None</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="ndBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="ndUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="ndBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="ndUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="ndBorderColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="ndUsePatternColor" /> Pattern color<input type="hidden" class="ft-color-input" id="ndPatternColor" value="#ffffff" /></label>
+              <label class="color-check-row"><input type="checkbox" id="ndUseForeColor" checked /> Fore color<input type="hidden" class="ft-color-input" id="ndForeColor" value="#ffffff" /></label>
+              <label class="radio-row"><input type="checkbox" id="ndBlink" /> Blink</label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Text</legend>
+            <div class="text-props-font-row">
+              <label>Font<select id="ndFont"><option>Arial Unicode MS</option><option>Arial</option></select></label>
+              <label>Size<select id="ndFontSize"><option value="10" selected>10</option><option value="12">12</option></select></label>
+              <div class="text-style-btns"><button type="button" class="text-style-btn" id="ndBold">B</button><button type="button" class="text-style-btn" id="ndItalic"><em>I</em></button><button type="button" class="text-style-btn" id="ndUnderline"><u>U</u></button></div>
+            </div>
+            <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+              <div class="text-align-grid nd-align-grid">
+                <label><input type="radio" name="ndAlign" value="topLeft" /><span></span></label>
+                <label><input type="radio" name="ndAlign" value="topCenter" /><span></span></label>
+                <label><input type="radio" name="ndAlign" value="topRight" /><span></span></label>
+                <label><input type="radio" name="ndAlign" value="middleLeft" /><span></span></label>
+                <label><input type="radio" name="ndAlign" value="middleCenter" checked /><span></span></label>
+                <label><input type="radio" name="ndAlign" value="middleRight" /><span></span></label>
+                <label><input type="radio" name="ndAlign" value="bottomLeft" /><span></span></label>
+                <label><input type="radio" name="ndAlign" value="bottomCenter" /><span></span></label>
+                <label><input type="radio" name="ndAlign" value="bottomRight" /><span></span></label>
+              </div>
+            </fieldset>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Value settings</legend>
+            <label>Number of digits<select id="ndNumberOfDigits"><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="8">8</option></select></label>
+            <label>Fill left with<select id="ndFillLeftWith"><option value="none" selected>None</option><option value="zero">Zero</option><option value="space">Space</option></select></label>
+            <label>Decimal places<select id="ndDecimalPlaces"><option value="0" selected>0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-nd-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="ndHeight" value="28" /></label><label>Width<input type="number" id="ndWidth" value="80" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="ndTop" value="16" /></label><label>Left<input type="number" id="ndLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="ndName" value="NumericDisplay1" /></label>
+            <label class="radio-row"><input type="checkbox" id="ndVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-nd-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">←</td><td>Value</td><td><input type="text" id="ndTag" value="Production.Count" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="ndTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="ndTag">…</button></td></tr>
+              <tr><td class="conn-dir">←</td><td>Polarity</td><td><input type="text" id="ndPolarityTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="ndPolarityTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="ndPolarityTag">…</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelNumericDisplay">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyNumericDisplay" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpNumericDisplay">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="stringDisplayDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="stringDisplayForm">
+        <h3>String Display Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-sd-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-sd-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-sd-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-sd-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="sdBorderStyle"><option value="line" selected>Line</option><option value="none">None</option></select></label>
+              <label>Border width<input type="number" id="sdBorderWidth" value="4" /></label>
+              <label>Back style<select id="sdBackStyle"><option value="solid" selected>Solid</option><option value="transparent">Transparent</option></select></label>
+              <label>Pattern style<select id="sdPatternStyle"><option value="none" selected>None</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="sdBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="sdUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="sdBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="sdUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="sdBorderColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="sdUsePatternColor" /> Pattern color<input type="hidden" class="ft-color-input" id="sdPatternColor" value="#ffffff" /></label>
+              <label class="color-check-row"><input type="checkbox" id="sdUseForeColor" checked /> Fore color<input type="hidden" class="ft-color-input" id="sdForeColor" value="#ffffff" /></label>
+              <label class="radio-row"><input type="checkbox" id="sdBlink" /> Blink</label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Text</legend>
+            <div class="text-props-font-row">
+              <label>Font<select id="sdFont"><option>Arial Unicode MS</option><option>Arial</option></select></label>
+              <label>Size<select id="sdFontSize"><option value="10" selected>10</option><option value="12">12</option></select></label>
+              <div class="text-style-btns"><button type="button" class="text-style-btn" id="sdBold">B</button><button type="button" class="text-style-btn" id="sdItalic"><em>I</em></button><button type="button" class="text-style-btn" id="sdUnderline"><u>U</u></button></div>
+            </div>
+            <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+              <div class="text-align-grid sd-align-grid">
+                <label><input type="radio" name="sdAlign" value="topLeft" /><span></span></label>
+                <label><input type="radio" name="sdAlign" value="topCenter" /><span></span></label>
+                <label><input type="radio" name="sdAlign" value="topRight" /><span></span></label>
+                <label><input type="radio" name="sdAlign" value="middleLeft" checked /><span></span></label>
+                <label><input type="radio" name="sdAlign" value="middleCenter" /><span></span></label>
+                <label><input type="radio" name="sdAlign" value="middleRight" /><span></span></label>
+                <label><input type="radio" name="sdAlign" value="bottomLeft" /><span></span></label>
+                <label><input type="radio" name="sdAlign" value="bottomCenter" /><span></span></label>
+                <label><input type="radio" name="sdAlign" value="bottomRight" /><span></span></label>
+              </div>
+            </fieldset>
+            <label class="radio-row"><input type="checkbox" id="sdWordWrap" checked /> Word wrap</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-sd-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="sdHeight" value="80" /></label><label>Width<input type="number" id="sdWidth" value="120" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="sdTop" value="16" /></label><label>Left<input type="number" id="sdLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="sdName" value="StringDisplay1" /></label>
+            <label class="radio-row"><input type="checkbox" id="sdVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-sd-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">←</td><td>Value</td><td><input type="text" id="sdTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="sdTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="sdTag">…</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelStringDisplay">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyStringDisplay" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpStringDisplay">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="stringInputDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="stringInputForm">
+        <h3>String Input Enable Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-sie-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-sie-tab="label">Label</button>
+          <button type="button" class="dialog-tab" data-sie-tab="string">String</button>
+          <button type="button" class="dialog-tab" data-sie-tab="timing">Timing</button>
+          <button type="button" class="dialog-tab" data-sie-tab="esignature">E-Signature</button>
+          <button type="button" class="dialog-tab" data-sie-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-sie-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-sie-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="sieBorderStyle"><option value="line" selected>Line</option><option value="none">None</option></select></label>
+              <label>Border width<input type="number" id="sieBorderWidth" value="4" /></label>
+              <label>Back style<select id="sieBackStyle"><option value="solid" selected>Solid</option></select></label>
+              <label>Pattern style<select id="siePatternStyle"><option value="none" selected>None</option></select></label>
+              <label>Shape<select id="sieShape"><option value="rectangle" selected>Rectangle</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="sieBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="sieUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="sieBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="sieUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="sieBorderColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="sieUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="sieHighlightColor" value="#0066cc" /></label>
+              <label class="radio-row"><input type="checkbox" id="sieBlink" /> Blink</label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Touch margins</legend>
+            <div class="ps-size-row">
+              <label>Horizontal margin<input type="number" id="sieHorizontalMargin" min="0" value="0" /></label>
+              <label>Vertical margin<input type="number" id="sieVerticalMargin" min="0" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label class="radio-row"><input type="checkbox" id="sieAudio" checked /> Audio</label>
+            <label class="radio-row"><input type="checkbox" id="sieKeyNavigation" /> Key navigation</label>
+            <label class="radio-row"><input type="checkbox" id="sieTakeFocusOnPress" /> Take focus on press</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-sie-tab-panel="label">
+          <fieldset class="ft-fieldset"><legend>Caption</legend>
+            <textarea id="sieCaption" rows="3" class="text-props-caption"></textarea>
+            <div class="text-props-font-row">
+              <label>Font<select id="sieFont"><option>Arial Unicode MS</option><option>Arial</option></select></label>
+              <label>Size<select id="sieFontSize"><option value="10" selected>10</option><option value="12">12</option></select></label>
+              <div class="text-style-btns"><button type="button" class="text-style-btn" id="sieBold">B</button><button type="button" class="text-style-btn" id="sieItalic"><em>I</em></button><button type="button" class="text-style-btn" id="sieUnderline"><u>U</u></button></div>
+            </div>
+            <label class="color-check-row"><input type="checkbox" id="sieUseCaptionColor" /> Caption color<input type="hidden" class="ft-color-input" id="sieCaptionColor" value="#ffffff" /></label>
+            <label class="color-check-row"><input type="checkbox" id="sieUseCaptionBackColor" /> Caption back color<input type="hidden" class="ft-color-input" id="sieCaptionBackColor" value="#001C38" /></label>
+            <label class="radio-row"><input type="checkbox" id="sieCaptionBlink" /> Caption blink</label>
+            <label class="radio-row"><input type="checkbox" id="sieWordWrap" checked /> Word wrap</label>
+            <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+              <div class="text-align-grid sie-align-grid">
+                <label><input type="radio" name="sieAlign" value="topLeft" /><span></span></label>
+                <label><input type="radio" name="sieAlign" value="topCenter" /><span></span></label>
+                <label><input type="radio" name="sieAlign" value="topRight" /><span></span></label>
+                <label><input type="radio" name="sieAlign" value="middleLeft" /><span></span></label>
+                <label><input type="radio" name="sieAlign" value="middleCenter" checked /><span></span></label>
+                <label><input type="radio" name="sieAlign" value="middleRight" /><span></span></label>
+                <label><input type="radio" name="sieAlign" value="bottomLeft" /><span></span></label>
+                <label><input type="radio" name="sieAlign" value="bottomCenter" /><span></span></label>
+                <label><input type="radio" name="sieAlign" value="bottomRight" /><span></span></label>
+              </div>
+            </fieldset>
+            <label>Caption back style<select id="sieCaptionBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Image settings</legend>
+            <label>Image<input type="text" id="sieImage" disabled placeholder="Optional" /></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-sie-tab-panel="string">
+          <fieldset class="ft-fieldset"><legend>Pop-up settings</legend>
+            <label>String pop-up<select id="sieStringPopup"><option value="keyboard" selected>Keyboard</option></select></label>
+            <label>Number of input characters<select id="sieNumberOfInputCharacters"><option value="4">4</option><option value="8" selected>8</option><option value="12">12</option><option value="16">16</option><option value="24">24</option><option value="32">32</option></select></label>
+            <label>Fill character<select id="sieFillCharacter"><option value="null" selected>NULL</option><option value="space">Space</option></select></label>
+            <label class="radio-row"><input type="checkbox" id="sieMaskScratchpad" /> Mask scratchpad</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-sie-tab-panel="timing">
+          <fieldset class="ft-fieldset"><legend>Timing and handshake settings</legend>
+            <label>Enter key control delay<select id="sieEnterKeyControlDelay"><option value="400" selected>400 msec</option><option value="800">800 msec</option></select></label>
+            <label>Enter key hold time<select id="sieEnterKeyHoldTime"><option value="250" selected>250 msec</option><option value="500">500 msec</option></select></label>
+            <label>Enter key handshake time<select id="sieEnterKeyHandshakeTime"><option value="4000" selected>4 seconds</option><option value="8000">8 seconds</option></select></label>
+            <label>Handshake reset type<select id="sieHandshakeResetType"><option value="nonZeroValue" selected>Non-zero Value</option><option value="zeroValue">Zero Value</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-sie-tab-panel="esignature">
+          <label class="radio-row"><input type="checkbox" disabled /> Require electronic signature</label>
+          <p class="ft-field-hint">E-Signature enforcement is planned.</p>
+        </div>
+        <div class="dialog-tab-panel" data-sie-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="sieHeight" value="80" /></label><label>Width<input type="number" id="sieWidth" value="80" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="sieTop" value="16" /></label><label>Left<input type="number" id="sieLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="sieName" value="StringInputEnable1" /></label>
+            <label class="radio-row"><input type="checkbox" id="sieVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-sie-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">→</td><td>Value</td><td><input type="text" id="sieTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="sieTag">…</button></td><td></td></tr>
+              <tr><td class="conn-dir">→</td><td>Enter</td><td><input type="text" id="sieEnterTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="sieEnterTag">…</button></td><td></td></tr>
+              <tr><td class="conn-dir">←</td><td>Enter Handshake</td><td><input type="text" id="sieEnterHandshakeTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="sieEnterHandshakeTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="sieEnterHandshakeTag">…</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelStringInput">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyStringInput" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpStringInput">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="numericInputDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="numericInputForm">
+        <h3>Numeric Input Enable Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-nie-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-nie-tab="label">Label</button>
+          <button type="button" class="dialog-tab" data-nie-tab="numeric">Numeric</button>
+          <button type="button" class="dialog-tab" data-nie-tab="timing">Timing</button>
+          <button type="button" class="dialog-tab" data-nie-tab="esignature">E-Signature</button>
+          <button type="button" class="dialog-tab" data-nie-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-nie-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-nie-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="nieBorderStyle"><option value="line" selected>Line</option><option value="none">None</option></select></label>
+              <label>Border width<input type="number" id="nieBorderWidth" value="4" /></label>
+              <label>Back style<select id="nieBackStyle"><option value="solid" selected>Solid</option></select></label>
+              <label>Pattern style<select id="niePatternStyle"><option value="none" selected>None</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="nieBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="nieUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="nieBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="nieUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="nieBorderColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="nieUseForeColor" checked /> Fore color<input type="hidden" class="ft-color-input" id="nieForeColor" value="#ffffff" /></label>
+            </div>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-nie-tab-panel="label">
+          <fieldset class="ft-fieldset"><legend>Caption</legend>
+            <textarea id="nieCaption" rows="3" class="text-props-caption"></textarea>
+            <div class="text-props-font-row">
+              <label>Font<select id="nieFont"><option>Arial Unicode MS</option></select></label>
+              <label>Size<select id="nieFontSize"><option value="10" selected>10</option></select></label>
+              <div class="text-style-btns"><button type="button" class="text-style-btn" id="nieBold">B</button><button type="button" class="text-style-btn" id="nieItalic"><em>I</em></button><button type="button" class="text-style-btn" id="nieUnderline"><u>U</u></button></div>
+            </div>
+            <label class="color-check-row"><input type="checkbox" id="nieUseCaptionColor" checked /> Caption color<input type="hidden" class="ft-color-input" id="nieCaptionColor" value="#ffffff" /></label>
+            <label class="radio-row"><input type="checkbox" id="nieWordWrap" checked /> Word wrap</label>
+            <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+              <div class="text-align-grid"><label><input type="radio" name="nieAlign" value="middleCenter" checked /><span></span></label></div>
+            </fieldset>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Image settings</legend>
+            <label>Image<input type="text" id="nieImage" disabled placeholder="Optional" /></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-nie-tab-panel="numeric">
+          <fieldset class="ft-fieldset"><legend>Pop-up settings</legend>
+            <label>Numeric pop-up<select id="nieNumericPopup"><option value="keypad" selected>Keypad</option></select></label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Min/max range and ramp settings</legend>
+            <label>Minimum value<input type="number" id="nieMinValue" value="0" /></label>
+            <label>Maximum value<input type="number" id="nieMaxValue" value="2147483647" /></label>
+            <label>Ramp value<input type="number" id="nieRampValue" value="0" /></label>
+            <label class="radio-row"><input type="checkbox" id="nieUseVariableMinMax" /> Use variable minimum/maximum</label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Decimal point settings</legend>
+            <label>Decimal point<select id="nieDecimalPoint"><option value="implicit" selected>Implicit</option><option value="fixed">Fixed</option></select></label>
+            <label>Fixed position output<select id="nieFixedPositionOutput"><option value="strippedValue" selected>Stripped Value</option></select></label>
+            <label>Digits after decimal<select id="nieDigitsAfterDecimal"><option value="0" selected>0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-nie-tab-panel="timing">
+          <fieldset class="ft-fieldset"><legend>Timing and handshake settings</legend>
+            <label>Enter key control delay<select id="nieEnterKeyControlDelay"><option value="400" selected>400 msec</option><option value="800">800 msec</option></select></label>
+            <label>Enter key hold time<select id="nieEnterKeyHoldTime"><option value="250" selected>250 msec</option><option value="500">500 msec</option></select></label>
+            <label>Enter key handshake time<select id="nieEnterKeyHandshakeTime"><option value="4000" selected>4 seconds</option><option value="8000">8 seconds</option></select></label>
+            <label>Handshake reset type<select id="nieHandshakeResetType"><option value="nonZeroValue" selected>Non-zero Value</option><option value="zeroValue">Zero Value</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-nie-tab-panel="esignature">
+          <label class="radio-row"><input type="checkbox" disabled /> Require electronic signature</label>
+          <p class="ft-field-hint">E-Signature enforcement is planned.</p>
+        </div>
+        <div class="dialog-tab-panel" data-nie-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="nieHeight" value="28" /></label><label>Width<input type="number" id="nieWidth" value="80" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="nieTop" value="16" /></label><label>Left<input type="number" id="nieLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="nieName" value="NumericInputEnable1" /></label>
+            <label class="radio-row"><input type="checkbox" id="nieVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-nie-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">→</td><td>Value</td><td><input type="text" id="nieTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="nieTag">…</button></td><td></td></tr>
+              <tr><td class="conn-dir">→</td><td>Optional Exp</td><td><input type="text" id="nieOptionalExpTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="nieOptionalExpTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="nieOptionalExpTag">…</button></td></tr>
+              <tr><td class="conn-dir">→</td><td>Enter</td><td><input type="text" id="nieEnterTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="nieEnterTag">…</button></td><td></td></tr>
+              <tr><td class="conn-dir">←</td><td>Enter Handshake</td><td><input type="text" id="nieEnterHandshakeTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="nieEnterHandshakeTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="nieEnterHandshakeTag">…</button></td></tr>
+              <tr><td class="conn-dir">←</td><td>Minimum</td><td><input type="text" id="nieMinimumTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="nieMinimumTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="nieMinimumTag">…</button></td></tr>
+              <tr><td class="conn-dir">←</td><td>Maximum</td><td><input type="text" id="nieMaximumTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="nieMaximumTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="nieMaximumTag">…</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelNumericInput">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyNumericInput" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpNumericInput">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="numericInputCursorDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="numericInputCursorForm">
+        <h3>Numeric Input Cursor Point Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-nic-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-nic-tab="numeric">Numeric</button>
+          <button type="button" class="dialog-tab" data-nic-tab="timing">Timing</button>
+          <button type="button" class="dialog-tab" data-nic-tab="esignature">E-Signature</button>
+          <button type="button" class="dialog-tab" data-nic-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-nic-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-nic-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="nicBorderStyle"><option value="line" selected>Line</option><option value="none">None</option></select></label>
+              <label>Border width<input type="number" id="nicBorderWidth" value="4" /></label>
+              <label>Back style<select id="nicBackStyle"><option value="solid" selected>Solid</option></select></label>
+              <label>Pattern style<select id="nicPatternStyle"><option value="none" selected>None</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="nicBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="nicUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="nicBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="nicUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="nicBorderColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="nicUsePatternColor" /> Pattern color<input type="hidden" class="ft-color-input" id="nicPatternColor" value="#ffffff" /></label>
+              <label class="color-check-row"><input type="checkbox" id="nicUseForeColor" checked /> Fore color<input type="hidden" class="ft-color-input" id="nicForeColor" value="#ffffff" /></label>
+              <label class="color-check-row"><input type="checkbox" id="nicUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="nicHighlightColor" value="#0066cc" /></label>
+              <label class="radio-row"><input type="checkbox" id="nicBlink" /> Blink</label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Text</legend>
+            <div class="text-props-font-row">
+              <label>Font<select id="nicFont"><option>Arial Unicode MS</option><option>Arial</option></select></label>
+              <label>Size<select id="nicFontSize"><option value="10" selected>10</option><option value="12">12</option></select></label>
+              <div class="text-style-btns"><button type="button" class="text-style-btn" id="nicBold">B</button><button type="button" class="text-style-btn" id="nicItalic"><em>I</em></button><button type="button" class="text-style-btn" id="nicUnderline"><u>U</u></button></div>
+            </div>
+            <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+              <div class="text-align-grid nic-align-grid">
+                <label><input type="radio" name="nicAlign" value="topLeft" /><span></span></label>
+                <label><input type="radio" name="nicAlign" value="topCenter" /><span></span></label>
+                <label><input type="radio" name="nicAlign" value="topRight" /><span></span></label>
+                <label><input type="radio" name="nicAlign" value="middleLeft" /><span></span></label>
+                <label><input type="radio" name="nicAlign" value="middleCenter" checked /><span></span></label>
+                <label><input type="radio" name="nicAlign" value="middleRight" /><span></span></label>
+                <label><input type="radio" name="nicAlign" value="bottomLeft" /><span></span></label>
+                <label><input type="radio" name="nicAlign" value="bottomCenter" /><span></span></label>
+                <label><input type="radio" name="nicAlign" value="bottomRight" /><span></span></label>
+              </div>
+            </fieldset>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Touch margins</legend>
+            <div class="ps-size-row">
+              <label>Horizontal margin<input type="number" id="nicHorizontalMargin" min="0" value="0" /></label>
+              <label>Vertical margin<input type="number" id="nicVerticalMargin" min="0" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label class="radio-row"><input type="checkbox" id="nicAudio" checked /> Audio</label>
+            <label class="radio-row"><input type="checkbox" id="nicKeyNavigation" checked /> Key navigation</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-nic-tab-panel="numeric">
+          <fieldset class="ft-fieldset"><legend>Pop-up settings</legend>
+            <label>Numeric pop-up<select id="nicNumericPopup"><option value="keypad" selected>Keypad</option></select></label>
+            <label>Caption on keypad/scratchpad<input type="text" id="nicKeypadCaption" /></label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Min/max range and ramp settings</legend>
+            <label>Minimum value<input type="number" id="nicMinValue" value="0" /></label>
+            <label>Maximum value<input type="number" id="nicMaxValue" value="2147483647" /></label>
+            <label>Ramp value<input type="number" id="nicRampValue" value="0" /></label>
+            <label class="radio-row"><input type="checkbox" id="nicUseVariableMinMax" /> Use variable minimum/maximum</label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Decimal point settings</legend>
+            <label>Decimal point<select id="nicDecimalPoint"><option value="implicit" selected>Implicit</option><option value="fixed">Fixed</option></select></label>
+            <label>Fixed position output<select id="nicFixedPositionOutput"><option value="strippedValue" selected>Stripped Value</option></select></label>
+            <label>Digits after decimal<select id="nicDigitsAfterDecimal"><option value="0" selected>0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Display settings</legend>
+            <label>Number of digits<select id="nicNumberOfDigits"><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="8">8</option></select></label>
+            <label>Fill left with<select id="nicFillLeftWith"><option value="none" selected>None</option><option value="zero">Zero</option><option value="space">Space</option></select></label>
+            <label>Decimal places<select id="nicDecimalPlaces"><option value="0" selected>0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-nic-tab-panel="timing">
+          <fieldset class="ft-fieldset"><legend>Timing and handshake settings</legend>
+            <label>Enter key control delay<select id="nicEnterKeyControlDelay"><option value="400" selected>400 msec</option><option value="800">800 msec</option></select></label>
+            <label>Enter key hold time<select id="nicEnterKeyHoldTime"><option value="250" selected>250 msec</option><option value="500">500 msec</option></select></label>
+            <label>Enter key handshake time<select id="nicEnterKeyHandshakeTime"><option value="4000" selected>4 seconds</option><option value="8000">8 seconds</option></select></label>
+            <label>Handshake reset type<select id="nicHandshakeResetType"><option value="nonZeroValue" selected>Non-zero Value</option><option value="zeroValue">Zero Value</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-nic-tab-panel="esignature">
+          <label class="radio-row"><input type="checkbox" disabled /> Require electronic signature</label>
+          <p class="ft-field-hint">E-Signature enforcement is planned.</p>
+        </div>
+        <div class="dialog-tab-panel" data-nic-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="nicHeight" value="28" /></label><label>Width<input type="number" id="nicWidth" value="80" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="nicTop" value="16" /></label><label>Left<input type="number" id="nicLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="nicName" value="NumericInputCursorPoint1" /></label>
+            <label class="radio-row"><input type="checkbox" id="nicVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-nic-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">→</td><td>Value</td><td><input type="text" id="nicTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="nicTag">…</button></td><td></td></tr>
+              <tr><td class="conn-dir">→</td><td>Optional Exp</td><td><input type="text" id="nicOptionalExpTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="nicOptionalExpTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="nicOptionalExpTag">…</button></td></tr>
+              <tr><td class="conn-dir">←</td><td>Indicator</td><td><input type="text" id="nicIndicatorTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="nicIndicatorTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="nicIndicatorTag">…</button></td></tr>
+              <tr><td class="conn-dir">→</td><td>Enter</td><td><input type="text" id="nicEnterTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="nicEnterTag">…</button></td><td></td></tr>
+              <tr><td class="conn-dir">←</td><td>Enter Handshake</td><td><input type="text" id="nicEnterHandshakeTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="nicEnterHandshakeTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="nicEnterHandshakeTag">…</button></td></tr>
+              <tr><td class="conn-dir">←</td><td>Minimum</td><td><input type="text" id="nicMinimumTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="nicMinimumTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="nicMinimumTag">…</button></td></tr>
+              <tr><td class="conn-dir">←</td><td>Maximum</td><td><input type="text" id="nicMaximumTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="nicMaximumTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="nicMaximumTag">…</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelNumericInputCursor">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyNumericInputCursor" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpNumericInputCursor">Help</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="momentaryButtonDialog" class="dialog dialog-ft dialog-momentary-props">
       <form id="momentaryButtonForm">
         <h3>Momentary Push Button Properties</h3>
@@ -1427,6 +2013,1310 @@
       </form>
     </dialog>
 
+    <dialog id="latchedButtonDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="latchedButtonForm">
+        <h3>Latched Push Button Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-lat-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-lat-tab="states">States</button>
+          <button type="button" class="dialog-tab" data-lat-tab="esignature">E-Signature</button>
+          <button type="button" class="dialog-tab" data-lat-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-lat-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-lat-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="latBorderStyle"><option value="line" selected>Line</option><option value="raisedInset">RaisedInset</option><option value="raised">Raised</option><option value="none">None</option></select></label>
+              <label>Border width<input type="number" id="latBorderWidth" min="0" max="20" value="1" /></label>
+              <label>Back style<select id="latBackStyle"><option value="transparent">Transparent</option><option value="solid" selected>Solid</option></select></label>
+              <label>Shape<select id="latShape"><option value="rectangle" selected>Rectangle</option><option value="roundedRectangle">Rounded Rectangle</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="latBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="latUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="latHighlightColor" value="#0066cc" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Button settings</legend>
+            <label>Latch reset type<select id="latLatchResetType"><option value="nonZeroValue" selected>Non-zero Value</option><option value="zeroValue">Zero Value</option></select></label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Touch margins</legend>
+            <div class="ps-size-row"><label>Horizontal margin<input type="number" id="latHorizontalMargin" min="0" max="100" value="0" /></label><label>Vertical margin<input type="number" id="latVerticalMargin" min="0" max="100" value="0" /></label></div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend><label class="radio-row"><input type="checkbox" id="latAudio" checked /> Audio</label></fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-lat-tab-panel="states">
+          <div class="ft-states-layout">
+            <div class="ft-states-sidebar">
+              <label class="ft-states-list-label">Select state:</label>
+              <select id="latStateSelect" class="ft-states-list" size="3"><option value="State0" selected>State0</option><option value="State1">State1</option><option value="Error">Error</option></select>
+              <div class="ft-states-copy-row"><button type="button" class="dialog-btn" id="latStateCopy">Copy…</button><button type="button" class="dialog-btn" id="latStatePaste" disabled>Paste…</button></div>
+            </div>
+            <div class="ft-states-editor">
+              <fieldset class="ft-fieldset"><legend>General</legend>
+                <label id="latStateValueRow">Value<input type="number" id="latStateValue" value="0" /></label>
+                <label class="color-check-row"><input type="checkbox" id="latStateUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="latStateBackColor" value="#001C38" /></label>
+                <label class="color-check-row"><input type="checkbox" id="latStateUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="latStateBorderColor" value="#001C38" /></label>
+                <label class="radio-row"><input type="checkbox" id="latStateBlink" /> Blink</label>
+              </fieldset>
+              <fieldset class="ft-fieldset"><legend>Caption</legend>
+                <textarea id="latStateCaption" rows="3" class="text-props-caption"></textarea>
+                <div class="text-props-font-row">
+                  <label>Font<select id="latFont"><option>Arial Unicode MS</option><option>Arial</option><option>Segoe UI</option></select></label>
+                  <label>Size<select id="latFontSize"><option value="10" selected>10</option><option value="12">12</option></select></label>
+                  <div class="text-style-btns"><button type="button" class="text-style-btn" id="latBold">B</button><button type="button" class="text-style-btn" id="latItalic"><em>I</em></button><button type="button" class="text-style-btn" id="latUnderline"><u>U</u></button></div>
+                </div>
+                <label class="color-check-row"><input type="checkbox" id="latStateUseCaptionColor" checked /> Caption color<input type="hidden" class="ft-color-input" id="latStateCaptionColor" value="#ffffff" /></label>
+                <label class="radio-row"><input type="checkbox" id="latStateWordWrap" checked /> Word wrap</label>
+                <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+                  <div class="text-align-grid lat-state-align-grid">
+                    <label><input type="radio" name="latStateAlign" value="middleCenter" checked /><span></span></label>
+                  </div>
+                </fieldset>
+              </fieldset>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-tab-panel" data-lat-tab-panel="esignature">
+          <label class="radio-row"><input type="checkbox" disabled /> Require electronic signature</label>
+          <p class="ft-field-hint">E-Signature enforcement is planned.</p>
+        </div>
+        <div class="dialog-tab-panel" data-lat-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="latHeight" value="38" /></label><label>Width<input type="number" id="latWidth" value="147" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="latTop" value="79" /></label><label>Left<input type="number" id="latLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="latName" value="LatchedButton1" /></label>
+            <label class="radio-row"><input type="checkbox" id="latVisible" checked /> Visible</label>
+            <label class="radio-row"><input type="checkbox" id="latTouch" checked /> Touch</label>
+            <label>Key assignment<select id="latKeyAssignment"><option value="None" selected>None</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-lat-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">↔</td><td>Value</td><td><input type="text" id="latTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="latTag">…</button></td><td></td></tr>
+              <tr><td class="conn-dir">←</td><td>Indicator</td><td><input type="text" id="latIndicatorTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="latIndicatorTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="latIndicatorTag">…</button></td></tr>
+              <tr><td class="conn-dir">←</td><td>Handshake</td><td><input type="text" id="latHandshakeTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="latHandshakeTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="latHandshakeTag">…</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelLatchedButton">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyLatchedButton" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpLatchedButton">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="multistateButtonDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="multistateButtonForm">
+        <h3>Multistate Push Button Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-ms-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-ms-tab="states">States</button>
+          <button type="button" class="dialog-tab" data-ms-tab="timing">Timing</button>
+          <button type="button" class="dialog-tab" data-ms-tab="esignature">E-Signature</button>
+          <button type="button" class="dialog-tab" data-ms-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-ms-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-ms-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="msBorderStyle"><option value="line" selected>Line</option><option value="raisedInset">RaisedInset</option><option value="raised">Raised</option><option value="none">None</option></select></label>
+              <label>Border width<input type="number" id="msBorderWidth" min="0" max="20" value="1" /></label>
+              <label>Back style<select id="msBackStyle"><option value="transparent">Transparent</option><option value="solid" selected>Solid</option></select></label>
+              <label>Shape<select id="msShape"><option value="rectangle" selected>Rectangle</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="msBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="msUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="msHighlightColor" value="#0066cc" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>State settings</legend>
+            <label>Number of states<select id="msNumberOfStates"><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
+            <label>Next state based on<select id="msNextStateBasedOn"><option value="currentState" selected>Current State</option></select></label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Touch margins</legend>
+            <div class="ps-size-row"><label>Horizontal margin<input type="number" id="msHorizontalMargin" value="0" /></label><label>Vertical margin<input type="number" id="msVerticalMargin" value="0" /></label></div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend><label class="radio-row"><input type="checkbox" id="msAudio" checked /> Audio</label></fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-ms-tab-panel="states">
+          <div class="ft-states-layout">
+            <div class="ft-states-sidebar">
+              <label class="ft-states-list-label">Select state:</label>
+              <select id="msStateSelect" class="ft-states-list" size="4"></select>
+              <div class="ft-states-copy-row ft-states-mgmt-row">
+                <button type="button" class="dialog-btn" id="msInsertState">Insert State</button>
+                <button type="button" class="dialog-btn" id="msDeleteState">Delete State</button>
+              </div>
+              <div class="ft-states-copy-row"><button type="button" class="dialog-btn" id="msStateCopy">Copy…</button><button type="button" class="dialog-btn" id="msStatePaste" disabled>Paste…</button></div>
+            </div>
+            <div class="ft-states-editor">
+              <fieldset class="ft-fieldset"><legend>General</legend>
+                <label id="msStateValueRow">Value<input type="number" id="msStateValue" value="0" /></label>
+                <label class="color-check-row"><input type="checkbox" id="msStateUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="msStateBackColor" value="#001C38" /></label>
+                <label class="color-check-row"><input type="checkbox" id="msStateUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="msStateBorderColor" value="#001C38" /></label>
+                <label class="radio-row"><input type="checkbox" id="msStateBlink" /> Blink</label>
+              </fieldset>
+              <fieldset class="ft-fieldset"><legend>Caption</legend>
+                <textarea id="msStateCaption" rows="3" class="text-props-caption"></textarea>
+                <div class="text-props-font-row">
+                  <label>Font<select id="msFont"><option>Arial Unicode MS</option></select></label>
+                  <label>Size<select id="msFontSize"><option value="10" selected>10</option></select></label>
+                  <div class="text-style-btns"><button type="button" class="text-style-btn" id="msBold">B</button><button type="button" class="text-style-btn" id="msItalic"><em>I</em></button><button type="button" class="text-style-btn" id="msUnderline"><u>U</u></button></div>
+                </div>
+                <label class="color-check-row"><input type="checkbox" id="msStateUseCaptionColor" checked /> Caption color<input type="hidden" class="ft-color-input" id="msStateCaptionColor" value="#ffffff" /></label>
+                <label class="radio-row"><input type="checkbox" id="msStateWordWrap" checked /> Word wrap</label>
+                <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+                  <div class="text-align-grid ms-state-align-grid"><label><input type="radio" name="msStateAlign" value="middleCenter" checked /><span></span></label></div>
+                </fieldset>
+              </fieldset>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-tab-panel" data-ms-tab-panel="timing">
+          <fieldset class="ft-fieldset"><legend>Auto repeat settings</legend>
+            <label>Auto repeat rate<select id="msAutoRepeatRate"><option value="0" selected>0</option><option value="100">100 msec</option><option value="200">200 msec</option><option value="400">400 msec</option></select></label>
+            <label>Auto repeat delay<select id="msAutoRepeatDelay"><option value="400" selected>400 msec</option><option value="800">800 msec</option><option value="1200">1200 msec</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-ms-tab-panel="esignature">
+          <label class="radio-row"><input type="checkbox" disabled /> Require electronic signature</label>
+          <p class="ft-field-hint">E-Signature enforcement is planned.</p>
+        </div>
+        <div class="dialog-tab-panel" data-ms-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="msHeight" value="38" /></label><label>Width<input type="number" id="msWidth" value="147" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="msTop" value="79" /></label><label>Left<input type="number" id="msLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="msName" value="MultistateButton1" /></label>
+            <label class="radio-row"><input type="checkbox" id="msVisible" checked /> Visible</label>
+            <label class="radio-row"><input type="checkbox" id="msTouch" checked /> Touch</label>
+            <label>Key assignment<select id="msKeyAssignment"><option value="None" selected>None</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-ms-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">↔</td><td>Value</td><td><input type="text" id="msTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="msTag">…</button></td><td></td></tr>
+              <tr><td class="conn-dir">←</td><td>Indicator</td><td><input type="text" id="msIndicatorTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="msIndicatorTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="msIndicatorTag">…</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelMultistateButton">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyMultistateButton" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpMultistateButton">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="interlockedButtonDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="interlockedButtonForm">
+        <h3>Interlocked Push Button Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-ilk-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-ilk-tab="states">States</button>
+          <button type="button" class="dialog-tab" data-ilk-tab="esignature">E-Signature</button>
+          <button type="button" class="dialog-tab" data-ilk-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-ilk-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-ilk-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="ilkBorderStyle"><option value="line" selected>Line</option><option value="raisedInset">RaisedInset</option><option value="raised">Raised</option><option value="none">None</option></select></label>
+              <label>Border width<input type="number" id="ilkBorderWidth" min="0" max="20" value="1" /></label>
+              <label>Back style<select id="ilkBackStyle"><option value="transparent">Transparent</option><option value="solid" selected>Solid</option></select></label>
+              <label>Shape<select id="ilkShape"><option value="rectangle" selected>Rectangle</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="ilkBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="ilkUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="ilkHighlightColor" value="#0066cc" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Button value</legend>
+            <label>Value<input type="number" id="ilkButtonValue" value="1" /></label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Touch margins</legend>
+            <div class="ps-size-row"><label>Horizontal margin<input type="number" id="ilkHorizontalMargin" value="0" /></label><label>Vertical margin<input type="number" id="ilkVerticalMargin" value="0" /></label></div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend><label class="radio-row"><input type="checkbox" id="ilkAudio" checked /> Audio</label></fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-ilk-tab-panel="states">
+          <div class="ft-states-layout">
+            <div class="ft-states-sidebar">
+              <label class="ft-states-list-label">Select state:</label>
+              <select id="ilkStateSelect" class="ft-states-list" size="2"><option value="State0" selected>State0</option><option value="State1">State1</option></select>
+              <div class="ft-states-copy-row"><button type="button" class="dialog-btn" id="ilkStateCopy">Copy…</button><button type="button" class="dialog-btn" id="ilkStatePaste" disabled>Paste…</button></div>
+            </div>
+            <div class="ft-states-editor">
+              <fieldset class="ft-fieldset"><legend>General</legend>
+                <label class="color-check-row"><input type="checkbox" id="ilkStateUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="ilkStateBackColor" value="#001C38" /></label>
+                <label class="color-check-row"><input type="checkbox" id="ilkStateUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="ilkStateBorderColor" value="#001C38" /></label>
+                <label class="radio-row"><input type="checkbox" id="ilkStateBlink" /> Blink</label>
+                <label>Pattern style<select id="ilkStatePatternStyle"><option value="none" selected>None</option></select></label>
+              </fieldset>
+              <fieldset class="ft-fieldset"><legend>Caption</legend>
+                <textarea id="ilkStateCaption" rows="3" class="text-props-caption"></textarea>
+                <div class="text-props-font-row">
+                  <label>Font<select id="ilkFont"><option>Arial Unicode MS</option></select></label>
+                  <label>Size<select id="ilkFontSize"><option value="10" selected>10</option></select></label>
+                  <div class="text-style-btns"><button type="button" class="text-style-btn" id="ilkBold">B</button><button type="button" class="text-style-btn" id="ilkItalic"><em>I</em></button><button type="button" class="text-style-btn" id="ilkUnderline"><u>U</u></button></div>
+                </div>
+                <label class="color-check-row"><input type="checkbox" id="ilkStateUseCaptionColor" checked /> Caption color<input type="hidden" class="ft-color-input" id="ilkStateCaptionColor" value="#ffffff" /></label>
+                <label class="radio-row"><input type="checkbox" id="ilkStateWordWrap" checked /> Word wrap</label>
+                <label>Caption back style<select id="ilkCaptionBackStyle"><option value="transparent" selected>Transparent</option></select></label>
+                <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+                  <div class="text-align-grid ilk-state-align-grid">
+                    <label><input type="radio" name="ilkStateAlign" value="middleLeft" checked /><span></span></label>
+                    <label><input type="radio" name="ilkStateAlign" value="middleCenter" /><span></span></label>
+                  </div>
+                </fieldset>
+              </fieldset>
+              <fieldset class="ft-fieldset"><legend>Image settings</legend>
+                <label>Image<input type="text" id="ilkStateImage" placeholder="Optional" /><button type="button" class="dialog-btn" disabled>…</button></label>
+                <label>Image back style<select id="ilkImageBackStyle"><option value="transparent" selected>Transparent</option></select></label>
+              </fieldset>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-tab-panel" data-ilk-tab-panel="esignature">
+          <label class="radio-row"><input type="checkbox" disabled /> Require electronic signature</label>
+          <p class="ft-field-hint">E-Signature enforcement is planned.</p>
+        </div>
+        <div class="dialog-tab-panel" data-ilk-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="ilkHeight" value="38" /></label><label>Width<input type="number" id="ilkWidth" value="147" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="ilkTop" value="79" /></label><label>Left<input type="number" id="ilkLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="ilkName" value="InterlockedButton1" /></label>
+            <label class="radio-row"><input type="checkbox" id="ilkVisible" checked /> Visible</label>
+            <label class="radio-row"><input type="checkbox" id="ilkTouch" checked /> Touch</label>
+            <label>Key assignment<select id="ilkKeyAssignment"><option value="None" selected>None</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-ilk-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">↔</td><td>Value</td><td><input type="text" id="ilkTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="ilkTag">…</button></td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelInterlockedButton">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyInterlockedButton" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpInterlockedButton">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="rampButtonDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="rampButtonForm">
+        <h3>Ramp Button Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-rmp-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-rmp-tab="label">Label</button>
+          <button type="button" class="dialog-tab" data-rmp-tab="timing">Timing</button>
+          <button type="button" class="dialog-tab" data-rmp-tab="esignature">E-Signature</button>
+          <button type="button" class="dialog-tab" data-rmp-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-rmp-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-rmp-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="rmpBorderStyle"><option value="line" selected>Line</option><option value="raisedInset">RaisedInset</option><option value="raised">Raised</option><option value="none">None</option></select></label>
+              <label>Border width<input type="number" id="rmpBorderWidth" min="0" max="20" value="1" /></label>
+              <label>Back style<select id="rmpBackStyle"><option value="solid" selected>Solid</option><option value="transparent">Transparent</option></select></label>
+              <label>Pattern style<select id="rmpPatternStyle"><option value="none" selected>None</option></select></label>
+              <label>Shape<select id="rmpShape"><option value="rectangle" selected>Rectangle</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="rmpBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="rmpUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="rmpBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rmpUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="rmpBorderColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rmpUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="rmpHighlightColor" value="#0066cc" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Button settings</legend>
+            <label class="radio-row"><input type="checkbox" id="rmpUseVariableLimit" /> Use variable lower/upper limit</label>
+            <label class="radio-row"><input type="checkbox" id="rmpUseVariableRamp" /> Use variable ramp value</label>
+            <fieldset class="ft-fieldset"><legend>Operation direction</legend>
+              <label class="radio-row"><input type="radio" name="rmpDirection" value="rampUp" checked /> Ramp up</label>
+              <label class="radio-row"><input type="radio" name="rmpDirection" value="rampDown" /> Ramp down</label>
+            </fieldset>
+            <label>Upper limit<input type="number" id="rmpUpperLimit" value="100" /></label>
+            <label>Lower limit<input type="number" id="rmpLowerLimit" value="0" /></label>
+            <label>Ramp value<input type="number" id="rmpRampValue" value="1" /></label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Touch margins</legend>
+            <div class="ps-size-row"><label>Horizontal margin<input type="number" id="rmpHorizontalMargin" value="0" /></label><label>Vertical margin<input type="number" id="rmpVerticalMargin" value="0" /></label></div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend><label class="radio-row"><input type="checkbox" id="rmpAudio" checked /> Audio</label></fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-rmp-tab-panel="label">
+          <fieldset class="ft-fieldset"><legend>Caption</legend>
+            <textarea id="rmpCaption" rows="3" class="text-props-caption"></textarea>
+            <div class="text-props-font-row">
+              <label>Font<select id="rmpFont"><option>Arial Unicode MS</option></select></label>
+              <label>Size<select id="rmpFontSize"><option value="10" selected>10</option></select></label>
+              <div class="text-style-btns"><button type="button" class="text-style-btn" id="rmpBold">B</button><button type="button" class="text-style-btn" id="rmpItalic"><em>I</em></button><button type="button" class="text-style-btn" id="rmpUnderline"><u>U</u></button></div>
+            </div>
+            <label class="color-check-row"><input type="checkbox" id="rmpUseCaptionColor" checked /> Caption color<input type="hidden" class="ft-color-input" id="rmpCaptionColor" value="#ffffff" /></label>
+            <label class="radio-row"><input type="checkbox" id="rmpWordWrap" checked /> Word wrap</label>
+            <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+              <div class="text-align-grid rmp-align-grid"><label><input type="radio" name="rmpAlign" value="middleCenter" checked /><span></span></label></div>
+            </fieldset>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Image settings</legend>
+            <label>Image<input type="text" id="rmpImage" placeholder="Optional" /><button type="button" class="dialog-btn" disabled>…</button></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-rmp-tab-panel="timing">
+          <fieldset class="ft-fieldset"><legend>Auto repeat settings</legend>
+            <label>Auto repeat rate<select id="rmpAutoRepeatRate"><option value="0" selected>0</option><option value="100">100 msec</option><option value="200">200 msec</option><option value="400">400 msec</option></select></label>
+            <label>Auto repeat delay<select id="rmpAutoRepeatDelay"><option value="400" selected>400 msec</option><option value="800">800 msec</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-rmp-tab-panel="esignature">
+          <label class="radio-row"><input type="checkbox" disabled /> Require electronic signature</label>
+          <p class="ft-field-hint">E-Signature enforcement is planned.</p>
+        </div>
+        <div class="dialog-tab-panel" data-rmp-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="rmpHeight" value="160" /></label><label>Width<input type="number" id="rmpWidth" value="182" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="rmpTop" value="242" /></label><label>Left<input type="number" id="rmpLeft" value="329" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="rmpName" value="RampButton1" /></label>
+            <label class="radio-row"><input type="checkbox" id="rmpVisible" checked /> Visible</label>
+            <label class="radio-row"><input type="checkbox" id="rmpTouch" checked /> Touch</label>
+            <label>Key assignment<select id="rmpKeyAssignment"><option value="None" selected>None</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-rmp-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">↔</td><td>Value</td><td><input type="text" id="rmpTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="rmpTag">…</button></td><td></td></tr>
+              <tr><td class="conn-dir">←</td><td>Ramp</td><td><input type="text" id="rmpRampTagConn" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="rmpRampTagConn">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="rmpRampTagConn">…</button></td></tr>
+              <tr><td class="conn-dir">←</td><td>Limit</td><td><input type="text" id="rmpLimitTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="rmpLimitTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="rmpLimitTag">…</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelRampButton">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyRampButton" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpRampButton">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="closeDisplayButtonDialog" class="dialog dialog-ft dialog-goto-props">
+      <form id="closeDisplayButtonForm">
+        <h3>Close Display Button Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-cdb-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-cdb-tab="label">Label</button>
+          <button type="button" class="dialog-tab" data-cdb-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-cdb-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-cdb-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="cdbBorderStyle"><option value="line" selected>Line</option><option value="raised">Raised</option><option value="none">None</option></select></label>
+              <label>Back style<select id="cdbBackStyle"><option value="solid" selected>Solid</option><option value="transparent">Transparent</option></select></label>
+              <label>Shape<select id="cdbShape"><option value="rectangle" selected>Rectangle</option></select></label>
+              <label>Border width<input type="number" id="cdbBorderWidth" min="0" max="20" value="1" /></label>
+              <label>Pattern style<select id="cdbPatternStyle"><option value="none" selected>None</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="cdbBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="cdbUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="cdbBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="cdbUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="cdbBorderColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="cdbUsePatternColor" /> Pattern color<input type="hidden" class="ft-color-input" id="cdbPatternColor" value="#ffffff" /></label>
+              <label class="color-check-row"><input type="checkbox" id="cdbUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="cdbHighlightColor" value="#0066cc" /></label>
+              <label class="radio-row"><input type="checkbox" id="cdbBlink" /> Blink</label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Value</legend>
+            <label class="radio-row"><input type="checkbox" id="cdbWriteOnClose" /> Write on close</label>
+            <label>Close value<input type="number" id="cdbCloseValue" value="0" disabled /></label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Touch margins</legend>
+            <div class="ps-size-row">
+              <label>Horizontal margin<input type="number" id="cdbHorizontalMargin" min="0" value="0" /></label>
+              <label>Vertical margin<input type="number" id="cdbVerticalMargin" min="0" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label class="radio-row"><input type="checkbox" id="cdbAudio" checked /> Audio</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-cdb-tab-panel="label">
+          <fieldset class="ft-fieldset"><legend>Caption</legend>
+            <textarea id="cdbCaption" rows="3" class="text-props-caption"></textarea>
+            <div class="text-props-font-row">
+              <label>Font<select id="cdbFont"><option>Arial Unicode MS</option><option>Arial</option></select></label>
+              <label>Size<select id="cdbFontSize"><option value="10" selected>10</option><option value="12">12</option></select></label>
+              <div class="text-style-btns"><button type="button" class="text-style-btn" id="cdbBold">B</button><button type="button" class="text-style-btn" id="cdbItalic"><em>I</em></button><button type="button" class="text-style-btn" id="cdbUnderline"><u>U</u></button></div>
+            </div>
+            <div class="text-props-options">
+              <div class="text-props-left">
+                <label class="color-check-row"><input type="checkbox" id="cdbUseCaptionColor" /> Caption color<input type="hidden" class="ft-color-input" id="cdbCaptionColor" value="#ffffff" /></label>
+                <label class="color-check-row"><input type="checkbox" id="cdbUseCaptionBackColor" /> Caption back color<input type="hidden" class="ft-color-input" id="cdbCaptionBackColor" value="#001C38" /></label>
+                <label class="radio-row"><input type="checkbox" id="cdbCaptionBlink" /> Caption blink</label>
+                <label class="radio-row"><input type="checkbox" id="cdbWordWrap" checked /> Word wrap</label>
+              </div>
+              <div class="text-props-right">
+                <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+                  <div class="text-align-grid">
+                    <label><input type="radio" name="cdbAlign" value="topLeft" /><span></span></label>
+                    <label><input type="radio" name="cdbAlign" value="topCenter" /><span></span></label>
+                    <label><input type="radio" name="cdbAlign" value="topRight" /><span></span></label>
+                    <label><input type="radio" name="cdbAlign" value="middleLeft" /><span></span></label>
+                    <label><input type="radio" name="cdbAlign" value="middleCenter" checked /><span></span></label>
+                    <label><input type="radio" name="cdbAlign" value="middleRight" /><span></span></label>
+                    <label><input type="radio" name="cdbAlign" value="bottomLeft" /><span></span></label>
+                    <label><input type="radio" name="cdbAlign" value="bottomCenter" /><span></span></label>
+                    <label><input type="radio" name="cdbAlign" value="bottomRight" /><span></span></label>
+                  </div>
+                </fieldset>
+                <label>Caption back style<select id="cdbCaptionBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
+              </div>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Image settings</legend>
+            <label class="browse-row">Image<input type="text" id="cdbImage" placeholder="Browse image…" /><button type="button" class="dialog-btn" id="cdbBrowseImage">…</button></label>
+            <label>Image back style<select id="cdbImageBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
+            <label class="color-check-row"><input type="checkbox" id="cdbUseImageColor" /> Image color<input type="hidden" class="ft-color-input" id="cdbImageColor" value="#ffffff" /></label>
+            <label class="color-check-row"><input type="checkbox" id="cdbUseImageBackColor" /> Image back color<input type="hidden" class="ft-color-input" id="cdbImageBackColor" value="#001C38" /></label>
+            <label class="radio-row"><input type="checkbox" id="cdbImageBlink" /> Image blink</label>
+            <label class="radio-row"><input type="checkbox" id="cdbImageScaled" /> Image scaled</label>
+            <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+              <div class="text-align-grid cdb-image-align-grid">
+                <label><input type="radio" name="cdbImageAlign" value="topLeft" /><span></span></label>
+                <label><input type="radio" name="cdbImageAlign" value="topCenter" /><span></span></label>
+                <label><input type="radio" name="cdbImageAlign" value="topRight" /><span></span></label>
+                <label><input type="radio" name="cdbImageAlign" value="middleLeft" /><span></span></label>
+                <label><input type="radio" name="cdbImageAlign" value="middleCenter" checked /><span></span></label>
+                <label><input type="radio" name="cdbImageAlign" value="middleRight" /><span></span></label>
+                <label><input type="radio" name="cdbImageAlign" value="bottomLeft" /><span></span></label>
+                <label><input type="radio" name="cdbImageAlign" value="bottomCenter" /><span></span></label>
+                <label><input type="radio" name="cdbImageAlign" value="bottomRight" /><span></span></label>
+              </div>
+            </fieldset>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-cdb-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="cdbHeight" value="80" /></label><label>Width<input type="number" id="cdbWidth" value="80" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="cdbTop" value="16" /></label><label>Left<input type="number" id="cdbLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="cdbName" value="CloseDisplayButton1" /></label>
+            <label class="radio-row"><input type="checkbox" id="cdbVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-cdb-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">→</td><td>Value</td><td><input type="text" id="cdbTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="cdbTag">…</button></td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelCloseDisplayButton">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyCloseDisplayButton" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpCloseDisplayButton">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="recipePlusButtonDialog" class="dialog dialog-ft dialog-goto-props">
+      <form id="recipePlusButtonForm">
+        <h3>RecipePlus Button Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-rpb-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-rpb-tab="label">Label</button>
+          <button type="button" class="dialog-tab" data-rpb-tab="esignature">E-Signature</button>
+          <button type="button" class="dialog-tab" data-rpb-tab="common">Common</button>
+        </div>
+        <div class="dialog-tab-panel active" data-rpb-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="rpbBorderStyle"><option value="line" selected>Line</option><option value="raised">Raised</option><option value="none">None</option></select></label>
+              <label>Back style<select id="rpbBackStyle"><option value="solid" selected>Solid</option><option value="transparent">Transparent</option></select></label>
+              <label>Shape<select id="rpbShape"><option value="rectangle" selected>Rectangle</option></select></label>
+              <label>Border width<input type="number" id="rpbBorderWidth" min="0" max="20" value="1" /></label>
+              <label>Pattern style<select id="rpbPatternStyle"><option value="none" selected>None</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="rpbBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="rpbUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="rpbBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rpbUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="rpbBorderColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rpbUsePatternColor" /> Pattern color<input type="hidden" class="ft-color-input" id="rpbPatternColor" value="#ffffff" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rpbUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="rpbHighlightColor" value="#0066cc" /></label>
+              <label class="radio-row"><input type="checkbox" id="rpbBlink" /> Blink</label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Action</legend>
+            <label>Action<select id="rpbAction"><option value="download" selected>Download</option><option value="upload">Upload</option><option value="delete">Delete</option><option value="create">Create</option><option value="select">Select</option></select></label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Touch margins</legend>
+            <div class="ps-size-row"><label>Horizontal margin<input type="number" id="rpbHorizontalMargin" min="0" value="0" /></label><label>Vertical margin<input type="number" id="rpbVerticalMargin" min="0" value="0" /></label></div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend><label class="radio-row"><input type="checkbox" id="rpbAudio" checked /> Audio</label></fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-rpb-tab-panel="label">
+          <fieldset class="ft-fieldset"><legend>Caption</legend>
+            <textarea id="rpbCaption" rows="3" class="text-props-caption"></textarea>
+            <button type="button" class="dialog-btn ft-insert-var-btn" id="rpbInsertVariable" disabled>Insert Variable…</button>
+            <div class="text-props-font-row">
+              <label>Font<select id="rpbFont"><option>Arial Unicode MS</option><option>Arial</option></select></label>
+              <label>Size<select id="rpbFontSize"><option value="10" selected>10</option><option value="12">12</option></select></label>
+              <div class="text-style-btns"><button type="button" class="text-style-btn" id="rpbBold">B</button><button type="button" class="text-style-btn" id="rpbItalic"><em>I</em></button><button type="button" class="text-style-btn" id="rpbUnderline"><u>U</u></button></div>
+            </div>
+            <div class="text-props-options">
+              <div class="text-props-left">
+                <label class="color-check-row"><input type="checkbox" id="rpbUseCaptionColor" /> Caption color<input type="hidden" class="ft-color-input" id="rpbCaptionColor" value="#ffffff" /></label>
+                <label class="color-check-row"><input type="checkbox" id="rpbUseCaptionBackColor" /> Caption back color<input type="hidden" class="ft-color-input" id="rpbCaptionBackColor" value="#001C38" /></label>
+                <label class="radio-row"><input type="checkbox" id="rpbCaptionBlink" /> Caption blink</label>
+                <label class="radio-row"><input type="checkbox" id="rpbWordWrap" checked /> Word wrap</label>
+              </div>
+              <div class="text-props-right">
+                <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+                  <div class="text-align-grid">
+                    <label><input type="radio" name="rpbAlign" value="topLeft" /><span></span></label>
+                    <label><input type="radio" name="rpbAlign" value="topCenter" /><span></span></label>
+                    <label><input type="radio" name="rpbAlign" value="topRight" /><span></span></label>
+                    <label><input type="radio" name="rpbAlign" value="middleLeft" /><span></span></label>
+                    <label><input type="radio" name="rpbAlign" value="middleCenter" checked /><span></span></label>
+                    <label><input type="radio" name="rpbAlign" value="middleRight" /><span></span></label>
+                    <label><input type="radio" name="rpbAlign" value="bottomLeft" /><span></span></label>
+                    <label><input type="radio" name="rpbAlign" value="bottomCenter" /><span></span></label>
+                    <label><input type="radio" name="rpbAlign" value="bottomRight" /><span></span></label>
+                  </div>
+                </fieldset>
+                <label>Caption back style<select id="rpbCaptionBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
+              </div>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Image settings</legend>
+            <label class="browse-row">Image<input type="text" id="rpbImage" placeholder="Browse image…" /><button type="button" class="dialog-btn" id="rpbBrowseImage">…</button></label>
+            <label>Image back style<select id="rpbImageBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
+            <label class="color-check-row"><input type="checkbox" id="rpbUseImageColor" /> Image color<input type="hidden" class="ft-color-input" id="rpbImageColor" value="#ffffff" /></label>
+            <label class="color-check-row"><input type="checkbox" id="rpbUseImageBackColor" /> Image back color<input type="hidden" class="ft-color-input" id="rpbImageBackColor" value="#001C38" /></label>
+            <label class="radio-row"><input type="checkbox" id="rpbImageBlink" /> Image blink</label>
+            <label class="radio-row"><input type="checkbox" id="rpbImageScaled" /> Image scaled</label>
+            <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+              <div class="text-align-grid rpb-image-align-grid">
+                <label><input type="radio" name="rpbImageAlign" value="topLeft" /><span></span></label>
+                <label><input type="radio" name="rpbImageAlign" value="topCenter" /><span></span></label>
+                <label><input type="radio" name="rpbImageAlign" value="topRight" /><span></span></label>
+                <label><input type="radio" name="rpbImageAlign" value="middleLeft" /><span></span></label>
+                <label><input type="radio" name="rpbImageAlign" value="middleCenter" checked /><span></span></label>
+                <label><input type="radio" name="rpbImageAlign" value="middleRight" /><span></span></label>
+                <label><input type="radio" name="rpbImageAlign" value="bottomLeft" /><span></span></label>
+                <label><input type="radio" name="rpbImageAlign" value="bottomCenter" /><span></span></label>
+                <label><input type="radio" name="rpbImageAlign" value="bottomRight" /><span></span></label>
+              </div>
+            </fieldset>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-rpb-tab-panel="esignature">
+          <label class="radio-row"><input type="checkbox" id="rpbRequireESignature" disabled /> Require electronic signature</label>
+          <label class="radio-row"><input type="checkbox" disabled /> Allow blank comment</label>
+          <fieldset class="ft-fieldset"><legend>Single signatory</legend><label class="radio-row"><input type="checkbox" disabled /> Require re-authentication</label></fieldset>
+          <fieldset class="ft-fieldset"><legend>Counter signatory</legend>
+            <label class="radio-row"><input type="checkbox" disabled /> Require counter signature</label>
+            <label>Authorized group<select disabled><option>Administrators</option></select></label>
+          </fieldset>
+          <p class="ft-field-hint">E-Signature enforcement is planned — options shown for FactoryTalk parity.</p>
+        </div>
+        <div class="dialog-tab-panel" data-rpb-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="rpbHeight" value="80" /></label><label>Width<input type="number" id="rpbWidth" value="80" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="rpbTop" value="16" /></label><label>Left<input type="number" id="rpbLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="rpbName" value="RecipePlusButton1" /></label>
+            <label class="radio-row"><input type="checkbox" id="rpbVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelRecipePlusButton">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyRecipePlusButton" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpRecipePlusButton">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="recipePlusSelectorDialog" class="dialog dialog-ft dialog-goto-props">
+      <form id="recipePlusSelectorForm">
+        <h3>RecipePlus Selector Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-rps-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-rps-tab="recipe">Recipe</button>
+          <button type="button" class="dialog-tab" data-rps-tab="common">Common</button>
+        </div>
+        <div class="dialog-tab-panel active" data-rps-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="rpsBorderStyle"><option value="line" selected>Line</option><option value="raised">Raised</option><option value="none">None</option></select></label>
+              <label>Border width<input type="number" id="rpsBorderWidth" min="0" max="20" value="1" /></label>
+              <label>Back style<select id="rpsBackStyle"><option value="solid" selected>Solid</option><option value="transparent">Transparent</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="rpsBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="rpsUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="rpsBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rpsUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="rpsBorderColor" value="#000000" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rpsUseForeColor" checked /> Fore color<input type="hidden" class="ft-color-input" id="rpsForeColor" value="#ffffff" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rpsUseHeaderBackColor" checked /> Header back color<input type="hidden" class="ft-color-input" id="rpsHeaderBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rpsUseHeaderForeColor" checked /> Header fore color<input type="hidden" class="ft-color-input" id="rpsHeaderForeColor" value="#ffffff" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rpsUseSelectionBackColor" checked /> Selection back color<input type="hidden" class="ft-color-input" id="rpsSelectionBackColor" value="#0066cc" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rpsUseSelectionForeColor" checked /> Selection fore color<input type="hidden" class="ft-color-input" id="rpsSelectionForeColor" value="#000000" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Text</legend>
+            <div class="text-props-font-row">
+              <label>Font<select id="rpsFont"><option>Arial Unicode MS</option><option>Arial</option><option>Segoe UI</option></select></label>
+              <label>Size<select id="rpsFontSize"><option value="8">8</option><option value="9">9</option><option value="10" selected>10</option><option value="12">12</option></select></label>
+              <div class="text-style-btns"><button type="button" class="text-style-btn" id="rpsBold">B</button><button type="button" class="text-style-btn" id="rpsItalic"><em>I</em></button><button type="button" class="text-style-btn" id="rpsUnderline"><u>U</u></button></div>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label class="radio-row"><input type="checkbox" id="rpsKeyNavigation" checked /> Key navigation</label>
+            <label class="radio-row"><input type="checkbox" id="rpsWrapAround" /> Wrap around</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-rps-tab-panel="recipe">
+          <fieldset class="ft-fieldset"><legend>Column</legend>
+            <label class="radio-row"><input type="checkbox" id="rpsDisplayHeader" checked /> Display header</label>
+            <label class="ft-states-list-label">Select a column:</label>
+            <select id="rpsColumnSelect" class="ft-states-list" size="4"></select>
+            <label>Width<input type="number" id="rpsColumnWidth" min="20" max="999" value="150" /></label>
+            <label>Header text<input type="text" id="rpsColumnHeaderText" value="Recipe" /></label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>List settings</legend>
+            <label>Lines per item<select id="rpsLinesPerItem"><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
+            <label class="radio-row"><input type="checkbox" id="rpsWordWrap" checked /> Word wrap</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-rps-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="rpsHeight" value="150" /></label><label>Width<input type="number" id="rpsWidth" value="150" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="rpsTop" value="16" /></label><label>Left<input type="number" id="rpsLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="rpsName" value="RecipePlusSelector1" /></label>
+            <label class="radio-row"><input type="checkbox" id="rpsVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelRecipePlusSelector">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyRecipePlusSelector" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpRecipePlusSelector">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="barGraphDialog" class="dialog dialog-ft dialog-goto-props">
+      <form id="barGraphForm">
+        <h3>Bar Graph Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-bgr-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-bgr-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-bgr-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-bgr-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="bgrBorderStyle"><option value="line" selected>Line</option><option value="raised">Raised</option><option value="none">None</option></select></label>
+              <label>Border width<input type="number" id="bgrBorderWidth" min="0" max="20" value="4" /></label>
+              <label>Back style<select id="bgrBackStyle"><option value="solid" selected>Solid</option><option value="transparent">Transparent</option></select></label>
+              <label>Fill style<select id="bgrFillStyle"><option value="solid" selected>Solid</option><option value="transparent">Transparent</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="bgrBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="bgrUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="bgrBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="bgrUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="bgrBorderColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="bgrUseFillColor" checked /> Fill color<input type="hidden" class="ft-color-input" id="bgrFillColor" value="#0066cc" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Bar graph settings</legend>
+            <div class="ps-size-row">
+              <label>Minimum value<input type="number" id="bgrMinValue" value="0" /></label>
+              <label>Maximum value<input type="number" id="bgrMaxValue" value="100" /></label>
+            </div>
+            <label>Fill direction<select id="bgrFillDirection"><option value="bottomToTop" selected>Bottom to Top</option><option value="topToBottom">Top to Bottom</option><option value="leftToRight">Left to Right</option><option value="rightToLeft">Right to Left</option></select></label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Thresholds</legend>
+            <label>Number of thresholds<select id="bgrNumberOfThresholds"><option value="0" selected>0</option><option value="1">1</option><option value="2">2</option></select></label>
+            <label>Threshold type<select id="bgrThresholdType"><option value="value" selected>Value</option></select></label>
+            <div class="bgr-threshold-row">
+              <label>Threshold 1 value<input type="number" id="bgrThreshold1Value" value="50" disabled /></label>
+              <label class="color-check-row"><input type="checkbox" id="bgrThreshold1UseFillColor" disabled /> Fill color<input type="hidden" class="ft-color-input" id="bgrThreshold1FillColor" value="#ffff00" /></label>
+              <label class="radio-row"><input type="checkbox" id="bgrThreshold1Blink" disabled /> Blink</label>
+            </div>
+            <div class="bgr-threshold-row">
+              <label>Threshold 2 value<input type="number" id="bgrThreshold2Value" value="75" disabled /></label>
+              <label class="color-check-row"><input type="checkbox" id="bgrThreshold2UseFillColor" disabled /> Fill color<input type="hidden" class="ft-color-input" id="bgrThreshold2FillColor" value="#ffb6c1" /></label>
+              <label class="radio-row"><input type="checkbox" id="bgrThreshold2Blink" disabled /> Blink</label>
+            </div>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-bgr-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="bgrHeight" value="120" /></label><label>Width<input type="number" id="bgrWidth" value="80" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="bgrTop" value="16" /></label><label>Left<input type="number" id="bgrLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="bgrName" value="BarGraph1" /></label>
+            <label class="radio-row"><input type="checkbox" id="bgrVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-bgr-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">←</td><td>Value</td><td><input type="text" id="bgrTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="bgrTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="bgrTag">…</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelBarGraph">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyBarGraph" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpBarGraph">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="listIndicatorDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="listIndicatorForm">
+        <h3>List Indicator Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-li-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-li-tab="states">States</button>
+          <button type="button" class="dialog-tab" data-li-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-li-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-li-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="liBorderStyle"><option value="line" selected>Line</option><option value="raised">Raised</option><option value="none">None</option></select></label>
+              <label>Border width<input type="number" id="liBorderWidth" min="0" max="20" value="4" /></label>
+              <label>Back style<select id="liBackStyle"><option value="solid" selected>Solid</option><option value="transparent">Transparent</option></select></label>
+              <label>Pattern style<select id="liPatternStyle"><option value="none" selected>None</option><option value="solid">Solid</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="liBorderUsesBackColor" /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="liUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="liBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="liUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="liBorderColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="liUsePatternColor" /> Pattern color<input type="hidden" class="ft-color-input" id="liPatternColor" value="#ffffff" /></label>
+              <label class="color-check-row"><input type="checkbox" id="liUseSelectionForeColor" checked /> Selection fore color<input type="hidden" class="ft-color-input" id="liSelectionForeColor" value="#000000" /></label>
+              <label class="color-check-row"><input type="checkbox" id="liUseSelectionBackColor" checked /> Selection back color<input type="hidden" class="ft-color-input" id="liSelectionBackColor" value="#0066cc" /></label>
+              <label class="radio-row"><input type="checkbox" id="liBlink" /> Blink</label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Text</legend>
+            <div class="text-props-font-row">
+              <label>Font<select id="liFont"><option>Arial Unicode MS</option><option>Arial</option><option>Segoe UI</option></select></label>
+              <label>Size<select id="liFontSize"><option value="8">8</option><option value="9">9</option><option value="10" selected>10</option><option value="12">12</option></select></label>
+              <div class="text-style-btns"><button type="button" class="text-style-btn" id="liBold">B</button><button type="button" class="text-style-btn" id="liItalic"><em>I</em></button><button type="button" class="text-style-btn" id="liUnderline"><u>U</u></button></div>
+            </div>
+            <fieldset class="ft-fieldset"><legend>Caption truncate</legend>
+              <label class="radio-row"><input type="radio" name="liCaptionTruncate" value="word" checked /> Word</label>
+              <label class="radio-row"><input type="radio" name="liCaptionTruncate" value="character" /> Character</label>
+            </fieldset>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>State settings</legend>
+            <label>Number of states<select id="liNumberOfStates"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
+            <label>Trigger type<select id="liTriggerType"><option value="value" selected>Value</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-li-tab-panel="states">
+          <div class="ft-states-layout">
+            <div class="ft-states-sidebar">
+              <label class="ft-states-list-label">Select state:</label>
+              <select id="liStateSelect" class="ft-states-list" size="6"></select>
+              <div class="ft-states-copy-row ft-states-mgmt-row">
+                <button type="button" class="dialog-btn" id="liInsertState">Insert State</button>
+                <button type="button" class="dialog-btn" id="liDeleteState">Delete State</button>
+              </div>
+              <div class="ft-states-copy-row"><button type="button" class="dialog-btn" id="liStateCopy">Copy…</button><button type="button" class="dialog-btn" id="liStatePaste" disabled>Paste…</button></div>
+            </div>
+            <div class="ft-states-editor">
+              <fieldset class="ft-fieldset"><legend>Value</legend>
+                <label>Value<input type="number" id="liStateValue" value="0" /></label>
+              </fieldset>
+              <fieldset class="ft-fieldset"><legend>Caption</legend>
+                <textarea id="liStateCaption" rows="4" class="text-props-caption"></textarea>
+                <button type="button" class="dialog-btn ft-insert-var-btn" id="liInsertVariable" disabled>Insert Variable…</button>
+                <div class="text-props-options">
+                  <div class="text-props-left">
+                    <label class="color-check-row"><input type="checkbox" id="liStateUseCaptionColor" /> Caption color<input type="hidden" class="ft-color-input" id="liStateCaptionColor" value="#ffffff" /></label>
+                    <label class="color-check-row"><input type="checkbox" id="liStateUseCaptionBackColor" /> Caption back color<input type="hidden" class="ft-color-input" id="liStateCaptionBackColor" value="#001C38" /></label>
+                    <label class="radio-row"><input type="checkbox" id="liStateCaptionBlink" /> Caption blink</label>
+                  </div>
+                  <div class="text-props-right">
+                    <label>Caption back style<select id="liStateCaptionBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
+                    <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+                      <div class="dls-h-align-row text-align-grid li-state-align-grid">
+                        <label title="Left"><input type="radio" name="liStateAlign" value="middleLeft" checked /><span></span></label>
+                        <label title="Center"><input type="radio" name="liStateAlign" value="middleCenter" /><span></span></label>
+                        <label title="Right"><input type="radio" name="liStateAlign" value="middleRight" /><span></span></label>
+                      </div>
+                    </fieldset>
+                  </div>
+                </div>
+              </fieldset>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-tab-panel" data-li-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="liHeight" value="120" /></label><label>Width<input type="number" id="liWidth" value="80" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="liTop" value="16" /></label><label>Left<input type="number" id="liLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="liName" value="ListIndicator1" /></label>
+            <label class="radio-row"><input type="checkbox" id="liVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-li-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">←</td><td>Indicator</td><td><input type="text" id="liTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="liTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="liTag">…</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelListIndicator">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyListIndicator" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpListIndicator">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="symbolIndicatorDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="symbolIndicatorForm">
+        <h3>Symbol Indicator Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-si-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-si-tab="states">States</button>
+          <button type="button" class="dialog-tab" data-si-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-si-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-si-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>State settings</legend>
+            <label>Number of states<select id="siNumberOfStates"><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
+            <label>Trigger type<select id="siTriggerType"><option value="value" selected>Value</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-si-tab-panel="states">
+          <div class="ft-states-layout">
+            <div class="ft-states-sidebar">
+              <label class="ft-states-list-label">Select state:</label>
+              <select id="siStateSelect" class="ft-states-list" size="6"></select>
+              <div class="ft-states-copy-row ft-states-mgmt-row">
+                <button type="button" class="dialog-btn" id="siInsertState">Insert State</button>
+                <button type="button" class="dialog-btn" id="siDeleteState">Delete State</button>
+              </div>
+              <div class="ft-states-copy-row"><button type="button" class="dialog-btn" id="siStateCopy">Copy…</button><button type="button" class="dialog-btn" id="siStatePaste" disabled>Paste…</button></div>
+            </div>
+            <div class="ft-states-editor">
+              <fieldset class="ft-fieldset"><legend>General</legend>
+                <label id="siStateValueRow">Value<input type="number" id="siStateValue" value="0" /></label>
+              </fieldset>
+              <fieldset class="ft-fieldset"><legend>Symbol settings</legend>
+                <label class="browse-row">Symbol<input type="text" id="siStateImage" placeholder="Browse image…" /><button type="button" class="dialog-btn" id="siBrowseStateImage">…</button></label>
+                <label class="color-check-row"><input type="checkbox" id="siStateUseImageColor" /> Image color<input type="hidden" class="ft-color-input" id="siStateImageColor" value="#ffffff" /></label>
+                <label class="color-check-row"><input type="checkbox" id="siStateUseImageBackColor" /> Image back color<input type="hidden" class="ft-color-input" id="siStateImageBackColor" value="#001C38" /></label>
+                <label class="radio-row"><input type="checkbox" id="siStateImageBlink" /> Image blink</label>
+                <label class="radio-row"><input type="checkbox" id="siStateImageScaled" checked /> Image scaled</label>
+                <label>Image back style<select id="siStateImageBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
+                <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+                  <div class="text-align-grid si-state-image-align-grid">
+                    <label><input type="radio" name="siStateImageAlign" value="topLeft" /><span></span></label>
+                    <label><input type="radio" name="siStateImageAlign" value="topCenter" /><span></span></label>
+                    <label><input type="radio" name="siStateImageAlign" value="topRight" /><span></span></label>
+                    <label><input type="radio" name="siStateImageAlign" value="middleLeft" /><span></span></label>
+                    <label><input type="radio" name="siStateImageAlign" value="middleCenter" checked /><span></span></label>
+                    <label><input type="radio" name="siStateImageAlign" value="middleRight" /><span></span></label>
+                    <label><input type="radio" name="siStateImageAlign" value="bottomLeft" /><span></span></label>
+                    <label><input type="radio" name="siStateImageAlign" value="bottomCenter" /><span></span></label>
+                    <label><input type="radio" name="siStateImageAlign" value="bottomRight" /><span></span></label>
+                  </div>
+                </fieldset>
+              </fieldset>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-tab-panel" data-si-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="siHeight" value="64" /></label><label>Width<input type="number" id="siWidth" value="64" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="siTop" value="16" /></label><label>Left<input type="number" id="siLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="siName" value="SymbolIndicator1" /></label>
+            <label class="radio-row"><input type="checkbox" id="siVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-si-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">←</td><td>Indicator</td><td><input type="text" id="siTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="siTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="siTag">…</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelSymbolIndicator">Cancel</button>
+          <button type="button" class="dialog-btn" id="applySymbolIndicator" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpSymbolIndicator">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="multistateIndicatorDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="multistateIndicatorForm">
+        <h3>Multistate Indicator Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-mi-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-mi-tab="states">States</button>
+          <button type="button" class="dialog-tab" data-mi-tab="common">Common</button>
+          <button type="button" class="dialog-tab" data-mi-tab="connections">Connections</button>
+        </div>
+        <div class="dialog-tab-panel active" data-mi-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="miBorderStyle"><option value="line">Line</option><option value="raisedInset" selected>RaisedInset</option><option value="raised">Raised</option><option value="none">None</option></select></label>
+              <label>Border width<input type="number" id="miBorderWidth" min="0" max="20" value="1" /></label>
+              <label>Back style<select id="miBackStyle"><option value="solid" selected>Solid</option><option value="transparent">Transparent</option></select></label>
+              <label>Shape<select id="miShape"><option value="rectangle" selected>Rectangle</option><option value="circle">Circle</option></select></label>
+            </div>
+            <label class="color-check-row"><input type="checkbox" id="miBorderUsesBackColor" checked /> Border uses back color</label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>State settings</legend>
+            <label>Number of states<select id="miNumberOfStates"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
+            <label>Trigger type<select id="miTriggerType"><option value="value" selected>Value</option></select></label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-mi-tab-panel="states">
+          <div class="ft-states-layout">
+            <div class="ft-states-sidebar">
+              <label class="ft-states-list-label">Select state:</label>
+              <select id="miStateSelect" class="ft-states-list" size="6"></select>
+              <div class="ft-states-copy-row ft-states-mgmt-row">
+                <button type="button" class="dialog-btn" id="miInsertState">Insert State</button>
+                <button type="button" class="dialog-btn" id="miDeleteState">Delete State</button>
+              </div>
+              <div class="ft-states-copy-row"><button type="button" class="dialog-btn" id="miStateCopy">Copy…</button><button type="button" class="dialog-btn" id="miStatePaste" disabled>Paste…</button></div>
+            </div>
+            <div class="ft-states-editor">
+              <fieldset class="ft-fieldset ft-state-general-box"><legend>General</legend>
+                <div class="ft-state-general-grid">
+                  <div class="ft-state-general-left">
+                    <label id="miStateValueRow" class="ft-state-value-row">Value<input type="number" id="miStateValue" value="0" /></label>
+                    <label class="radio-row"><input type="checkbox" id="miStateBlink" /> Blink</label>
+                    <label>Pattern style<select id="miStatePatternStyle"><option value="none" selected>None</option><option value="solid">Solid</option></select></label>
+                    <label class="color-check-row ft-state-inline-color"><input type="checkbox" id="miStateUsePatternColor" /> Pattern color<input type="hidden" class="ft-color-input" id="miStatePatternColor" value="#ffffff" /></label>
+                  </div>
+                  <div class="ft-state-general-colors">
+                    <label class="color-check-row ft-state-swatch-row"><input type="checkbox" id="miStateUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="miStateBackColor" value="#001C38" /></label>
+                    <label class="color-check-row ft-state-swatch-row"><input type="checkbox" id="miStateUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="miStateBorderColor" value="#001C38" /></label>
+                  </div>
+                </div>
+              </fieldset>
+              <fieldset class="ft-fieldset"><legend>Caption</legend>
+                <textarea id="miStateCaption" rows="3" class="text-props-caption"></textarea>
+                <button type="button" class="dialog-btn ft-insert-var-btn" id="miInsertVariable" disabled>Insert Variable…</button>
+                <div class="text-props-font-row">
+                  <label>Font<select id="miFont"><option>Tahoma</option><option>Arial</option><option>Arial Unicode MS</option><option>Segoe UI</option></select></label>
+                  <label>Size<select id="miFontSize"><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="12">12</option><option value="13" selected>13</option><option value="14">14</option></select></label>
+                  <div class="text-style-btns"><button type="button" class="text-style-btn" id="miBold">B</button><button type="button" class="text-style-btn" id="miItalic"><em>I</em></button><button type="button" class="text-style-btn" id="miUnderline"><u>U</u></button></div>
+                </div>
+                <label class="color-check-row"><input type="checkbox" id="miStateUseCaptionColor" checked /> Caption color<input type="hidden" class="ft-color-input" id="miStateCaptionColor" value="#ffffff" /></label>
+                <label class="color-check-row"><input type="checkbox" id="miStateUseCaptionBackColor" /> Caption back color<input type="hidden" class="ft-color-input" id="miStateCaptionBackColor" value="#001C38" /></label>
+                <label class="radio-row"><input type="checkbox" id="miStateCaptionBlink" /> Caption blink</label>
+                <label class="radio-row"><input type="checkbox" id="miStateWordWrap" checked /> Word wrap</label>
+                <label>Caption back style<select id="miStateCaptionBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
+                <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+                  <div class="text-align-grid mi-state-align-grid">
+                    <label><input type="radio" name="miStateAlign" value="topLeft" /><span></span></label>
+                    <label><input type="radio" name="miStateAlign" value="topCenter" /><span></span></label>
+                    <label><input type="radio" name="miStateAlign" value="topRight" /><span></span></label>
+                    <label><input type="radio" name="miStateAlign" value="middleLeft" /><span></span></label>
+                    <label><input type="radio" name="miStateAlign" value="middleCenter" checked /><span></span></label>
+                    <label><input type="radio" name="miStateAlign" value="middleRight" /><span></span></label>
+                    <label><input type="radio" name="miStateAlign" value="bottomLeft" /><span></span></label>
+                    <label><input type="radio" name="miStateAlign" value="bottomCenter" /><span></span></label>
+                    <label><input type="radio" name="miStateAlign" value="bottomRight" /><span></span></label>
+                  </div>
+                </fieldset>
+              </fieldset>
+              <fieldset class="ft-fieldset"><legend>Image settings</legend>
+                <label class="browse-row">Image<input type="text" id="miStateImage" placeholder="Browse image…" /><button type="button" class="dialog-btn" id="miBrowseStateImage">…</button></label>
+                <label class="color-check-row"><input type="checkbox" id="miStateUseImageColor" /> Image color<input type="hidden" class="ft-color-input" id="miStateImageColor" value="#ffffff" /></label>
+                <label class="color-check-row"><input type="checkbox" id="miStateUseImageBackColor" /> Image back color<input type="hidden" class="ft-color-input" id="miStateImageBackColor" value="#001C38" /></label>
+                <label class="radio-row"><input type="checkbox" id="miStateImageBlink" /> Image blink</label>
+                <label class="radio-row"><input type="checkbox" id="miStateImageScaled" /> Image scaled</label>
+                <label>Image back style<select id="miStateImageBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
+                <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+                  <div class="text-align-grid mi-state-image-align-grid">
+                    <label><input type="radio" name="miStateImageAlign" value="topLeft" /><span></span></label>
+                    <label><input type="radio" name="miStateImageAlign" value="topCenter" /><span></span></label>
+                    <label><input type="radio" name="miStateImageAlign" value="topRight" /><span></span></label>
+                    <label><input type="radio" name="miStateImageAlign" value="middleLeft" /><span></span></label>
+                    <label><input type="radio" name="miStateImageAlign" value="middleCenter" checked /><span></span></label>
+                    <label><input type="radio" name="miStateImageAlign" value="middleRight" /><span></span></label>
+                    <label><input type="radio" name="miStateImageAlign" value="bottomLeft" /><span></span></label>
+                    <label><input type="radio" name="miStateImageAlign" value="bottomCenter" /><span></span></label>
+                    <label><input type="radio" name="miStateImageAlign" value="bottomRight" /><span></span></label>
+                  </div>
+                </fieldset>
+              </fieldset>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-tab-panel" data-mi-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="miHeight" value="33" /></label><label>Width<input type="number" id="miWidth" value="71" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="miTop" value="16" /></label><label>Left<input type="number" id="miLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="miName" value="MultistateIndicator1" /></label>
+            <label class="radio-row"><input type="checkbox" id="miVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-mi-tab-panel="connections">
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">←</td><td>Indicator</td><td><input type="text" id="miTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="miTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="miTag">…</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelMultistateIndicator">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyMultistateIndicator" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpMultistateIndicator">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="displayListSelectorDialog" class="dialog dialog-ft dialog-maintained-props">
+      <form id="displayListSelectorForm">
+        <h3>Display List Selector Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-dls-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-dls-tab="states">States</button>
+          <button type="button" class="dialog-tab" data-dls-tab="common">Common</button>
+        </div>
+        <div class="dialog-tab-panel active" data-dls-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="dlsBorderStyle"><option value="line" selected>Line</option><option value="raised">Raised</option><option value="none">None</option></select></label>
+              <label>Back style<select id="dlsBackStyle"><option value="solid" selected>Solid</option><option value="transparent">Transparent</option></select></label>
+              <label>Shape<select id="dlsShape"><option value="rectangle" selected>Rectangle</option></select></label>
+              <label>Border width<input type="number" id="dlsBorderWidth" min="0" max="20" value="1" /></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="dlsBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="dlsUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="dlsHighlightColor" value="#0066cc" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>List index</legend>
+            <label>Number of states<select id="dlsNumberOfStates"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
+            <label class="browse-row">Value ↔<input type="text" id="dlsTag" /><button type="button" class="ft-mini-btn" data-tag-pick="dlsTag">…</button></label>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Caption font</legend>
+            <div class="text-props-font-row">
+              <label>Font<select id="dlsFont"><option>Arial Unicode MS</option><option>Arial</option></select></label>
+              <label>Size<select id="dlsFontSize"><option value="8">8</option><option value="9">9</option><option value="10" selected>10</option><option value="12">12</option></select></label>
+              <div class="text-style-btns"><button type="button" class="text-style-btn" id="dlsBold">B</button><button type="button" class="text-style-btn" id="dlsItalic"><em>I</em></button><button type="button" class="text-style-btn" id="dlsUnderline"><u>U</u></button></div>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Touch margins</legend>
+            <div class="ps-size-row">
+              <label>Horizontal margin<input type="number" id="dlsHorizontalMargin" min="0" value="0" /></label>
+              <label>Vertical margin<input type="number" id="dlsVerticalMargin" min="0" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label class="radio-row"><input type="checkbox" id="dlsAudio" checked /> Audio</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-dls-tab-panel="states">
+          <div class="ft-states-layout">
+            <div class="ft-states-sidebar">
+              <label class="ft-states-list-label">Select state:</label>
+              <select id="dlsStateSelect" class="ft-states-list" size="6"></select>
+              <div class="ft-states-copy-row ft-states-mgmt-row">
+                <button type="button" class="dialog-btn" id="dlsInsertState">Insert State</button>
+                <button type="button" class="dialog-btn" id="dlsDeleteState">Delete State</button>
+              </div>
+              <div class="ft-states-copy-row"><button type="button" class="dialog-btn" id="dlsStateCopy">Copy…</button><button type="button" class="dialog-btn" id="dlsStatePaste" disabled>Paste…</button></div>
+            </div>
+            <div class="ft-states-editor">
+              <fieldset class="ft-fieldset"><legend>Display settings</legend>
+                <label class="browse-row">Display<input type="text" id="dlsStateTarget" /><button type="button" class="dialog-btn" id="dlsBrowseStateDisplay">…</button></label>
+                <div class="goto-param-row">
+                  <label class="radio-row"><input type="radio" name="dlsStateParameterType" id="dlsStateParameterFileRadio" value="file" checked /> Parameter file</label>
+                  <input type="text" id="dlsStateParameterFile" />
+                </div>
+                <div class="goto-param-row">
+                  <label class="radio-row"><input type="radio" name="dlsStateParameterType" id="dlsStateParameterListRadio" value="list" /> Parameter list</label>
+                  <input type="text" id="dlsStateParameterList" disabled />
+                </div>
+                <label class="radio-row"><input type="checkbox" id="dlsStateDisplayPosition" /> Display position</label>
+                <div class="ps-size-row">
+                  <label>Top position<input type="number" id="dlsStateDisplayTop" min="0" value="0" disabled /></label>
+                  <label>Left position<input type="number" id="dlsStateDisplayLeft" min="0" value="0" disabled /></label>
+                </div>
+              </fieldset>
+              <fieldset class="ft-fieldset"><legend>Caption</legend>
+                <label class="radio-row"><input type="checkbox" id="dlsStateUseDisplayName" /> Use display name</label>
+                <textarea id="dlsStateCaption" rows="3" class="text-props-caption"></textarea>
+                <button type="button" class="dialog-btn" id="dlsStateInsertVariable" disabled>Insert Variable…</button>
+                <label class="color-check-row"><input type="checkbox" id="dlsStateUseCaptionColor" /> Caption color<input type="hidden" class="ft-color-input" id="dlsStateCaptionColor" value="#ffffff" /></label>
+                <label class="color-check-row"><input type="checkbox" id="dlsStateUseCaptionBackColor" /> Caption back color<input type="hidden" class="ft-color-input" id="dlsStateCaptionBackColor" value="#001C38" /></label>
+                <label class="radio-row"><input type="checkbox" id="dlsStateCaptionBlink" /> Caption blink</label>
+                <label>Caption back style<select id="dlsStateCaptionBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
+                <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+                  <div class="text-align-grid dls-state-align-grid">
+                    <label title="Left"><input type="radio" name="dlsStateAlign" value="middleLeft" checked /><span></span></label>
+                    <label title="Center"><input type="radio" name="dlsStateAlign" value="middleCenter" /><span></span></label>
+                    <label title="Right"><input type="radio" name="dlsStateAlign" value="middleRight" /><span></span></label>
+                  </div>
+                </fieldset>
+              </fieldset>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-tab-panel" data-dls-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="dlsHeight" value="80" /></label><label>Width<input type="number" id="dlsWidth" value="120" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="dlsTop" value="16" /></label><label>Left<input type="number" id="dlsLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="dlsName" value="DisplayListSelector1" /></label>
+            <label class="radio-row"><input type="checkbox" id="dlsVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelDisplayListSelector">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyDisplayListSelector" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpDisplayListSelector">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="returnToButtonDialog" class="dialog dialog-ft dialog-goto-props">
+      <form id="returnToButtonForm">
+        <h3>Return to Display Button Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-rtb-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-rtb-tab="label">Label</button>
+          <button type="button" class="dialog-tab" data-rtb-tab="common">Common</button>
+        </div>
+        <div class="dialog-tab-panel active" data-rtb-tab-panel="general">
+          <fieldset class="ft-fieldset"><legend>Appearance</legend>
+            <div class="goto-props-grid">
+              <label>Border style<select id="rtbBorderStyle"><option value="line" selected>Line</option><option value="raised">Raised</option><option value="none">None</option></select></label>
+              <label>Back style<select id="rtbBackStyle"><option value="solid" selected>Solid</option><option value="transparent">Transparent</option></select></label>
+              <label>Shape<select id="rtbShape"><option value="rectangle" selected>Rectangle</option></select></label>
+              <label>Border width<input type="number" id="rtbBorderWidth" min="0" max="20" value="1" /></label>
+              <label>Pattern style<select id="rtbPatternStyle"><option value="none" selected>None</option></select></label>
+            </div>
+            <div class="goto-props-colors">
+              <label class="color-check-row"><input type="checkbox" id="rtbBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="rtbUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="rtbBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rtbUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="rtbBorderColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rtbUsePatternColor" /> Pattern color<input type="hidden" class="ft-color-input" id="rtbPatternColor" value="#ffffff" /></label>
+              <label class="color-check-row"><input type="checkbox" id="rtbUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="rtbHighlightColor" value="#0066cc" /></label>
+              <label class="radio-row"><input type="checkbox" id="rtbBlink" /> Blink</label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Touch margins</legend>
+            <div class="ps-size-row">
+              <label>Horizontal margin<input type="number" id="rtbHorizontalMargin" min="0" value="0" /></label>
+              <label>Vertical margin<input type="number" id="rtbVerticalMargin" min="0" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label class="radio-row"><input type="checkbox" id="rtbAudio" checked /> Audio</label>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-rtb-tab-panel="label">
+          <fieldset class="ft-fieldset"><legend>Caption</legend>
+            <textarea id="rtbCaption" rows="3" class="text-props-caption"></textarea>
+            <div class="text-props-font-row">
+              <label>Font<select id="rtbFont"><option>Arial Unicode MS</option><option>Arial</option></select></label>
+              <label>Size<select id="rtbFontSize"><option value="10" selected>10</option><option value="12">12</option></select></label>
+              <div class="text-style-btns"><button type="button" class="text-style-btn" id="rtbBold">B</button><button type="button" class="text-style-btn" id="rtbItalic"><em>I</em></button><button type="button" class="text-style-btn" id="rtbUnderline"><u>U</u></button></div>
+            </div>
+            <div class="text-props-options">
+              <div class="text-props-left">
+                <label class="color-check-row"><input type="checkbox" id="rtbUseCaptionColor" /> Caption color<input type="hidden" class="ft-color-input" id="rtbCaptionColor" value="#ffffff" /></label>
+                <label class="color-check-row"><input type="checkbox" id="rtbUseCaptionBackColor" /> Caption back color<input type="hidden" class="ft-color-input" id="rtbCaptionBackColor" value="#001C38" /></label>
+                <label class="radio-row"><input type="checkbox" id="rtbCaptionBlink" /> Caption blink</label>
+                <label class="radio-row"><input type="checkbox" id="rtbWordWrap" checked /> Word wrap</label>
+              </div>
+              <div class="text-props-right">
+                <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+                  <div class="text-align-grid">
+                    <label><input type="radio" name="rtbAlign" value="topLeft" /><span></span></label>
+                    <label><input type="radio" name="rtbAlign" value="topCenter" /><span></span></label>
+                    <label><input type="radio" name="rtbAlign" value="topRight" /><span></span></label>
+                    <label><input type="radio" name="rtbAlign" value="middleLeft" /><span></span></label>
+                    <label><input type="radio" name="rtbAlign" value="middleCenter" checked /><span></span></label>
+                    <label><input type="radio" name="rtbAlign" value="middleRight" /><span></span></label>
+                    <label><input type="radio" name="rtbAlign" value="bottomLeft" /><span></span></label>
+                    <label><input type="radio" name="rtbAlign" value="bottomCenter" /><span></span></label>
+                    <label><input type="radio" name="rtbAlign" value="bottomRight" /><span></span></label>
+                  </div>
+                </fieldset>
+                <label>Caption back style<select id="rtbCaptionBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
+              </div>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset"><legend>Image settings</legend>
+            <label class="browse-row">Image<input type="text" id="rtbImage" placeholder="Browse image…" /><button type="button" class="dialog-btn" id="rtbBrowseImage">…</button></label>
+            <label>Image back style<select id="rtbImageBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
+            <label class="color-check-row"><input type="checkbox" id="rtbUseImageColor" /> Image color<input type="hidden" class="ft-color-input" id="rtbImageColor" value="#ffffff" /></label>
+            <label class="color-check-row"><input type="checkbox" id="rtbUseImageBackColor" /> Image back color<input type="hidden" class="ft-color-input" id="rtbImageBackColor" value="#001C38" /></label>
+            <label class="radio-row"><input type="checkbox" id="rtbImageBlink" /> Image blink</label>
+            <label class="radio-row"><input type="checkbox" id="rtbImageScaled" /> Image scaled</label>
+            <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
+              <div class="text-align-grid rtb-image-align-grid">
+                <label><input type="radio" name="rtbImageAlign" value="topLeft" /><span></span></label>
+                <label><input type="radio" name="rtbImageAlign" value="topCenter" /><span></span></label>
+                <label><input type="radio" name="rtbImageAlign" value="topRight" /><span></span></label>
+                <label><input type="radio" name="rtbImageAlign" value="middleLeft" /><span></span></label>
+                <label><input type="radio" name="rtbImageAlign" value="middleCenter" checked /><span></span></label>
+                <label><input type="radio" name="rtbImageAlign" value="middleRight" /><span></span></label>
+                <label><input type="radio" name="rtbImageAlign" value="bottomLeft" /><span></span></label>
+                <label><input type="radio" name="rtbImageAlign" value="bottomCenter" /><span></span></label>
+                <label><input type="radio" name="rtbImageAlign" value="bottomRight" /><span></span></label>
+              </div>
+            </fieldset>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-rtb-tab-panel="common">
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="rtbHeight" value="80" /></label><label>Width<input type="number" id="rtbWidth" value="80" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="rtbTop" value="16" /></label><label>Left<input type="number" id="rtbLeft" value="16" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Other</legend>
+            <label>Name<input type="text" id="rtbName" value="ReturnToDisplayButton1" /></label>
+            <label class="radio-row"><input type="checkbox" id="rtbVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelReturnToButton">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyReturnToButton" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpReturnToButton">Help</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="gotoButtonDialog" class="dialog dialog-ft dialog-goto-props">
       <form id="gotoButtonForm">
         <h3>Goto Display Button Properties</h3>
@@ -1442,9 +3332,9 @@
             <div class="goto-props-grid">
               <label>Border style
                 <select id="gbBorderStyle">
-                  <option value="raised" selected>Raised</option>
+                  <option value="line" selected>Line</option>
+                  <option value="raised">Raised</option>
                   <option value="raisedInset">RaisedInset</option>
-                  <option value="line">Line</option>
                   <option value="none">None</option>
                 </select>
               </label>
@@ -1460,7 +3350,7 @@
                   <option value="roundedRectangle">Rounded Rectangle</option>
                 </select>
               </label>
-              <label>Border width<input type="number" id="gbBorderWidth" min="0" max="20" value="3" /></label>
+              <label>Border width<input type="number" id="gbBorderWidth" min="0" max="20" value="1" /></label>
               <label>Pattern style
                 <select id="gbPatternStyle">
                   <option value="none" selected>None</option>
@@ -1468,11 +3358,11 @@
               </label>
             </div>
             <div class="goto-props-colors">
-              <label class="color-check-row"><input type="checkbox" id="gbBorderUsesBackColor" /> Border uses back color</label>
-              <label class="color-check-row"><input type="checkbox" id="gbUseBackColor" /> Back color<input type="hidden" class="ft-color-input" id="gbBackColor" value="#dcdcdc" /></label>
-              <label class="color-check-row"><input type="checkbox" id="gbUseBorderColor" /> Border color<input type="hidden" class="ft-color-input" id="gbBorderColor" value="#e0e0e0" /></label>
+              <label class="color-check-row"><input type="checkbox" id="gbBorderUsesBackColor" checked /> Border uses back color</label>
+              <label class="color-check-row"><input type="checkbox" id="gbUseBackColor" checked /> Back color<input type="hidden" class="ft-color-input" id="gbBackColor" value="#001C38" /></label>
+              <label class="color-check-row"><input type="checkbox" id="gbUseBorderColor" checked /> Border color<input type="hidden" class="ft-color-input" id="gbBorderColor" value="#000000" /></label>
               <label class="color-check-row"><input type="checkbox" id="gbUsePatternColor" /> Pattern color<input type="hidden" class="ft-color-input" id="gbPatternColor" value="#ffffff" /></label>
-              <label class="color-check-row"><input type="checkbox" id="gbUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="gbHighlightColor" value="#00ff00" /></label>
+              <label class="color-check-row"><input type="checkbox" id="gbUseHighlightColor" /> Highlight color<input type="hidden" class="ft-color-input" id="gbHighlightColor" value="#0066cc" /></label>
               <label class="radio-row"><input type="checkbox" id="gbBlink" /> Blink</label>
             </div>
           </fieldset>
@@ -1515,7 +3405,7 @@
         <div class="dialog-tab-panel" data-gb-tab-panel="label">
           <fieldset class="ft-fieldset">
             <legend>Caption</legend>
-            <textarea id="gbCaption" rows="3" class="text-props-caption">Production Data</textarea>
+            <textarea id="gbCaption" rows="3" class="text-props-caption"></textarea>
             <div class="text-props-font-row">
               <label>Font
                 <select id="gbFont">
@@ -1543,8 +3433,8 @@
             <div class="text-props-options">
               <div class="text-props-left">
                 <label class="color-check-row">
-                  <input type="checkbox" id="gbUseCaptionColor" checked /> Caption color
-                  <input type="hidden" class="ft-color-input" id="gbCaptionColor" value="#000000" />
+                  <input type="checkbox" id="gbUseCaptionColor" /> Caption color
+                  <input type="hidden" class="ft-color-input" id="gbCaptionColor" value="#ffffff" />
                 </label>
                 <label class="color-check-row">
                   <input type="checkbox" id="gbUseCaptionBackColor" /> Caption back color
@@ -1579,8 +3469,31 @@
           </fieldset>
           <fieldset class="ft-fieldset">
             <legend>Image settings</legend>
-            <label>Image<input type="text" id="gbImage" placeholder="Browse image…" /><button type="button" class="dialog-btn" id="gbBrowseImage">…</button></label>
+            <label class="browse-row">Image<input type="text" id="gbImage" placeholder="Browse image…" /><button type="button" class="dialog-btn" id="gbBrowseImage">…</button></label>
+            <label>Image back style
+              <select id="gbImageBackStyle">
+                <option value="transparent" selected>Transparent</option>
+                <option value="solid">Solid</option>
+              </select>
+            </label>
+            <label class="color-check-row"><input type="checkbox" id="gbUseImageColor" /> Image color<input type="hidden" class="ft-color-input" id="gbImageColor" value="#ffffff" /></label>
+            <label class="color-check-row"><input type="checkbox" id="gbUseImageBackColor" /> Image back color<input type="hidden" class="ft-color-input" id="gbImageBackColor" value="#001C38" /></label>
+            <label class="radio-row"><input type="checkbox" id="gbImageBlink" /> Image blink</label>
             <label class="radio-row"><input type="checkbox" id="gbImageScaled" /> Image scaled</label>
+            <fieldset class="ft-fieldset text-align-fieldset">
+              <legend>Alignment</legend>
+              <div class="text-align-grid gb-image-align-grid">
+                <label><input type="radio" name="gbImageAlign" value="topLeft" /><span></span></label>
+                <label><input type="radio" name="gbImageAlign" value="topCenter" /><span></span></label>
+                <label><input type="radio" name="gbImageAlign" value="topRight" /><span></span></label>
+                <label><input type="radio" name="gbImageAlign" value="middleLeft" /><span></span></label>
+                <label><input type="radio" name="gbImageAlign" value="middleCenter" checked /><span></span></label>
+                <label><input type="radio" name="gbImageAlign" value="middleRight" /><span></span></label>
+                <label><input type="radio" name="gbImageAlign" value="bottomLeft" /><span></span></label>
+                <label><input type="radio" name="gbImageAlign" value="bottomCenter" /><span></span></label>
+                <label><input type="radio" name="gbImageAlign" value="bottomRight" /><span></span></label>
+              </div>
+            </fieldset>
           </fieldset>
         </div>
         <div class="dialog-tab-panel" data-gb-tab-panel="common">
@@ -1605,7 +3518,14 @@
           </fieldset>
         </div>
         <div class="dialog-tab-panel" data-gb-tab-panel="connections">
-          <p class="side-hint">Goto Display buttons navigate to another display and do not use tag connections.</p>
+          <table class="ft-connections-table">
+            <thead><tr><th></th><th>Name</th><th>Tag / Expression</th><th>Tag</th><th>Exprn</th></tr></thead>
+            <tbody>
+              <tr><td class="conn-dir">←</td><td>Display Name</td><td><input type="text" id="gbDisplayNameTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="gbDisplayNameTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="gbDisplayNameTag">…</button></td></tr>
+              <tr><td class="conn-dir">←</td><td>Top Position</td><td><input type="text" id="gbDisplayTopTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="gbDisplayTopTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="gbDisplayTopTag">…</button></td></tr>
+              <tr><td class="conn-dir">←</td><td>Left Position</td><td><input type="text" id="gbDisplayLeftTag" /></td><td><button type="button" class="ft-mini-btn" data-tag-pick="gbDisplayLeftTag">…</button></td><td><button type="button" class="ft-mini-btn" data-expr-pick="gbDisplayLeftTag">…</button></td></tr>
+            </tbody>
+          </table>
         </div>
         <div class="dialog-actions">
           <button type="submit" class="dialog-btn primary">OK</button>
@@ -1660,6 +3580,103 @@
         <button type="button" class="dialog-btn" id="imageBrowserCancel">Cancel</button>
         <button type="button" class="dialog-btn" id="imageBrowserHelp">Help</button>
       </div>
+    </dialog>
+
+    <dialog id="shapePropertiesDialog" class="dialog dialog-ft dialog-maintained-props dialog-shape-props">
+      <form id="shapePropertiesForm">
+        <h3 id="shapePropertiesTitle">Polygon Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-sp-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-sp-tab="common">Common</button>
+        </div>
+        <div class="dialog-tab-panel active" data-sp-tab-panel="general">
+          <div class="shape-props-general">
+            <div class="shape-props-left">
+              <label>Line style
+                <select id="spLineStyle">
+                  <option value="solid" selected>Solid</option>
+                  <option value="dash">Dash</option>
+                  <option value="dot">Dot</option>
+                </select>
+              </label>
+              <label>Back style
+                <select id="spBackStyle">
+                  <option value="solid" selected>Solid</option>
+                  <option value="gradient">Gradient</option>
+                  <option value="transparent">Transparent</option>
+                </select>
+              </label>
+              <label>Pattern style
+                <select id="spPatternStyle">
+                  <option value="none" selected>None</option>
+                </select>
+              </label>
+            </div>
+            <div class="shape-props-colors">
+              <label class="color-check-row shape-props-color-row">
+                <input type="checkbox" id="spUseForeColor" checked /> Fore color
+                <input type="hidden" class="ft-color-input" id="spForeColor" value="#c6c6c6" />
+              </label>
+              <label class="color-check-row shape-props-color-row">
+                <input type="checkbox" id="spUseBackColor" checked /> Back color
+                <input type="hidden" class="ft-color-input" id="spBackColor" value="#c6c6c6" />
+              </label>
+              <label class="color-check-row shape-props-color-row">
+                <input type="checkbox" id="spUsePatternColor" /> Pattern color
+                <input type="hidden" class="ft-color-input" id="spPatternColor" value="#ffffff" />
+              </label>
+              <div id="spGradientExtras" class="shape-props-gradient-extra hidden">
+                <label class="color-check-row shape-props-color-row" id="spEndColorRow">
+                  End color
+                  <input type="hidden" class="ft-color-input" id="spEndColor" value="#e8e8e8" />
+                </label>
+                <label id="spGradientStopRow">Gradient stop
+                  <input type="number" id="spGradientStop" min="0" max="100" value="95" />
+                </label>
+                <label id="spGradientDirRow">Gradient direction
+                  <select id="spGradientDir">
+                    <option value="gradientHorizontalFromRight" selected>Horizontal from right</option>
+                    <option value="gradientHorizontalFromLeft">Horizontal from left</option>
+                    <option value="gradientVertical">Vertical</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="shape-props-linewidth-col">
+              <label>Line width
+                <input type="number" id="spLineWidth" min="0" max="20" value="1" />
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-tab-panel" data-sp-tab-panel="common">
+          <fieldset class="ft-fieldset">
+            <legend>Size</legend>
+            <div class="ps-size-row">
+              <label>Height<input type="number" id="spHeight" min="1" max="4096" value="34" /></label>
+              <label>Width<input type="number" id="spWidth" min="1" max="4096" value="262" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Position</legend>
+            <div class="ps-size-row">
+              <label>Top<input type="number" id="spTop" min="0" max="4096" value="0" /></label>
+              <label>Left<input type="number" id="spLeft" min="0" max="4096" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Other</legend>
+            <label>Name<input type="text" id="spName" maxlength="40" value="Rectangle1" /></label>
+            <label class="radio-row"><input type="checkbox" id="spVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelShapeProperties">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyShapeProperties" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpShapeProperties">Help</button>
+        </div>
+      </form>
     </dialog>
 
     <dialog id="canvasImagePropertiesDialog" class="dialog dialog-ft dialog-canvas-image-props">
@@ -1794,12 +3811,29 @@
       </div>
     </dialog>
 
-    <script src="template-compose.js?v=0.1.7"></script>
-    <script src="studio-objects-menu.js?v=0.2.7"></script>
-    <script src="studio-color-picker.js?v=0.1.0"></script>
+    <script src="template-compose.js?v=0.1.8"></script>
+    <script src="studio-objects-menu.js?v=0.3.9"></script>
+    <script src="studio-color-picker.js?v=0.2.0"></script>
     <script src="rslogix-tags.js?v=0.1.0"></script>
     <script src="expression-eval.js?v=0.1.0"></script>
-    <script src="studio-tag-tools.js?v=0.1.0"></script>
-    <script src="studio.js?v=0.5.8"></script>
+    <script src="studio-tag-tools.js?v=0.1.1"></script>
+    <script src="studio-numeric-input.js?v=0.1.1"></script>
+    <script src="studio-numeric-display.js?v=0.1.0"></script>
+    <script src="studio-string-display.js?v=0.1.0"></script>
+    <script src="studio-time-date-display.js?v=0.1.2"></script>
+    <script src="studio-string-input.js?v=0.1.0"></script>
+    <script src="studio-return-button.js?v=0.1.0"></script>
+    <script src="studio-close-button.js?v=0.1.0"></script>
+    <script src="studio-display-list-selector.js?v=0.1.0"></script>
+    <script src="studio-multistate-indicator.js?v=0.1.5"></script>
+    <script src="studio-symbol-indicator.js?v=0.1.0"></script>
+    <script src="studio-list-indicator.js?v=0.1.0"></script>
+    <script src="studio-bar-graph.js?v=0.1.0"></script>
+    <script src="studio-recipeplus-button.js?v=0.1.0"></script>
+    <script src="studio-recipeplus-selector.js?v=0.1.0"></script>
+    <script src="studio-communications-setup.js?v=0.1.1"></script>
+    <script src="studio-latched-multistate.js?v=0.1.2"></script>
+    <script src="studio-shape-properties.js?v=0.1.3"></script>
+    <script src="studio.js?v=0.5.32"></script>
   </body>
 </html>

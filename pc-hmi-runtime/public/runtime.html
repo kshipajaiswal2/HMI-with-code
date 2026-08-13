@@ -7,7 +7,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=0.3.9" />
+    <link rel="stylesheet" href="styles.css?v=0.4.7" />
+    <script>
+      (function () {
+        if (new URLSearchParams(location.search).get('embed') !== '1') return;
+        document.documentElement.classList.add('embed-root');
+        document.addEventListener('DOMContentLoaded', function () {
+          document.getElementById('runtimeHeader')?.classList.add('hidden');
+          document.getElementById('navBar')?.classList.add('hidden');
+          document.getElementById('alarmBanner')?.classList.add('hidden');
+          document.getElementById('app')?.classList.add('embed-mode');
+          document.body?.classList.add('embed-body');
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="app" class="hmi-app">
@@ -42,8 +55,8 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="expression-eval.js?v=0.1.0"></script>
-    <script src="components/registry.js?v=0.3.29"></script>
-    <script src="template-compose.js?v=0.1.7"></script>
-    <script src="app.js?v=0.2.13"></script>
+    <script src="components/registry.js?v=0.3.44"></script>
+    <script src="template-compose.js?v=0.1.10"></script>
+    <script src="app.js?v=0.2.22"></script>
   </body>
 </html>

@@ -738,6 +738,23 @@ body.explorer-resize-active {
 .dialog-error.hidden { display: none; }
 
 .dialog-ft { min-width: 420px; }
+.dialog-comm-setup { min-width: 460px; }
+.dialog-comm-setup .comm-test-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.dialog-comm-setup .comm-status {
+  margin: 0;
+  font-size: 11px;
+  color: #666;
+}
+.dialog-comm-setup .comm-status-ok { color: #0a6b0a; }
+.dialog-comm-setup .comm-ip-hint {
+  margin: -4px 0 10px;
+}
+.dialog-comm-setup .comm-status-error { color: #b00000; }
 
 .dialog-grid-settings { min-width: 460px; }
 .grid-settings-body {
@@ -927,7 +944,84 @@ body.explorer-resize-active {
 }
 .ft-states-copy-row { display: flex; gap: 4px; flex-wrap: wrap; }
 .ft-states-copy-row .dialog-btn { flex: 1; min-width: 0; padding: 2px 6px; font-size: 11px; }
+.dialog-maintained-props .ft-numeric-display-value { font-variant-numeric: tabular-nums; }
+
+.dialog-shape-props { min-width: 420px; max-width: 480px; }
+.shape-props-general {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px 20px;
+  align-items: start;
+  padding: 8px 4px 4px;
+}
+.shape-props-left label,
+.shape-props-linewidth-col label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.shape-props-left select { width: 132px; }
+.shape-props-linewidth-col { padding-top: 0; }
+.shape-props-linewidth-col input {
+  width: 36px;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+.shape-props-colors { min-width: 148px; }
+.shape-props-color-row {
+  display: grid !important;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 6px !important;
+}
+.shape-props-color-row .ft-color-picker { margin-left: 0 !important; }
+.dialog-shape-props .shape-props-color-row .ft-color-trigger {
+  width: 22px;
+  height: 22px;
+}
+.shape-props-gradient-extra label { display: block; margin-top: 4px; font-size: 12px; }
+.shape-props-gradient-extra input,
+.shape-props-gradient-extra select { max-width: 132px; margin-top: 2px; }
+.ft-numeric-display { box-sizing: border-box; }
+.ft-states-mgmt-row { flex-direction: column; }
+.ft-states-mgmt-row .dialog-btn { width: 100%; }
 .ft-states-editor fieldset { margin-bottom: 8px; }
+
+/* FT Multistate Indicator — States tab General box (Back/Border swatches on right) */
+.ft-state-general-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 20px;
+  align-items: start;
+}
+.ft-state-general-left label { display: block; margin-bottom: 6px; font-size: 12px; }
+.ft-state-value-row input { width: 48px; margin-left: 4px; }
+.ft-state-general-colors {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 108px;
+}
+.ft-state-swatch-row {
+  display: grid !important;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 4px 6px;
+  margin-bottom: 0 !important;
+}
+.ft-state-swatch-row .ft-color-picker { margin-left: 0 !important; }
+.ft-state-inline-color .ft-color-picker { margin-left: 0 !important; }
+.dialog-maintained-props .ft-state-swatch-row .ft-color-trigger,
+.dialog-maintained-props .ft-state-inline-color .ft-color-trigger {
+  width: 22px;
+  height: 22px;
+  padding: 1px;
+}
+
 .ft-insert-var-btn { margin: 4px 0 8px; font-size: 11px; }
 
 .ft-connections-table {
@@ -971,6 +1065,14 @@ body.explorer-resize-active {
   margin-bottom: 8px;
 }
 .dialog-goto-props .goto-props-colors label { display: block; margin-bottom: 4px; }
+.bgr-threshold-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border, #ccc);
+}
 .dialog-goto-props .browse-row {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -1375,6 +1477,7 @@ body.explorer-resize-active {
   box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.25);
   font-size: 11px;
   color: #000;
+  z-index: 100000;
 }
 .ft-color-dropdown.hidden { display: none; }
 .ft-color-section { margin-bottom: 6px; }
@@ -1420,10 +1523,24 @@ body.explorer-resize-active {
   border-bottom: 1px solid #e0e0e0;
 }
 .ft-color-other-label { font-size: 11px; }
-.ft-color-other-preview { flex: 0 0 auto; }
+.ft-color-other-preview {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 18px;
+}
+.ft-color-other-preview.is-selected {
+  border: 2px solid #F99746;
+  box-shadow: 0 0 0 1px #fff inset;
+}
 .color-check-row .ft-color-picker,
 .grid-color-row .ft-color-picker,
 .ds-color-row .ft-color-picker {
+  margin-left: 4px;
+}
+.dialog-maintained-props .color-check-row .ft-color-picker {
+  margin-left: 4px;
+}
+.shape-props-colors .color-check-row .ft-color-picker {
   margin-left: auto;
 }
 .dialog label.ds-color-row .ft-color-picker { margin-top: 0; }

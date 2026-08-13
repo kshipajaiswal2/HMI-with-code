@@ -20,7 +20,20 @@ const state = {
   placement: null,
   propsDialog: { kind: null, snapshot: '', editIndex: null, ref: null },
   canvasSelection: { index: null },
-  canvasEditDrag: null
+  canvasHitClick: { index: null, time: 0 },
+  canvasEditDrag: null,
+  canvasEditOverlayRefresh: null,
+  pendingGraphicSelection: null,
+  pendingPreviewReload: null,
+  pendingPreviewReloadRequest: false,
+  previewFrameReady: false,
+  propsFormFill: false,
+  deferredStudioInitsDone: false,
+  deferredStudioInitsStarted: false,
+  canvasEditOverlayStale: true,
+  undoStack: [],
+  redoStack: [],
+  undoSuspended: false
 };
 
 window.StudioState = state;
@@ -110,8 +123,9 @@ const placementRubberband = document.getElementById('placementRubberband');
 const canvasEditOverlay = document.getElementById('canvasEditOverlay');
 
 const CANVAS_GRAPHIC_TYPES = new Set([
-  'Text', 'Image', 'MomentaryButton', 'MaintainedButton', 'MultistateIndicator',
-  'GotoButton', 'TimeDateDisplay', 'StringDisplay', 'AlarmTicker', 'Rectangle', 'Ellipse',
+  'Text', 'Image', 'NumericDisplay', 'NumericInputEnable', 'NumericInputCursorPoint', 'StringDisplay', 'StringInputEnable', 'MomentaryButton', 'MaintainedButton', 'LatchedButton', 'MultistateButton', 'InterlockedButton', 'RampButton',
+  'MultistateIndicator', 'SymbolIndicator', 'ListIndicator', 'BarGraph', 'RecipePlusButton', 'RecipePlusSelector',
+  'GotoButton', 'ReturnToButton', 'CloseDisplayButton', 'DisplayListSelector', 'TimeDateDisplay', 'StringDisplay', 'AlarmTicker', 'Rectangle', 'Ellipse',
   'SafetyLadderDiagram'
 ]);
 const displayGrid = document.getElementById('displayGrid');
@@ -126,6 +140,25 @@ const statusMsg = document.getElementById('statusMsg');
 
 function setStatus(msg) {
   statusMsg.textContent = msg;
+}
+
+function exposeStudioGlobals() {
+  window.state = state;
+  window.setStatus = setStatus;
+  window.displayIsOpen = displayIsOpen;
+  window.fetchOpenCanvas = fetchOpenCanvas;
+  window.resetPropsDialogState = resetPropsDialogState;
+  window.updatePropsApplyButton = updatePropsApplyButton;
+  window.upsertCanvasComponent = upsertCanvasComponent;
+  window.commitPropsSnapshot = commitPropsSnapshot;
+  window.refreshCanvasEditOverlay = refreshCanvasEditOverlay;
+  window.scheduleRefreshCanvasEditOverlay = scheduleRefreshCanvasEditOverlay;
+  window.clearPropsDialogState = clearPropsDialogState;
+  window.activateSelectTool = activateSelectTool;
+  window.showImageBrowserDialog = showImageBrowserDialog;
+  window.showDisplayPickerDialog = showDisplayPickerDialog;
+  window.fetchJson = fetchJson;
+  window.refreshProjectConfig = refreshProjectConfig;
 }
 
 function closeAllMenus() {
@@ -188,11 +221,15 @@ function studioPreviewUrl(params) {
 async function openPropertiesByGraphicName(name, componentType = '', source = '') {
   if (!name || !displayIsOpen()) return;
 
-  await refreshCanvasEditOverlay();
-
-  const editIndex = state.canvasEditCache?.editComponents?.findIndex(
+  let editIndex = state.canvasEditCache?.editComponents?.findIndex(
     (entry) => entry.comp?.name === name
   );
+  if (editIndex == null || editIndex < 0) {
+    scheduleRefreshCanvasEditOverlay();
+    editIndex = state.canvasEditCache?.editComponents?.findIndex(
+      (entry) => entry.comp?.name === name
+    );
+  }
   if (editIndex >= 0) {
     setCanvasSelection(editIndex);
     await openPropertiesForComponent(editIndex);
@@ -209,13 +246,33 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       return;
     }
     const raw = state.canvasEditCache?.raw || await fetchOpenCanvas();
-    const ref = resolveComponentEditRef(comp, raw, source);
+    let ref = resolveComponentEditRef(comp, raw, source);
+    if (ref.type === 'template-override' && comp.name) {
+      const base = await fetchTemplateComponent(comp.name);
+      if (base) {
+        comp = { ...base, ...comp, name: comp.name };
+        ref = { type: 'template-global', name: comp.name };
+      }
+    }
 
     if (comp.type === 'GotoButton') {
       fillGotoButtonForm(comp);
       resetPropsDialogState('goto', readGotoButtonForm, 'applyGotoButton', null, ref);
       switchGotoButtonTab('general');
+      wireGotoButtonDialogTools();
       document.getElementById('gotoButtonDialog')?.showModal();
+    } else if (comp.type === 'ReturnToButton') {
+      window.StudioReturnToButton?.fillReturnToButtonForm(comp);
+      resetPropsDialogState('return-to', window.StudioReturnToButton.readReturnToButtonForm, 'applyReturnToButton', null, ref);
+      window.StudioReturnToButton?.switchReturnToButtonTab('general');
+      window.StudioReturnToButton?.wireReturnToButtonTools();
+      document.getElementById('returnToButtonDialog')?.showModal();
+    } else if (comp.type === 'CloseDisplayButton') {
+      window.StudioCloseDisplayButton?.fillCloseDisplayButtonForm(comp);
+      resetPropsDialogState('close-display', window.StudioCloseDisplayButton.readCloseDisplayButtonForm, 'applyCloseDisplayButton', null, ref);
+      window.StudioCloseDisplayButton?.switchCloseDisplayButtonTab('general');
+      window.StudioCloseDisplayButton?.wireCloseDisplayButtonTools();
+      document.getElementById('closeDisplayButtonDialog')?.showModal();
       if (ref.type === 'template-override') {
         setStatus(`Editing ${name} — screen override (change Global Objects/Template to affect all displays)`);
       } else if (ref.type === 'shell') {
@@ -223,6 +280,60 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       } else {
         setStatus(`Editing ${name}`);
       }
+    } else if (comp.type === 'DisplayListSelector') {
+      window.StudioDisplayListSelector?.fillDisplayListSelectorForm(comp);
+      resetPropsDialogState('display-list', window.StudioDisplayListSelector.readDisplayListSelectorForm, 'applyDisplayListSelector', null, ref);
+      window.StudioDisplayListSelector?.switchDisplayListSelectorTab('general');
+      window.StudioDisplayListSelector?.wireDisplayListSelectorTools();
+      document.getElementById('displayListSelectorDialog')?.showModal();
+    } else if (comp.type === 'MultistateIndicator') {
+      window.StudioMultistateIndicator?.fillMultistateIndicatorForm(comp);
+      resetPropsDialogState('multistate-indicator', window.StudioMultistateIndicator.readMultistateIndicatorForm, 'applyMultistateIndicator', null, ref);
+      window.StudioMultistateIndicator?.switchMultistateIndicatorTab('general');
+      window.StudioMultistateIndicator?.wireMultistateIndicatorTools();
+      document.getElementById('multistateIndicatorDialog')?.showModal();
+      if (ref.type === 'template-global') {
+        setStatus(`Editing Template → ${comp.name} (applies to all displays)`);
+      }
+    } else if (comp.type === 'TimeDateDisplay') {
+      window.StudioTimeDateDisplay?.fillTimeDateDisplayForm(comp);
+      resetPropsDialogState('time-date', window.StudioTimeDateDisplay.readTimeDateDisplayForm, 'applyTimeDateDisplay', null, ref);
+      window.StudioTimeDateDisplay?.switchTimeDateDisplayTab('general');
+      window.StudioTimeDateDisplay?.wireTimeDateDisplayTools();
+      document.getElementById('timeDateDisplayDialog')?.showModal();
+      if (ref.type === 'template-global') {
+        setStatus(`Editing Template → ${comp.name} (applies to all displays)`);
+      }
+    } else if (comp.type === 'SymbolIndicator') {
+      window.StudioSymbolIndicator?.fillSymbolIndicatorForm(comp);
+      resetPropsDialogState('symbol-indicator', window.StudioSymbolIndicator.readSymbolIndicatorForm, 'applySymbolIndicator', null, ref);
+      window.StudioSymbolIndicator?.switchSymbolIndicatorTab('general');
+      window.StudioSymbolIndicator?.wireSymbolIndicatorTools();
+      document.getElementById('symbolIndicatorDialog')?.showModal();
+    } else if (comp.type === 'ListIndicator') {
+      window.StudioListIndicator?.fillListIndicatorForm(comp);
+      resetPropsDialogState('list-indicator', window.StudioListIndicator.readListIndicatorForm, 'applyListIndicator', null, ref);
+      window.StudioListIndicator?.switchListIndicatorTab('general');
+      window.StudioListIndicator?.wireListIndicatorTools();
+      document.getElementById('listIndicatorDialog')?.showModal();
+    } else if (comp.type === 'BarGraph') {
+      window.StudioBarGraph?.fillBarGraphForm(comp);
+      resetPropsDialogState('bar-graph', window.StudioBarGraph.readBarGraphForm, 'applyBarGraph', null, ref);
+      window.StudioBarGraph?.switchBarGraphTab('general');
+      window.StudioBarGraph?.wireBarGraphTools();
+      document.getElementById('barGraphDialog')?.showModal();
+    } else if (comp.type === 'RecipePlusButton') {
+      window.StudioRecipePlusButton?.fillRecipePlusButtonForm(comp);
+      resetPropsDialogState('recipeplus-button', window.StudioRecipePlusButton.readRecipePlusButtonForm, 'applyRecipePlusButton', null, ref);
+      window.StudioRecipePlusButton?.switchRecipePlusButtonTab('general');
+      window.StudioRecipePlusButton?.wireRecipePlusButtonTools();
+      document.getElementById('recipePlusButtonDialog')?.showModal();
+    } else if (comp.type === 'RecipePlusSelector') {
+      window.StudioRecipePlusSelector?.fillRecipePlusSelectorForm(comp);
+      resetPropsDialogState('recipeplus-selector', window.StudioRecipePlusSelector.readRecipePlusSelectorForm, 'applyRecipePlusSelector', null, ref);
+      window.StudioRecipePlusSelector?.switchRecipePlusSelectorTab('general');
+      window.StudioRecipePlusSelector?.wireRecipePlusSelectorTools();
+      document.getElementById('recipePlusSelectorDialog')?.showModal();
     } else if (comp.type === 'Text') {
       fillTextPropertiesForm(comp);
       resetPropsDialogState('text', readTextPropertiesForm, 'applyTextProperties', null, ref);
@@ -235,6 +346,36 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       } else {
         setStatus(`Editing ${name}`);
       }
+    } else if (comp.type === 'NumericDisplay') {
+      window.StudioNumericDisplay?.fillNumericDisplayForm(comp);
+      resetPropsDialogState('numeric', window.StudioNumericDisplay.readNumericDisplayForm, 'applyNumericDisplay', null, ref);
+      window.StudioNumericDisplay?.switchNumericDisplayTab('general');
+      window.StudioNumericDisplay?.wireNumericDisplayTools();
+      document.getElementById('numericDisplayDialog')?.showModal();
+    } else if (comp.type === 'StringDisplay') {
+      window.StudioStringDisplay?.fillStringDisplayForm(comp);
+      resetPropsDialogState('string-display', window.StudioStringDisplay.readStringDisplayForm, 'applyStringDisplay', null, ref);
+      window.StudioStringDisplay?.switchStringDisplayTab('general');
+      window.StudioStringDisplay?.wireStringDisplayTools();
+      document.getElementById('stringDisplayDialog')?.showModal();
+    } else if (comp.type === 'StringInputEnable') {
+      window.StudioStringInput?.fillStringInputForm(comp);
+      resetPropsDialogState('string-input', window.StudioStringInput.readStringInputForm, 'applyStringInput', null, ref);
+      window.StudioStringInput?.switchStringInputTab('general');
+      window.StudioStringInput?.wireStringInputTools();
+      document.getElementById('stringInputDialog')?.showModal();
+    } else if (comp.type === 'NumericInputEnable') {
+      window.StudioNumericInput?.fillNumericInputForm(comp);
+      resetPropsDialogState('numeric-input', window.StudioNumericInput.readNumericInputForm, 'applyNumericInput', null, ref);
+      window.StudioNumericInput?.switchNumericInputTab('general');
+      window.StudioNumericInput?.wireNumericInputTools();
+      document.getElementById('numericInputDialog')?.showModal();
+    } else if (comp.type === 'NumericInputCursorPoint') {
+      window.StudioNumericInput?.fillNumericInputCursorForm(comp);
+      resetPropsDialogState('numeric-input-cursor', window.StudioNumericInput.readNumericInputCursorForm, 'applyNumericInputCursor', null, ref);
+      window.StudioNumericInput?.switchNumericInputCursorTab('general');
+      window.StudioNumericInput?.wireNumericInputCursorTools();
+      document.getElementById('numericInputCursorDialog')?.showModal();
     } else if (comp.type === 'MomentaryButton') {
       fillMomentaryButtonForm(comp);
       resetPropsDialogState('momentary', readMomentaryButtonForm, 'applyMomentaryButton', null, ref);
@@ -246,11 +387,37 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       switchMaintainedButtonTab('general');
       wireMaintainedButtonDialogTools();
       document.getElementById('maintainedButtonDialog')?.showModal();
+    } else if (comp.type === 'LatchedButton') {
+      window.StudioLatchedMultistate?.fillLatchedButtonForm(comp);
+      resetPropsDialogState('latched', window.StudioLatchedMultistate.readLatchedButtonForm, 'applyLatchedButton', null, ref);
+      window.StudioLatchedMultistate?.switchLatchedButtonTab('general');
+      window.StudioLatchedMultistate?.wireLatchedButtonDialogTools();
+      document.getElementById('latchedButtonDialog')?.showModal();
+    } else if (comp.type === 'MultistateButton') {
+      window.StudioLatchedMultistate?.fillMultistateButtonForm(comp);
+      resetPropsDialogState('multistate', window.StudioLatchedMultistate.readMultistateButtonForm, 'applyMultistateButton', null, ref);
+      window.StudioLatchedMultistate?.switchMultistateButtonTab('general');
+      window.StudioLatchedMultistate?.wireMultistateButtonDialogTools();
+      document.getElementById('multistateButtonDialog')?.showModal();
+    } else if (comp.type === 'InterlockedButton') {
+      window.StudioLatchedMultistate?.fillInterlockedButtonForm(comp);
+      resetPropsDialogState('interlocked', window.StudioLatchedMultistate.readInterlockedButtonForm, 'applyInterlockedButton', null, ref);
+      window.StudioLatchedMultistate?.switchInterlockedButtonTab('general');
+      window.StudioLatchedMultistate?.wireInterlockedButtonDialogTools();
+      document.getElementById('interlockedButtonDialog')?.showModal();
+    } else if (comp.type === 'RampButton') {
+      window.StudioLatchedMultistate?.fillRampButtonForm(comp);
+      resetPropsDialogState('ramp', window.StudioLatchedMultistate.readRampButtonForm, 'applyRampButton', null, ref);
+      window.StudioLatchedMultistate?.switchRampButtonTab('general');
+      window.StudioLatchedMultistate?.wireRampButtonDialogTools();
+      document.getElementById('rampButtonDialog')?.showModal();
     } else if (comp.type === 'Image') {
       fillCanvasImagePropertiesForm(comp);
       resetPropsDialogState('image', readCanvasImagePropertiesForm, 'applyCanvasImageProperties', null, ref);
       switchCanvasImagePropertiesTab('general');
       document.getElementById('canvasImagePropertiesDialog')?.showModal();
+    } else if (comp.type === 'Rectangle' || comp.type === 'Ellipse') {
+      window.StudioShapeProperties?.openShapePropertiesDialog(comp, ref, null);
     } else {
       setStatus(`${comp.type} properties not available yet`);
     }
@@ -278,13 +445,15 @@ function initStudioEmbedBridge() {
     if (e.data?.type === 'planthmi-embed-graphic-click') {
       const name = e.data.name;
       if (!name) return;
-      refreshCanvasEditOverlay().then(() => {
-        const editIndex = state.canvasEditCache?.editComponents?.findIndex(
-          (entry) => entry.comp?.name === name
-        );
-        if (editIndex >= 0) setCanvasSelection(editIndex);
-        else clearCanvasSelection();
-      }).catch(() => {});
+      const editIndex = state.canvasEditCache?.editComponents?.findIndex(
+        (entry) => entry.comp?.name === name
+      );
+      if (editIndex >= 0) {
+        setCanvasSelection(editIndex);
+        return;
+      }
+      state.pendingGraphicSelection = name;
+      scheduleRefreshCanvasEditOverlay();
       return;
     }
     if (e.data?.type === 'planthmi-embed-graphic-dblclick') {
@@ -294,13 +463,26 @@ function initStudioEmbedBridge() {
   });
 }
 
-async function fetchOpenCanvas() {
+async function fetchOpenCanvas(options = {}) {
+  const { force = false } = options;
   const project = state.activeProject;
   const id = state.selectedScreenId;
-  if (isEditingGlobalObject()) {
-    return fetchJson(`/api/runtime/global-objects/${encodeURIComponent(id)}?project=${encodeURIComponent(project)}`);
+  const key = `${project || ''}:${id || ''}:${state.previewKind || 'display'}:raw`;
+  if (!force && openCanvasCache.key === key && openCanvasCache.data) {
+    return openCanvasCache.data;
   }
-  return fetchJson(`/api/runtime/screens/${encodeURIComponent(id)}?project=${encodeURIComponent(project)}&raw=1&_=${Date.now()}`);
+  let data;
+  if (isEditingGlobalObject()) {
+    data = await fetchJson(`/api/runtime/global-objects/${encodeURIComponent(id)}?project=${encodeURIComponent(project)}`);
+  } else {
+    data = await fetchJson(`/api/runtime/screens/${encodeURIComponent(id)}?project=${encodeURIComponent(project)}&raw=1`);
+  }
+  openCanvasCache = { key, data };
+  return data;
+}
+
+function invalidateOpenCanvasCache() {
+  openCanvasCache = { key: '', data: null };
 }
 
 async function fetchComposedCanvas() {
@@ -309,7 +491,31 @@ async function fetchComposedCanvas() {
   if (isEditingGlobalObject()) {
     return fetchOpenCanvas();
   }
-  return fetchJson(`/api/runtime/screens/${encodeURIComponent(id)}?project=${encodeURIComponent(project)}&_=${Date.now()}`);
+  return fetchJson(`/api/runtime/screens/${encodeURIComponent(id)}?project=${encodeURIComponent(project)}`);
+}
+
+const COMPOSED_CACHE_MS = 8000;
+let composedCanvasCache = { key: '', data: null, ts: 0 };
+let openCanvasCache = { key: '', data: null };
+
+function invalidateComposedCanvasCache() {
+  composedCanvasCache = { key: '', data: null, ts: 0 };
+}
+
+function invalidateCanvasCaches() {
+  invalidateOpenCanvasCache();
+  invalidateComposedCanvasCache();
+}
+
+async function fetchComposedCanvasCached() {
+  const key = `${state.activeProject || ''}:${state.selectedScreenId || ''}:${state.previewKind || 'display'}`;
+  const now = Date.now();
+  if (composedCanvasCache.key === key && composedCanvasCache.data && now - composedCanvasCache.ts < COMPOSED_CACHE_MS) {
+    return composedCanvasCache.data;
+  }
+  const data = await fetchComposedCanvas();
+  composedCanvasCache = { key, data, ts: now };
+  return data;
 }
 
 function stripComponentMeta(comp) {
@@ -318,6 +524,214 @@ function stripComponentMeta(comp) {
     _source, _templateIndex, _displayIndex, _replacesTemplate, _composed, ...clean
   } = comp;
   return clean;
+}
+
+const UNDO_MAX = 40;
+
+function cloneUndoData(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function getUndoContext() {
+  return {
+    project: state.activeProject,
+    screenId: state.selectedScreenId,
+    previewKind: state.previewKind || 'display'
+  };
+}
+
+function clearUndoHistory() {
+  state.undoStack = [];
+  state.redoStack = [];
+  updateUndoRedoUI();
+}
+
+async function captureScreenUndoPatch(keys) {
+  const canvas = state.canvasEditCache?.raw || await fetchOpenCanvas();
+  const patch = {};
+  for (const key of keys) {
+    if (key === 'components') patch.components = cloneUndoData(canvas.components || []);
+    if (key === 'template') patch.template = cloneUndoData(canvas.template);
+    if (key === 'overviewShell') patch.overviewShell = cloneUndoData(canvas.overviewShell);
+  }
+  return patch;
+}
+
+async function captureGlobalObjectUndo(objectId) {
+  const tpl = await fetchJson(
+    `/api/runtime/global-objects/${encodeURIComponent(objectId)}?project=${encodeURIComponent(state.activeProject)}`
+  );
+  return {
+    objectId,
+    components: cloneUndoData(tpl.components || [])
+  };
+}
+
+async function buildUndoEntry(options = {}) {
+  const ctx = getUndoContext();
+  const entry = { context: ctx, patch: {}, globalPatch: null };
+  const screenKeys = options.screenKeys ?? ['components', 'template', 'overviewShell'];
+  if (screenKeys.length) {
+    entry.patch = await captureScreenUndoPatch(screenKeys);
+  }
+  if (options.globalObjectId) {
+    entry.globalPatch = await captureGlobalObjectUndo(options.globalObjectId);
+  }
+  return entry;
+}
+
+function pushUndoEntry(entry) {
+  if (state.undoSuspended || !entry?.context?.project || !entry.context.screenId) return;
+  state.undoStack.push(entry);
+  while (state.undoStack.length > UNDO_MAX) state.undoStack.shift();
+  state.redoStack = [];
+  updateUndoRedoUI();
+}
+
+async function pushUndoBefore(options = {}) {
+  const entry = await buildUndoEntry(options);
+  pushUndoEntry(entry);
+}
+
+function captureDragUndoEntry(entry) {
+  const canvas = state.canvasEditCache?.raw;
+  if (!canvas || !state.activeProject || !state.selectedScreenId || !entry) return null;
+  const undoEntry = {
+    context: getUndoContext(),
+    patch: {},
+    globalPatch: null
+  };
+  if (entry.ref?.type === 'shell') {
+    undoEntry.patch.overviewShell = cloneUndoData(canvas.overviewShell);
+  } else if (entry.ref?.type === 'template-override') {
+    undoEntry.patch.template = cloneUndoData(canvas.template);
+  } else {
+    undoEntry.patch.components = cloneUndoData(canvas.components);
+  }
+  return undoEntry;
+}
+
+async function pushUndoForEditRef(ref) {
+  if (ref?.type === 'template-global') {
+    const canvas = state.canvasEditCache?.raw || await fetchOpenCanvas();
+    const globalObjectId = defaultTemplateConfig(canvas).globalObjectId || 'Template';
+    await pushUndoBefore({ screenKeys: [], globalObjectId });
+  } else if (ref?.type === 'template-override') {
+    await pushUndoBefore({ screenKeys: ['template'] });
+  } else if (ref?.type === 'shell') {
+    await pushUndoBefore({ screenKeys: ['overviewShell'] });
+  } else {
+    await pushUndoBefore({ screenKeys: ['components'] });
+  }
+}
+
+function isEditableKeyboardTarget(target) {
+  if (!target) return false;
+  const tag = target.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
+}
+
+function updateUndoRedoUI() {
+  const canEdit = displayIsOpen();
+  const canUndo = canEdit && state.undoStack.length > 0;
+  const canRedo = canEdit && state.redoStack.length > 0;
+  document.querySelectorAll('[data-edit-action="undo"], [data-tb="undo"]').forEach((el) => {
+    el.classList.toggle('disabled', !canUndo);
+  });
+  document.querySelectorAll('[data-edit-action="redo"], [data-tb="redo"]').forEach((el) => {
+    el.classList.toggle('disabled', !canRedo);
+  });
+}
+
+async function ensureUndoContext(ctx) {
+  if (!ctx?.project || !ctx.screenId) return false;
+  if (state.activeProject !== ctx.project) {
+    await openProject(ctx.project);
+  }
+  if (state.selectedScreenId !== ctx.screenId) {
+    if (ctx.previewKind === 'global-object') {
+      openGlobalObjectPreview(ctx.screenId, ctx.screenId);
+    } else {
+      openDisplayPreview(ctx.screenId, ctx.screenId);
+    }
+    scheduleRefreshCanvasEditOverlay();
+  }
+  return true;
+}
+
+async function applyUndoEntry(entry) {
+  state.undoSuspended = true;
+  try {
+    await ensureUndoContext(entry.context);
+    const screenPatch = {};
+    if (entry.patch?.components !== undefined) screenPatch.components = entry.patch.components;
+    if (entry.patch?.template !== undefined) screenPatch.template = entry.patch.template;
+    if (entry.patch?.overviewShell !== undefined) screenPatch.overviewShell = entry.patch.overviewShell;
+    if (Object.keys(screenPatch).length) {
+      await patchOpenCanvas(screenPatch);
+      const canvas = await fetchOpenCanvas();
+      state.canvasEditCache.raw = { ...canvas, ...screenPatch };
+    }
+    if (entry.globalPatch) {
+      await fetchJson(
+        `/api/projects/${encodeURIComponent(entry.context.project)}/global-objects/${encodeURIComponent(entry.globalPatch.objectId)}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ components: entry.globalPatch.components })
+        }
+      );
+    }
+    await updateCanvasPreview({ forceReload: true });
+    refreshObjectExplorer();
+    refreshPropertyPanel();
+    scheduleRefreshCanvasEditOverlay();
+    clearCanvasSelection();
+  } finally {
+    state.undoSuspended = false;
+  }
+}
+
+async function undoEdit() {
+  if (!displayIsOpen()) {
+    setStatus('Open a display to undo edits');
+    return;
+  }
+  if (!state.undoStack.length) {
+    setStatus('Nothing to undo');
+    return;
+  }
+  const entry = state.undoStack.pop();
+  const restoreKeys = Object.keys(entry.patch || {}).filter((k) => entry.patch[k] !== undefined);
+  const current = await buildUndoEntry({
+    screenKeys: restoreKeys,
+    globalObjectId: entry.globalPatch?.objectId
+  });
+  state.redoStack.push(current);
+  await applyUndoEntry(entry);
+  updateUndoRedoUI();
+  setStatus('Undo');
+}
+
+async function redoEdit() {
+  if (!displayIsOpen()) {
+    setStatus('Open a display to redo edits');
+    return;
+  }
+  if (!state.redoStack.length) {
+    setStatus('Nothing to redo');
+    return;
+  }
+  const entry = state.redoStack.pop();
+  const restoreKeys = Object.keys(entry.patch || {}).filter((k) => entry.patch[k] !== undefined);
+  const current = await buildUndoEntry({
+    screenKeys: restoreKeys,
+    globalObjectId: entry.globalPatch?.objectId
+  });
+  state.undoStack.push(current);
+  await applyUndoEntry(entry);
+  updateUndoRedoUI();
+  setStatus('Redo');
 }
 
 function defaultTemplateConfig(canvas) {
@@ -407,6 +821,16 @@ async function fetchTemplateComponent(name) {
   }
 }
 
+async function resolveTemplateGlobalPropertiesEntry(entry) {
+  if (!entry?.comp?.name || entry.ref?.type !== 'template-override') return entry;
+  const base = await fetchTemplateComponent(entry.comp.name);
+  if (!base) return entry;
+  return {
+    comp: { ...base, ...entry.comp, name: entry.comp.name },
+    ref: { type: 'template-global', name: entry.comp.name }
+  };
+}
+
 function getOverviewShellBase(rawScreen, name) {
   if (typeof TemplateCompose === 'undefined') return null;
   const shell = TemplateCompose.buildOverviewShell({ ...rawScreen, overviewShell: {} });
@@ -449,10 +873,31 @@ async function patchTemplateOverride(name, patch, options = {}) {
   template.replace = replace;
   await patchOpenCanvas({ template });
   state.canvasEditCache.raw = { ...canvas, template };
+  invalidateComposedCanvasCache();
+
+  if (options.mergeOnly || isGeometryPatch(patch)) {
+    if (previewUpdateBoundsByName(name, patch)) {
+      updateCanvasEditHitBounds(name, patch);
+      refreshObjectExplorer();
+      refreshPropertyPanel();
+      return;
+    }
+  } else {
+    try {
+      const composed = await fetchComposedCanvasCached();
+      const merged = composed.components?.find((c) => c.name === name);
+      if (merged && previewPatchByName(name, merged)) {
+        refreshObjectExplorer();
+        refreshPropertyPanel();
+        return;
+      }
+    } catch { /* fall back to full reload */ }
+  }
+
   await updateCanvasPreview({ forceReload: true });
   refreshObjectExplorer();
   refreshPropertyPanel();
-  await refreshCanvasEditOverlay();
+  scheduleRefreshCanvasEditOverlay();
 }
 
 async function removeTemplateOverride(name) {
@@ -466,7 +911,7 @@ async function removeTemplateOverride(name) {
   await updateCanvasPreview({ forceReload: true });
   refreshObjectExplorer();
   refreshPropertyPanel();
-  await refreshCanvasEditOverlay();
+  scheduleRefreshCanvasEditOverlay();
 }
 
 async function buildCanvasEditComponents(rawCanvas) {
@@ -477,10 +922,17 @@ async function buildCanvasEditComponents(rawCanvas) {
     }
   });
 
+  let composed = null;
+  const loadComposed = async () => {
+    if (composed) return composed;
+    composed = await fetchComposedCanvasCached();
+    return composed;
+  };
+
   if (!isEditingGlobalObject() && rawCanvas.navGroup === 'overview') {
     try {
-      const composed = await fetchComposedCanvas();
-      for (const comp of composed.components || []) {
+      const data = await loadComposed();
+      for (const comp of data.components || []) {
         if (comp._source === 'shell' && isCanvasGraphicComponent(comp)) {
           list.push({ comp, ref: { type: 'shell', name: comp.name } });
         }
@@ -490,9 +942,9 @@ async function buildCanvasEditComponents(rawCanvas) {
 
   if (!isEditingGlobalObject()) {
     try {
-      const composed = await fetchComposedCanvas();
+      const data = await loadComposed();
       const seen = new Set(list.map((entry) => entry.comp?.name).filter(Boolean));
-      for (const comp of composed.components || []) {
+      for (const comp of data.components || []) {
         if (comp._source !== 'template' || !isCanvasGraphicComponent(comp)) continue;
         if (seen.has(comp.name)) continue;
         list.push({ comp, ref: { type: 'template-override', name: comp.name } });
@@ -507,24 +959,30 @@ async function buildCanvasEditComponents(rawCanvas) {
 async function patchOpenCanvas(patch) {
   const project = state.activeProject;
   const id = state.selectedScreenId;
+  let result;
   if (isEditingGlobalObject()) {
-    return fetchJson(`/api/projects/${encodeURIComponent(project)}/global-objects/${encodeURIComponent(id)}`, {
+    result = await fetchJson(`/api/projects/${encodeURIComponent(project)}/global-objects/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    });
+  } else {
+    result = await fetchJson(`/api/projects/${encodeURIComponent(project)}/screens/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch)
     });
   }
-  return fetchJson(`/api/projects/${encodeURIComponent(project)}/screens/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(patch)
-  });
+  invalidateCanvasCaches();
+  markCanvasEditOverlayStale();
+  return result;
 }
 
 async function upsertCanvasComponent(component) {
   if (!displayIsOpen()) return false;
   const ref = state.propsDialog.ref;
   const clean = stripComponentMeta(component);
+  if (!state.undoSuspended) await pushUndoForEditRef(ref);
 
   if (ref?.type === 'shell') {
     const canvas = await fetchOpenCanvas();
@@ -535,10 +993,57 @@ async function upsertCanvasComponent(component) {
     else overviewShell[ref.name] = stored;
     await patchOpenCanvas({ overviewShell });
     state.canvasEditCache.raw = { ...canvas, overviewShell };
+    invalidateCanvasCaches();
+    try {
+      const composed = await fetchComposedCanvasCached();
+      const merged = composed.components?.find((c) => c.name === ref.name);
+      if (merged && previewPatchByName(ref.name, merged)) {
+        refreshObjectExplorer();
+        refreshPropertyPanel();
+        return true;
+      }
+    } catch { /* fall back to full reload */ }
     await updateCanvasPreview({ forceReload: true });
     refreshObjectExplorer();
     refreshPropertyPanel();
-    await refreshCanvasEditOverlay();
+    scheduleRefreshCanvasEditOverlay();
+    return true;
+  }
+
+  if (ref?.type === 'template-global') {
+    const canvas = await fetchOpenCanvas();
+    const globalObjectId = defaultTemplateConfig(canvas).globalObjectId || 'Template';
+    const tpl = await fetchJson(
+      `/api/runtime/global-objects/${encodeURIComponent(globalObjectId)}?project=${encodeURIComponent(state.activeProject)}`
+    );
+    const components = [...(tpl.components || [])];
+    const idx = components.findIndex((c) => c.name === ref.name);
+    if (idx < 0) return false;
+    components[idx] = clean;
+    await fetchJson(
+      `/api/projects/${encodeURIComponent(state.activeProject)}/global-objects/${encodeURIComponent(globalObjectId)}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ components })
+      }
+    );
+    invalidateCanvasCaches();
+    try {
+      const composed = await fetchComposedCanvasCached();
+      const merged = composed.components?.find((c) => c.name === ref.name);
+      if (merged && previewPatchByName(ref.name, merged)) {
+        refreshObjectExplorer();
+        refreshPropertyPanel();
+        setStatus(`Updated Template → ${ref.name}`);
+        return true;
+      }
+    } catch { /* fall back to full reload */ }
+    await updateCanvasPreview({ forceReload: true });
+    refreshObjectExplorer();
+    refreshPropertyPanel();
+    scheduleRefreshCanvasEditOverlay();
+    setStatus(`Updated Template → ${ref.name}`);
     return true;
   }
 
@@ -563,23 +1068,43 @@ async function upsertCanvasComponent(component) {
   }
   await patchOpenCanvas({ components });
   state.canvasEditCache.raw = { ...canvas, components };
-  await updateCanvasPreview({
-    index,
-    component: clean,
-    mode: isNew ? 'append' : 'patch',
-    components
-  });
+  if (isNew || isEditingGlobalObject()) {
+    await updateCanvasPreview({ forceReload: true });
+  } else {
+    await updateCanvasPreview({ name: clean.name, component: clean, mode: 'patch-by-name' });
+  }
   refreshObjectExplorer();
   refreshPropertyPanel();
-  await refreshCanvasEditOverlay();
+  if (isNew || isEditingGlobalObject()) {
+    scheduleRefreshCanvasEditOverlay();
+  }
   return true;
+}
+
+function markCanvasEditOverlayStale() {
+  state.canvasEditOverlayStale = true;
+}
+
+function isUiWorkSuspended() {
+  return Boolean(
+    state.propsFormFill ||
+    state.canvasEditDrag ||
+    document.querySelector('dialog.dialog[open]')
+  );
 }
 
 function resetPropsDialogState(kind, readFn, applyBtnId, editIndex = null, ref = null) {
   const entry = editIndex != null ? state.canvasEditCache?.editComponents?.[editIndex] : null;
+  state.propsFormFill = true;
+  let snapshot = '';
+  try {
+    snapshot = JSON.stringify(readFn());
+  } finally {
+    state.propsFormFill = false;
+  }
   state.propsDialog = {
     kind,
-    snapshot: JSON.stringify(readFn()),
+    snapshot,
     editIndex: editIndex ?? null,
     ref: ref ?? entry?.ref ?? null
   };
@@ -587,10 +1112,22 @@ function resetPropsDialogState(kind, readFn, applyBtnId, editIndex = null, ref =
   if (applyBtn) applyBtn.disabled = true;
 }
 
+let propsApplyCheckTimer = null;
+let propsApplyCheckPending = null;
+
 function updatePropsApplyButton(readFn, applyBtnId) {
-  const applyBtn = document.getElementById(applyBtnId);
-  if (!applyBtn || !state.propsDialog.snapshot) return;
-  applyBtn.disabled = JSON.stringify(readFn()) === state.propsDialog.snapshot;
+  if (state.propsFormFill) return;
+  propsApplyCheckPending = { readFn, applyBtnId };
+  if (propsApplyCheckTimer) return;
+  propsApplyCheckTimer = setTimeout(() => {
+    propsApplyCheckTimer = null;
+    const pending = propsApplyCheckPending;
+    propsApplyCheckPending = null;
+    if (!pending) return;
+    const applyBtn = document.getElementById(pending.applyBtnId);
+    if (!applyBtn || !state.propsDialog.snapshot) return;
+    applyBtn.disabled = JSON.stringify(pending.readFn()) === state.propsDialog.snapshot;
+  }, 100);
 }
 
 function commitPropsSnapshot(readFn, applyBtnId) {
@@ -608,6 +1145,7 @@ async function addObjectToDisplay(component) {
     setStatus('Open a display or global object first, then choose an object to add');
     return false;
   }
+  if (!state.undoSuspended) await pushUndoBefore({ screenKeys: ['components'] });
   const canvas = await fetchOpenCanvas();
   const components = [...(canvas.components || []), component];
   await patchOpenCanvas({ components });
@@ -620,7 +1158,7 @@ async function addObjectToDisplay(component) {
   });
   refreshObjectExplorer();
   refreshPropertyPanel();
-  await refreshCanvasEditOverlay();
+  scheduleRefreshCanvasEditOverlay();
   return true;
 }
 
@@ -754,7 +1292,6 @@ async function applyTextProperties() {
   await upsertCanvasComponent(comp);
   commitPropsSnapshot(readTextPropertiesForm, 'applyTextProperties');
   state.canvasSelection.index = state.propsDialog.editIndex;
-  await refreshCanvasEditOverlay();
   setStatus(`Applied ${comp.name} on ${state.selectedScreenId}`);
 }
 
@@ -1082,7 +1619,6 @@ async function applyMomentaryButton() {
   await upsertCanvasComponent(comp);
   commitPropsSnapshot(readMomentaryButtonForm, 'applyMomentaryButton');
   state.canvasSelection.index = state.propsDialog.editIndex;
-  await refreshCanvasEditOverlay();
   setStatus(`Applied ${comp.name} on ${state.selectedScreenId}`);
 }
 
@@ -1407,7 +1943,6 @@ async function applyMaintainedButton() {
   await upsertCanvasComponent(comp);
   commitPropsSnapshot(readMaintainedButtonForm, 'applyMaintainedButton');
   state.canvasSelection.index = state.propsDialog.editIndex;
-  await refreshCanvasEditOverlay();
   setStatus(`Applied ${comp.name} on ${state.selectedScreenId}`);
 }
 
@@ -1489,9 +2024,6 @@ function initMaintainedButtonDialog() {
       updatePropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
     });
   }
-  if (window.FtColorPicker) {
-    window.FtColorPicker.initAll(document.getElementById('maintainedButtonDialog'));
-  }
 }
 
 function nextGotoButtonName(components) {
@@ -1503,29 +2035,33 @@ function defaultGotoButtonComponent(overrides = {}) {
   return {
     type: 'GotoButton',
     name: 'GotoDisplayButton1',
-    label: 'Production Data',
-    caption: 'Production Data',
-    target: '101_Production_Data',
+    label: '',
+    caption: '',
+    target: '',
+    displayNameTag: '',
+    displayTopTag: '',
+    displayLeftTag: '',
     left: 8,
     top: 75,
     width: 66,
     height: 35,
     visible: true,
-    borderStyle: 'raised',
-    borderWidth: 3,
+    borderStyle: 'line',
+    borderWidth: 1,
     borderUsesBackColor: true,
-    useBackColor: false,
-    useBorderColor: false,
+    useBackColor: true,
+    useBorderColor: true,
     usePatternColor: false,
     useHighlightColor: false,
     backStyle: 'solid',
-    backColor: '#dcdcdc',
-    borderColor: '#e0e0e0',
+    backColor: '#001C38',
+    borderColor: '#000000',
     patternColor: '#ffffff',
-    highlightColor: '#00ff00',
+    highlightColor: '#0066cc',
     patternStyle: 'none',
     shape: 'rectangle',
     blink: false,
+    useVariableDisplay: false,
     parameterType: 'file',
     parameterFile: '',
     parameterList: '',
@@ -1536,18 +2072,35 @@ function defaultGotoButtonComponent(overrides = {}) {
     audio: true,
     horizontalMargin: 0,
     verticalMargin: 0,
-    fontFamily: 'Arial',
+    fontFamily: 'Arial Unicode MS',
     fontSize: 10,
-    bold: true,
+    bold: false,
     italic: false,
     underline: false,
-    foreColor: '#000000',
-    useForeColor: true,
+    foreColor: '#ffffff',
+    useForeColor: false,
+    useCaptionColor: false,
     captionBackStyle: 'transparent',
     wordWrap: true,
     alignment: 'middleCenter',
+    imageBackStyle: 'transparent',
+    imageAlignment: 'middleCenter',
     ...overrides
   };
+}
+
+function wireGotoButtonDialogTools() {
+  if (window.StudioTagTools) StudioTagTools.wirePickButtons();
+  if (window.FtColorPicker) window.FtColorPicker.initAll(document.getElementById('gotoButtonDialog'));
+  syncGotoButtonGeneralFields();
+  syncGotoButtonLabelFields();
+}
+
+function syncGotoButtonLabelFields() {
+  document.getElementById('gbCaptionColor').disabled = !document.getElementById('gbUseCaptionColor')?.checked;
+  document.getElementById('gbCaptionBackColor').disabled = !document.getElementById('gbUseCaptionBackColor')?.checked;
+  document.getElementById('gbImageColor').disabled = !document.getElementById('gbUseImageColor')?.checked;
+  document.getElementById('gbImageBackColor').disabled = !document.getElementById('gbUseImageBackColor')?.checked;
 }
 
 async function showGotoButtonDialog(overrides = {}) {
@@ -1563,6 +2116,7 @@ async function showGotoButtonDialog(overrides = {}) {
   fillGotoButtonForm(comp);
   resetPropsDialogState('goto', readGotoButtonForm, 'applyGotoButton');
   switchGotoButtonTab('general');
+  wireGotoButtonDialogTools();
   document.getElementById('gotoButtonDialog')?.showModal();
 }
 
@@ -1681,25 +2235,53 @@ function fillGotoButtonForm(comp) {
   document.getElementById('gbBold').classList.toggle('active', Boolean(comp.bold));
   document.getElementById('gbItalic').classList.toggle('active', Boolean(comp.italic));
   document.getElementById('gbUnderline').classList.toggle('active', Boolean(comp.underline));
-  document.getElementById('gbUseCaptionColor').checked = comp.useForeColor !== false;
-  document.getElementById('gbCaptionColor').value = comp.foreColor || '#000000';
+  document.getElementById('gbUseCaptionColor').checked = comp.useCaptionColor !== undefined
+    ? Boolean(comp.useCaptionColor)
+    : comp.useForeColor !== false;
+  document.getElementById('gbCaptionColor').value = comp.foreColor || '#ffffff';
   document.getElementById('gbUseCaptionBackColor').checked = Boolean(comp.useCaptionBackColor);
-  document.getElementById('gbCaptionBackColor').value = comp.captionBackColor || '#002952';
+  document.getElementById('gbCaptionBackColor').value = comp.captionBackColor || '#001C38';
   document.getElementById('gbCaptionBlink').checked = Boolean(comp.captionBlink);
   document.getElementById('gbWordWrap').checked = comp.wordWrap !== false;
   document.querySelector(`#gotoButtonForm input[name="gbAlign"][value="${comp.alignment || 'middleCenter'}"]`)?.click();
   document.getElementById('gbCaptionBackStyle').value = comp.captionBackStyle || 'transparent';
   document.getElementById('gbImage').value = comp.image || '';
+  document.getElementById('gbImageBackStyle').value = comp.imageBackStyle || 'transparent';
+  document.getElementById('gbUseImageColor').checked = Boolean(comp.useImageColor);
+  document.getElementById('gbImageColor').value = comp.imageColor || '#ffffff';
+  document.getElementById('gbUseImageBackColor').checked = Boolean(comp.useImageBackColor);
+  document.getElementById('gbImageBackColor').value = comp.imageBackColor || '#001C38';
+  document.getElementById('gbImageBlink').checked = Boolean(comp.imageBlink);
   document.getElementById('gbImageScaled').checked = Boolean(comp.imageScaled);
+  document.querySelector(`#gotoButtonForm input[name="gbImageAlign"][value="${comp.imageAlignment || 'middleCenter'}"]`)?.click();
+  document.getElementById('gbDisplayNameTag').value = comp.displayNameTag || '';
+  document.getElementById('gbDisplayTopTag').value = comp.displayTopTag || '';
+  document.getElementById('gbDisplayLeftTag').value = comp.displayLeftTag || '';
   document.getElementById('gbHeight').value = comp.height ?? 35;
   document.getElementById('gbWidth').value = comp.width ?? 66;
   document.getElementById('gbTop').value = comp.top ?? 75;
   document.getElementById('gbLeft').value = comp.left ?? 8;
   document.getElementById('gbName').value = comp.name || 'GotoDisplayButton1';
   document.getElementById('gbVisible').checked = comp.visible !== false;
-  document.getElementById('gbCaptionColor').disabled = !document.getElementById('gbUseCaptionColor').checked;
-  document.getElementById('gbCaptionBackColor').disabled = !document.getElementById('gbUseCaptionBackColor').checked;
+  syncGotoButtonLabelFields();
   syncGotoButtonGeneralFields();
+}
+
+function validateGotoButton(comp) {
+  if (comp.useVariableDisplay) {
+    if (!comp.displayNameTag) {
+      setStatus('Enter a Display Name tag on the Connections tab');
+      switchGotoButtonTab('connections');
+      return false;
+    }
+    return true;
+  }
+  if (!comp.target) {
+    setStatus('Enter a display name on the General tab');
+    switchGotoButtonTab('general');
+    return false;
+  }
+  return true;
 }
 
 function readGotoButtonForm() {
@@ -1732,6 +2314,9 @@ function readGotoButtonForm() {
     shape: document.getElementById('gbShape').value,
     blink: document.getElementById('gbBlink').checked,
     useVariableDisplay: document.getElementById('gbUseVariableDisplay').checked,
+    displayNameTag: document.getElementById('gbDisplayNameTag').value.trim(),
+    displayTopTag: document.getElementById('gbDisplayTopTag').value.trim(),
+    displayLeftTag: document.getElementById('gbDisplayLeftTag').value.trim(),
     parameterType: document.querySelector('#gotoButtonForm input[name="gbParameterType"]:checked')?.value || 'file',
     parameterFile: document.getElementById('gbParameterFile').value.trim(),
     parameterList: document.getElementById('gbParameterList').value.trim(),
@@ -1749,6 +2334,7 @@ function readGotoButtonForm() {
     underline: document.getElementById('gbUnderline').classList.contains('active'),
     foreColor: document.getElementById('gbCaptionColor').value,
     useForeColor: document.getElementById('gbUseCaptionColor').checked,
+    useCaptionColor: document.getElementById('gbUseCaptionColor').checked,
     useCaptionBackColor: document.getElementById('gbUseCaptionBackColor').checked,
     captionBackColor: document.getElementById('gbCaptionBackColor').value,
     captionBlink: document.getElementById('gbCaptionBlink').checked,
@@ -1756,32 +2342,30 @@ function readGotoButtonForm() {
     wordWrap: document.getElementById('gbWordWrap').checked,
     alignment,
     image: document.getElementById('gbImage').value.trim() || undefined,
-    imageScaled: document.getElementById('gbImageScaled').checked
+    imageBackStyle: document.getElementById('gbImageBackStyle').value,
+    useImageColor: document.getElementById('gbUseImageColor').checked,
+    imageColor: document.getElementById('gbImageColor').value,
+    useImageBackColor: document.getElementById('gbUseImageBackColor').checked,
+    imageBackColor: document.getElementById('gbImageBackColor').value,
+    imageBlink: document.getElementById('gbImageBlink').checked,
+    imageScaled: document.getElementById('gbImageScaled').checked,
+    imageAlignment: document.querySelector('#gotoButtonForm input[name="gbImageAlign"]:checked')?.value || 'middleCenter'
   };
 }
 
 async function applyGotoButton() {
   const comp = readGotoButtonForm();
-  if (!comp.useVariableDisplay && !comp.target) {
-    setStatus('Enter a display name on the General tab');
-    switchGotoButtonTab('general');
-    return;
-  }
+  if (!validateGotoButton(comp)) return;
   await upsertCanvasComponent(comp);
   commitPropsSnapshot(readGotoButtonForm, 'applyGotoButton');
   state.canvasSelection.index = state.propsDialog.editIndex;
-  await refreshCanvasEditOverlay();
   setStatus(`Applied ${comp.name} on ${state.selectedScreenId}`);
 }
 
 async function saveGotoButton(e) {
   e.preventDefault();
   const comp = readGotoButtonForm();
-  if (!comp.useVariableDisplay && !comp.target) {
-    setStatus('Enter a display name on the General tab');
-    switchGotoButtonTab('general');
-    return;
-  }
+  if (!validateGotoButton(comp)) return;
   await upsertCanvasComponent(comp);
   document.getElementById('gotoButtonDialog').close();
   state.canvasSelection.index = state.propsDialog.editIndex;
@@ -1814,14 +2398,20 @@ function initGotoButtonDialog() {
   document.querySelectorAll('#gotoButtonDialog .dialog-tab').forEach((tab) => {
     tab.addEventListener('click', () => switchGotoButtonTab(tab.dataset.gbTab));
   });
-  document.getElementById('gbUseCaptionColor')?.addEventListener('change', (e) => {
-    document.getElementById('gbCaptionColor').disabled = !e.target.checked;
+  document.getElementById('gbUseCaptionColor')?.addEventListener('change', () => {
+    syncGotoButtonLabelFields();
     updatePropsApplyButton(readGotoButtonForm, 'applyGotoButton');
   });
-  document.getElementById('gbUseCaptionBackColor')?.addEventListener('change', (e) => {
-    document.getElementById('gbCaptionBackColor').disabled = !e.target.checked;
+  document.getElementById('gbUseCaptionBackColor')?.addEventListener('change', () => {
+    syncGotoButtonLabelFields();
     updatePropsApplyButton(readGotoButtonForm, 'applyGotoButton');
   });
+  for (const id of ['gbUseImageColor', 'gbUseImageBackColor']) {
+    document.getElementById(id)?.addEventListener('change', () => {
+      syncGotoButtonLabelFields();
+      updatePropsApplyButton(readGotoButtonForm, 'applyGotoButton');
+    });
+  }
   for (const id of ['gbBold', 'gbItalic', 'gbUnderline']) {
     document.getElementById(id)?.addEventListener('click', (e) => {
       e.preventDefault();
@@ -2054,7 +2644,6 @@ async function applyCanvasImageProperties() {
   await upsertCanvasComponent(comp);
   commitPropsSnapshot(readCanvasImagePropertiesForm, 'applyCanvasImageProperties');
   state.canvasSelection.index = state.propsDialog.editIndex;
-  await refreshCanvasEditOverlay();
   setStatus(`Applied ${comp.name} on ${state.selectedScreenId}`);
 }
 
@@ -2228,6 +2817,7 @@ function startObjectPlacement(kind, defaults = {}) {
   objectPlacementOverlay?.classList.remove('hidden', 'tool-text', 'tool-momentary', 'tool-image');
   if (kind === 'text') objectPlacementOverlay?.classList.add('tool-text');
   else if (kind === 'image') objectPlacementOverlay?.classList.add('tool-image');
+  else if (kind === 'string-display') objectPlacementOverlay?.classList.add('tool-text');
   else objectPlacementOverlay?.classList.add('tool-momentary');
   objectPlacementOverlay?.setAttribute('aria-hidden', 'false');
   previewCanvasWrap?.classList.add('placement-active');
@@ -2236,6 +2826,8 @@ function startObjectPlacement(kind, defaults = {}) {
     setStatus('Drag on the display to draw a text box (Esc to cancel)');
   } else if (kind === 'image') {
     setStatus('Drag on the display to draw an image box (Esc to cancel)');
+  } else if (kind === 'string-display') {
+    setStatus('Drag on the display to draw a string display box (Esc to cancel)');
   } else {
     setStatus('Drag on the display to draw a button (Esc to cancel)');
   }
@@ -2255,7 +2847,7 @@ function activateSelectTool(statusMessage) {
   updateObjectsMenuChecks();
   cancelObjectPlacement();
   previewCanvasWrap?.classList.add('studio-edit-mode');
-  refreshCanvasEditOverlay();
+  scheduleRefreshCanvasEditOverlay();
   if (statusMessage) setStatus(statusMessage);
 }
 
@@ -2272,10 +2864,58 @@ async function completeObjectPlacement(rect) {
   try {
     if (kind === 'text') {
       await showTextPropertiesDialog(defaults);
+    } else if (kind === 'numeric') {
+      await window.StudioNumericDisplay?.showNumericDisplayDialog(defaults);
+    } else if (kind === 'string-display') {
+      await window.StudioStringDisplay?.showStringDisplayDialog(defaults);
+    } else if (kind === 'string-input') {
+      await window.StudioStringInput?.showStringInputDialog(defaults);
+    } else if (kind === 'numeric-input') {
+      await window.StudioNumericInput?.showNumericInputDialog(defaults);
+    } else if (kind === 'numeric-input-cursor') {
+      await window.StudioNumericInput?.showNumericInputCursorDialog(defaults);
     } else if (kind === 'momentary') {
       await showMomentaryButtonDialog(defaults);
     } else if (kind === 'maintained') {
       await showMaintainedButtonDialog(defaults);
+    } else if (kind === 'latched') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioLatchedMultistate?.showLatchedButtonDialog(defaults);
+    } else if (kind === 'multistate') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioLatchedMultistate?.showMultistateButtonDialog(defaults);
+    } else if (kind === 'interlocked') {
+      await window.StudioLatchedMultistate?.showInterlockedButtonDialog(defaults);
+    } else if (kind === 'ramp') {
+      await window.StudioLatchedMultistate?.showRampButtonDialog(defaults);
+    } else if (kind === 'display-list') {
+      await window.StudioDisplayListSelector?.showDisplayListSelectorDialog(defaults);
+    } else if (kind === 'multistate-indicator') {
+      await window.StudioMultistateIndicator?.showMultistateIndicatorDialog(defaults);
+    } else if (kind === 'time-date') {
+      await window.StudioTimeDateDisplay?.showTimeDateDisplayDialog(defaults);
+    } else if (kind === 'symbol-indicator') {
+      const fileName = await showImageBrowserDialog();
+      if (!fileName) {
+        activateSelectTool('Symbol placement cancelled');
+        return;
+      }
+      const states = window.StudioSymbolIndicator?.defaultSymbolIndicatorStates(defaults.numberOfStates ?? 2, fileName);
+      await window.StudioSymbolIndicator?.showSymbolIndicatorDialog({ ...defaults, states, initialImage: fileName });
+    } else if (kind === 'list-indicator') {
+      await window.StudioListIndicator?.showListIndicatorDialog(defaults);
+    } else if (kind === 'bar-graph') {
+      await window.StudioBarGraph?.showBarGraphDialog(defaults);
+    } else if (kind === 'recipeplus-button') {
+      await window.StudioRecipePlusButton?.showRecipePlusButtonDialog(defaults);
+    } else if (kind === 'recipeplus-selector') {
+      await window.StudioRecipePlusSelector?.showRecipePlusSelectorDialog(defaults);
     } else if (kind === 'image') {
       const fileName = await showImageBrowserDialog();
       if (!fileName) {
@@ -2353,6 +2993,7 @@ function clearCanvasSelection() {
   }
   state.canvasSelection.index = null;
   state.canvasEditDrag = null;
+  state.canvasHitClick = { index: null, time: 0 };
   refreshCanvasEditOverlaySelection();
   previewSetSelection(null);
 }
@@ -2385,11 +3026,86 @@ function applyGraphicBoundsStyle(el, comp) {
   el.style.height = `${comp.height ?? 32}px`;
 }
 
+function updateCanvasEditHitBounds(name, bounds) {
+  const editComponents = state.canvasEditCache?.editComponents;
+  if (!editComponents?.length || !name || !bounds) return;
+  const index = editComponents.findIndex((entry) => entry.comp?.name === name);
+  if (index < 0) return;
+  Object.assign(editComponents[index].comp, bounds);
+  const hit = canvasEditOverlay?.querySelector(`.canvas-graphic-hit[data-index="${index}"]`);
+  if (hit) applyGraphicBoundsStyle(hit, editComponents[index].comp);
+}
+
 function attachPreviewLoadHandler() {
   if (!previewFrame) return;
+  state.previewFrameReady = false;
   previewFrame.onload = () => {
-    refreshCanvasEditOverlay().catch(() => {});
+    state.previewFrameReady = true;
+    if (state.pendingPreviewReloadRequest) {
+      state.pendingPreviewReloadRequest = false;
+      reloadDisplayPreview().catch(() => {});
+      return;
+    }
+    scheduleRefreshCanvasEditOverlay();
   };
+}
+
+let canvasOverlayRefreshTimer = null;
+let canvasOverlayRefreshPending = false;
+
+function scheduleRefreshCanvasEditOverlay() {
+  if (isUiWorkSuspended()) {
+    canvasOverlayRefreshPending = true;
+    return;
+  }
+  canvasOverlayRefreshPending = false;
+  if (canvasOverlayRefreshTimer) clearTimeout(canvasOverlayRefreshTimer);
+  canvasOverlayRefreshTimer = setTimeout(() => {
+    canvasOverlayRefreshTimer = null;
+    refreshCanvasEditOverlay().catch(() => {});
+  }, 400);
+}
+
+function scheduleRefreshAfterDialogClose() {
+  if (!canvasOverlayRefreshPending || isUiWorkSuspended()) return;
+  scheduleRefreshCanvasEditOverlay();
+}
+
+document.addEventListener('close', (e) => {
+  if (e.target instanceof HTMLDialogElement) {
+    scheduleRefreshAfterDialogClose();
+  }
+}, true);
+
+async function renderCanvasEditHits(editComponents) {
+  canvasEditOverlay.innerHTML = '';
+  canvasEditOverlay.classList.remove('hidden');
+  canvasEditOverlay.setAttribute('aria-hidden', 'false');
+  previewCanvasWrap?.classList.add('select-active');
+
+  const batchSize = 12;
+  for (let start = 0; start < editComponents.length; start += batchSize) {
+    const end = Math.min(start + batchSize, editComponents.length);
+    for (let index = start; index < end; index += 1) {
+      const { comp } = editComponents[index];
+      const hit = document.createElement('div');
+      hit.className = 'canvas-graphic-hit';
+      hit.dataset.index = String(index);
+      applyGraphicBoundsStyle(hit, comp);
+      if (index === state.canvasSelection.index) hit.classList.add('selected');
+
+      for (const corner of ['nw', 'ne', 'sw', 'se']) {
+        const handle = document.createElement('span');
+        handle.className = `resize-handle ${corner}`;
+        handle.dataset.handle = corner;
+        hit.appendChild(handle);
+      }
+      canvasEditOverlay.appendChild(hit);
+    }
+    if (end < editComponents.length) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+  }
 }
 
 async function refreshCanvasEditOverlay() {
@@ -2402,41 +3118,50 @@ async function refreshCanvasEditOverlay() {
     return;
   }
 
-  try {
-    const raw = await fetchOpenCanvas();
-    const editComponents = await buildCanvasEditComponents(raw);
-    state.canvasEditCache = { raw, editComponents };
-  } catch {
-    canvasEditOverlay.classList.add('hidden');
+  if (!state.previewFrameReady) {
     return;
   }
 
-  const editComponents = state.canvasEditCache.editComponents || [];
-  canvasEditOverlay.innerHTML = '';
-  canvasEditOverlay.classList.remove('hidden');
-  canvasEditOverlay.setAttribute('aria-hidden', 'false');
-  previewCanvasWrap?.classList.add('select-active');
-
-  for (let index = 0; index < editComponents.length; index += 1) {
-    const { comp } = editComponents[index];
-    const hit = document.createElement('div');
-    hit.className = 'canvas-graphic-hit';
-    hit.dataset.index = String(index);
-    applyGraphicBoundsStyle(hit, comp);
-    if (index === state.canvasSelection.index) hit.classList.add('selected');
-
-    for (const corner of ['nw', 'ne', 'sw', 'se']) {
-      const handle = document.createElement('span');
-      handle.className = `resize-handle ${corner}`;
-      handle.dataset.handle = corner;
-      hit.appendChild(handle);
-    }
-    canvasEditOverlay.appendChild(hit);
+  if (!state.canvasEditOverlayStale &&
+      state.canvasEditCache?.editComponents?.length &&
+      canvasEditOverlay.querySelector('.canvas-graphic-hit')) {
+    refreshCanvasEditOverlaySelection();
+    return;
   }
 
-  if (state.canvasSelection.index != null) {
-    const selectedName = editComponents[state.canvasSelection.index]?.comp?.name || null;
-    previewSetSelection(selectedName);
+  if (state.canvasEditOverlayRefresh) {
+    return state.canvasEditOverlayRefresh;
+  }
+
+  state.canvasEditOverlayRefresh = (async () => {
+    try {
+      const raw = await fetchOpenCanvas();
+      const editComponents = await buildCanvasEditComponents(raw);
+      state.canvasEditCache = { raw, editComponents };
+    } catch {
+      canvasEditOverlay.classList.add('hidden');
+      return;
+    }
+
+    const editComponents = state.canvasEditCache.editComponents || [];
+    await renderCanvasEditHits(editComponents);
+    state.canvasEditOverlayStale = false;
+
+    if (state.canvasSelection.index != null) {
+      const selectedName = editComponents[state.canvasSelection.index]?.comp?.name || null;
+      previewSetSelection(selectedName);
+    } else if (state.pendingGraphicSelection) {
+      const pendingName = state.pendingGraphicSelection;
+      state.pendingGraphicSelection = null;
+      const pendingIndex = editComponents.findIndex((entry) => entry.comp?.name === pendingName);
+      if (pendingIndex >= 0) setCanvasSelection(pendingIndex);
+    }
+  })();
+
+  try {
+    await state.canvasEditOverlayRefresh;
+  } finally {
+    state.canvasEditOverlayRefresh = null;
   }
 }
 
@@ -2453,7 +3178,7 @@ async function updateCanvasComponentBounds(index, bounds) {
     await patchOpenCanvas({ overviewShell });
     state.canvasEditCache.raw = { ...canvas, overviewShell };
     await updateCanvasPreview({ forceReload: true });
-    await refreshCanvasEditOverlay();
+    scheduleRefreshCanvasEditOverlay();
     setCanvasSelection(index);
     return;
   }
@@ -2471,19 +3196,57 @@ async function updateCanvasComponentBounds(index, bounds) {
   components[compIndex] = { ...components[compIndex], ...bounds };
   await patchOpenCanvas({ components });
   state.canvasEditCache.raw = { ...canvas, components };
-  await updateCanvasPreview({ index: compIndex, bounds });
+  if (entry.comp) Object.assign(entry.comp, bounds);
+  updateCanvasEditHitBounds(entry.comp?.name, bounds);
+  await updateCanvasPreview({ name: entry.comp?.name, bounds });
+  setCanvasSelection(index);
+  return;
 }
 
 async function openPropertiesForComponent(index) {
-  const entry = state.canvasEditCache?.editComponents?.[index];
-  const comp = entry?.comp;
-  if (!comp) return;
+  flushDeferredDialogInits();
+  ensureDeferredStudioInits();
+  let entry = state.canvasEditCache?.editComponents?.[index];
+  if (!entry?.comp) return;
+  entry = await resolveTemplateGlobalPropertiesEntry(entry);
+  const comp = entry.comp;
+  const ref = entry.ref;
   try {
     if (comp.type === 'Text') {
       fillTextPropertiesForm(comp);
       resetPropsDialogState('text', readTextPropertiesForm, 'applyTextProperties', index, entry.ref);
       switchTextPropertiesTab('general');
       document.getElementById('textPropertiesDialog')?.showModal();
+    } else if (comp.type === 'NumericDisplay') {
+      window.StudioNumericDisplay?.fillNumericDisplayForm(comp);
+      resetPropsDialogState('numeric', window.StudioNumericDisplay.readNumericDisplayForm, 'applyNumericDisplay', index, entry.ref);
+      window.StudioNumericDisplay?.switchNumericDisplayTab('general');
+      window.StudioNumericDisplay?.wireNumericDisplayTools();
+      document.getElementById('numericDisplayDialog')?.showModal();
+    } else if (comp.type === 'StringDisplay') {
+      window.StudioStringDisplay?.fillStringDisplayForm(comp);
+      resetPropsDialogState('string-display', window.StudioStringDisplay.readStringDisplayForm, 'applyStringDisplay', index, entry.ref);
+      window.StudioStringDisplay?.switchStringDisplayTab('general');
+      window.StudioStringDisplay?.wireStringDisplayTools();
+      document.getElementById('stringDisplayDialog')?.showModal();
+    } else if (comp.type === 'StringInputEnable') {
+      window.StudioStringInput?.fillStringInputForm(comp);
+      resetPropsDialogState('string-input', window.StudioStringInput.readStringInputForm, 'applyStringInput', index, entry.ref);
+      window.StudioStringInput?.switchStringInputTab('general');
+      window.StudioStringInput?.wireStringInputTools();
+      document.getElementById('stringInputDialog')?.showModal();
+    } else if (comp.type === 'NumericInputEnable') {
+      window.StudioNumericInput?.fillNumericInputForm(comp);
+      resetPropsDialogState('numeric-input', window.StudioNumericInput.readNumericInputForm, 'applyNumericInput', index, entry.ref);
+      window.StudioNumericInput?.switchNumericInputTab('general');
+      window.StudioNumericInput?.wireNumericInputTools();
+      document.getElementById('numericInputDialog')?.showModal();
+    } else if (comp.type === 'NumericInputCursorPoint') {
+      window.StudioNumericInput?.fillNumericInputCursorForm(comp);
+      resetPropsDialogState('numeric-input-cursor', window.StudioNumericInput.readNumericInputCursorForm, 'applyNumericInputCursor', index, entry.ref);
+      window.StudioNumericInput?.switchNumericInputCursorTab('general');
+      window.StudioNumericInput?.wireNumericInputCursorTools();
+      document.getElementById('numericInputCursorDialog')?.showModal();
     } else if (comp.type === 'MomentaryButton') {
       fillMomentaryButtonForm(comp);
       resetPropsDialogState('momentary', readMomentaryButtonForm, 'applyMomentaryButton', index, entry.ref);
@@ -2495,16 +3258,111 @@ async function openPropertiesForComponent(index) {
       switchMaintainedButtonTab('general');
       wireMaintainedButtonDialogTools();
       document.getElementById('maintainedButtonDialog')?.showModal();
+    } else if (comp.type === 'LatchedButton') {
+      window.StudioLatchedMultistate?.fillLatchedButtonForm(comp);
+      resetPropsDialogState('latched', window.StudioLatchedMultistate.readLatchedButtonForm, 'applyLatchedButton', index, entry.ref);
+      window.StudioLatchedMultistate?.switchLatchedButtonTab('general');
+      window.StudioLatchedMultistate?.wireLatchedButtonDialogTools();
+      document.getElementById('latchedButtonDialog')?.showModal();
+    } else if (comp.type === 'MultistateButton') {
+      window.StudioLatchedMultistate?.fillMultistateButtonForm(comp);
+      resetPropsDialogState('multistate', window.StudioLatchedMultistate.readMultistateButtonForm, 'applyMultistateButton', index, entry.ref);
+      window.StudioLatchedMultistate?.switchMultistateButtonTab('general');
+      window.StudioLatchedMultistate?.wireMultistateButtonDialogTools();
+      document.getElementById('multistateButtonDialog')?.showModal();
+    } else if (comp.type === 'InterlockedButton') {
+      window.StudioLatchedMultistate?.fillInterlockedButtonForm(comp);
+      resetPropsDialogState('interlocked', window.StudioLatchedMultistate.readInterlockedButtonForm, 'applyInterlockedButton', index, entry.ref);
+      window.StudioLatchedMultistate?.switchInterlockedButtonTab('general');
+      window.StudioLatchedMultistate?.wireInterlockedButtonDialogTools();
+      document.getElementById('interlockedButtonDialog')?.showModal();
+    } else if (comp.type === 'RampButton') {
+      window.StudioLatchedMultistate?.fillRampButtonForm(comp);
+      resetPropsDialogState('ramp', window.StudioLatchedMultistate.readRampButtonForm, 'applyRampButton', index, entry.ref);
+      window.StudioLatchedMultistate?.switchRampButtonTab('general');
+      window.StudioLatchedMultistate?.wireRampButtonDialogTools();
+      document.getElementById('rampButtonDialog')?.showModal();
     } else if (comp.type === 'GotoButton') {
       fillGotoButtonForm(comp);
       resetPropsDialogState('goto', readGotoButtonForm, 'applyGotoButton', index, entry.ref);
       switchGotoButtonTab('general');
+      wireGotoButtonDialogTools();
       document.getElementById('gotoButtonDialog')?.showModal();
+    } else if (comp.type === 'ReturnToButton') {
+      window.StudioReturnToButton?.fillReturnToButtonForm(comp);
+      resetPropsDialogState('return-to', window.StudioReturnToButton.readReturnToButtonForm, 'applyReturnToButton', index, entry.ref);
+      window.StudioReturnToButton?.switchReturnToButtonTab('general');
+      window.StudioReturnToButton?.wireReturnToButtonTools();
+      document.getElementById('returnToButtonDialog')?.showModal();
+    } else if (comp.type === 'CloseDisplayButton') {
+      window.StudioCloseDisplayButton?.fillCloseDisplayButtonForm(comp);
+      resetPropsDialogState('close-display', window.StudioCloseDisplayButton.readCloseDisplayButtonForm, 'applyCloseDisplayButton', index, entry.ref);
+      window.StudioCloseDisplayButton?.switchCloseDisplayButtonTab('general');
+      window.StudioCloseDisplayButton?.wireCloseDisplayButtonTools();
+      document.getElementById('closeDisplayButtonDialog')?.showModal();
+    } else if (comp.type === 'DisplayListSelector') {
+      window.StudioDisplayListSelector?.fillDisplayListSelectorForm(comp);
+      resetPropsDialogState('display-list', window.StudioDisplayListSelector.readDisplayListSelectorForm, 'applyDisplayListSelector', index, entry.ref);
+      window.StudioDisplayListSelector?.switchDisplayListSelectorTab('general');
+      window.StudioDisplayListSelector?.wireDisplayListSelectorTools();
+      document.getElementById('displayListSelectorDialog')?.showModal();
+    } else if (comp.type === 'MultistateIndicator') {
+      window.StudioMultistateIndicator?.fillMultistateIndicatorForm(comp);
+      resetPropsDialogState('multistate-indicator', window.StudioMultistateIndicator.readMultistateIndicatorForm, 'applyMultistateIndicator', index, ref);
+      window.StudioMultistateIndicator?.switchMultistateIndicatorTab('general');
+      window.StudioMultistateIndicator?.wireMultistateIndicatorTools();
+      document.getElementById('multistateIndicatorDialog')?.showModal();
+      if (ref?.type === 'template-global') {
+        setStatus(`Editing Template → ${comp.name} (applies to all displays)`);
+      }
+    } else if (comp.type === 'TimeDateDisplay') {
+      window.StudioTimeDateDisplay?.fillTimeDateDisplayForm(comp);
+      resetPropsDialogState('time-date', window.StudioTimeDateDisplay.readTimeDateDisplayForm, 'applyTimeDateDisplay', index, ref);
+      window.StudioTimeDateDisplay?.switchTimeDateDisplayTab('general');
+      window.StudioTimeDateDisplay?.wireTimeDateDisplayTools();
+      document.getElementById('timeDateDisplayDialog')?.showModal();
+      if (ref?.type === 'template-global') {
+        setStatus(`Editing Template → ${comp.name} (applies to all displays)`);
+      }
+    } else if (comp.type === 'SymbolIndicator') {
+      window.StudioSymbolIndicator?.fillSymbolIndicatorForm(comp);
+      resetPropsDialogState('symbol-indicator', window.StudioSymbolIndicator.readSymbolIndicatorForm, 'applySymbolIndicator', index, entry.ref);
+      window.StudioSymbolIndicator?.switchSymbolIndicatorTab('general');
+      window.StudioSymbolIndicator?.wireSymbolIndicatorTools();
+      document.getElementById('symbolIndicatorDialog')?.showModal();
+    } else if (comp.type === 'ListIndicator') {
+      window.StudioListIndicator?.fillListIndicatorForm(comp);
+      resetPropsDialogState('list-indicator', window.StudioListIndicator.readListIndicatorForm, 'applyListIndicator', index, entry.ref);
+      window.StudioListIndicator?.switchListIndicatorTab('general');
+      window.StudioListIndicator?.wireListIndicatorTools();
+      document.getElementById('listIndicatorDialog')?.showModal();
+    } else if (comp.type === 'BarGraph') {
+      window.StudioBarGraph?.fillBarGraphForm(comp);
+      resetPropsDialogState('bar-graph', window.StudioBarGraph.readBarGraphForm, 'applyBarGraph', index, entry.ref);
+      window.StudioBarGraph?.switchBarGraphTab('general');
+      window.StudioBarGraph?.wireBarGraphTools();
+      document.getElementById('barGraphDialog')?.showModal();
+    } else if (comp.type === 'RecipePlusButton') {
+      window.StudioRecipePlusButton?.fillRecipePlusButtonForm(comp);
+      resetPropsDialogState('recipeplus-button', window.StudioRecipePlusButton.readRecipePlusButtonForm, 'applyRecipePlusButton', index, entry.ref);
+      window.StudioRecipePlusButton?.switchRecipePlusButtonTab('general');
+      window.StudioRecipePlusButton?.wireRecipePlusButtonTools();
+      document.getElementById('recipePlusButtonDialog')?.showModal();
+    } else if (comp.type === 'RecipePlusSelector') {
+      window.StudioRecipePlusSelector?.fillRecipePlusSelectorForm(comp);
+      resetPropsDialogState('recipeplus-selector', window.StudioRecipePlusSelector.readRecipePlusSelectorForm, 'applyRecipePlusSelector', index, entry.ref);
+      window.StudioRecipePlusSelector?.switchRecipePlusSelectorTab('general');
+      window.StudioRecipePlusSelector?.wireRecipePlusSelectorTools();
+      document.getElementById('recipePlusSelectorDialog')?.showModal();
     } else if (comp.type === 'Image') {
       fillCanvasImagePropertiesForm(comp);
-      resetPropsDialogState('image', readCanvasImagePropertiesForm, 'applyCanvasImageProperties', index, entry.ref);
+      resetPropsDialogState('image', readCanvasImagePropertiesForm, 'applyCanvasImageProperties', index, ref);
       switchCanvasImagePropertiesTab('general');
       document.getElementById('canvasImagePropertiesDialog')?.showModal();
+    } else if (comp.type === 'Rectangle' || comp.type === 'Ellipse') {
+      window.StudioShapeProperties?.openShapePropertiesDialog(comp, ref, index);
+    } else {
+      setStatus(`${comp.type} properties — double-click supported types: Text, shapes, buttons, indicators, Clock`);
     }
   } catch (err) {
     setStatus(`Properties error: ${err.message}`);
@@ -2532,7 +3390,21 @@ function initCanvasEditOverlay() {
     setCanvasSelection(index);
 
     const comp = state.canvasEditCache?.editComponents?.[index]?.comp;
+    const entry = state.canvasEditCache?.editComponents?.[index];
     if (!comp) return;
+
+    const now = Date.now();
+    const isDoubleClick = !handle &&
+      state.canvasHitClick.index === index &&
+      now - state.canvasHitClick.time < 450;
+    state.canvasHitClick = { index, time: now };
+
+    if (isDoubleClick) {
+      state.canvasEditDrag = null;
+      openPropertiesForComponent(index)
+        .catch((err) => setStatus(`Error: ${err.message}`));
+      return;
+    }
 
     const start = getCanvasPoint(e.clientX, e.clientY);
     if (handle) {
@@ -2540,6 +3412,9 @@ function initCanvasEditOverlay() {
         mode: `resize-${handle.dataset.handle}`,
         index,
         start,
+        startedAt: now,
+        moved: false,
+        undoEntry: captureDragUndoEntry(entry),
         orig: {
           left: comp.left ?? 0,
           top: comp.top ?? 0,
@@ -2552,6 +3427,9 @@ function initCanvasEditOverlay() {
         mode: 'move',
         index,
         start,
+        startedAt: now,
+        moved: false,
+        undoEntry: captureDragUndoEntry(entry),
         orig: {
           left: comp.left ?? 0,
           top: comp.top ?? 0,
@@ -2562,11 +3440,14 @@ function initCanvasEditOverlay() {
     }
   });
 
-  canvasEditOverlay.addEventListener('dblclick', (e) => {
+  canvasEditOverlay.addEventListener('contextmenu', (e) => {
+    if (state.placement || !objectPlacementOverlay?.classList.contains('hidden')) return;
+    if (!displayIsOpen()) return;
+    e.preventDefault();
+    e.stopPropagation();
     const hit = e.target.closest('.canvas-graphic-hit');
-    if (!hit) return;
-    openPropertiesForComponent(Number(hit.dataset.index))
-      .catch((err) => setStatus(`Error: ${err.message}`));
+    if (hit) setCanvasSelection(Number(hit.dataset.index));
+    showWorkspaceContextMenu(e);
   });
 
   document.addEventListener('mousemove', (e) => {
@@ -2579,6 +3460,7 @@ function initCanvasEditOverlay() {
     const current = getCanvasPoint(e.clientX, e.clientY);
     const dx = current.x - drag.start.x;
     const dy = current.y - drag.start.y;
+    if (!drag.moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
     let left = drag.orig.left;
     let top = drag.orig.top;
     let width = drag.orig.width;
@@ -2619,6 +3501,7 @@ function initCanvasEditOverlay() {
     top = Math.max(0, Math.min(top, canvasH - height));
 
     applyGraphicBoundsStyle(hit, { left, top, width, height });
+    drag.moved = true;
     drag.pending = { left, top, width, height };
   });
 
@@ -2628,11 +3511,17 @@ function initCanvasEditOverlay() {
       state.canvasEditDrag = null;
       return;
     }
+    const elapsed = Date.now() - (drag.startedAt || 0);
+    if (!drag.moved && elapsed < 450) {
+      state.canvasEditDrag = null;
+      return;
+    }
     const bounds = drag.pending;
     const index = drag.index;
+    const undoEntry = drag.undoEntry;
     state.canvasEditDrag = null;
+    if (undoEntry) pushUndoEntry(undoEntry);
     updateCanvasComponentBounds(index, bounds)
-      .then(() => refreshCanvasEditOverlay())
       .catch((err) => setStatus(`Error: ${err.message}`));
   });
 
@@ -2659,6 +3548,7 @@ async function deleteSelectedCanvasComponent() {
   if (editIndex == null) return;
   const entry = state.canvasEditCache?.editComponents?.[editIndex];
   if (!entry) return;
+  if (!state.undoSuspended) await pushUndoForEditRef(entry.ref);
 
   if (entry.ref?.type === 'shell') {
     const canvas = await fetchOpenCanvas();
@@ -2669,7 +3559,7 @@ async function deleteSelectedCanvasComponent() {
     await updateCanvasPreview({ forceReload: true });
     refreshObjectExplorer();
     refreshPropertyPanel();
-    await refreshCanvasEditOverlay();
+    scheduleRefreshCanvasEditOverlay();
     setStatus('Overview shell override removed');
     return;
   }
@@ -2691,7 +3581,7 @@ async function deleteSelectedCanvasComponent() {
   await updateCanvasPreview({ removedIndex: compIndex, components });
   refreshObjectExplorer();
   refreshPropertyPanel();
-  await refreshCanvasEditOverlay();
+  scheduleRefreshCanvasEditOverlay();
   setStatus('Object deleted');
 }
 
@@ -2715,6 +3605,26 @@ function handleObjectAction(id) {
     startObjectPlacement('text', item.textDefaults || {});
     return;
   }
+  if (item.action === 'numeric-display-properties') {
+    startObjectPlacement('numeric', item.numericDefaults || {});
+    return;
+  }
+  if (item.action === 'string-display-properties') {
+    startObjectPlacement('string-display', item.stringDisplayDefaults || {});
+    return;
+  }
+  if (item.action === 'string-input-properties') {
+    startObjectPlacement('string-input', item.stringInputDefaults || {});
+    return;
+  }
+  if (item.action === 'numeric-input-properties') {
+    startObjectPlacement('numeric-input', item.numericInputDefaults || {});
+    return;
+  }
+  if (item.action === 'numeric-input-cursor-properties') {
+    startObjectPlacement('numeric-input-cursor', item.numericInputCursorDefaults || {});
+    return;
+  }
   if (item.action === 'momentary-button-properties') {
     startObjectPlacement('momentary', item.buttonDefaults || {});
     return;
@@ -2723,8 +3633,64 @@ function handleObjectAction(id) {
     startObjectPlacement('maintained', item.buttonDefaults || {});
     return;
   }
+  if (item.action === 'latched-button-properties') {
+    startObjectPlacement('latched', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'multistate-button-properties') {
+    startObjectPlacement('multistate', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'interlocked-button-properties') {
+    startObjectPlacement('interlocked', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'ramp-button-properties') {
+    startObjectPlacement('ramp', item.buttonDefaults || {});
+    return;
+  }
   if (item.action === 'goto-button-properties') {
     showGotoButtonDialog(item.buttonDefaults || {}).catch((err) => setStatus(`Error: ${err.message}`));
+    return;
+  }
+  if (item.action === 'return-to-button-properties') {
+    window.StudioReturnToButton?.showReturnToButtonDialog(item.buttonDefaults || {}).catch((err) => setStatus(`Error: ${err.message}`));
+    return;
+  }
+  if (item.action === 'close-display-button-properties') {
+    window.StudioCloseDisplayButton?.showCloseDisplayButtonDialog(item.buttonDefaults || {}).catch((err) => setStatus(`Error: ${err.message}`));
+    return;
+  }
+  if (item.action === 'display-list-selector-properties') {
+    startObjectPlacement('display-list', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'multistate-indicator-properties') {
+    startObjectPlacement('multistate-indicator', item.indicatorDefaults || {});
+    return;
+  }
+  if (item.action === 'time-date-properties') {
+    startObjectPlacement('time-date', item.displayDefaults || {});
+    return;
+  }
+  if (item.action === 'symbol-indicator-properties') {
+    startObjectPlacement('symbol-indicator', item.indicatorDefaults || {});
+    return;
+  }
+  if (item.action === 'list-indicator-properties') {
+    startObjectPlacement('list-indicator', item.indicatorDefaults || {});
+    return;
+  }
+  if (item.action === 'bar-graph-properties') {
+    startObjectPlacement('bar-graph', item.graphDefaults || {});
+    return;
+  }
+  if (item.action === 'recipeplus-button-properties') {
+    startObjectPlacement('recipeplus-button', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'recipeplus-selector-properties') {
+    startObjectPlacement('recipeplus-selector', item.selectorDefaults || {});
     return;
   }
   if (item.action === 'image-properties') {
@@ -2973,7 +3939,7 @@ function testDisplay() {
     setStatus('Open a display first');
     return;
   }
-  const url = `/runtime.html?project=${encodeURIComponent(state.activeProject)}&screen=${encodeURIComponent(state.selectedScreenId)}`;
+  const url = `/runtime.html?project=${encodeURIComponent(state.activeProject)}&screen=${encodeURIComponent(state.selectedScreenId)}&_=${Date.now()}`;
   window.open(url, 'planthmi-test-display', 'width=1024,height=768');
   setStatus(`Testing display: ${state.selectedScreenId}`);
 }
@@ -3040,6 +4006,7 @@ function clearPreviewFrame() {
 function closeDisplayWorkspace() {
   hideWorkspaceContextMenu();
   cancelObjectPlacement();
+  clearUndoHistory();
   state.previewLoadToken += 1;
   state.selectedScreenId = null;
   state.selectedNode = null;
@@ -3098,22 +4065,38 @@ function previewUpdateBounds(index, bounds) {
   return previewPost('bounds', { index, bounds });
 }
 
+function previewUpdateBoundsByName(name, bounds) {
+  return previewPost('bounds-by-name', { name, bounds });
+}
+
+function previewPatchByName(name, component) {
+  return previewPost('patch-by-name', { name, component });
+}
+
 function previewSyncComponents(components) {
   return previewPost('sync-components', { components });
 }
 
 async function updateCanvasPreview(options = {}) {
-  const { components, index, component, bounds, removedIndex, mode, forceReload = false } = options;
-  if (!isEditingGlobalObject() && !forceReload) {
-    options = { ...options, forceReload: true };
-  }
-  if (options.forceReload) {
+  const {
+    components, index, component, bounds, removedIndex, mode,
+    forceReload = false, name
+  } = options;
+  if (forceReload) {
+    if (!state.previewFrameReady) {
+      state.pendingPreviewReloadRequest = true;
+      return;
+    }
     await reloadDisplayPreview();
     return;
   }
   let updated = false;
-  if (bounds != null && index != null) {
+  if (bounds != null && name) {
+    updated = previewUpdateBoundsByName(name, bounds);
+  } else if (bounds != null && index != null) {
     updated = previewUpdateBounds(index, bounds);
+  } else if (mode === 'patch-by-name' && name && component) {
+    updated = previewPatchByName(name, component);
   } else if (mode === 'append' && index != null && component) {
     updated = previewAppendComponent(index, component);
   } else if (mode === 'patch' && index != null && component) {
@@ -3147,6 +4130,7 @@ function updateEditMenuState() {
   });
   const wallpaperSub = document.querySelector('#editMenu [data-edit-submenu="wallpaper"]');
   if (wallpaperSub) wallpaperSub.classList.toggle('disabled', !displayOpen);
+  updateUndoRedoUI();
 }
 
 function renderRecentProjectsMenu() {
@@ -3430,6 +4414,12 @@ async function setWallpaper(mode, value) {
 function handleEditAction(action) {
   closeAllMenus();
   switch (action) {
+    case 'undo':
+      undoEdit().catch((err) => setStatus(`Undo error: ${err.message}`));
+      break;
+    case 'redo':
+      redoEdit().catch((err) => setStatus(`Redo error: ${err.message}`));
+      break;
     case 'display-settings':
       showDisplaySettingsDialog().catch((err) => setStatus(`Error: ${err.message}`));
       break;
@@ -3705,7 +4695,7 @@ function handleExplorerAction(node) {
       showGlobalObjectDefaultsDialog();
       break;
     case 'communications':
-      showProjectSettingsDialog('runtime');
+      window.StudioCommunicationsSetup?.showCommunicationsSetupDialog();
       break;
     case 'recipeplus-setup':
     case 'recipeplus-editor':
@@ -3765,7 +4755,9 @@ function selectNode(row, node) {
   } else if (node.type === 'item') {
     if (node.id === 'project-settings') showProjectSettingsDialog('general');
     else if (node.id === 'startup') showProjectSettingsDialog('runtime');
-    else if (node.id === 'communications' || node.id === 'linx-communications') showProjectSettingsDialog('runtime');
+    else if (node.id === 'communications' || node.id === 'linx-communications') {
+      window.StudioCommunicationsSetup?.showCommunicationsSetupDialog();
+    }
     else openSystemPanel(node);
   } else if (node.type === 'folder' && !node.children?.length) {
     setStatus(`${node.label} — expand folder or select an item`);
@@ -3787,20 +4779,32 @@ function getProjectSettingsWindowSize() {
 
 async function reloadDisplayPreview() {
   if (!state.selectedScreenId || !state.activeProject || previewStage?.classList.contains('hidden')) return;
-  const loadToken = ++state.previewLoadToken;
-  const screenId = state.selectedScreenId;
-  await applyPreviewCanvasSize(screenId);
-  if (loadToken !== state.previewLoadToken || state.selectedScreenId !== screenId) return;
-  const { width, height } = state.previewCanvas;
-  previewFrame.src =
-    studioPreviewUrl({
-      [state.previewKind === 'global-object' ? 'globalObject' : 'screen']: screenId,
-      project: state.activeProject,
-      w: width,
-      h: height,
-      _: Date.now()
-    });
-  attachPreviewLoadHandler();
+  if (state.pendingPreviewReload) return state.pendingPreviewReload;
+
+  state.previewFrameReady = false;
+  markCanvasEditOverlayStale();
+  state.pendingPreviewReload = (async () => {
+    try {
+      invalidateCanvasCaches();
+      const loadToken = ++state.previewLoadToken;
+      const screenId = state.selectedScreenId;
+      await applyPreviewCanvasSize(screenId);
+      if (loadToken !== state.previewLoadToken || state.selectedScreenId !== screenId) return;
+      previewFrame.src =
+        studioPreviewUrl({
+          [state.previewKind === 'global-object' ? 'globalObject' : 'screen']: screenId,
+          project: state.activeProject,
+          w: state.previewCanvas.width,
+          h: state.previewCanvas.height,
+          _: Date.now()
+        });
+      attachPreviewLoadHandler();
+    } finally {
+      state.pendingPreviewReload = null;
+    }
+  })();
+
+  return state.pendingPreviewReload;
 }
 
 function applyPreviewZoom() {
@@ -3837,7 +4841,13 @@ async function applyPreviewCanvasSize(screenId) {
   applyPreviewZoom();
 }
 
+function ensureDeferredStudioInits() {
+  if (!state.deferredStudioInitsStarted) runDeferredStudioInits();
+}
+
 function openDisplayPreview(screenId, title) {
+  ensureDeferredStudioInits();
+  markCanvasEditOverlayStale();
   state.previewKind = 'display';
   panelView.classList.add('hidden');
   showPreviewStage();
@@ -3866,6 +4876,8 @@ function openDisplayPreview(screenId, title) {
 }
 
 function openGlobalObjectPreview(objectId, title) {
+  ensureDeferredStudioInits();
+  markCanvasEditOverlayStale();
   state.previewKind = 'global-object';
   panelView.classList.add('hidden');
   showPreviewStage();
@@ -4532,7 +5544,7 @@ function runRuntime() {
     setStatus('Open an application first');
     return;
   }
-  const url = `/runtime.html?project=${encodeURIComponent(state.activeProject)}`;
+  const url = `/runtime.html?project=${encodeURIComponent(state.activeProject)}&_=${Date.now()}`;
   const rt = state.projectConfig?.runtime || {};
   const w = rt.width || 800;
   const h = rt.height || 600;
@@ -4574,8 +5586,6 @@ async function showProjectSettingsDialog(activeTab = 'general') {
 
   document.getElementById('psAppName').value = cfg.name || state.activeProject;
   document.getElementById('psSubtitle').value = cfg.subtitle || '';
-  document.getElementById('psDriver').value = cfg.communication?.driver || 'simulator';
-  document.getElementById('psPoll').value = cfg.communication?.pollIntervalMs || 200;
   document.getElementById('psFullscreen').checked = Boolean(rt.fullscreen);
   const startupSelect = document.getElementById('psStartup');
   startupSelect.innerHTML = screens.map((s) =>
@@ -4646,11 +5656,6 @@ async function saveProjectSettings(e) {
     name: appName,
     subtitle: document.getElementById('psSubtitle').value.trim(),
     startupScreen: document.getElementById('psStartup').value,
-    communication: {
-      ...(state.projectConfig?.communication || {}),
-      driver: document.getElementById('psDriver').value,
-      pollIntervalMs: Number(document.getElementById('psPoll').value) || 200
-    },
     runtime: {
       windowProfile,
       width,
@@ -4786,7 +5791,7 @@ async function openDiagnosticsViewer() {
     <div class="panel-content">
       <h2>Diagnostics Viewer</h2>
       <p><strong>Project:</strong> ${escapeHtml(status.projectName)} (${escapeHtml(status.projectId)})</p>
-      <p><strong>Communication:</strong> ${escapeHtml(status.communication?.driver || '—')} — ${escapeHtml(status.communication?.connected ? 'Connected' : 'Disconnected')}</p>
+      <p><strong>Communication:</strong> ${escapeHtml(status.communication?.driver || '—')} — ${escapeHtml(status.communication?.connected ? 'Connected' : 'Disconnected')}${status.communication?.plcIpAddress ? ` @ ${escapeHtml(status.communication.plcIpAddress)}` : ''}</p>
       <p><strong>Startup screen:</strong> ${escapeHtml(status.startupScreen || '—')}</p>
       <h3 style="margin-top:12px;font-size:12px">Live tags (first 50)</h3>
       <table class="data-table"><thead><tr><th>Tag</th><th>Value</th><th>Quality</th></tr></thead>
@@ -5806,7 +6811,13 @@ function hideExplorerContextMenu() {
 function getWorkspaceContextMenuItems() {
   if (!displayIsOpen()) return [];
   const zoomDefault = state.viewPrefs.zoom === 100;
-  return [
+  const hasSelection = state.canvasSelection.index != null;
+  const items = [];
+  if (hasSelection) {
+    items.push({ action: 'object-properties', label: 'Properties...' });
+    items.push({ separator: true });
+  }
+  items.push(
     { action: 'display-settings', label: 'Display Settings...' },
     { action: 'key-assignments', label: 'Key Assignments' },
     { separator: true },
@@ -5822,7 +6833,8 @@ function getWorkspaceContextMenuItems() {
     { action: 'cancel-zoom', label: 'Cancel Zoom', disabled: zoomDefault },
     { separator: true },
     { action: 'unlock-wallpaper', label: 'Unlock All Wallpaper', disabled: true }
-  ];
+  );
+  return items;
 }
 
 function renderContextMenuButton(item) {
@@ -5892,6 +6904,12 @@ function hideWorkspaceContextMenu() {
 
 function runWorkspaceContextAction(action) {
   switch (action) {
+    case 'object-properties':
+      if (state.canvasSelection.index != null) {
+        openPropertiesForComponent(state.canvasSelection.index)
+          .catch((err) => setStatus(`Error: ${err.message}`));
+      }
+      break;
     case 'display-settings':
       showDisplaySettingsDialog().catch((err) => setStatus(`Error: ${err.message}`));
       break;
@@ -6178,7 +7196,10 @@ document.getElementById('fileMenu')?.querySelectorAll('[data-action]').forEach((
 });
 
 document.getElementById('editMenu')?.querySelectorAll('[data-edit-action]').forEach((el) => {
-  el.addEventListener('click', () => handleEditAction(el.dataset.editAction));
+  el.addEventListener('click', () => {
+    if (el.classList.contains('disabled')) return;
+    handleEditAction(el.dataset.editAction);
+  });
 });
 
 document.getElementById('viewMenu')?.querySelectorAll('[data-view-action]').forEach((el) => {
@@ -6416,6 +7437,18 @@ document.getElementById('cancelOptions').addEventListener('click', () => documen
 document.getElementById('closeTransfer').addEventListener('click', () => document.getElementById('transferDialog').close());
 
 document.addEventListener('keydown', (e) => {
+  if (!isEditableKeyboardTarget(e.target)) {
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      undoEdit().catch((err) => setStatus(`Undo error: ${err.message}`));
+      return;
+    }
+    if (e.ctrlKey && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+      e.preventDefault();
+      redoEdit().catch((err) => setStatus(`Redo error: ${err.message}`));
+      return;
+    }
+  }
   if (e.ctrlKey && e.key.toLowerCase() === 'k') {
     e.preventDefault();
     showKeyAssignmentsDialog();
@@ -6434,33 +7467,117 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+function runWhenIdle(fn, timeoutMs = 250) {
+  if (window.requestIdleCallback) {
+    window.requestIdleCallback(fn, { timeout: timeoutMs });
+  } else {
+    setTimeout(fn, 0);
+  }
+}
+
+function runDeferredStudioInits() {
+  if (state.deferredStudioInitsStarted) return;
+  state.deferredStudioInitsStarted = true;
+
+  initDraggableDialogs();
+  initExplorerContextMenu();
+  initExplorerResizer();
+  initWorkspaceContextMenu();
+  initCanvasEditOverlay();
+  initObjectPlacement();
+  if (typeof renderObjectsMenu === 'function') {
+    renderObjectsMenu(document.getElementById('objectsMenu'));
+  }
+  updateUndoRedoUI();
+
+  const dialogInitBatches = [
+    [
+      initImagePropertiesDialog,
+      initImageBrowserDialog,
+      initCanvasImagePropertiesDialog,
+      initTextPropertiesDialog,
+      () => window.StudioNumericDisplay?.initNumericDisplayDialog(),
+      () => window.StudioStringDisplay?.initStringDisplayDialog()
+    ],
+    [
+      () => window.StudioStringInput?.initStringInputDialog(),
+      () => window.StudioNumericInput?.initNumericInputDialog(),
+      () => window.StudioNumericInput?.initNumericInputCursorDialog(),
+      initMomentaryButtonDialog,
+      initMaintainedButtonDialog,
+      () => window.StudioLatchedMultistate?.initLatchedButtonDialog()
+    ],
+    [
+      () => window.StudioLatchedMultistate?.initMultistateButtonDialog(),
+      () => window.StudioLatchedMultistate?.initInterlockedButtonDialog(),
+      () => window.StudioLatchedMultistate?.initRampButtonDialog(),
+      initGotoButtonDialog,
+      () => window.StudioReturnToButton?.initReturnToButtonDialog(),
+      () => window.StudioCloseDisplayButton?.initCloseDisplayButtonDialog()
+    ],
+    [
+      () => window.StudioDisplayListSelector?.initDisplayListSelectorDialog(),
+      () => window.StudioMultistateIndicator?.initMultistateIndicatorDialog(),
+      () => window.StudioTimeDateDisplay?.initTimeDateDisplayDialog(),
+      () => window.StudioSymbolIndicator?.initSymbolIndicatorDialog(),
+      () => window.StudioListIndicator?.initListIndicatorDialog()
+    ],
+    [
+      () => window.StudioBarGraph?.initBarGraphDialog(),
+      () => window.StudioRecipePlusButton?.initRecipePlusButtonDialog(),
+      () => window.StudioRecipePlusSelector?.initRecipePlusSelectorDialog(),
+      () => window.StudioCommunicationsSetup?.initCommunicationsSetupDialog(),
+      () => window.StudioShapeProperties?.initShapePropertiesDialog(),
+      initAlarmWizardDialog,
+      initTagEditDialog,
+      () => { if (window.StudioTagTools) StudioTagTools.wirePickButtons(); },
+      initDisplayPickerDialog,
+      initGraphicsImportExportWizard
+    ]
+  ];
+
+  state.deferredDialogInitQueue = dialogInitBatches.slice();
+  runNextDeferredDialogInitBatch();
+}
+
+function runNextDeferredDialogInitBatch() {
+  const batch = state.deferredDialogInitQueue?.shift();
+  if (!batch) {
+    state.deferredStudioInitsDone = true;
+    state.deferredDialogInitQueue = null;
+    return;
+  }
+  for (const fn of batch) {
+    try { fn(); } catch { /* dialog init optional */ }
+  }
+  if (!state.deferredDialogInitQueue?.length) {
+    state.deferredStudioInitsDone = true;
+    state.deferredDialogInitQueue = null;
+    return;
+  }
+  runWhenIdle(runNextDeferredDialogInitBatch, 250);
+}
+
+function flushDeferredDialogInits() {
+  if (state.deferredStudioInitsDone) return;
+  while (state.deferredDialogInitQueue?.length) {
+    const batch = state.deferredDialogInitQueue.shift();
+    for (const fn of batch) {
+      try { fn(); } catch { /* dialog init optional */ }
+    }
+  }
+  state.deferredStudioInitsDone = true;
+  state.deferredDialogInitQueue = null;
+}
+
 async function init() {
   try {
+    exposeStudioGlobals();
     loadViewPrefs();
-    initDraggableDialogs();
-    initExplorerContextMenu();
-    initExplorerResizer();
-    initWorkspaceContextMenu();
     initStartupDialog();
-    initImagePropertiesDialog();
-    initImageBrowserDialog();
-    initCanvasImagePropertiesDialog();
-    initTextPropertiesDialog();
-    initMomentaryButtonDialog();
-    initMaintainedButtonDialog();
-    initGotoButtonDialog();
-    initAlarmWizardDialog();
-    initTagEditDialog();
-    if (window.StudioTagTools) StudioTagTools.wirePickButtons();
-    initDisplayPickerDialog();
-    initObjectPlacement();
     initStudioEmbedBridge();
-    initCanvasEditOverlay();
-    initGraphicsImportExportWizard();
-    if (typeof renderObjectsMenu === 'function') {
-      renderObjectsMenu(document.getElementById('objectsMenu'));
-    }
     applyViewPrefs();
+    runWhenIdle(runDeferredStudioInits, 400);
     await loadProjects();
     showStartupDialog('existing');
   } catch (err) {

@@ -1,5 +1,3 @@
-const socket = io();
-
 const urlParams = new URLSearchParams(window.location.search);
 const EMBED_MODE = urlParams.get('embed') === '1';
 const STUDIO_EDIT = urlParams.get('studioEdit') === '1';
@@ -9,10 +7,21 @@ const GLOBAL_OBJECT = urlParams.get('globalObject') || '';
 const EMBED_WIDTH = Number(urlParams.get('w')) || null;
 const EMBED_HEIGHT = Number(urlParams.get('h')) || null;
 
+let socket = null;
+const STUDIO_PREVIEW = EMBED_MODE && STUDIO_EDIT;
+if (!STUDIO_PREVIEW) {
+  try {
+    if (typeof io === 'function') socket = io({ transports: ['websocket', 'polling'] });
+  } catch (err) {
+    console.warn('Socket.IO unavailable:', err);
+  }
+}
+
 const state = {
   tags: {},
   alarms: { active: [], unacknowledgedCount: 0, history: [] },
   currentScreen: null,
+  screenHistory: [],
   loadedScreen: null,
   currentUser: null,
   navigation: null,
@@ -27,6 +36,28 @@ function apiUrl(path) {
   if (!state.projectId) return path;
   const sep = path.includes('?') ? '&' : '?';
   return `${path}${sep}project=${encodeURIComponent(state.projectId)}`;
+}
+
+function fetchWithTimeout(url, ms = 10000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
+function updateCommStatusUI(communication) {
+  if (!commStatus) return;
+  const label = commStatus.querySelector('span:last-child');
+  if (communication?.connected) {
+    commStatus.classList.add('connected');
+    if (label) {
+      label.textContent = communication.driver === 'simulator'
+        ? 'Simulator'
+        : (communication.driver || 'Connected');
+    }
+  } else {
+    commStatus.classList.remove('connected');
+    if (label) label.textContent = communication?.quality === 'bad' ? 'Offline' : 'Connecting...';
+  }
 }
 
 const screenContent = document.getElementById('screenContent');
@@ -96,6 +127,16 @@ function createContext() {
     navigate: (screenId) => {
       if (STUDIO_EDIT) return;
       loadScreen(screenId);
+    },
+    navigateBack: () => {
+      if (STUDIO_EDIT) return;
+      const prev = state.screenHistory?.pop();
+      if (prev) loadScreen(prev, { skipHistory: true });
+    },
+    closeDisplay: () => {
+      if (STUDIO_EDIT) return;
+      const prev = state.screenHistory?.pop();
+      if (prev) loadScreen(prev, { skipHistory: true });
     },
     studioEdit: STUDIO_EDIT,
 
@@ -203,16 +244,19 @@ async function composeWithTemplate(screen) {
   }
 }
 
-async function loadScreen(screenId) {
+async function loadScreen(screenId, options = {}) {
+  if (!options.skipHistory && state.currentScreen && state.currentScreen !== screenId) {
+    state.screenHistory.push(state.currentScreen);
+  }
   state.tagBindings = [];
   state.alarmCallbacks = [];
   state.userCallbacks = [];
 
   try {
-    const res = await fetch(apiUrl(`/api/runtime/screens/${screenId}?raw=1&_=${Date.now()}`));
+    const res = await fetchWithTimeout(apiUrl(`/api/runtime/screens/${screenId}?_=${Date.now()}`));
     if (!res.ok) throw new Error('not found');
-    const raw = await res.json();
-    const screen = await composeWithTemplate(raw);
+    let screen = await res.json();
+    if (!screen._composed) screen = await composeWithTemplate(screen);
     await renderLoadedScreen(screen, screenId);
   } catch {
     renderPlaceholder(screenId);
@@ -228,7 +272,7 @@ async function loadGlobalObject(objectId) {
   state.userCallbacks = [];
 
   try {
-    const res = await fetch(apiUrl(`/api/runtime/global-objects/${objectId}`));
+    const res = await fetchWithTimeout(apiUrl(`/api/runtime/global-objects/${objectId}`));
     if (!res.ok) throw new Error('not found');
     const screen = await res.json();
     await renderLoadedScreen(screen, objectId);
@@ -251,7 +295,7 @@ async function renderLoadedScreen(screen, screenId) {
 
   syncTagBindings();
   const tagNames = collectTags(screen.components);
-  if (tagNames.length) socket.emit('subscribe', tagNames);
+  if (tagNames.length) socket?.emit('subscribe', tagNames);
   await hydrateTagsFromServer();
 }
 
@@ -302,12 +346,22 @@ function renderScreen(screen) {
   const ctx = createContext();
   state.activeContext = ctx;
   (screen.components || []).forEach((comp, index) => {
-    const el = ComponentRegistry.render(comp, ctx);
-    el.dataset.componentIndex = String(index);
-    if (comp._displayIndex != null) el.dataset.displayIndex = String(comp._displayIndex);
-    if (comp._source) el.dataset.source = comp._source;
-    if (comp.type) el.dataset.componentType = comp.type;
-    screenContent.appendChild(el);
+    try {
+      const el = ComponentRegistry.render(comp, ctx);
+      el.dataset.componentIndex = String(index);
+      if (comp._displayIndex != null) el.dataset.displayIndex = String(comp._displayIndex);
+      if (comp._source) el.dataset.source = comp._source;
+      if (comp.type) el.dataset.componentType = comp.type;
+      screenContent.appendChild(el);
+    } catch (err) {
+      console.error(`Render failed for ${comp?.type || 'component'} ${comp?.name || index}:`, err);
+      const fallback = document.createElement('div');
+      fallback.className = 'unknown-component ft-graphic';
+      fallback.textContent = `Render error: ${comp?.type || 'unknown'}`;
+      if (comp?.left != null) fallback.style.left = `${comp.left}px`;
+      if (comp?.top != null) fallback.style.top = `${comp.top}px`;
+      screenContent.appendChild(fallback);
+    }
   });
 }
 
@@ -396,6 +450,37 @@ function updatePreviewComponentBounds(index, bounds) {
   return true;
 }
 
+function findPreviewGraphicByName(name) {
+  if (!name) return null;
+  const el = screenContent?.querySelector(`.ft-graphic[data-name="${CSS.escape(name)}"]`);
+  if (!el) return null;
+  const index = Number(el.dataset.componentIndex);
+  const comp = Number.isFinite(index) ? state.loadedScreen?.components?.[index] : null;
+  return { el, index, comp };
+}
+
+function updatePreviewComponentBoundsByName(name, bounds) {
+  const hit = findPreviewGraphicByName(name);
+  if (!hit?.comp || !hit.el) return false;
+  Object.assign(hit.comp, bounds);
+  ComponentRegistry.applyGraphicsObject(hit.el, hit.comp);
+  return true;
+}
+
+function patchPreviewComponentByName(name, comp) {
+  const hit = findPreviewGraphicByName(name);
+  if (!hit?.comp || !hit.el || hit.index == null) return false;
+  const ctx = state.activeContext || createContext();
+  const merged = { ...hit.comp, ...comp, name: hit.comp.name || name };
+  const el = ComponentRegistry.render(merged, ctx);
+  el.dataset.componentIndex = String(hit.index);
+  if (merged.type) el.dataset.componentType = merged.type;
+  if (merged._source) el.dataset.source = merged._source;
+  hit.el.replaceWith(el);
+  state.loadedScreen.components[hit.index] = merged;
+  return true;
+}
+
 function syncPreviewComponents(components) {
   if (!state.loadedScreen) return false;
   state.loadedScreen = { ...state.loadedScreen, components: [...components] };
@@ -424,6 +509,10 @@ function handleStudioPreviewMessage(data) {
       return removePreviewComponent(data.index);
     case 'bounds':
       return updatePreviewComponentBounds(data.index, data.bounds);
+    case 'bounds-by-name':
+      return updatePreviewComponentBoundsByName(data.name, data.bounds);
+    case 'patch-by-name':
+      return patchPreviewComponentByName(data.name, data.component);
     case 'sync-components':
       return syncPreviewComponents(data.components);
     case 'selection':
@@ -522,38 +611,37 @@ document.getElementById('ackBannerBtn').addEventListener('click', () => {
   });
 });
 
-socket.on('init', (data) => {
-  state.tags = data.tags || {};
-  state.alarms = data.alarms || { active: [], history: [] };
-  state.currentUser = data.user;
-  if (data.communication?.connected) {
-    commStatus.classList.add('connected');
-    commStatus.querySelector('span:last-child').textContent = 'Simulator';
-  }
-  updateUserUI();
-  updateAlarmBanner();
-  syncTagBindings();
-});
+if (socket) {
+  socket.on('init', (data) => {
+    state.tags = data.tags || {};
+    state.alarms = data.alarms || { active: [], history: [] };
+    state.currentUser = data.user;
+    updateCommStatusUI(data.communication);
+    updateUserUI();
+    updateAlarmBanner();
+    syncTagBindings();
+  });
 
-socket.on('tags', (tags) => {
-  applyTagsSnapshot(tags);
-});
+  socket.on('tags', (tags) => {
+    applyTagsSnapshot(tags);
+  });
 
-socket.on('tag-update', (update) => {
-  if (!state.tags[update.name]) state.tags[update.name] = {};
-  state.tags[update.name].value = update.value;
-  updateTagBindings(update.name, update.value);
-});
+  socket.on('tag-update', (update) => {
+    if (!state.tags[update.name]) state.tags[update.name] = {};
+    state.tags[update.name].value = update.value;
+    updateTagBindings(update.name, update.value);
+  });
 
-socket.on('alarm-update', (alarms) => {
-  state.alarms = alarms;
-  updateAlarmUI();
-});
+  socket.on('alarm-update', (alarms) => {
+    state.alarms = alarms;
+    updateAlarmUI();
+  });
 
-socket.on('user-changed', (user) => {
-  state.currentUser = user;
-  updateUserUI();
-});
+  socket.on('user-changed', (user) => {
+    state.currentUser = user;
+    updateUserUI();
+  });
+}
 
 async function init() {
   if (EMBED_MODE) {
@@ -577,18 +665,28 @@ async function init() {
     });
   }
 
-  document.getElementById('clock').textContent = new Date().toLocaleString();
-  setInterval(() => { document.getElementById('clock').textContent = new Date().toLocaleString(); }, 1000);
+  const clockEl = document.getElementById('clock');
+  if (clockEl) clockEl.textContent = new Date().toLocaleString();
+  if (!EMBED_MODE) {
+    setInterval(() => {
+      const clockEl = document.getElementById('clock');
+      if (clockEl) clockEl.textContent = new Date().toLocaleString();
+    }, 1000);
+  }
 
   try {
     const [statusRes, navRes] = await Promise.all([
-      fetch(apiUrl('/api/runtime/status')),
-      fetch(apiUrl('/api/runtime/navigation'))
+      fetchWithTimeout(apiUrl('/api/runtime/status')),
+      fetchWithTimeout(apiUrl('/api/runtime/navigation'))
     ]);
+    if (!statusRes.ok || !navRes.ok) {
+      throw new Error(`Server returned ${statusRes.status}/${navRes.status}`);
+    }
     const status = await statusRes.json();
-    state.projectId = status.projectId || state.projectId;
+    state.projectId = status.projectId || state.projectId || PROJECT_ID;
     state.projectSubtitle = status.projectSubtitle || '';
     state.projectRuntime = status.runtime || { width: 800, height: 600 };
+    updateCommStatusUI(status.communication);
     if (EMBED_MODE && EMBED_WIDTH && EMBED_HEIGHT) {
       state.projectRuntime = { ...state.projectRuntime, width: EMBED_WIDTH, height: EMBED_HEIGHT };
     }
@@ -605,8 +703,10 @@ async function init() {
       const screen = START_SCREEN || status.startupScreen || '100_Overview';
       await loadScreen(screen);
     }
-  } catch {
+  } catch (err) {
+    console.error('Runtime init failed:', err);
     screenTitle.textContent = 'Connection error';
+    updateCommStatusUI({ connected: false, quality: 'bad' });
   }
 }
 

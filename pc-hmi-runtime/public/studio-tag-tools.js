@@ -151,6 +151,8 @@
 
   function wirePickButtons() {
     document.querySelectorAll('[data-tag-pick]').forEach((btn) => {
+      if (btn.dataset.tagPickWired === '1') return;
+      btn.dataset.tagPickWired = '1';
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-tag-pick');
         const input = $(id);
@@ -158,6 +160,8 @@
       });
     });
     document.querySelectorAll('[data-expr-pick]').forEach((btn) => {
+      if (btn.dataset.exprPickWired === '1') return;
+      btn.dataset.exprPickWired = '1';
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-expr-pick');
         const input = $(id);

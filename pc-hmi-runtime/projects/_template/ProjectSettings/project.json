@@ -3096,33 +3096,7 @@
       "description": "Zone03_Error"
     }
   ],
-  "alarms": [
-    {
-      "tag": "Alarm.EStop",
-      "message": "Emergency stop activated",
-      "priority": 1
-    },
-    {
-      "tag": "Alarm.DoorOpen",
-      "message": "Safety door open",
-      "priority": 2
-    },
-    {
-      "tag": "Alarm.LowAir",
-      "message": "Low air pressure",
-      "priority": 3
-    },
-    {
-      "tag": "Alarm.MotorFault",
-      "message": "Motor M01 fault",
-      "priority": 2
-    },
-    {
-      "tag": "Alarm.HighTemp",
-      "message": "High temperature detected",
-      "priority": 3
-    }
-  ],
+  "alarms": [],
   "studio": {
     "globalObjectDefaults": {
       "linkAnimation": "linkWithExpressions",

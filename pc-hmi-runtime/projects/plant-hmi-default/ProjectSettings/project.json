@@ -4,8 +4,10 @@
   "startupScreen": "100_Overview",
   "communication": {
     "driver": "simulator",
+    "plcIpAddress": "",
+    "path": "0",
     "opcua": {
-      "endpoint": "opc.tcp://localhost:4840",
+      "port": 4840,
       "securityMode": "None",
       "securityPolicy": "None"
     },

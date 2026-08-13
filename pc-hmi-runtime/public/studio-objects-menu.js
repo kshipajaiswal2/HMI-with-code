@@ -24,45 +24,41 @@ window.OBJECTS_MENU = [
     id: 'push-button', label: 'Push Button', children: [
       { id: 'btn-momentary', label: 'Momentary', action: 'momentary-button-properties' },
       { id: 'btn-maintained', label: 'Maintained', action: 'maintained-button-properties' },
-      { id: 'btn-latched', label: 'Latched', planned: true },
-      { id: 'btn-multistate', label: 'Multistate', planned: true },
-      { id: 'btn-interlocked', label: 'Interlocked', planned: true },
-      { id: 'btn-ramp', label: 'Ramp', planned: true }
+      { id: 'btn-latched', label: 'Latched', action: 'latched-button-properties' },
+      { id: 'btn-multistate', label: 'Multistate', action: 'multistate-button-properties' },
+      { id: 'btn-interlocked', label: 'Interlocked', action: 'interlocked-button-properties' },
+      { id: 'btn-ramp', label: 'Ramp', action: 'ramp-button-properties' }
     ]
   },
   {
     id: 'numeric-string', label: 'Numeric and String', children: [
-      { id: 'num-display', label: 'Numeric Display', component: { type: 'NumericDisplay', tag: 'Production.Count', label: 'Value', format: 'integer' } },
-      { id: 'num-input-enable', label: 'Numeric Input Enable', planned: true },
-      { id: 'num-input-cursor', label: 'Numeric Input Cursor Point', planned: true },
+      { id: 'num-display', label: 'Numeric Display', action: 'numeric-display-properties' },
+      { id: 'num-input-enable', label: 'Numeric Input Enable', action: 'numeric-input-properties' },
+      { id: 'num-input-cursor', label: 'Numeric Input Cursor Point', action: 'numeric-input-cursor-properties' },
       { sep: true },
-      { id: 'str-display', label: 'String Display', action: 'text-properties', textDefaults: { caption: 'NNN' } },
-      { id: 'str-input-enable', label: 'String Input Enable', planned: true }
+      { id: 'str-display', label: 'String Display', action: 'string-display-properties' },
+      { id: 'str-input-enable', label: 'String Input Enable', action: 'string-input-properties' }
     ]
   },
   {
     id: 'display-nav', label: 'Display Navigation', children: [
-      { id: 'nav-goto', label: 'Goto Display Button', action: 'goto-button-properties' },
-      { id: 'nav-return', label: 'Return To', planned: true },
-      { id: 'nav-close', label: 'Close', planned: true },
-      { id: 'nav-list', label: 'Display List Selector', planned: true }
+      { id: 'nav-goto', label: 'Goto', action: 'goto-button-properties' },
+      { id: 'nav-return', label: 'Return To', action: 'return-to-button-properties' },
+      { id: 'nav-close', label: 'Close', action: 'close-display-button-properties' },
+      { id: 'nav-list', label: 'Display List Selector', action: 'display-list-selector-properties' }
     ]
   },
   {
     id: 'indicator', label: 'Indicator', children: [
-      { id: 'ind-multistate', label: 'Multistate', component: { type: 'MultistateIndicator', tag: 'System.Healthy', width: 71, height: 33, states: [
-        { id: 'Error', caption: 'Error', backColor: '#001C38', borderColor: '#001C38', captionColor: '#fff' },
-        { id: '0', value: 0, caption: 'Fault', backColor: 'red', borderColor: '#ff8000', captionColor: '#fff' },
-        { id: '1', value: 1, caption: 'Healthy', backColor: '#00c000', borderColor: '#40ff10', captionColor: '#fff' }
-      ] } },
-      { id: 'ind-symbol', label: 'Symbol', planned: true },
-      { id: 'ind-list', label: 'List', planned: true }
+      { id: 'ind-multistate', label: 'Multistate', action: 'multistate-indicator-properties' },
+      { id: 'ind-symbol', label: 'Symbol', action: 'symbol-indicator-properties' },
+      { id: 'ind-list', label: 'List', action: 'list-indicator-properties' }
     ]
   },
   {
     id: 'gauge-graph', label: 'Gauge and Graph', children: [
       { id: 'gauge-analog', label: 'Analog Gauge', planned: true },
-      { id: 'gauge-bar', label: 'Bar Graph', planned: true },
+      { id: 'gauge-bar', label: 'Bar Graph', action: 'bar-graph-properties' },
       { id: 'gauge-histogram', label: 'Histogram', planned: true }
     ]
   },
@@ -76,8 +72,8 @@ window.OBJECTS_MENU = [
   },
   {
     id: 'recipe-plus', label: 'RecipePlus', children: [
-      { id: 'recipe-btn', label: 'RecipePlus Button', planned: true },
-      { id: 'recipe-selector', label: 'RecipePlus Selector', planned: true },
+      { id: 'recipe-btn', label: 'RecipePlus Button', action: 'recipeplus-button-properties' },
+      { id: 'recipe-selector', label: 'RecipePlus Selector', action: 'recipeplus-selector-properties' },
       { id: 'recipe-table', label: 'RecipePlus Table', planned: true }
     ]
   },
@@ -119,7 +115,7 @@ window.OBJECTS_MENU = [
       { id: 'adv-macro', label: 'Macro', planned: true },
       { id: 'adv-shutdown', label: 'Shutdown', planned: true },
       { id: 'adv-config-mode', label: 'Goto Configure Mode', planned: true },
-      { id: 'adv-time-date', label: 'Time and Date', planned: true },
+      { id: 'adv-time-date', label: 'Time and Date', action: 'time-date-properties' },
       {
         id: 'adv-alarm', label: 'Alarm', children: [
           { id: 'alarm-ack', label: 'Acknowledge', planned: true },

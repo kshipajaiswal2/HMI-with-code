@@ -88,7 +88,7 @@
       "width": 2,
       "height": 165,
       "backStyle": "solid",
-      "backColor": "#000000",
+      "backColor": "#C6C6C6",
       "lineWidth": 0
     },
     {
@@ -99,7 +99,7 @@
       "width": 2,
       "height": 165,
       "backStyle": "solid",
-      "backColor": "#000000",
+      "backColor": "#C6C6C6",
       "lineWidth": 0
     },
     {
@@ -148,7 +148,7 @@
       "type": "Text",
       "name": "PrestartLabel1",
       "caption": "All Safety Healthy",
-      "left": 276,
+      "left": 281,
       "top": 226,
       "width": 155,
       "height": 26,
@@ -203,6 +203,9 @@
       "top": 230,
       "width": 19,
       "height": 19,
+      "lineWidth": 1,
+      "useForeColor": true,
+      "foreColor": "#000000",
       "backColor": "#10EB10"
     },
     {
@@ -212,6 +215,9 @@
       "top": 263,
       "width": 19,
       "height": 19,
+      "lineWidth": 1,
+      "useForeColor": true,
+      "foreColor": "#000000",
       "backColor": "#10EB10"
     },
     {
@@ -221,6 +227,9 @@
       "top": 295,
       "width": 19,
       "height": 19,
+      "lineWidth": 1,
+      "useForeColor": true,
+      "foreColor": "#000000",
       "backColor": "#10EB10"
     },
     {
@@ -230,12 +239,18 @@
       "top": 326,
       "width": 19,
       "height": 19,
+      "lineWidth": 1,
+      "useForeColor": true,
+      "foreColor": "#000000",
       "backColor": "#10EB10"
     },
     {
       "type": "MultistateIndicator",
       "name": "PrestartAct1",
       "shape": "circle",
+      "numberOfStates": 2,
+      "triggerType": "value",
+      "borderStyle": "none",
       "tag": "Prestart.SafetyOK",
       "left": 503,
       "top": 230,
@@ -243,24 +258,24 @@
       "height": 19,
       "states": [
         {
-          "id": "Error",
-          "backColor": "navy",
-          "borderColor": "navy",
-          "caption": ""
-        },
-        {
-          "id": "0",
+          "id": "State0",
           "value": 0,
           "backColor": "#F83D3D",
           "borderColor": "#F83D3D",
           "caption": ""
         },
         {
-          "id": "1",
+          "id": "State1",
           "value": 1,
           "backColor": "#10EB10",
           "borderColor": "#10EB10",
           "caption": ""
+        },
+        {
+          "id": "Error",
+          "backColor": "navy",
+          "borderColor": "navy",
+          "caption": "Error"
         }
       ]
     },
@@ -268,6 +283,9 @@
       "type": "MultistateIndicator",
       "name": "PrestartAct2",
       "shape": "circle",
+      "numberOfStates": 2,
+      "triggerType": "value",
+      "borderStyle": "none",
       "tag": "Prestart.PowerOK",
       "left": 503,
       "top": 263,
@@ -275,24 +293,24 @@
       "height": 19,
       "states": [
         {
-          "id": "Error",
-          "backColor": "navy",
-          "borderColor": "navy",
-          "caption": ""
-        },
-        {
-          "id": "0",
+          "id": "State0",
           "value": 0,
           "backColor": "#F83D3D",
           "borderColor": "#F83D3D",
           "caption": ""
         },
         {
-          "id": "1",
+          "id": "State1",
           "value": 1,
           "backColor": "#10EB10",
           "borderColor": "#10EB10",
           "caption": ""
+        },
+        {
+          "id": "Error",
+          "backColor": "navy",
+          "borderColor": "navy",
+          "caption": "Error"
         }
       ]
     },
@@ -300,6 +318,9 @@
       "type": "MultistateIndicator",
       "name": "PrestartAct3",
       "shape": "circle",
+      "numberOfStates": 2,
+      "triggerType": "value",
+      "borderStyle": "none",
       "tag": "Prestart.Ready",
       "left": 503,
       "top": 295,
@@ -307,24 +328,24 @@
       "height": 19,
       "states": [
         {
-          "id": "Error",
-          "backColor": "navy",
-          "borderColor": "navy",
-          "caption": ""
-        },
-        {
-          "id": "0",
+          "id": "State0",
           "value": 0,
           "backColor": "#F83D3D",
           "borderColor": "#F83D3D",
           "caption": ""
         },
         {
-          "id": "1",
+          "id": "State1",
           "value": 1,
           "backColor": "#10EB10",
           "borderColor": "#10EB10",
           "caption": ""
+        },
+        {
+          "id": "Error",
+          "backColor": "navy",
+          "borderColor": "navy",
+          "caption": "Error"
         }
       ]
     },
@@ -332,6 +353,9 @@
       "type": "MultistateIndicator",
       "name": "PrestartAct4",
       "shape": "circle",
+      "numberOfStates": 2,
+      "triggerType": "value",
+      "borderStyle": "none",
       "tag": "Prestart.AirOK",
       "left": 503,
       "top": 326,
@@ -339,24 +363,24 @@
       "height": 19,
       "states": [
         {
-          "id": "Error",
-          "backColor": "navy",
-          "borderColor": "navy",
-          "caption": ""
-        },
-        {
-          "id": "0",
+          "id": "State0",
           "value": 0,
           "backColor": "#F83D3D",
           "borderColor": "#F83D3D",
           "caption": ""
         },
         {
-          "id": "1",
+          "id": "State1",
           "value": 1,
           "backColor": "#10EB10",
           "borderColor": "#10EB10",
           "caption": ""
+        },
+        {
+          "id": "Error",
+          "backColor": "navy",
+          "borderColor": "navy",
+          "caption": "Error"
         }
       ]
     }

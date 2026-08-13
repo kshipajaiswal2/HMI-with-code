@@ -10,13 +10,25 @@
     'SubNav', 'Panel', 'Grid', 'SectionHeader', 'DataTable', 'AlarmTable',
     'LegendTable', 'LoginPanel', 'MimicPanel', 'ChecklistGrid', 'ControlRow',
     'StatusRow', 'PlaceholderScreen', 'AccessDenied', 'NavButton',
-    'ActionButton', 'ToggleButton', 'NumericDisplay', 'StateIndicator'
+    'ActionButton', 'ToggleButton', 'MomentaryButton', 'NumericDisplay', 'StateIndicator'
   ]);
 
   function isFlowComponent(comp) {
     if (!comp || comp.type === 'ContentArea') return false;
     if (comp.left != null || comp.top != null) return false;
     return FLOW_COMPONENT_TYPES.has(comp.type);
+  }
+
+  function isEmptyFlowComponent(comp) {
+    if (!comp) return true;
+    if (comp.type === 'Panel' || comp.type === 'Grid' || comp.type === 'SubNav') {
+      return !(comp.children && comp.children.length);
+    }
+    return false;
+  }
+
+  function hasVisibleFlowContent(flowScreen) {
+    return flowScreen.some((comp) => !isEmptyFlowComponent(comp));
   }
 
   function deriveContentBounds(templateComponents, runtime = {}) {
@@ -201,7 +213,7 @@
       else absoluteScreen.push(tagged);
     }
 
-    const contentArea = flowScreen.length
+    const contentArea = hasVisibleFlowContent(flowScreen)
       ? [{
         type: 'ContentArea',
         name: '__displayContent',

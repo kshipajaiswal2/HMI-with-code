@@ -170,6 +170,22 @@ class TagLogicService {
     }
     return [...byName.values()];
   }
+
+  /** Header / overview tags used by Template.json when not defined in project tags. */
+  static mergeBuiltinRuntimeTags(tagDefinitions) {
+    const list = tagDefinitions || [];
+    const byName = new Map(list.map((t) => [t.name, { ...t }]));
+    const builtins = [
+      { name: 'System.AutoMode', type: 'bool', description: '1=Auto, 0=Manual' },
+      { name: 'System.Running', type: 'bool', description: 'Line running' },
+      { name: 'Comm.PLCConnected', type: 'bool', description: 'PLC communication' },
+      { name: 'Comm.ScanRate', type: 'float', description: 'PLC scan rate ms' }
+    ];
+    for (const def of builtins) {
+      if (!byName.has(def.name)) byName.set(def.name, def);
+    }
+    return [...byName.values()];
+  }
 }
 
 TagLogicService.ESTOP_CHAIN = ESTOP_CHAIN;

@@ -5,8 +5,7 @@
     "300_Manual_Operation",
     "400_Active_Alarms",
     "500_Recipe",
-    "600_Legends",
-    "700_User_Management"
+    "600_Legends"
   ],
   "assignments": {
     "100_overview.xml": "100_Overview",
@@ -25,7 +24,6 @@
     "402_alarm_remedies_popup.xml": "400_Active_Alarms",
     "500_recipe.xml": "500_Recipe",
     "500_recipe_1.xml": "500_Recipe",
-    "600_legends.xml": "600_Legends",
-    "700_user_management.xml": "700_User_Management"
+    "600_legends.xml": "600_Legends"
   }
 }

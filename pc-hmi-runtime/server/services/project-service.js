@@ -187,6 +187,42 @@ function readImageFileMeta(filePath) {
   };
 }
 
+/**
+ * Validates that screen modifications don't contaminate other screens or the template.
+ * Returns { valid: boolean, errors: string[] }
+ */
+function validateScreenIsolation(screenData) {
+  const errors = [];
+
+  // Ensure screen doesn't accidentally modify template
+  if (screenData.components && Array.isArray(screenData.components)) {
+    screenData.components.forEach((comp, idx) => {
+      if (comp.name && comp.name.startsWith('Template_')) {
+        errors.push(`Component ${idx} ("${comp.name}"): Components should not start with "Template_" prefix — this may affect global template.`);
+      }
+    });
+  }
+
+  // Ensure template replacements are minimal
+  if (screenData.template && screenData.template.replace) {
+    const replaceKeys = Object.keys(screenData.template.replace);
+    if (replaceKeys.length > 10) {
+      console.warn(`Screen "${screenData.id}" has ${replaceKeys.length} template replacements — ensure these are screen-specific overrides only.`);
+    }
+  }
+
+  // Warn if screen has components that might be shared
+  if (screenData.components && screenData.components.length > 50) {
+    errors.push(`Screen has ${screenData.components.length} components — consider moving shared elements to Global Objects/Template instead.`);
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings: errors
+  };
+}
+
 /** FactoryTalk-style on-disk project layout (one folder per project under projects/) */
 const PROJECT_FOLDERS = [
   'Accounts',

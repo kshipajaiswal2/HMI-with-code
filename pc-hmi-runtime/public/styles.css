@@ -149,13 +149,15 @@ html.embed-root body {
 .ft-graphic {
   position: absolute;
   box-sizing: border-box;
-  z-index: 2;
 }
 .ft-text {
   box-sizing: border-box;
   padding: 2px 4px;
   overflow: hidden;
   line-height: 1.2;
+}
+.ft-text.ft-graphic {
+  padding: 0;
 }
 .ft-image {
   overflow: hidden;
@@ -268,6 +270,55 @@ body.studio-edit-mode .ft-graphic.studio-selected {
   white-space: nowrap;
   flex: 0 0 auto;
   margin-right: 4px;
+}
+.ft-alarm-list {
+  z-index: 4;
+}
+.ft-alarm-list-header,
+.ft-alarm-list-body {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.ft-alarm-list-header span {
+  padding: 0 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ft-alarm-list-body {
+  background: #dcdcdc;
+}
+.ft-alarm-list-row {
+  border-bottom: 1px solid #c0c0c0;
+  cursor: default;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.ft-alarm-list-time {
+  padding: 0 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ft-alarm-list-msg {
+  padding: 0 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ft-list-nav-key,
+.ft-clear-alarm-history {
+  z-index: 6;
+  cursor: pointer;
+}
+.ft-list-nav-icon,
+.ft-clear-alarm-icon,
+.ft-maintained-btn-icon {
+  pointer-events: none;
 }
 .hmi-app.embed-mode .ft-text:empty {
   background: rgba(255, 255, 255, 0.85);
@@ -516,6 +567,22 @@ body.embed-body {
 .ft-multistate-circle {
   border: none;
 }
+.ft-ladder-wire {
+  z-index: 1;
+  pointer-events: none;
+}
+.ft-ladder-bar {
+  z-index: 3;
+  pointer-events: none;
+}
+.ft-multistate-flat {
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0;
+  padding: 0 !important;
+  background-color: transparent;
+  z-index: 2;
+}
 
 .ft-list-indicator {
   box-sizing: border-box;
@@ -712,7 +779,7 @@ body.embed-body {
   top: 48px;
   bottom: 48px;
   width: 2px;
-  background: #c6c6c6;
+  background: #000;
 }
 .ft-safety-ladder__rungs {
   display: flex;
@@ -735,7 +802,7 @@ body.embed-body {
   right: 0;
   bottom: 16.5px;
   height: 2px;
-  background: #c6c6c6;
+  background: #000;
   z-index: 0;
   pointer-events: none;
 }
@@ -746,7 +813,7 @@ body.embed-body {
   bottom: 16.5px;
   width: 2px;
   height: 22px;
-  background: #c6c6c6;
+  background: #000;
   z-index: 0;
 }
 .ft-safety-ladder__serpentine-bus {
@@ -760,7 +827,7 @@ body.embed-body {
   top: 0;
   width: 2px;
   height: 22px;
-  background: #c6c6c6;
+  background: #000;
 }
 .ft-safety-ladder__serpentine-line {
   position: absolute;
@@ -768,7 +835,7 @@ body.embed-body {
   right: 0;
   top: 21px;
   height: 2px;
-  background: #c6c6c6;
+  background: #000;
 }
 .ft-safety-ladder__serpentine-rise {
   position: absolute;
@@ -776,7 +843,7 @@ body.embed-body {
   top: 22px;
   width: 2px;
   bottom: 0;
-  background: #c6c6c6;
+  background: #000;
 }
 .ft-safety-ladder__cell {
   display: flex;
@@ -811,7 +878,7 @@ body.embed-body {
 .ft-safety-ladder__bar {
   width: 2px;
   height: 33px;
-  background: #c6c6c6;
+  background: #000;
   flex-shrink: 0;
 }
 .ft-safety-ladder__indicator {

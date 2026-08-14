@@ -1462,15 +1462,53 @@ body.explorer-resize-active {
   box-sizing: border-box;
 }
 .ft-color-native-input {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+.ft-color-other-row .ft-color-native-input {
   position: absolute;
-  width: 0;
-  height: 0;
+  right: 0;
+  top: 0;
+  width: 24px;
+  height: 18px;
   opacity: 0;
   pointer-events: none;
+  cursor: pointer;
+}
+.ft-color-other-controls {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.ft-color-hex-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 96px;
+  height: 18px;
+  padding: 1px 4px;
+  border: 1px solid #808080;
+  font-size: 11px;
+  font-family: Consolas, "Courier New", monospace;
+  box-sizing: border-box;
+  background: #fff;
+  color: #000;
+}
+.ft-color-hex-input:focus {
+  outline: 1px dotted #000;
+  outline-offset: -1px;
+}
+.ft-color-hex-input.is-invalid {
+  border-color: #c0504d;
+  background: #fff0f0;
 }
 .ft-color-dropdown {
   position: fixed;
-  min-width: 196px;
+  min-width: 240px;
   padding: 6px 8px 8px;
   border: 1px solid #808080;
   background: #fff;
@@ -1478,6 +1516,10 @@ body.explorer-resize-active {
   font-size: 11px;
   color: #000;
   z-index: 100000;
+  margin: 0;
+}
+.ft-color-dropdown:popover-open {
+  display: block;
 }
 .ft-color-dropdown.hidden { display: none; }
 .ft-color-section { margin-bottom: 6px; }
@@ -1513,6 +1555,7 @@ body.explorer-resize-active {
   cursor: default;
 }
 .ft-color-other-row {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1522,15 +1565,119 @@ body.explorer-resize-active {
   border-top: 1px solid #e0e0e0;
   border-bottom: 1px solid #e0e0e0;
 }
-.ft-color-other-label { font-size: 11px; }
+.ft-color-other-label {
+  font-size: 11px;
+  flex: 0 0 auto;
+}
 .ft-color-other-preview {
   flex: 0 0 auto;
   width: 24px;
   height: 18px;
+  cursor: pointer;
 }
 .ft-color-other-preview.is-selected {
   border: 2px solid #F99746;
   box-shadow: 0 0 0 1px #fff inset;
+}
+.ft-color-custom-section {
+  margin: 0 0 8px;
+  padding: 4px 0 6px;
+  border-bottom: 1px solid #e0e0e0;
+}
+.ft-color-spectrum-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.ft-color-sv-panel {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  border: 1px solid #808080;
+  cursor: crosshair;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.ft-color-sv-bg {
+  position: absolute;
+  inset: 0;
+  background-color: #f00;
+}
+.ft-color-sv-panel::before,
+.ft-color-sv-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ft-color-sv-panel::before {
+  background: linear-gradient(to right, #fff, rgba(255, 255, 255, 0));
+}
+.ft-color-sv-panel::after {
+  background: linear-gradient(to top, #000, rgba(0, 0, 0, 0));
+}
+.ft-color-sv-cursor {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65);
+  pointer-events: none;
+}
+.ft-color-hue-track {
+  position: relative;
+  width: 100%;
+  height: 14px;
+  border: 1px solid #808080;
+  cursor: pointer;
+  background: linear-gradient(to right,
+    #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%);
+  box-sizing: border-box;
+}
+.ft-color-hue-cursor {
+  position: absolute;
+  top: -2px;
+  width: 8px;
+  height: 18px;
+  margin-left: -4px;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+.ft-color-rgb-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.ft-color-rgb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  color: #333;
+}
+.ft-color-rgb-field span {
+  font-weight: 600;
+  line-height: 1;
+}
+.ft-color-rgb-input {
+  width: 100%;
+  height: 20px;
+  padding: 1px 4px;
+  border: 1px solid #808080;
+  font-size: 11px;
+  font-family: Consolas, "Courier New", monospace;
+  box-sizing: border-box;
+  background: #fff;
+  color: #000;
+}
+.ft-color-rgb-input:focus {
+  outline: 1px dotted #000;
+  outline-offset: -1px;
 }
 .color-check-row .ft-color-picker,
 .grid-color-row .ft-color-picker,

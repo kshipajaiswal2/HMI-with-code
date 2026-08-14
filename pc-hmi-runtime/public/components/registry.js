@@ -14,6 +14,7 @@ const NAV_IMAGES = {
 };
 
 const ComponentRegistry = {
+  _alarmListControllers: new Map(),
   SectionHeader(comp) {
     const el = document.createElement('h2');
     el.className = 'section-header';
@@ -253,9 +254,13 @@ const ComponentRegistry = {
     caption.className = 'ft-btn-caption';
     caption.style.pointerEvents = 'none';
     btn.style.display = 'flex';
+    btn.style.flexDirection = 'column';
+    btn.style.alignItems = 'center';
+    btn.style.justifyContent = 'center';
     btn.style.padding = '0 4px';
     btn.style.overflow = 'hidden';
     btn.appendChild(caption);
+    let imgEl = null;
 
     const indicatorTag = comp.indicatorTag || comp.tag;
     const state0 = states.find((s) => s.id === 'State0') || states[0];
@@ -265,9 +270,26 @@ const ComponentRegistry = {
 
     const renderState = (stateDef) => {
       if (!stateDef) return;
+      if (imgEl) {
+        imgEl.remove();
+        imgEl = null;
+      }
       const merged = ComponentRegistry.mergeMomentaryState(comp, stateDef);
       ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit });
+      if (stateDef.image) {
+        imgEl = document.createElement('img');
+        imgEl.className = 'ft-maintained-btn-icon';
+        imgEl.src = ComponentRegistry.imageUrl(stateDef.image, ctx);
+        imgEl.alt = '';
+        imgEl.draggable = false;
+        imgEl.style.pointerEvents = 'none';
+        imgEl.style.maxWidth = '88%';
+        imgEl.style.maxHeight = '88%';
+        imgEl.style.objectFit = 'contain';
+        btn.insertBefore(imgEl, caption);
+      }
       caption.textContent = stateDef.caption ?? comp.caption ?? comp.label ?? '';
+      caption.style.display = caption.textContent ? '' : 'none';
       const alignId = stateDef.alignment || comp.alignment || 'middleCenter';
       const align = ComponentRegistry.textAlignment(alignId);
       btn.style.justifyContent = align.justify;
@@ -915,7 +937,13 @@ const ComponentRegistry = {
     } else if (borderStyle === 'raised') {
       el.style.borderStyle = 'solid';
       el.style.borderWidth = `${borderWidth}px`;
-      if (comp.useBorderColor && comp.borderColor && !comp.borderUsesBackColor) {
+      if (comp.navSideAccent && comp.useBorderColor && comp.borderColor && !comp.borderUsesBackColor) {
+        el.style.borderColor = '#ffffff #808080 #808080 #ffffff';
+        el.style.borderLeftColor = comp.borderColor;
+        el.style.borderRightColor = comp.borderColor;
+        el.style.borderLeftWidth = `${Math.max(borderWidth, 3)}px`;
+        el.style.borderRightWidth = `${Math.max(borderWidth, 3)}px`;
+      } else if (comp.useBorderColor && comp.borderColor && !comp.borderUsesBackColor) {
         el.style.borderColor = comp.borderColor;
       } else {
         el.style.borderColor = '#ffffff #808080 #808080 #ffffff';
@@ -941,7 +969,7 @@ const ComponentRegistry = {
     el.classList.toggle('ft-blink', Boolean(comp.blink));
     el.style.borderRadius = comp.shape === 'roundedRectangle' ? '4px' : '0';
     el.style.cursor = comp.studioEdit ? 'default' : 'pointer';
-    el.style.padding = '0 4px';
+    el.style.padding = (comp.width != null && comp.width <= 36) ? '0' : '0 4px';
     el.style.overflow = 'hidden';
     el.style.margin = '0';
     el.style.outline = 'none';
@@ -1029,8 +1057,7 @@ const ComponentRegistry = {
     valueEl.style.width = '100%';
     el.appendChild(valueEl);
 
-    const digits = comp.numberOfDigits ?? 5;
-    const placeholder = 'N'.repeat(Math.max(1, digits));
+    const placeholder = ComponentRegistry.numericDisplayPlaceholder(comp);
     const alignId = comp.alignment || 'middleCenter';
     const align = ComponentRegistry.textAlignment(alignId);
     el.style.justifyContent = align.justify;
@@ -1057,6 +1084,7 @@ const ComponentRegistry = {
     };
 
     if (comp.tag && !studioEdit) {
+      valueEl.textContent = placeholder;
       ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
     } else {
       valueEl.textContent = placeholder;
@@ -1133,7 +1161,7 @@ const ComponentRegistry = {
     if (comp.tag && !studioEdit) {
       ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
     } else {
-      valueEl.textContent = 'NNNNN';
+      valueEl.textContent = ComponentRegistry.numericDisplayPlaceholder(comp);
     }
 
     if (comp.caption) {
@@ -1253,8 +1281,7 @@ const ComponentRegistry = {
     valueEl.style.width = '100%';
     el.appendChild(valueEl);
 
-    const digits = comp.numberOfDigits ?? 5;
-    const placeholder = 'N'.repeat(Math.max(1, digits));
+    const placeholder = ComponentRegistry.numericDisplayPlaceholder(comp);
     const alignId = comp.alignment || 'middleCenter';
     const align = ComponentRegistry.textAlignment(alignId);
     el.style.justifyContent = align.justify;
@@ -1356,15 +1383,32 @@ const ComponentRegistry = {
 
   formatNumericDisplayValue(val, comp) {
     const digits = comp.numberOfDigits ?? 5;
-    if (val === null || val === undefined) return 'N'.repeat(Math.max(1, digits));
+    const decimalPlaces = comp.decimalPlaces ?? comp.decimals ?? 0;
+    const placeholder = () => {
+      if (decimalPlaces > 0) {
+        const intDigits = Math.max(1, digits - decimalPlaces - 1);
+        return `${'N'.repeat(intDigits)}.${'N'.repeat(decimalPlaces)}`;
+      }
+      return 'N'.repeat(Math.max(1, digits));
+    };
+    if (val === null || val === undefined) return placeholder();
     const n = Number(val);
     if (Number.isNaN(n)) return String(val);
-    const decimalPlaces = comp.decimalPlaces ?? comp.decimals ?? 0;
     let text = decimalPlaces > 0 ? n.toFixed(decimalPlaces) : String(Math.round(n));
     const fill = (comp.fillLeftWith || 'none').toLowerCase();
     if (fill === 'zero') text = text.padStart(digits, '0');
     else if (fill === 'space') text = text.padStart(digits, ' ');
     return text;
+  },
+
+  numericDisplayPlaceholder(comp) {
+    const digits = comp.numberOfDigits ?? 5;
+    const decimalPlaces = comp.decimalPlaces ?? comp.decimals ?? 0;
+    if (decimalPlaces > 0) {
+      const intDigits = Math.max(1, digits - decimalPlaces - 1);
+      return `${'N'.repeat(intDigits)}.${'N'.repeat(decimalPlaces)}`;
+    }
+    return 'N'.repeat(Math.max(1, digits));
   },
 
   StateIndicator(comp, ctx) {
@@ -1406,6 +1450,8 @@ const ComponentRegistry = {
     if (comp.shape === 'circle') {
       el.classList.add('ft-multistate-circle', 'ft-status-led');
       el.style.borderRadius = '50%';
+    } else if (comp.borderStyle === 'none' && (comp.width == null || comp.width <= 36)) {
+      el.classList.add('ft-multistate-flat');
     }
 
     el.style.display = 'flex';
@@ -1531,11 +1577,16 @@ const ComponentRegistry = {
     };
 
     const tag = comp.tag || comp.indicatorTag;
-    if (tag && !studioEdit) {
+    if (tag) {
       ComponentRegistry.bindIndicatorRef(tag, showTagState, ctx);
+      const current = ctx.getTagValue(tag);
+      if (current !== undefined && current !== null) {
+        showTagState(current);
+      } else {
+        showTagState(comp.defaultValue ?? comp.previewValue ?? 0);
+      }
     } else {
-      const previewValue = studioEdit ? 0 : (comp.defaultValue ?? 0);
-      showTagState(previewValue);
+      showTagState(comp.defaultValue ?? comp.previewValue ?? 0);
     }
 
     if (studioEdit) {
@@ -1981,16 +2032,27 @@ const ComponentRegistry = {
     return match || errorState || states.find((s) => s.value === 0) || states[0];
   },
 
-  defaultMultistateIndicatorStates(count = 4) {
+  defaultMultistateIndicatorStates(count = 2) {
+    const palette = [
+      { backColor: '#F83D3D', borderColor: '#C00000' },
+      { backColor: '#10EB10', borderColor: '#10EB10' },
+      { backColor: '#001C38', borderColor: '#001C38' },
+      { backColor: '#F79646', borderColor: '#E36C09' },
+      { backColor: '#4F81BD', borderColor: '#1F497D' },
+      { backColor: '#8064A2', borderColor: '#5F497A' },
+      { backColor: '#C0504D', borderColor: '#953734' },
+      { backColor: '#9BBB59', borderColor: '#76923C' }
+    ];
     const states = [];
     for (let i = 0; i < count; i++) {
+      const colors = palette[i] || palette[palette.length - 1];
       states.push({
         id: `State${i}`,
         value: i,
         useBackColor: true,
-        backColor: '#001C38',
+        backColor: colors.backColor,
         useBorderColor: true,
-        borderColor: '#001C38',
+        borderColor: colors.borderColor,
         caption: '',
         useCaptionColor: true,
         captionColor: '#ffffff',
@@ -2087,6 +2149,9 @@ const ComponentRegistry = {
   },
 
   AlarmList(comp, ctx) {
+    if (ComponentRegistry.isPlacedGraphic(comp)) {
+      return ComponentRegistry.renderFtAlarmList(comp, ctx);
+    }
     const wrapper = document.createElement('div');
     const table = document.createElement('table');
     table.className = 'alarm-table';
@@ -2108,6 +2173,289 @@ const ComponentRegistry = {
       }
     });
     return wrapper;
+  },
+
+  renderFtAlarmList(comp, ctx) {
+    const el = document.createElement('div');
+    el.className = 'ft-alarm-list ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    el.style.boxSizing = 'border-box';
+    el.style.overflow = 'hidden';
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.backgroundColor = comp.backColor || '#dcdcdc';
+
+    const borderWidth = comp.borderWidth ?? 2;
+    if (comp.borderStyle === 'raisedInset') {
+      el.style.borderStyle = 'solid';
+      el.style.borderWidth = `${borderWidth}px`;
+      el.style.borderColor = '#808080 #ffffff #ffffff #808080';
+    }
+
+    const fontSize = comp.fontSize || 12;
+    const rowHeight = fontSize + 10;
+    const headerHeight = rowHeight + 2;
+    const visibleCount = Math.max(1, Math.floor(((comp.height || 428) - headerHeight) / rowHeight));
+    const listWidth = comp.width || 678;
+    const timeColWidth = Math.max(140, Math.round(listWidth * 0.34));
+    const gridColumns = `${timeColWidth}px minmax(0, 1fr)`;
+
+    const header = document.createElement('div');
+    header.className = 'ft-alarm-list-header';
+    header.style.height = `${headerHeight}px`;
+    header.style.width = '100%';
+    header.style.minWidth = '0';
+    header.style.boxSizing = 'border-box';
+    header.style.backgroundColor = comp.headerBackColor || '#808080';
+    header.style.color = comp.headerForeColor || '#000000';
+    header.style.fontFamily = comp.fontFamily || 'Arial';
+    header.style.fontSize = `${fontSize}px`;
+    header.style.fontWeight = comp.bold ? '700' : '400';
+    header.style.display = comp.displayHeader === false ? 'none' : 'grid';
+    header.style.gridTemplateColumns = gridColumns;
+    header.style.alignItems = 'center';
+    if (comp.displayHeader !== false) {
+      header.innerHTML = `<span class="ft-alarm-list-time">${escapeHtml(comp.headerTextAlarmTime || 'Alarm time')}</span><span class="ft-alarm-list-msg">${escapeHtml(comp.headerTextMessage || 'Message')}</span>`;
+    }
+
+    const body = document.createElement('div');
+    body.className = 'ft-alarm-list-body';
+    body.style.flex = '1';
+    body.style.width = '100%';
+    body.style.minWidth = '0';
+    body.style.overflow = 'hidden';
+    body.style.fontFamily = comp.fontFamily || 'Arial';
+    body.style.fontSize = `${fontSize}px`;
+
+    el.appendChild(header);
+    el.appendChild(body);
+
+    const controller = {
+      selectedIndex: 0,
+      scrollOffset: 0,
+      rows: [],
+      visibleCount,
+      moveUp() {
+        if (controller.selectedIndex > 0) {
+          controller.selectedIndex -= 1;
+          if (controller.selectedIndex < controller.scrollOffset) {
+            controller.scrollOffset = controller.selectedIndex;
+          }
+        } else if (controller.scrollOffset > 0) {
+          controller.scrollOffset -= 1;
+        }
+        paint();
+      },
+      moveDown() {
+        const maxIndex = controller.rows.length - 1;
+        if (controller.selectedIndex < maxIndex) {
+          controller.selectedIndex += 1;
+          if (controller.selectedIndex >= controller.scrollOffset + controller.visibleCount) {
+            controller.scrollOffset = controller.selectedIndex - controller.visibleCount + 1;
+          }
+        }
+        paint();
+      },
+      pageUp() {
+        controller.scrollOffset = Math.max(0, controller.scrollOffset - controller.visibleCount);
+        controller.selectedIndex = controller.scrollOffset;
+        paint();
+      },
+      pageDown() {
+        const maxOffset = Math.max(0, controller.rows.length - controller.visibleCount);
+        controller.scrollOffset = Math.min(maxOffset, controller.scrollOffset + controller.visibleCount);
+        controller.selectedIndex = Math.min(controller.rows.length - 1, controller.scrollOffset);
+        paint();
+      }
+    };
+
+    const buildRows = (alarms) => {
+      const mode = comp.listMode || 'active';
+      let rows = [];
+      if (mode === 'history') {
+        rows = (alarms?.history || []).map((entry) => ({
+          time: entry.activatedAt || entry.acknowledgedAt || entry.clearedAt || Date.now(),
+          message: entry.message || '—',
+          id: entry.id
+        }));
+      } else {
+        rows = (alarms?.active || []).map((entry) => ({
+          time: entry.activatedAt || Date.now(),
+          message: entry.message || '—',
+          id: entry.id
+        }));
+      }
+      if (!rows.length && comp.demoMessage) {
+        rows = [{ time: Date.now(), message: comp.demoMessage, demo: true }];
+      }
+      return rows;
+    };
+
+    const paint = () => {
+      body.innerHTML = '';
+      const slice = controller.rows.slice(controller.scrollOffset, controller.scrollOffset + controller.visibleCount);
+      slice.forEach((row, idx) => {
+        const absoluteIndex = controller.scrollOffset + idx;
+        const rowEl = document.createElement('div');
+        rowEl.className = 'ft-alarm-list-row';
+        rowEl.style.display = 'grid';
+        rowEl.style.gridTemplateColumns = gridColumns;
+        rowEl.style.width = '100%';
+        rowEl.style.minWidth = '0';
+        rowEl.style.height = `${rowHeight}px`;
+        rowEl.style.alignItems = 'center';
+        rowEl.style.boxSizing = 'border-box';
+        rowEl.style.padding = '0 4px';
+        if (comp.wordWrap !== false) {
+          rowEl.style.whiteSpace = 'normal';
+          rowEl.style.overflowWrap = 'break-word';
+        } else {
+          rowEl.style.whiteSpace = 'nowrap';
+          rowEl.style.overflow = 'hidden';
+        }
+        if (absoluteIndex === controller.selectedIndex) {
+          rowEl.classList.add('selected');
+          rowEl.style.backgroundColor = comp.selectionBackColor || '#000080';
+          rowEl.style.color = comp.selectionForeColor || '#ffffff';
+        }
+        const timeText = comp.formatAlarmTime === 'shortDateTime'
+          ? ComponentRegistry.formatFtShortDateTime(new Date(row.time))
+          : formatTime(row.time);
+        rowEl.innerHTML = `<span class="ft-alarm-list-time">${escapeHtml(timeText)}</span><span class="ft-alarm-list-msg">${escapeHtml(row.message)}</span>`;
+        rowEl.addEventListener('click', () => {
+          controller.selectedIndex = absoluteIndex;
+          paint();
+        });
+        body.appendChild(rowEl);
+      });
+    };
+
+    ctx.onAlarmUpdate((alarms) => {
+      controller.rows = buildRows(alarms);
+      if (controller.selectedIndex >= controller.rows.length) {
+        controller.selectedIndex = Math.max(0, controller.rows.length - 1);
+      }
+      if (controller.scrollOffset > Math.max(0, controller.rows.length - controller.visibleCount)) {
+        controller.scrollOffset = Math.max(0, controller.rows.length - controller.visibleCount);
+      }
+      paint();
+    });
+
+    if (comp.name) {
+      ComponentRegistry._alarmListControllers.set(comp.name, controller);
+    }
+    return el;
+  },
+
+  ListNavKey(comp, ctx, action) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-list-nav-key ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'raised',
+      borderWidth: comp.borderWidth ?? 3,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#A0A0A4',
+      useBackColor: comp.useBackColor !== false,
+      studioEdit: Boolean(ctx.studioEdit)
+    });
+    btn.style.display = 'flex';
+    btn.style.alignItems = 'center';
+    btn.style.justifyContent = 'center';
+    btn.style.padding = '0';
+    if (comp.image) {
+      const img = document.createElement('img');
+      img.className = 'ft-list-nav-icon';
+      img.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      img.alt = '';
+      img.draggable = false;
+      img.style.maxWidth = '70%';
+      img.style.maxHeight = '70%';
+      img.style.objectFit = 'contain';
+      img.style.pointerEvents = 'none';
+      btn.appendChild(img);
+    }
+    if (!ctx.studioEdit) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const list = ComponentRegistry._alarmListControllers.get(comp.linkedObject);
+        list?.[action]?.();
+      });
+    }
+    return btn;
+  },
+
+  MoveUpKey(comp, ctx) {
+    return ComponentRegistry.ListNavKey(comp, ctx, 'moveUp');
+  },
+
+  PageUpKey(comp, ctx) {
+    return ComponentRegistry.ListNavKey(comp, ctx, 'pageUp');
+  },
+
+  PageDownKey(comp, ctx) {
+    return ComponentRegistry.ListNavKey(comp, ctx, 'pageDown');
+  },
+
+  MoveDownKey(comp, ctx) {
+    return ComponentRegistry.ListNavKey(comp, ctx, 'moveDown');
+  },
+
+  ClearAlarmHistoryButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-clear-alarm-history ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'raised',
+      borderWidth: comp.borderWidth ?? 3,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#dcdcdc',
+      useBackColor: comp.useBackColor !== false,
+      studioEdit: Boolean(ctx.studioEdit)
+    });
+    btn.style.display = 'flex';
+    btn.style.alignItems = 'center';
+    btn.style.justifyContent = 'center';
+    btn.style.padding = '0';
+    if (comp.image) {
+      const img = document.createElement('img');
+      img.className = 'ft-clear-alarm-icon';
+      img.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      img.alt = '';
+      img.draggable = false;
+      img.style.maxWidth = '80%';
+      img.style.maxHeight = '80%';
+      img.style.objectFit = 'contain';
+      img.style.pointerEvents = 'none';
+      btn.appendChild(img);
+    }
+    if (!ctx.studioEdit && ctx.clearAlarmHistory) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        ctx.clearAlarmHistory();
+      });
+    }
+    return btn;
   },
 
   AlarmHistory(comp, ctx) {
@@ -2287,6 +2635,11 @@ const ComponentRegistry = {
       return el;
     }
     ComponentRegistry.applyGraphicsObject(el, comp);
+    if (comp.name?.startsWith('SafetyRung') || comp.name?.startsWith('SafetyRail') || comp.name?.startsWith('SafetyBusLine')) {
+      el.classList.add('ft-ladder-wire');
+    } else if (comp.name?.includes('BarL') || comp.name?.includes('BarR') || comp.name?.startsWith('SafetyBusDrop') || comp.name?.startsWith('SafetyBusRise')) {
+      el.classList.add('ft-ladder-bar');
+    }
     const borderW = comp.lineWidth ?? comp.borderWidth ?? 1;
     const borderColor = comp.foreColor || comp.borderColor || '#c6c6c6';
     if (comp.backStyle === 'gradient') {
@@ -2499,10 +2852,11 @@ const ComponentRegistry = {
       ...comp,
       borderStyle: comp.borderStyle || 'line',
       borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      borderUsesBackColor: comp.borderUsesBackColor ?? true,
       backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
+      backColor: comp.backColor || '#dcdcdc',
       useBackColor: comp.useBackColor !== false,
+      navSideAccent: comp.navSideAccent,
       studioEdit
     });
     btn.style.display = 'flex';
@@ -2594,7 +2948,9 @@ const ComponentRegistry = {
       if (comp.useVariableDisplay && comp.displayNameTag) {
         ComponentRegistry.bindIndicatorRef(comp.displayNameTag, () => {}, ctx);
       }
-      if (comp.target || comp.useVariableDisplay) {
+      if (comp.userAction) {
+        btn.addEventListener('click', () => ComponentRegistry.handleUserAction(comp.userAction, comp, ctx));
+      } else if (comp.target || comp.useVariableDisplay) {
         btn.addEventListener('click', navigateToTarget);
       }
     }
@@ -3573,6 +3929,7 @@ const ComponentRegistry = {
   },
 
   AlarmTicker(comp, ctx) {
+    const studioEdit = Boolean(ctx.studioEdit);
     const el = document.createElement('div');
     el.className = 'ft-alarm-ticker ft-graphic';
     if (comp.name) el.dataset.name = comp.name;
@@ -3664,7 +4021,7 @@ const ComponentRegistry = {
 
     ComponentRegistry.applyGraphicsObject(el, comp);
 
-    const caption = comp.caption ?? comp.label ?? '';
+    const caption = String(comp.caption ?? comp.label ?? '').replace(/\\n/g, '\n');
     el.textContent = caption;
 
     const fontFamily = comp.fontFamily || 'Arial Unicode MS';
@@ -3678,7 +4035,19 @@ const ComponentRegistry = {
     if (comp.useForeColor !== false) {
       el.style.color = comp.foreColor || '#000000';
     }
-    if (comp.useBackColor && comp.backStyle === 'solid') {
+    if (comp.useBackColor && comp.backStyle === 'gradient') {
+      const start = comp.backColor || '#c6c6c6';
+      const end = comp.endColor || '#e8e8e8';
+      const stop = comp.gradientStop ?? 95;
+      const shading = comp.gradientShadingStyle || comp.gradientDirection || '';
+      if (shading === 'gradientHorizontalFromRight') {
+        el.style.background = `linear-gradient(to left, ${start} 0%, ${end} ${stop}%)`;
+      } else if (shading === 'gradientHorizontalFromLeft') {
+        el.style.background = `linear-gradient(to right, ${start} 0%, ${end} ${stop}%)`;
+      } else {
+        el.style.background = `linear-gradient(to bottom, ${start} 0%, ${end} ${stop}%)`;
+      }
+    } else if (comp.useBackColor && comp.backStyle === 'solid') {
       el.style.backgroundColor = comp.backColor || '#ffffff';
     } else {
       el.style.backgroundColor = 'transparent';

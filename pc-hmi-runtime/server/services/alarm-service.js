@@ -84,6 +84,12 @@ class AlarmService extends EventEmitter {
     return count;
   }
 
+  clearHistory() {
+    this.history = [];
+    this.emit('change', this.getState());
+    return true;
+  }
+
   getState() {
     return {
       active: this.active,

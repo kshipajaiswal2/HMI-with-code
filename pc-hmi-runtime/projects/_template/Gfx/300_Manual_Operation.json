@@ -1,65 +1,177 @@
 {
   "id": "300_Manual_Operation",
   "title": "Manual Operation",
+  "subtitle": "Manual Operation",
   "navGroup": "manual",
   "securityLevel": 1,
   "components": [
     {
-      "type": "SubNav",
-      "navKey": "manual"
+      "type": "Rectangle",
+      "name": "ManualLegendBox",
+      "left": 677,
+      "top": 64,
+      "width": 121,
+      "height": 112,
+      "visible": true,
+      "backStyle": "solid",
+      "backColor": "#E8E8E8",
+      "useBackColor": true,
+      "foreColor": "#000000",
+      "lineWidth": 1
     },
     {
-      "type": "SectionHeader",
-      "label": "Manual Controls"
+      "type": "Text",
+      "name": "ManualLegendTitle",
+      "caption": "Equipment Status",
+      "left": 691,
+      "top": 66,
+      "width": 99,
+      "height": 16,
+      "fontFamily": "Arial",
+      "fontSize": 12,
+      "backStyle": "transparent",
+      "alignment": "middleCenter",
+      "wordWrap": false
     },
     {
-      "type": "Panel",
-      "style": {
-        "className": "control-row"
-      },
-      "children": [
-        {
-          "type": "ToggleButton",
-          "tag": "Manual.ConveyorRun",
-          "label": "Conveyor Run"
-        },
-        {
-          "type": "ToggleButton",
-          "tag": "Manual.PumpRun",
-          "label": "Pump Run"
-        }
-      ]
+      "type": "Rectangle",
+      "name": "ManualLegendSwatch0",
+      "left": 683,
+      "top": 91,
+      "width": 13,
+      "height": 14,
+      "visible": true,
+      "backStyle": "solid",
+      "backColor": "red",
+      "useBackColor": true,
+      "foreColor": "red",
+      "lineWidth": 0
     },
     {
-      "type": "Grid",
-      "style": {
-        "className": "metric-grid cols-2"
-      },
-      "children": [
-        {
-          "type": "NumericDisplay",
-          "tag": "Manual.VFD_Speed",
-          "label": "VFD Speed",
-          "format": "float",
-          "decimals": 1,
-          "unit": "Hz"
-        },
-        {
-          "type": "StateIndicator",
-          "tag": "System.AutoMode",
-          "label": "Mode",
-          "states": {
-            "true": {
-              "text": "Auto",
-              "color": "#00c000"
-            },
-            "false": {
-              "text": "Manual",
-              "color": "#0066cc"
-            }
-          }
-        }
-      ]
+      "type": "Text",
+      "name": "ManualLegendLabel0",
+      "caption": "Fault",
+      "left": 698,
+      "top": 88,
+      "width": 91,
+      "height": 18,
+      "fontFamily": "Arial",
+      "fontSize": 12,
+      "backStyle": "transparent",
+      "alignment": "middleLeft",
+      "wordWrap": false
+    },
+    {
+      "type": "Rectangle",
+      "name": "ManualLegendSwatch1",
+      "left": 683,
+      "top": 108,
+      "width": 13,
+      "height": 13,
+      "visible": true,
+      "backStyle": "solid",
+      "backColor": "#71FF71",
+      "useBackColor": true,
+      "foreColor": "#71FF71",
+      "lineWidth": 0
+    },
+    {
+      "type": "Text",
+      "name": "ManualLegendLabel1",
+      "caption": "Automatic - Idle",
+      "left": 698,
+      "top": 105,
+      "width": 94,
+      "height": 18,
+      "fontFamily": "Arial",
+      "fontSize": 12,
+      "backStyle": "transparent",
+      "alignment": "middleLeft",
+      "wordWrap": false
+    },
+    {
+      "type": "Rectangle",
+      "name": "ManualLegendSwatch2",
+      "left": 683,
+      "top": 124,
+      "width": 13,
+      "height": 13,
+      "visible": true,
+      "backStyle": "solid",
+      "backColor": "green",
+      "useBackColor": true,
+      "foreColor": "green",
+      "lineWidth": 0
+    },
+    {
+      "type": "Text",
+      "name": "ManualLegendLabel2",
+      "caption": "Automatic - Run",
+      "left": 698,
+      "top": 120,
+      "width": 93,
+      "height": 19,
+      "fontFamily": "Arial",
+      "fontSize": 12,
+      "backStyle": "transparent",
+      "alignment": "middleLeft",
+      "wordWrap": false
+    },
+    {
+      "type": "Rectangle",
+      "name": "ManualLegendSwatch3",
+      "left": 683,
+      "top": 141,
+      "width": 13,
+      "height": 13,
+      "visible": true,
+      "backStyle": "solid",
+      "backColor": "#00F0FF",
+      "useBackColor": true,
+      "foreColor": "#00F0FF",
+      "lineWidth": 0
+    },
+    {
+      "type": "Text",
+      "name": "ManualLegendLabel3",
+      "caption": "Manual - Idle",
+      "left": 698,
+      "top": 139,
+      "width": 91,
+      "height": 17,
+      "fontFamily": "Arial",
+      "fontSize": 12,
+      "backStyle": "transparent",
+      "alignment": "middleLeft",
+      "wordWrap": false
+    },
+    {
+      "type": "Rectangle",
+      "name": "ManualLegendSwatch4",
+      "left": 683,
+      "top": 157,
+      "width": 13,
+      "height": 13,
+      "visible": true,
+      "backStyle": "solid",
+      "backColor": "blue",
+      "useBackColor": true,
+      "foreColor": "blue",
+      "lineWidth": 0
+    },
+    {
+      "type": "Text",
+      "name": "ManualLegendLabel4",
+      "caption": "Manual - Run",
+      "left": 698,
+      "top": 155,
+      "width": 92,
+      "height": 19,
+      "fontFamily": "Arial",
+      "fontSize": 12,
+      "backStyle": "transparent",
+      "alignment": "middleLeft",
+      "wordWrap": false
     }
   ],
   "displaySettings": {
@@ -95,6 +207,9 @@
         "useVariableDisplayPosition": false,
         "horizontalMargin": 0,
         "verticalMargin": 0
+      },
+      "NavRecipe": {
+        "image": "recipe1 1.bmp"
       }
     }
   }

@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "st-ethernet-ip": "^2.7.5"
   },
   "devDependencies": {
     "electron": "^34.0.0"

@@ -135,6 +135,7 @@ function createContext() {
     },
     closeDisplay: () => {
       if (STUDIO_EDIT) return;
+      closePopup();
       const prev = state.screenHistory?.pop();
       if (prev) loadScreen(prev, { skipHistory: true });
     },
@@ -188,6 +189,13 @@ function createContext() {
       });
     },
 
+    async clearAlarmHistory() {
+      await fetch('/api/runtime/alarms/clear-history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+    },
+
     async login(username, password) {
       const res = await fetch('/api/runtime/login', {
         method: 'POST',
@@ -227,8 +235,27 @@ function buildNavBar() {
   navBar.appendChild(userEl);
 }
 
+function composedSideShellMissing(screen) {
+  if (!screen?._composed || !screen?.navGroup) return false;
+  const components = screen.components || [];
+  if (screen.navGroup === 'manual') {
+    return !components.some((c) => c.name?.startsWith('ManualNav_'));
+  }
+  if (screen.navGroup === 'overview') {
+    return !components.some((c) => c.name?.startsWith('OverviewNav_'));
+  }
+  if (screen.navGroup === 'alarms') {
+    return !components.some((c) => c.name?.startsWith('AlarmNav_'));
+  }
+  if (screen.navGroup === 'settings') {
+    return !components.some((c) => c.name === 'ScreenSubtitle' && c._source === 'shell');
+  }
+  return false;
+}
+
 async function composeWithTemplate(screen) {
-  if (!screen || screen._composed || screen.kind === 'global-object') return screen;
+  if (!screen || screen.kind === 'global-object') return screen;
+  if (screen._composed && !composedSideShellMissing(screen)) return screen;
   const compose = typeof TemplateCompose !== 'undefined' ? TemplateCompose : null;
   if (!compose) return screen;
   const cfg = compose.resolveTemplateConfig(screen);
@@ -244,6 +271,12 @@ async function composeWithTemplate(screen) {
   }
 }
 
+async function fetchRawScreen(screenId) {
+  const res = await fetchWithTimeout(apiUrl(`/api/runtime/screens/${encodeURIComponent(screenId)}?raw=1&_=${Date.now()}`));
+  if (!res.ok) return null;
+  return res.json();
+}
+
 async function loadScreen(screenId, options = {}) {
   if (!options.skipHistory && state.currentScreen && state.currentScreen !== screenId) {
     state.screenHistory.push(state.currentScreen);
@@ -253,11 +286,22 @@ async function loadScreen(screenId, options = {}) {
   state.userCallbacks = [];
 
   try {
-    const res = await fetchWithTimeout(apiUrl(`/api/runtime/screens/${screenId}?_=${Date.now()}`));
+    const res = await fetchWithTimeout(apiUrl(`/api/runtime/screens/${encodeURIComponent(screenId)}?_=${Date.now()}`));
     if (!res.ok) throw new Error('not found');
     let screen = await res.json();
-    if (!screen._composed) screen = await composeWithTemplate(screen);
-    await renderLoadedScreen(screen, screenId);
+    if (!screen._composed || composedSideShellMissing(screen)) {
+      const raw = await fetchRawScreen(screenId);
+      screen = await composeWithTemplate(raw ? { ...raw, _composed: false } : screen);
+    } else if (!screen._composed) {
+      screen = await composeWithTemplate(screen);
+    }
+    
+    // Check if this screen should be displayed as a popup
+    if (screen.layout === 'popup') {
+      await renderPopupScreen(screen, screenId);
+    } else {
+      await renderLoadedScreen(screen, screenId);
+    }
   } catch {
     renderPlaceholder(screenId);
     state.currentScreen = screenId;
@@ -282,6 +326,45 @@ async function loadGlobalObject(objectId) {
     updateNav(null);
     screenTitle.textContent = objectId.replace(/_/g, ' ');
   }
+}
+
+async function renderPopupScreen(screen, screenId) {
+  const container = ensurePopupContainer();
+  container.innerHTML = '';
+  container.style.display = 'flex';
+  
+  const popupWrapper = document.createElement('div');
+  popupWrapper.style.cssText = `
+    position: relative;
+    background: white;
+    border: 2px solid #999;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  `;
+  
+  const ctx = createContext();
+  ctx.closeDisplay = closePopup;
+  state.activeContext = ctx;
+  
+  const size = resolveScreenSize(screen);
+  popupWrapper.style.width = `${size.width}px`;
+  popupWrapper.style.height = `${size.height}px`;
+  popupWrapper.style.backgroundColor = size.backgroundColor;
+  
+  (screen.components || []).forEach((comp, index) => {
+    try {
+      const el = ComponentRegistry.render(comp, ctx);
+      el.dataset.componentIndex = String(index);
+      if (comp._displayIndex != null) el.dataset.displayIndex = String(comp._displayIndex);
+      if (comp._source) el.dataset.source = comp._source;
+      if (comp.type) el.dataset.componentType = comp.type;
+      popupWrapper.appendChild(el);
+    } catch (err) {
+      console.error(`Popup render failed for ${comp?.type || 'component'}:`, err);
+    }
+  });
+  
+  container.appendChild(popupWrapper);
+  activePopup = { screenId, element: popupWrapper, context: ctx };
 }
 
 async function renderLoadedScreen(screen, screenId) {
@@ -338,6 +421,7 @@ function renderScreen(screen) {
   const size = resolveScreenSize(screen);
   applyDisplayCanvasSize(size.width, size.height, size.backgroundColor);
   screenContent.innerHTML = '';
+  ComponentRegistry._alarmListControllers?.clear?.();
   screenContent.style.position = 'relative';
   if (EMBED_MODE) {
     screenContent.style.width = '100%';
@@ -643,6 +727,97 @@ if (socket) {
   });
 }
 
+// Popup management system
+let popupContainer = null;
+let activePopup = null;
+
+function ensurePopupContainer() {
+  if (popupContainer) return popupContainer;
+  popupContainer = document.createElement('div');
+  popupContainer.id = 'popupContainer';
+  popupContainer.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+  `;
+  popupContainer.addEventListener('click', (e) => {
+    if (e.target === popupContainer) closePopup();
+  });
+  document.body.appendChild(popupContainer);
+  return popupContainer;
+}
+
+async function loadPopup(screenId) {
+  if (activePopup) closePopup();
+  
+  try {
+    const res = await fetchWithTimeout(apiUrl(`/api/runtime/screens/${encodeURIComponent(screenId)}?_=${Date.now()}`));
+    if (!res.ok) throw new Error('not found');
+    let screen = await res.json();
+    
+    if (!screen._composed || composedSideShellMissing(screen)) {
+      const raw = await fetchRawScreen(screenId);
+      screen = await composeWithTemplate(raw ? { ...raw, _composed: false } : screen);
+    } else if (!screen._composed) {
+      screen = await composeWithTemplate(screen);
+    }
+    
+    const container = ensurePopupContainer();
+    container.innerHTML = '';
+    container.style.display = 'flex';
+    
+    const popupWrapper = document.createElement('div');
+    popupWrapper.style.cssText = `
+      position: relative;
+      background: white;
+      border: 2px solid #999;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    `;
+    
+    const ctx = createContext();
+    ctx.closeDisplay = closePopup;
+    state.activeContext = ctx;
+    
+    const size = resolveScreenSize(screen);
+    popupWrapper.style.width = `${size.width}px`;
+    popupWrapper.style.height = `${size.height}px`;
+    popupWrapper.style.backgroundColor = size.backgroundColor;
+    
+    (screen.components || []).forEach((comp, index) => {
+      try {
+        const el = ComponentRegistry.render(comp, ctx);
+        el.dataset.componentIndex = String(index);
+        if (comp._displayIndex != null) el.dataset.displayIndex = String(comp._displayIndex);
+        if (comp._source) el.dataset.source = comp._source;
+        if (comp.type) el.dataset.componentType = comp.type;
+        popupWrapper.appendChild(el);
+      } catch (err) {
+        console.error(`Popup render failed for ${comp?.type || 'component'}:`, err);
+      }
+    });
+    
+    container.appendChild(popupWrapper);
+    activePopup = { screenId, element: popupWrapper, context: ctx };
+  } catch (err) {
+    console.error(`Failed to load popup ${screenId}:`, err);
+    closePopup();
+  }
+}
+
+function closePopup() {
+  if (!popupContainer) return;
+  popupContainer.style.display = 'none';
+  popupContainer.innerHTML = '';
+  activePopup = null;
+}
+
 async function init() {
   if (EMBED_MODE) {
     document.documentElement.classList.add('embed-root');
@@ -711,4 +886,6 @@ async function init() {
 }
 
 window.loadScreen = loadScreen;
+window.loadPopup = loadPopup;
+window.closePopup = closePopup;
 init();

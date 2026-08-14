@@ -44,16 +44,23 @@ function loadProjectRuntime(projectId) {
 
   if (driver) driver.disconnect();
   driver = createCommunicationDriver(projectConfig.communication || {}, tagService, alarmService, tagLogicService);
+  const driverType = projectConfig.communication?.driver || 'simulator';
 
   return Promise.resolve(driver.connect())
     .then(() => {
-      seedDemoTagValues(tagService);
+      // Only seed demo data in simulator mode to prevent overwrites in live PLC mode
+      if (driverType === 'simulator') {
+        seedDemoTagValues(tagService);
+      }
       tagLogicService.evaluate();
       loadedRuntimeProjectId = id;
     })
     .catch((err) => {
       console.error('Communication driver connect failed:', err.message);
-      seedDemoTagValues(tagService);
+      // Only seed demo data in simulator mode as fallback
+      if (driverType === 'simulator') {
+        seedDemoTagValues(tagService);
+      }
       tagLogicService.evaluate();
       loadedRuntimeProjectId = id;
     });
@@ -314,7 +321,8 @@ app.get('/api/runtime/screens', (req, res) => {
 app.get('/api/runtime/screens/:id', (req, res) => {
   res.set('Cache-Control', 'no-store');
   const raw = req.query.raw === '1' || req.query.raw === 'true';
-  const screen = projectService.getScreen(resolveProjectId(req), req.params.id, { raw });
+  const rawFile = req.query.file === '1' || req.query.file === 'true';
+  const screen = projectService.getScreen(resolveProjectId(req), req.params.id, { raw, rawFile });
   if (!screen) return res.status(404).json({ error: 'Screen not found' });
   res.json(screen);
 });
@@ -351,13 +359,30 @@ app.post('/api/runtime/alarms/acknowledge', (req, res) => {
   res.json({ success: ok });
 });
 
+app.post('/api/runtime/alarms/clear-history', (_req, res) => {
+  alarmService.clearHistory();
+  res.json({ success: true });
+});
+
 app.post('/api/runtime/tags/write', (req, res) => {
   const { tag, value } = req.body || {};
   if (!tag) return res.status(400).json({ error: 'tag required' });
   if (tagLogicService.isComputed(tag)) {
     return res.status(400).json({ error: `${tag} is computed by Python logic and cannot be written directly` });
   }
+  
+  // Write to tag service (always updated locally)
   const ok = tagService.set(tag, value);
+  
+  // Forward write to PLC driver if connected and not in simulator mode
+  if (driver && driver.writeTagToPLC && driver.connected && projectConfig.communication?.driver !== 'simulator') {
+    try {
+      driver.writeTagToPLC(tag, value);
+    } catch (err) {
+      console.warn(`Failed to write tag to PLC: ${err.message}`);
+    }
+  }
+  
   tagLogicService.evaluate();
   alarmService.evaluate();
   res.json({ success: ok });
@@ -396,6 +421,45 @@ app.post('/api/runtime/communication/test', async (req, res) => {
   });
 });
 
+app.post('/api/runtime/communication/switch-mode', async (req, res) => {
+  ensureRuntimeLoaded();
+  const { driver: newDriver } = req.body || {};
+  
+  if (!newDriver || !['simulator', 'ethernet-ip', 'opcua'].includes(newDriver)) {
+    return res.status(400).json({ success: false, error: 'Invalid driver. Must be simulator, ethernet-ip, or opcua' });
+  }
+
+  try {
+    // Update project config with new driver
+    projectConfig.communication = projectConfig.communication || {};
+    projectConfig.communication.driver = newDriver;
+
+    // Save the updated config
+    projectService.updateProjectConfig(projectService.getActiveId(), projectConfig);
+
+    // Reconnect with new driver
+    if (driver) driver.disconnect();
+    driver = createCommunicationDriver(projectConfig.communication || {}, tagService, alarmService, tagLogicService);
+    
+    const result = await driver.connect();
+    
+    // Broadcast mode change
+    io.emit('communication-changed', {
+      driver: newDriver,
+      connected: result.connected,
+      status: driver.getStatus?.()
+    });
+
+    res.json({ 
+      success: true, 
+      message: `Switched to ${newDriver} mode`,
+      communication: driver.getStatus?.() ?? { driver: newDriver, connected: false }
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/api/runtime/login', (req, res) => {
   const { username, password } = req.body || {};
   const result = userService.login(username, password);
@@ -407,6 +471,90 @@ app.post('/api/runtime/logout', (_req, res) => {
   userService.logout();
   io.emit('user-changed', null);
   res.json({ success: true });
+});
+
+// User Management API Endpoints
+app.get('/api/runtime/users', (_req, res) => {
+  const users = userService.getAllUsers();
+  res.json({ success: true, users });
+});
+
+app.post('/api/runtime/users/add', (req, res) => {
+  const { username, password, group } = req.body || {};
+  if (!username?.trim() || !password?.trim()) {
+    return res.status(400).json({ success: false, error: 'Username and password required' });
+  }
+  try {
+    const result = userService.addUser(username.trim(), password.trim(), group);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/users/delete', (req, res) => {
+  const { username } = req.body || {};
+  if (!username?.trim()) {
+    return res.status(400).json({ success: false, error: 'Username required' });
+  }
+  try {
+    const result = userService.deleteUser(username.trim());
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/users/enable', (req, res) => {
+  const { username } = req.body || {};
+  if (!username?.trim()) {
+    return res.status(400).json({ success: false, error: 'Username required' });
+  }
+  try {
+    const result = userService.enableUser(username.trim());
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/users/disable', (req, res) => {
+  const { username } = req.body || {};
+  if (!username?.trim()) {
+    return res.status(400).json({ success: false, error: 'Username required' });
+  }
+  try {
+    const result = userService.disableUser(username.trim());
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/users/change-password', (req, res) => {
+  const { username, newPassword } = req.body || {};
+  if (!username?.trim() || !newPassword?.trim()) {
+    return res.status(400).json({ success: false, error: 'Username and new password required' });
+  }
+  try {
+    const result = userService.changePassword(username.trim(), newPassword.trim());
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/users/change-group', (req, res) => {
+  const { username, group } = req.body || {};
+  if (!username?.trim()) {
+    return res.status(400).json({ success: false, error: 'Username required' });
+  }
+  try {
+    const result = userService.changeGroup(username.trim(), group);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
 });
 
 io.on('connection', (socket) => {

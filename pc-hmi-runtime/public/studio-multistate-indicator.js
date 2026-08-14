@@ -8,14 +8,21 @@
     return (states || []).map((s) => ({ ...s }));
   }
 
+  function defaultStateColors(index) {
+    if (index === 0) return { backColor: '#F83D3D', borderColor: '#C00000' };
+    if (index === 1) return { backColor: '#10EB10', borderColor: '#10EB10' };
+    return { backColor: '#001C38', borderColor: '#001C38' };
+  }
+
   function defaultMultistateIndicatorState(i, overrides = {}) {
+    const colors = defaultStateColors(i);
     return {
       id: `State${i}`,
       value: i,
       useBackColor: true,
-      backColor: '#001C38',
+      backColor: colors.backColor,
       useBorderColor: true,
-      borderColor: '#001C38',
+      borderColor: colors.borderColor,
       blink: false,
       patternStyle: 'none',
       usePatternColor: false,
@@ -106,7 +113,7 @@
   }
 
   function defaultMultistateIndicatorComponent(overrides = {}) {
-    const count = overrides.numberOfStates ?? 4;
+    const count = overrides.numberOfStates ?? 2;
     return {
       type: 'MultistateIndicator',
       name: 'MultistateIndicator1',
@@ -123,7 +130,7 @@
       borderUsesBackColor: true,
       backStyle: 'solid',
       shape: 'rectangle',
-      fontFamily: 'Tahoma',
+      fontFamily: 'Arial Unicode MS',
       fontSize: 13,
       bold: false,
       italic: false,
@@ -216,36 +223,47 @@
   }
 
   function loadMiStateFromDraft(stateId) {
-    miActiveStateId = stateId;
-    const state = miStatesDraft?.find((s) => s.id === stateId) || {};
-    document.getElementById('miStateSelect').value = stateId;
-    document.getElementById('miStateUseBackColor').checked = state.useBackColor !== false;
-    document.getElementById('miStateBackColor').value = state.backColor || '#001C38';
-    document.getElementById('miStateUseBorderColor').checked = state.useBorderColor !== false;
-    document.getElementById('miStateBorderColor').value = state.borderColor || '#001C38';
-    document.getElementById('miStateBlink').checked = Boolean(state.blink);
-    document.getElementById('miStatePatternStyle').value = state.patternStyle || 'none';
-    document.getElementById('miStateUsePatternColor').checked = Boolean(state.usePatternColor);
-    document.getElementById('miStatePatternColor').value = state.patternColor || '#ffffff';
-    document.getElementById('miStateCaption').value = state.caption ?? '';
-    document.getElementById('miStateUseCaptionColor').checked = state.useCaptionColor !== false;
-    document.getElementById('miStateCaptionColor').value = state.captionColor || '#ffffff';
-    document.getElementById('miStateUseCaptionBackColor').checked = Boolean(state.useCaptionBackColor);
-    document.getElementById('miStateCaptionBackColor').value = state.captionBackColor || '#001C38';
-    document.getElementById('miStateCaptionBlink').checked = Boolean(state.captionBlink);
-    document.getElementById('miStateWordWrap').checked = state.wordWrap !== false;
-    document.getElementById('miStateCaptionBackStyle').value = state.captionBackStyle || 'transparent';
-    document.getElementById('miStateImage').value = state.image || '';
-    document.getElementById('miStateUseImageColor').checked = Boolean(state.useImageColor);
-    document.getElementById('miStateImageColor').value = state.imageColor || '#ffffff';
-    document.getElementById('miStateUseImageBackColor').checked = Boolean(state.useImageBackColor);
-    document.getElementById('miStateImageBackColor').value = state.imageBackColor || '#001C38';
-    document.getElementById('miStateImageBlink').checked = Boolean(state.imageBlink);
-    document.getElementById('miStateImageScaled').checked = Boolean(state.imageScaled);
-    document.getElementById('miStateImageBackStyle').value = state.imageBackStyle || 'transparent';
-    document.getElementById('miStateValue').value = state.value ?? 0;
-    document.querySelector(`#multistateIndicatorForm input[name="miStateAlign"][value="${state.alignment || 'middleCenter'}"]`)?.click();
-    document.querySelector(`#multistateIndicatorForm input[name="miStateImageAlign"][value="${state.imageAlignment || 'middleCenter'}"]`)?.click();
+    if (window.state) window.state.propsFormFill = true;
+    try {
+      miActiveStateId = stateId;
+      const state = miStatesDraft?.find((s) => s.id === stateId) || {};
+      document.getElementById('miStateSelect').value = stateId;
+      document.getElementById('miStateUseBackColor').checked = state.useBackColor !== false;
+      document.getElementById('miStateBackColor').value = state.backColor || '#F83D3D';
+      document.getElementById('miStateUseBorderColor').checked = state.useBorderColor !== false;
+      document.getElementById('miStateBorderColor').value = state.borderColor || '#C00000';
+      document.getElementById('miStateBlink').checked = Boolean(state.blink);
+      document.getElementById('miStatePatternStyle').value = state.patternStyle || 'none';
+      document.getElementById('miStateUsePatternColor').checked = Boolean(state.usePatternColor);
+      document.getElementById('miStatePatternColor').value = state.patternColor || '#ffffff';
+      document.getElementById('miStateCaption').value = state.caption ?? '';
+      document.getElementById('miStateUseCaptionColor').checked = state.useCaptionColor !== false;
+      document.getElementById('miStateCaptionColor').value = state.captionColor || '#ffffff';
+      document.getElementById('miStateUseCaptionBackColor').checked = Boolean(state.useCaptionBackColor);
+      document.getElementById('miStateCaptionBackColor').value = state.captionBackColor || '#001C38';
+      document.getElementById('miStateCaptionBlink').checked = Boolean(state.captionBlink);
+      document.getElementById('miStateWordWrap').checked = state.wordWrap !== false;
+      document.getElementById('miStateCaptionBackStyle').value = state.captionBackStyle || 'transparent';
+      document.getElementById('miStateImage').value = state.image || '';
+      document.getElementById('miStateUseImageColor').checked = Boolean(state.useImageColor);
+      document.getElementById('miStateImageColor').value = state.imageColor || '#ffffff';
+      document.getElementById('miStateUseImageBackColor').checked = Boolean(state.useImageBackColor);
+      document.getElementById('miStateImageBackColor').value = state.imageBackColor || '#001C38';
+      document.getElementById('miStateImageBlink').checked = Boolean(state.imageBlink);
+      document.getElementById('miStateImageScaled').checked = Boolean(state.imageScaled);
+      document.getElementById('miStateImageBackStyle').value = state.imageBackStyle || 'transparent';
+      document.getElementById('miStateValue').value = state.value ?? 0;
+      const align = state.alignment || 'middleCenter';
+      const imgAlign = state.imageAlignment || 'middleCenter';
+      document.querySelectorAll('#multistateIndicatorForm input[name="miStateAlign"]').forEach((el) => {
+        el.checked = el.value === align;
+      });
+      document.querySelectorAll('#multistateIndicatorForm input[name="miStateImageAlign"]').forEach((el) => {
+        el.checked = el.value === imgAlign;
+      });
+    } finally {
+      if (window.state) window.state.propsFormFill = false;
+    }
     syncMiFields();
   }
 

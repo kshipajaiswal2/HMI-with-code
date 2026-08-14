@@ -240,20 +240,14 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
     const composed = isEditingGlobalObject()
       ? await fetchOpenCanvas()
       : await fetchComposedCanvas();
-    const comp = composed.components?.find((c) => c.name === name);
+    let comp = composed.components?.find((c) => c.name === name);
     if (!comp) {
       setStatus(`No editable object named ${name}`);
       return;
     }
     const raw = state.canvasEditCache?.raw || await fetchOpenCanvas();
     let ref = resolveComponentEditRef(comp, raw, source);
-    if (ref.type === 'template-override' && comp.name) {
-      const base = await fetchTemplateComponent(comp.name);
-      if (base) {
-        comp = { ...base, ...comp, name: comp.name };
-        ref = { type: 'template-global', name: comp.name };
-      }
-    }
+    ({ comp, ref } = await mergeTemplateOverrideComponent(comp, ref));
 
     if (comp.type === 'GotoButton') {
       fillGotoButtonForm(comp);
@@ -261,6 +255,7 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       switchGotoButtonTab('general');
       wireGotoButtonDialogTools();
       document.getElementById('gotoButtonDialog')?.showModal();
+      setTemplateEditStatus(name, ref);
     } else if (comp.type === 'ReturnToButton') {
       window.StudioReturnToButton?.fillReturnToButtonForm(comp);
       resetPropsDialogState('return-to', window.StudioReturnToButton.readReturnToButtonForm, 'applyReturnToButton', null, ref);
@@ -276,7 +271,7 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       if (ref.type === 'template-override') {
         setStatus(`Editing ${name} — screen override (change Global Objects/Template to affect all displays)`);
       } else if (ref.type === 'shell') {
-        setStatus(`Editing ${name} — overview nav override for this display`);
+        setStatus(`Editing ${name} — ${navShellStatusLabel(state.canvasEditCache?.raw)} override for this display`);
       } else {
         setStatus(`Editing ${name}`);
       }
@@ -342,7 +337,7 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       if (ref.type === 'template-override') {
         setStatus(`Editing ${name} — screen override (change Global Objects/Template to affect all displays)`);
       } else if (ref.type === 'shell') {
-        setStatus(`Editing ${name} — overview nav override for this display`);
+        setStatus(`Editing ${name} — ${navShellStatusLabel(state.canvasEditCache?.raw)} override for this display`);
       } else {
         setStatus(`Editing ${name}`);
       }
@@ -416,6 +411,7 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       resetPropsDialogState('image', readCanvasImagePropertiesForm, 'applyCanvasImageProperties', null, ref);
       switchCanvasImagePropertiesTab('general');
       document.getElementById('canvasImagePropertiesDialog')?.showModal();
+      setTemplateEditStatus(name, ref);
     } else if (comp.type === 'Rectangle' || comp.type === 'Ellipse') {
       window.StudioShapeProperties?.openShapePropertiesDialog(comp, ref, null);
     } else {
@@ -476,6 +472,7 @@ async function fetchOpenCanvas(options = {}) {
     data = await fetchJson(`/api/runtime/global-objects/${encodeURIComponent(id)}?project=${encodeURIComponent(project)}`);
   } else {
     data = await fetchJson(`/api/runtime/screens/${encodeURIComponent(id)}?project=${encodeURIComponent(project)}&raw=1`);
+    data = normalizeNavShellFields(data);
   }
   openCanvasCache = { key, data };
   return data;
@@ -553,6 +550,10 @@ async function captureScreenUndoPatch(keys) {
     if (key === 'components') patch.components = cloneUndoData(canvas.components || []);
     if (key === 'template') patch.template = cloneUndoData(canvas.template);
     if (key === 'overviewShell') patch.overviewShell = cloneUndoData(canvas.overviewShell);
+    if (key === 'manualShell') patch.manualShell = cloneUndoData(canvas.manualShell);
+    if (key === 'alarmsShell') patch.alarmsShell = cloneUndoData(canvas.alarmsShell);
+    if (key === 'settingsShell') patch.settingsShell = cloneUndoData(canvas.settingsShell);
+    if (key === 'navShell') Object.assign(patch, captureNavShellUndo(canvas));
   }
   return patch;
 }
@@ -602,7 +603,7 @@ function captureDragUndoEntry(entry) {
     globalPatch: null
   };
   if (entry.ref?.type === 'shell') {
-    undoEntry.patch.overviewShell = cloneUndoData(canvas.overviewShell);
+    Object.assign(undoEntry.patch, captureNavShellUndo(canvas));
   } else if (entry.ref?.type === 'template-override') {
     undoEntry.patch.template = cloneUndoData(canvas.template);
   } else {
@@ -619,7 +620,7 @@ async function pushUndoForEditRef(ref) {
   } else if (ref?.type === 'template-override') {
     await pushUndoBefore({ screenKeys: ['template'] });
   } else if (ref?.type === 'shell') {
-    await pushUndoBefore({ screenKeys: ['overviewShell'] });
+    await pushUndoBefore({ screenKeys: ['navShell'] });
   } else {
     await pushUndoBefore({ screenKeys: ['components'] });
   }
@@ -667,6 +668,9 @@ async function applyUndoEntry(entry) {
     if (entry.patch?.components !== undefined) screenPatch.components = entry.patch.components;
     if (entry.patch?.template !== undefined) screenPatch.template = entry.patch.template;
     if (entry.patch?.overviewShell !== undefined) screenPatch.overviewShell = entry.patch.overviewShell;
+    if (entry.patch?.manualShell !== undefined) screenPatch.manualShell = entry.patch.manualShell;
+    if (entry.patch?.alarmsShell !== undefined) screenPatch.alarmsShell = entry.patch.alarmsShell;
+    if (entry.patch?.settingsShell !== undefined) screenPatch.settingsShell = entry.patch.settingsShell;
     if (Object.keys(screenPatch).length) {
       await patchOpenCanvas(screenPatch);
       const canvas = await fetchOpenCanvas();
@@ -821,20 +825,90 @@ async function fetchTemplateComponent(name) {
   }
 }
 
-async function resolveTemplateGlobalPropertiesEntry(entry) {
-  if (!entry?.comp?.name || entry.ref?.type !== 'template-override') return entry;
-  const base = await fetchTemplateComponent(entry.comp.name);
-  if (!base) return entry;
+async function mergeTemplateOverrideComponent(comp, ref) {
+  if (ref?.type !== 'template-override' || !comp?.name) return { comp, ref };
+  const base = await fetchTemplateComponent(comp.name);
+  if (!base) return { comp, ref };
+  const canvas = state.canvasEditCache?.raw || await fetchOpenCanvas();
+  const replace = canvas?.template?.replace?.[comp.name] || {};
   return {
-    comp: { ...base, ...entry.comp, name: entry.comp.name },
-    ref: { type: 'template-global', name: entry.comp.name }
+    comp: { ...base, ...replace, ...comp, name: comp.name },
+    ref: { type: 'template-override', name: comp.name }
   };
 }
 
-function getOverviewShellBase(rawScreen, name) {
-  if (typeof TemplateCompose === 'undefined') return null;
-  const shell = TemplateCompose.buildOverviewShell({ ...rawScreen, overviewShell: {} });
-  return shell.find((c) => c.name === name) || null;
+async function resolveTemplatePropertiesEntry(entry) {
+  if (!entry?.comp?.name || entry.ref?.type !== 'template-override') return entry;
+  const merged = await mergeTemplateOverrideComponent(entry.comp, entry.ref);
+  return { comp: merged.comp, ref: merged.ref };
+}
+
+function setTemplateEditStatus(compName, ref) {
+  if (ref?.type === 'template-override') {
+    setStatus(`Editing ${compName} — screen override (edit Global Objects/Template to change all displays)`);
+  } else if (ref?.type === 'shell') {
+    setStatus(`Editing ${compName} — ${navShellStatusLabel(state.canvasEditCache?.raw)} override for this display`);
+  } else if (isEditingGlobalObject()) {
+    setStatus(`Editing Template → ${compName} (applies to all displays)`);
+  }
+}
+
+function getNavShellKey(rawScreen) {
+  if (rawScreen?.navGroup === 'manual') return 'manualShell';
+  if (rawScreen?.navGroup === 'overview') return 'overviewShell';
+  if (rawScreen?.navGroup === 'alarms') return 'alarmsShell';
+  if (rawScreen?.navGroup === 'settings') return 'settingsShell';
+  return null;
+}
+
+function normalizeNavShellFields(rawScreen) {
+  if (!rawScreen?.overviewShell) return rawScreen;
+  const targetKey = getNavShellKey(rawScreen);
+  if (!targetKey || targetKey === 'overviewShell') return rawScreen;
+  const misplaced = rawScreen.overviewShell;
+  if (!misplaced || !Object.keys(misplaced).length) {
+    const next = { ...rawScreen };
+    delete next.overviewShell;
+    return next;
+  }
+  const next = { ...rawScreen, [targetKey]: { ...(rawScreen[targetKey] || {}), ...misplaced } };
+  delete next.overviewShell;
+  return next;
+}
+
+function getNavShellBase(rawScreen, name) {
+  if (typeof TemplateCompose === 'undefined' || !rawScreen?.navGroup) return null;
+  if (rawScreen.navGroup === 'manual') {
+    const shell = TemplateCompose.buildManualShell({ ...rawScreen, manualShell: {} });
+    return shell.find((c) => c.name === name) || null;
+  }
+  if (rawScreen.navGroup === 'overview') {
+    const shell = TemplateCompose.buildOverviewShell({ ...rawScreen, overviewShell: {} });
+    return shell.find((c) => c.name === name) || null;
+  }
+  if (rawScreen.navGroup === 'alarms') {
+    const shell = TemplateCompose.buildAlarmsShell({ ...rawScreen, alarmsShell: {} });
+    return shell.find((c) => c.name === name) || null;
+  }
+  if (rawScreen.navGroup === 'settings') {
+    const shell = TemplateCompose.buildSettingsShell({ ...rawScreen, settingsShell: {} });
+    return shell.find((c) => c.name === name) || null;
+  }
+  return null;
+}
+
+function captureNavShellUndo(canvas) {
+  const key = getNavShellKey(canvas);
+  if (!key) return {};
+  return { [key]: cloneUndoData(canvas[key]) };
+}
+
+function navShellStatusLabel(rawScreen) {
+  const key = getNavShellKey(rawScreen);
+  if (key === 'manualShell') return 'manual nav';
+  if (key === 'alarmsShell') return 'alarms nav';
+  if (key === 'settingsShell') return 'settings nav';
+  return 'overview nav';
 }
 
 function resolveComponentEditRef(comp, raw, source = '') {
@@ -929,7 +1003,7 @@ async function buildCanvasEditComponents(rawCanvas) {
     return composed;
   };
 
-  if (!isEditingGlobalObject() && rawCanvas.navGroup === 'overview') {
+  if (!isEditingGlobalObject() && (rawCanvas.navGroup === 'overview' || rawCanvas.navGroup === 'manual')) {
     try {
       const data = await loadComposed();
       for (const comp of data.components || []) {
@@ -978,6 +1052,46 @@ async function patchOpenCanvas(patch) {
   return result;
 }
 
+async function propagateNavShellOverride(canvas, shellKey, buttonName, overrideValue) {
+  const navGroup = canvas?.navGroup;
+  if (!navGroup || !shellKey || !buttonName) return;
+  let subNav = [];
+  try {
+    const nav = await fetchJson(`/api/runtime/navigation?project=${encodeURIComponent(state.activeProject)}`);
+    subNav = nav?.subNav?.[navGroup] || [];
+  } catch {
+    return;
+  }
+  const project = state.activeProject;
+  const currentId = canvas.id;
+  await Promise.all(subNav.map(async (entry) => {
+    const screenId = entry?.screen;
+    if (!screenId || screenId === currentId) return;
+    let shellPatch;
+    if (!overrideValue || !Object.keys(overrideValue).length) {
+      try {
+        const raw = await fetchJson(`/api/runtime/screens/${encodeURIComponent(screenId)}?project=${encodeURIComponent(project)}&raw=1&file=1`);
+        const nextShell = { ...(raw?.[shellKey] || {}) };
+        delete nextShell[buttonName];
+        shellPatch = Object.keys(nextShell).length ? nextShell : {};
+      } catch {
+        return;
+      }
+      await fetchJson(`/api/projects/${encodeURIComponent(project)}/screens/${encodeURIComponent(screenId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [shellKey]: shellPatch, _replaceNavShell: true })
+      });
+      return;
+    }
+    await fetchJson(`/api/projects/${encodeURIComponent(project)}/screens/${encodeURIComponent(screenId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [shellKey]: { [buttonName]: overrideValue } })
+    });
+  }));
+}
+
 async function upsertCanvasComponent(component) {
   if (!displayIsOpen()) return false;
   const ref = state.propsDialog.ref;
@@ -986,13 +1100,16 @@ async function upsertCanvasComponent(component) {
 
   if (ref?.type === 'shell') {
     const canvas = await fetchOpenCanvas();
-    const base = getOverviewShellBase(canvas, ref.name) || {};
+    const shellKey = getNavShellKey(canvas);
+    if (!shellKey) return false;
+    const base = getNavShellBase(canvas, ref.name) || {};
     const stored = buildGotoOverrideStore(clean, base);
-    const overviewShell = { ...(canvas.overviewShell || {}) };
-    if (!stored || Object.keys(stored).length === 0) delete overviewShell[ref.name];
-    else overviewShell[ref.name] = stored;
-    await patchOpenCanvas({ overviewShell });
-    state.canvasEditCache.raw = { ...canvas, overviewShell };
+    const shellOverrides = { ...(canvas[shellKey] || {}) };
+    if (!stored || Object.keys(stored).length === 0) delete shellOverrides[ref.name];
+    else shellOverrides[ref.name] = stored;
+    await patchOpenCanvas({ [shellKey]: shellOverrides });
+    await propagateNavShellOverride(canvas, shellKey, ref.name, shellOverrides[ref.name] || null);
+    state.canvasEditCache.raw = { ...canvas, [shellKey]: shellOverrides };
     invalidateCanvasCaches();
     try {
       const composed = await fetchComposedCanvasCached();
@@ -3171,12 +3288,14 @@ async function updateCanvasComponentBounds(index, bounds) {
 
   if (entry.ref?.type === 'shell') {
     const canvas = await fetchOpenCanvas();
-    const overviewShell = {
-      ...(canvas.overviewShell || {}),
-      [entry.ref.name]: { ...(canvas.overviewShell?.[entry.ref.name] || {}), ...bounds }
+    const shellKey = getNavShellKey(canvas);
+    if (!shellKey) return;
+    const shellOverrides = {
+      ...(canvas[shellKey] || {}),
+      [entry.ref.name]: { ...(canvas[shellKey]?.[entry.ref.name] || {}), ...bounds }
     };
-    await patchOpenCanvas({ overviewShell });
-    state.canvasEditCache.raw = { ...canvas, overviewShell };
+    await patchOpenCanvas({ [shellKey]: shellOverrides });
+    state.canvasEditCache.raw = { ...canvas, [shellKey]: shellOverrides };
     await updateCanvasPreview({ forceReload: true });
     scheduleRefreshCanvasEditOverlay();
     setCanvasSelection(index);
@@ -3208,7 +3327,7 @@ async function openPropertiesForComponent(index) {
   ensureDeferredStudioInits();
   let entry = state.canvasEditCache?.editComponents?.[index];
   if (!entry?.comp) return;
-  entry = await resolveTemplateGlobalPropertiesEntry(entry);
+  entry = await resolveTemplatePropertiesEntry(entry);
   const comp = entry.comp;
   const ref = entry.ref;
   try {
@@ -3288,6 +3407,7 @@ async function openPropertiesForComponent(index) {
       switchGotoButtonTab('general');
       wireGotoButtonDialogTools();
       document.getElementById('gotoButtonDialog')?.showModal();
+      setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'ReturnToButton') {
       window.StudioReturnToButton?.fillReturnToButtonForm(comp);
       resetPropsDialogState('return-to', window.StudioReturnToButton.readReturnToButtonForm, 'applyReturnToButton', index, entry.ref);
@@ -3359,6 +3479,7 @@ async function openPropertiesForComponent(index) {
       resetPropsDialogState('image', readCanvasImagePropertiesForm, 'applyCanvasImageProperties', index, ref);
       switchCanvasImagePropertiesTab('general');
       document.getElementById('canvasImagePropertiesDialog')?.showModal();
+      setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'Rectangle' || comp.type === 'Ellipse') {
       window.StudioShapeProperties?.openShapePropertiesDialog(comp, ref, index);
     } else {
@@ -3552,15 +3673,17 @@ async function deleteSelectedCanvasComponent() {
 
   if (entry.ref?.type === 'shell') {
     const canvas = await fetchOpenCanvas();
-    const overviewShell = { ...(canvas.overviewShell || {}) };
-    delete overviewShell[entry.ref.name];
-    await patchOpenCanvas({ overviewShell });
+    const shellKey = getNavShellKey(canvas);
+    if (!shellKey) return;
+    const shellOverrides = { ...(canvas[shellKey] || {}) };
+    delete shellOverrides[entry.ref.name];
+    await patchOpenCanvas({ [shellKey]: shellOverrides });
     state.canvasSelection.index = null;
     await updateCanvasPreview({ forceReload: true });
     refreshObjectExplorer();
     refreshPropertyPanel();
     scheduleRefreshCanvasEditOverlay();
-    setStatus('Overview shell override removed');
+    setStatus(`${navShellStatusLabel(canvas)} shell override removed`);
     return;
   }
 

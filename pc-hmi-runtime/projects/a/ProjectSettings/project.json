@@ -23,7 +23,9 @@
       "securityPolicy": "None"
     },
     "pollIntervalMs": 200,
-    "reconnectIntervalMs": 5000
+    "reconnectIntervalMs": 5000,
+    "plcIpAddress": "",
+    "path": "0"
   },
   "users": [
     {
@@ -3120,7 +3122,7 @@
     },
     "lastOpenedWith": "Plant HMI Studio 1.0",
     "language": "en",
-    "lastOpenedAt": "2026-08-13T10:35:50.618Z"
+    "lastOpenedAt": "2026-08-14T08:54:48.225Z"
   },
   "createdAt": "2026-08-04T10:57:19.614Z"
 }

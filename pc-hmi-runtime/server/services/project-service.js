@@ -10,7 +10,7 @@ const DISPLAY_FOLDERS = [
   { id: '400_Active_Alarms', label: '400 Active Alarms', navGroup: 'alarms' },
   { id: '500_Recipe', label: '500 Recipe', navGroup: 'recipe' },
   { id: '600_Legends', label: '600 Legends', navGroup: 'legends' },
-  { id: '700_User_Management', label: '700 User Management', navGroup: 'users' }
+  { id: '800_UserManagement', label: '800 User Management', navGroup: 'users' }
 ];
 
 const WINDOW_SIZE_PRESETS = [
@@ -366,6 +366,26 @@ class ProjectService {
     }
   }
 
+  /** Copy any missing standard-library display JSON into a project's Gfx folder */
+  ensureStandardScreens(projectId) {
+    if (!this.projectExists(projectId) || projectId === '_template') return;
+    const lib = this.readStandardLibrary();
+    const projectGfx = this.gfxDir(projectId);
+    const templateGfx = path.join(this.templateDir, 'Gfx');
+    const refGfx = this.gfxDir(STARTER_REFERENCE_PROJECT);
+    const screensDir = path.join(this.rootDir, 'screens');
+
+    for (const entry of lib.screens || []) {
+      const fileName = `${entry.id}.json`;
+      const dest = path.join(projectGfx, fileName);
+      if (fs.existsSync(dest)) continue;
+      const from = [refGfx, templateGfx, screensDir]
+        .map((dir) => path.join(dir, fileName))
+        .find((candidate) => fs.existsSync(candidate));
+      if (from) fs.copyFileSync(from, dest);
+    }
+  }
+
   /** Create FactoryTalk-style folder tree; migrate legacy screens/ → Gfx/ */
   ensureProjectLayout(projectId, { force = false } = {}) {
     if (!force && this._layoutEnsured.has(projectId)) return;
@@ -376,6 +396,7 @@ class ProjectService {
     }
     this.migrateLegacyScreens(projectId);
     this.ensureDefaultGlobalObjects(projectId);
+    this.ensureStandardScreens(projectId);
     this.seedDefaultImages(projectId);
     this._layoutEnsured.add(projectId);
   }
@@ -904,11 +925,85 @@ class ProjectService {
   }
 
   getScreen(projectId, screenId, options = {}) {
+    this.ensureProjectLayout(projectId);
+    this.ensureStandardScreens(projectId);
     const file = this.screenFilePath(projectId, screenId);
     if (!fs.existsSync(file)) return null;
     const raw = JSON.parse(readFileWithRetry(file));
-    if (options.raw) return raw;
+    if (this.migrateMisplacedNavShell(raw)) {
+      writeJsonFileSafe(file, raw);
+    }
+    if (options.raw) {
+      if (options.rawFile) return raw;
+      return this.mergeSharedNavShell(projectId, raw);
+    }
     return this.composeScreenWithTemplate(projectId, raw);
+  }
+
+  /** Studio previously saved nav overrides under overviewShell; move them to the navGroup shell field. */
+  migrateMisplacedNavShell(screen) {
+    if (!screen?.overviewShell) return false;
+    const targetKey = screen.navGroup === 'manual'
+      ? 'manualShell'
+      : screen.navGroup === 'alarms'
+        ? 'alarmsShell'
+        : screen.navGroup === 'settings'
+          ? 'settingsShell'
+          : null;
+    if (!targetKey) return false;
+    const misplaced = screen.overviewShell;
+    if (!misplaced || !Object.keys(misplaced).length) {
+      delete screen.overviewShell;
+      return true;
+    }
+    screen[targetKey] = { ...(screen[targetKey] || {}), ...misplaced };
+    delete screen.overviewShell;
+    console.info(`[project-service] Migrated overviewShell → ${targetKey} on ${screen.id || 'screen'}`);
+    return true;
+  }
+
+  shellKeyForNavGroup(navGroup) {
+    if (navGroup === 'manual') return 'manualShell';
+    if (navGroup === 'alarms') return 'alarmsShell';
+    if (navGroup === 'overview') return 'overviewShell';
+    if (navGroup === 'settings') return 'settingsShell';
+    return null;
+  }
+
+  /** Nav sidebar overrides edited on one screen should apply across the whole nav group. */
+  mergeSharedNavShell(projectId, rawScreen) {
+    const shellKey = this.shellKeyForNavGroup(rawScreen?.navGroup);
+    if (!shellKey) return rawScreen;
+
+    const nav = this.readNavigation(projectId);
+    const subNav = nav.subNav?.[rawScreen.navGroup] || [];
+    const merged = {};
+
+    for (const entry of subNav) {
+      const screenId = entry?.screen;
+      if (!screenId) continue;
+      const file = this.screenFilePath(projectId, screenId);
+      if (!fs.existsSync(file)) continue;
+      try {
+        const other = JSON.parse(readFileWithRetry(file));
+        const otherShell = other?.[shellKey] || {};
+        for (const [name, override] of Object.entries(otherShell)) {
+          if (!override || typeof override !== 'object') continue;
+          merged[name] = { ...(merged[name] || {}), ...override };
+        }
+      } catch {
+        /* ignore unreadable screen */
+      }
+    }
+
+    const currentShell = rawScreen[shellKey] || {};
+    for (const [name, override] of Object.entries(currentShell)) {
+      if (!override || typeof override !== 'object') continue;
+      merged[name] = { ...(merged[name] || {}), ...override };
+    }
+
+    if (!Object.keys(merged).length) return rawScreen;
+    return { ...rawScreen, [shellKey]: merged };
   }
 
   composeScreenWithTemplate(projectId, rawScreen) {
@@ -920,7 +1015,8 @@ class ProjectService {
     if (!templateObject?.components?.length && projectId !== '_template') {
       templateObject = this.getGlobalObject('_template', globalObjectId);
     }
-    return composeScreen(rawScreen, templateObject, runtime);
+    const mergedScreen = this.mergeSharedNavShell(projectId, rawScreen);
+    return composeScreen(mergedScreen, templateObject, runtime);
   }
 
   getFolderForScreen(screenId) {
@@ -1065,6 +1161,20 @@ class ProjectService {
         replace[key] = clean;
       }
       patch.template = { ...patch.template, replace };
+    }
+    if (patch._replaceNavShell) {
+      for (const shellKey of ['manualShell', 'overviewShell', 'alarmsShell', 'settingsShell']) {
+        if (patch[shellKey] && typeof patch[shellKey] === 'object') {
+          screen[shellKey] = patch[shellKey];
+          delete patch[shellKey];
+        }
+      }
+      delete patch._replaceNavShell;
+    }
+    for (const shellKey of ['manualShell', 'overviewShell', 'alarmsShell', 'settingsShell']) {
+      if (!patch[shellKey] || typeof patch[shellKey] !== 'object') continue;
+      screen[shellKey] = { ...(screen[shellKey] || {}), ...patch[shellKey] };
+      delete patch[shellKey];
     }
     Object.assign(screen, patch);
     delete screen._composed;

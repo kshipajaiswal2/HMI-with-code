@@ -6,7 +6,7 @@
     { "screen": "400_Active_Alarms", "label": "Alarms", "icon": "alarms", "group": "alarms" },
     { "screen": "500_Recipe", "label": "Recipe", "icon": "recipe", "group": "recipe" },
     { "screen": "600_Legends", "label": "Legends", "icon": "legends", "group": "legends" },
-    { "screen": "700_User_Management", "label": "Login", "icon": "user", "group": "users" }
+    { "screen": "800_UserManagement", "label": "User", "icon": "user", "group": "users" }
   ],
   "subNav": {
     "overview": [
@@ -18,8 +18,9 @@
     "manual": [
       { "screen": "301_PLC_IO_List", "label": "PLC IO List" },
       { "screen": "302_PLC_Architecture", "label": "PLC Architecture" },
-      { "screen": "303_IO_List", "label": "IO List" },
-      { "screen": "304_Cycle_Time", "label": "Cycle Time" }
+      { "screen": "303_Run_Count", "label": "Run Time" },
+      { "screen": "304_Cycle_Time", "label": "Cycle Time" },
+      { "screen": "305_Network", "label": "Network" }
     ],
     "alarms": [
       { "screen": "400_Active_Alarms", "label": "Active Alarms" },
@@ -29,6 +30,9 @@
     "recipe": [
       { "screen": "500_Recipe", "label": "Recipe Select" },
       { "screen": "500_Recipe_1", "label": "Recipe Detail" }
+    ],
+    "users": [
+      { "screen": "800_UserManagement", "label": "User Management" }
     ]
   }
 }

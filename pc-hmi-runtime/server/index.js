@@ -11,11 +11,18 @@ const { createCommunicationDriver } = require('./services/communication/driver-f
 const { seedDemoTagValues } = require('./services/communication/demo-tag-seeds');
 const { TagLogicService } = require('./services/tag-logic-service');
 const { ProjectService } = require('./services/project-service');
+const { DeployService } = require('./services/deploy-service');
+const { isValidIpv4 } = require('./services/communication/ethernet-ip');
+const ParameterFiles = require('../public/parameter-files');
+const IoListTags = require('../shared/io-list-tags');
+const ParameterFileService = require('./services/parameter-file-service');
+const ParameterFileBuilder = require('../shared/parameter-file-builder');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = process.env.PORT || 8080;
 
 const projectService = new ProjectService(ROOT);
+const deployService = new DeployService(ROOT);
 const tagService = new TagService();
 const alarmService = new AlarmService(tagService);
 const tagLogicService = new TagLogicService(tagService);
@@ -24,52 +31,111 @@ let navigationConfig = {};
 let projectConfig = {};
 let driver = null;
 let loadedRuntimeProjectId = null;
+let runtimeCommunicationOverride = null;
+
+function getEffectiveCommunication() {
+  return {
+    ...(projectConfig.communication || {}),
+    ...(runtimeCommunicationOverride || {})
+  };
+}
+
+function shouldSeedDemoTags(communication) {
+  return (communication?.driver || 'simulator') === 'simulator';
+}
+
+function seedDemoTagsIfNeeded(communication) {
+  if (shouldSeedDemoTags(communication)) {
+    seedDemoTagValues(tagService);
+    tagService.syncConnections();
+  }
+}
+
+function emitCommunicationChanged() {
+  const status = driver?.getStatus?.() ?? { connected: false, driver: 'none', quality: 'bad' };
+  io.emit('communication-changed', {
+    ...status,
+    effectiveDriver: getEffectiveCommunication().driver || 'simulator',
+    plcIpAddress: getEffectiveCommunication().plcIpAddress || null
+  });
+}
+
+async function reloadCommunicationDriver(communicationOverride, options = {}) {
+  if (options.persistToProject) {
+    runtimeCommunicationOverride = null;
+  } else if (communicationOverride) {
+    runtimeCommunicationOverride = { ...communicationOverride };
+  }
+  const communication = getEffectiveCommunication();
+  if (driver) driver.disconnect();
+  driver = createCommunicationDriver(communication, tagService, alarmService, tagLogicService);
+  try {
+    await driver.connect();
+  } catch (err) {
+    console.error('Communication driver connect failed:', err.message);
+  }
+  seedDemoTagsIfNeeded(communication);
+  tagLogicService.evaluate();
+  alarmService.evaluate();
+  emitCommunicationChanged();
+  return driver.getStatus?.();
+}
+
+let runtimeLoadChain = Promise.resolve();
 
 function loadProjectRuntime(projectId) {
+  runtimeLoadChain = runtimeLoadChain.then(() => loadProjectRuntimeInner(projectId)).catch((err) => {
+    console.error('Runtime load failed:', err.message);
+  });
+  return runtimeLoadChain;
+}
+
+function loadProjectRuntimeInner(projectId) {
   const id = projectId || projectService.getActiveId();
   if (!id) return Promise.resolve();
   projectConfig = projectService.readProjectConfig(id);
   navigationConfig = projectService.readNavigation(id);
+  runtimeCommunicationOverride = null;
   userService = new UserService(projectConfig.users || []);
 
   const runtimeTags = TagLogicService.mergeBuiltinRuntimeTags(
     TagLogicService.mergeBuiltinSafetyTags(projectConfig.tags || [])
   );
+  tagService.clearSubscriptions();
   tagService.tags.clear();
   tagService.loadDefinitions(runtimeTags);
+  tagService.loadConnections(runtimeTags);
   tagLogicService.loadRules(runtimeTags);
   alarmService.definitions = [];
   alarmService.active = [];
   alarmService.loadDefinitions(projectConfig.alarms || []);
 
+  const communication = getEffectiveCommunication();
   if (driver) driver.disconnect();
-  driver = createCommunicationDriver(projectConfig.communication || {}, tagService, alarmService, tagLogicService);
-  const driverType = projectConfig.communication?.driver || 'simulator';
+  driver = createCommunicationDriver(communication, tagService, alarmService, tagLogicService);
 
   return Promise.resolve(driver.connect())
     .then(() => {
-      // Only seed demo data in simulator mode to prevent overwrites in live PLC mode
-      if (driverType === 'simulator') {
-        seedDemoTagValues(tagService);
-      }
+      seedDemoTagsIfNeeded(communication);
       tagLogicService.evaluate();
+      alarmService.evaluate();
       loadedRuntimeProjectId = id;
+      emitCommunicationChanged();
     })
     .catch((err) => {
       console.error('Communication driver connect failed:', err.message);
-      // Only seed demo data in simulator mode as fallback
-      if (driverType === 'simulator') {
-        seedDemoTagValues(tagService);
-      }
+      seedDemoTagsIfNeeded(communication);
       tagLogicService.evaluate();
+      alarmService.evaluate();
       loadedRuntimeProjectId = id;
+      emitCommunicationChanged();
     });
 }
 
-function ensureRuntimeLoaded() {
-  const activeId = projectService.getActiveId();
-  if (activeId && activeId !== loadedRuntimeProjectId) {
-    loadProjectRuntime(activeId);
+async function ensureRuntimeLoaded(req) {
+  const pid = req ? resolveProjectId(req) : projectService.getActiveId();
+  if (pid && pid !== loadedRuntimeProjectId) {
+    await loadProjectRuntime(pid);
   }
 }
 
@@ -93,6 +159,8 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.static(path.join(ROOT, 'public')));
+app.use('/shared', express.static(path.join(ROOT, 'shared')));
+app.use('/config', express.static(path.join(ROOT, 'config')));
 app.use('/projects', express.static(path.join(ROOT, 'projects')));
 
 app.get('/', (_req, res) => {
@@ -150,9 +218,108 @@ app.delete('/api/projects/:id/screens/:screenId', (req, res) => {
 
 app.patch('/api/projects/:id/config', (req, res) => {
   try {
-    const config = projectService.updateProjectConfig(req.params.id, req.body || {});
-    if (req.params.id === projectService.getActiveId()) loadProjectRuntime(req.params.id);
+    const patch = req.body || {};
+    if (patch.communication?.driver === 'ethernet-ip') {
+      const ip = String(patch.communication.plcIpAddress || '').trim();
+      if (!ip || !isValidIpv4(ip)) {
+        return res.status(400).json({ error: 'Valid PLC IP address is required for EtherNet/IP driver' });
+      }
+    }
+    const config = projectService.updateProjectConfig(req.params.id, patch);
+    if (patch.parameterFiles) {
+      ParameterFileService.writeProjectParameterParFiles(ROOT, req.params.id, config.parameterFiles);
+    }
+    if (req.params.id === projectService.getActiveId() || req.params.id === loadedRuntimeProjectId) {
+      loadProjectRuntime(req.params.id);
+    }
     res.json({ success: true, config });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/projects/:id/parameter-files', (req, res) => {
+  try {
+    const config = projectService.readProjectConfig(req.params.id);
+    const parameterFiles = ParameterFileBuilder.mergeProjectParameterFiles(config.parameterFiles);
+    res.json({ parameterFiles });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/projects/:id/parameter-files', (req, res) => {
+  try {
+    const kind = String(req.body?.kind || '').trim();
+    if (!ParameterFileBuilder.IO_LIST_KINDS[kind]) {
+      return res.status(400).json({ error: 'Invalid kind — use di, do, safetyDi, or safetyDo' });
+    }
+    const config = projectService.readProjectConfig(req.params.id);
+    const result = ParameterFileService.addProjectParameterFile(config, kind);
+    const next = projectService.updateProjectConfig(req.params.id, {
+      parameterFiles: result.parameterFiles,
+      tags: result.tags
+    });
+    ParameterFileService.writeProjectParameterParFiles(ROOT, req.params.id, result.parameterFiles);
+    fs.writeFileSync(
+      path.join(ROOT, 'config', 'io-list-tag-values.json'),
+      `${JSON.stringify(result.listValues, null, 2)}\n`
+    );
+    if (req.params.id === projectService.getActiveId() || req.params.id === loadedRuntimeProjectId) {
+      loadProjectRuntime(req.params.id);
+    }
+    res.json({
+      success: true,
+      added: result.addedName,
+      listNum: result.listNum,
+      parameterFiles: next.parameterFiles
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/projects/:id/parameter-files/:name', (req, res) => {
+  try {
+    const name = decodeURIComponent(req.params.name);
+    const config = projectService.readProjectConfig(req.params.id);
+    const files = { ...ParameterFileBuilder.mergeProjectParameterFiles(config.parameterFiles) };
+    if (!files[name]) return res.status(404).json({ error: 'Parameter file not found' });
+    const replacements = req.body?.replacements;
+    if (!replacements || typeof replacements !== 'object') {
+      return res.status(400).json({ error: 'replacements object required' });
+    }
+    files[name] = { ...files[name], replacements };
+    const next = projectService.updateProjectConfig(req.params.id, { parameterFiles: files });
+    ParameterFileService.writeProjectParameterParFiles(ROOT, req.params.id, files);
+    if (req.params.id === projectService.getActiveId() || req.params.id === loadedRuntimeProjectId) {
+      loadProjectRuntime(req.params.id);
+    }
+    res.json({ success: true, parameterFiles: next.parameterFiles });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/projects/:id/parameter-files/:name', (req, res) => {
+  try {
+    const name = decodeURIComponent(req.params.name);
+    const config = projectService.readProjectConfig(req.params.id);
+    const result = ParameterFileService.removeProjectParameterFile(config, name);
+    if (!result) return res.status(404).json({ error: 'Parameter file not found' });
+    const next = projectService.updateProjectConfig(req.params.id, {
+      parameterFiles: result.parameterFiles,
+      tags: result.tags
+    });
+    ParameterFileService.writeProjectParameterParFiles(ROOT, req.params.id, result.parameterFiles);
+    fs.writeFileSync(
+      path.join(ROOT, 'config', 'io-list-tag-values.json'),
+      `${JSON.stringify(result.listValues, null, 2)}\n`
+    );
+    if (req.params.id === projectService.getActiveId() || req.params.id === loadedRuntimeProjectId) {
+      loadProjectRuntime(req.params.id);
+    }
+    res.json({ success: true, removed: result.removedName, parameterFiles: next.parameterFiles });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -283,9 +450,63 @@ app.post('/api/projects/:id/open', (req, res) => {
   }
 });
 
-app.use('/api/runtime', (_req, _res, next) => {
-  ensureRuntimeLoaded();
-  next();
+app.post('/api/projects/:id/deploy/package', (req, res) => {
+  try {
+    const result = deployService.buildPanelPackage(req.params.id, projectService);
+    res.json({
+      success: true,
+      packageName: result.packageName,
+      packageDir: result.packageDir,
+      zipPath: result.zipPath,
+      zipError: result.zipError,
+      downloadUrl: result.zipPath
+        ? `/api/projects/${encodeURIComponent(req.params.id)}/deploy/download/${encodeURIComponent(path.basename(result.zipPath))}`
+        : null
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/projects/:id/deploy/copy', (req, res) => {
+  try {
+    const { targetPath } = req.body || {};
+    const result = deployService.deployToTarget(req.params.id, targetPath, projectService);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/projects/:id/deploy/download/:fileName', (req, res) => {
+  try {
+    const fileName = path.basename(req.params.fileName);
+    if (fileName !== req.params.fileName) {
+      return res.status(400).json({ error: 'Invalid package file name' });
+    }
+    const zipPath = path.join(deployService.outputRoot, fileName);
+    if (!fs.existsSync(zipPath)) return res.status(404).json({ error: 'Package not found' });
+    res.download(zipPath);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/projects/:id/deploy/packages', (req, res) => {
+  try {
+    res.json({ packages: deployService.listPackages() });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.use('/api/runtime', async (req, res, next) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    next();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/runtime/navigation', (req, res) => {
@@ -296,15 +517,23 @@ app.get('/api/runtime/navigation', (req, res) => {
 app.get('/api/runtime/status', (req, res) => {
   const pid = resolveProjectId(req);
   const config = projectService.readProjectConfig(pid);
+  const communication = getEffectiveCommunication();
   res.json({
     platform: 'Plant HMI Studio',
     version: '0.2.0',
     projectId: pid,
-    communication: driver?.getStatus?.() ?? { connected: false, driver: 'none', quality: 'bad' },
+    communication: {
+      ...(driver?.getStatus?.() ?? { connected: false, driver: 'none', quality: 'bad' }),
+      effectiveDriver: communication.driver || 'simulator',
+      plcIpAddress: communication.plcIpAddress || null,
+      path: communication.path || '0',
+      pollIntervalMs: communication.pollIntervalMs || 200
+    },
     currentUser: userService.getCurrentUser(),
     startupScreen: config.startupScreen || '100_Overview',
     projectName: config.name || pid,
     projectSubtitle: config.subtitle || '',
+    parameterFiles: ParameterFileBuilder.mergeProjectParameterFiles(config.parameterFiles),
     runtime: {
       width: config.runtime?.width ?? 800,
       height: config.runtime?.height ?? 600,
@@ -364,28 +593,44 @@ app.post('/api/runtime/alarms/clear-history', (_req, res) => {
   res.json({ success: true });
 });
 
-app.post('/api/runtime/tags/write', (req, res) => {
+app.post('/api/runtime/parameter-file/apply', async (req, res) => {
+  await ensureRuntimeLoaded(req);
+  const { parameterFile } = req.body || {};
+  if (!parameterFile) return res.status(400).json({ error: 'parameterFile required' });
+  const pid = resolveProjectId(req);
+  const config = projectService.readProjectConfig(pid);
+  const values = IoListTags.buildAllListRuntimeValues(config.parameterFiles, config.tags)[parameterFile];
+  if (!values) return res.status(404).json({ error: `Unknown parameter file: ${parameterFile}` });
+  const updated = [];
+  for (const [tag, value] of Object.entries(values)) {
+    if (tagService.set(tag, value)) updated.push(tag);
+  }
+  tagService.syncConnections();
+  tagLogicService.evaluate();
+  alarmService.evaluate();
+  io.emit('tags', tagService.getSubscribedSnapshot());
+  res.json({ success: true, parameterFile, updated: updated.length });
+});
+
+app.post('/api/runtime/tags/write', async (req, res) => {
   const { tag, value } = req.body || {};
   if (!tag) return res.status(400).json({ error: 'tag required' });
   if (tagLogicService.isComputed(tag)) {
     return res.status(400).json({ error: `${tag} is computed by Python logic and cannot be written directly` });
   }
-  
-  // Write to tag service (always updated locally)
-  const ok = tagService.set(tag, value);
-  
-  // Forward write to PLC driver if connected and not in simulator mode
-  if (driver && driver.writeTagToPLC && driver.connected && projectConfig.communication?.driver !== 'simulator') {
-    try {
-      driver.writeTagToPLC(tag, value);
-    } catch (err) {
-      console.warn(`Failed to write tag to PLC: ${err.message}`);
+  try {
+    if (typeof driver?.writeTag === 'function') {
+      await driver.writeTag(tag, value);
+    } else {
+      const ok = tagService.set(tag, value);
+      if (!ok) return res.status(404).json({ error: `Unknown tag: ${tag}` });
+      tagLogicService.evaluate();
+      alarmService.evaluate();
     }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(502).json({ error: err.message || 'Tag write failed' });
   }
-  
-  tagLogicService.evaluate();
-  alarmService.evaluate();
-  res.json({ success: ok });
 });
 
 app.get('/api/runtime/tags/logic', (_req, res) => {
@@ -400,64 +645,82 @@ app.post('/api/runtime/tags/logic/evaluate', (_req, res) => {
   res.json({ success: true, ...result, tags: tagService.getAll() });
 });
 
-app.post('/api/runtime/communication/test', async (req, res) => {
-  ensureRuntimeLoaded();
-  const { driver, plcIpAddress, path } = req.body || {};
-  if (driver === 'simulator') {
-    return res.json({ ok: true, message: 'Simulator does not require a live PLC' });
-  }
-  const { probePlc, isValidIpv4 } = require('./services/communication/ethernet-ip');
-  if (!plcIpAddress || !isValidIpv4(plcIpAddress)) {
-    return res.status(400).json({ ok: false, error: 'Valid PLC IP address is required' });
-  }
-  const port = driver === 'opcua' ? (req.body?.opcuaPort || 4840) : 44818;
-  const result = await probePlc(plcIpAddress, port);
+app.get('/api/runtime/communication', (_req, res) => {
+  const communication = getEffectiveCommunication();
   res.json({
-    ok: result.ok,
-    error: result.error,
-    plcIpAddress,
-    path: path || '0',
-    port
+    ...communication,
+    status: driver?.getStatus?.() ?? { connected: false, driver: 'none', quality: 'bad' }
   });
 });
 
-app.post('/api/runtime/communication/switch-mode', async (req, res) => {
+app.post('/api/runtime/communication/mode', async (req, res) => {
   ensureRuntimeLoaded();
-  const { driver: newDriver } = req.body || {};
-  
-  if (!newDriver || !['simulator', 'ethernet-ip', 'opcua'].includes(newDriver)) {
-    return res.status(400).json({ success: false, error: 'Invalid driver. Must be simulator, ethernet-ip, or opcua' });
+  const { driver: driverName, persist, plcIpAddress, path, pollIntervalMs } = req.body || {};
+  if (!driverName || !['simulator', 'ethernet-ip'].includes(driverName)) {
+    return res.status(400).json({ error: 'driver must be simulator or ethernet-ip' });
+  }
+  const next = {
+    ...getEffectiveCommunication(),
+    driver: driverName
+  };
+  if (plcIpAddress != null) next.plcIpAddress = String(plcIpAddress).trim();
+  if (path != null) next.path = String(path).trim() || '0';
+  if (pollIntervalMs != null) next.pollIntervalMs = Number(pollIntervalMs) || 200;
+
+  if (driverName === 'ethernet-ip') {
+    const { isValidIpv4 } = require('./services/communication/ethernet-ip');
+    if (!next.plcIpAddress || !isValidIpv4(next.plcIpAddress)) {
+      return res.status(400).json({ error: 'Valid PLC IP address is required for live mode' });
+    }
   }
 
   try {
-    // Update project config with new driver
-    projectConfig.communication = projectConfig.communication || {};
-    projectConfig.communication.driver = newDriver;
-
-    // Save the updated config
-    projectService.updateProjectConfig(projectService.getActiveId(), projectConfig);
-
-    // Reconnect with new driver
-    if (driver) driver.disconnect();
-    driver = createCommunicationDriver(projectConfig.communication || {}, tagService, alarmService, tagLogicService);
-    
-    const result = await driver.connect();
-    
-    // Broadcast mode change
-    io.emit('communication-changed', {
-      driver: newDriver,
-      connected: result.connected,
-      status: driver.getStatus?.()
-    });
-
-    res.json({ 
-      success: true, 
-      message: `Switched to ${newDriver} mode`,
-      communication: driver.getStatus?.() ?? { driver: newDriver, connected: false }
+    if (persist) {
+      const pid = projectService.getActiveId();
+      projectConfig = projectService.updateProjectConfig(pid, { communication: next });
+    }
+    const status = await reloadCommunicationDriver(next, { persistToProject: Boolean(persist) });
+    res.json({
+      success: true,
+      communication: getEffectiveCommunication(),
+      status
     });
   } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
+    res.status(500).json({ error: err.message || 'Failed to switch communication mode' });
   }
+});
+
+app.post('/api/runtime/communication/test', async (req, res) => {
+  ensureRuntimeLoaded();
+  const { driver: driverName, plcIpAddress, path } = req.body || {};
+  if (driverName === 'simulator') {
+    return res.json({ ok: true, message: 'Simulator does not require a live PLC' });
+  }
+  const { EthernetIpDriver, probePlc, isValidIpv4 } = require('./services/communication/ethernet-ip');
+  if (!plcIpAddress || !isValidIpv4(plcIpAddress)) {
+    return res.status(400).json({ ok: false, error: 'Valid PLC IP address is required' });
+  }
+  if (driverName === 'opcua') {
+    const port = req.body?.opcuaPort || 4840;
+    const result = await probePlc(plcIpAddress, port);
+    return res.json({
+      ok: result.ok,
+      error: result.error,
+      plcIpAddress,
+      path: path || '0',
+      port
+    });
+  }
+  const slot = Number(path ?? '0');
+  const result = await EthernetIpDriver.testConnection(plcIpAddress, 44818, Number.isFinite(slot) ? slot : 0);
+  res.json({
+    ok: result.ok,
+    error: result.error,
+    controller: result.controller,
+    version: result.version,
+    plcIpAddress,
+    path: path || '0'
+  });
 });
 
 app.post('/api/runtime/login', (req, res) => {
@@ -473,101 +736,24 @@ app.post('/api/runtime/logout', (_req, res) => {
   res.json({ success: true });
 });
 
-// User Management API Endpoints
-app.get('/api/runtime/users', (_req, res) => {
-  const users = userService.getAllUsers();
-  res.json({ success: true, users });
-});
-
-app.post('/api/runtime/users/add', (req, res) => {
-  const { username, password, group } = req.body || {};
-  if (!username?.trim() || !password?.trim()) {
-    return res.status(400).json({ success: false, error: 'Username and password required' });
-  }
-  try {
-    const result = userService.addUser(username.trim(), password.trim(), group);
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-app.post('/api/runtime/users/delete', (req, res) => {
-  const { username } = req.body || {};
-  if (!username?.trim()) {
-    return res.status(400).json({ success: false, error: 'Username required' });
-  }
-  try {
-    const result = userService.deleteUser(username.trim());
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-app.post('/api/runtime/users/enable', (req, res) => {
-  const { username } = req.body || {};
-  if (!username?.trim()) {
-    return res.status(400).json({ success: false, error: 'Username required' });
-  }
-  try {
-    const result = userService.enableUser(username.trim());
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-app.post('/api/runtime/users/disable', (req, res) => {
-  const { username } = req.body || {};
-  if (!username?.trim()) {
-    return res.status(400).json({ success: false, error: 'Username required' });
-  }
-  try {
-    const result = userService.disableUser(username.trim());
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-app.post('/api/runtime/users/change-password', (req, res) => {
-  const { username, newPassword } = req.body || {};
-  if (!username?.trim() || !newPassword?.trim()) {
-    return res.status(400).json({ success: false, error: 'Username and new password required' });
-  }
-  try {
-    const result = userService.changePassword(username.trim(), newPassword.trim());
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-app.post('/api/runtime/users/change-group', (req, res) => {
-  const { username, group } = req.body || {};
-  if (!username?.trim()) {
-    return res.status(400).json({ success: false, error: 'Username required' });
-  }
-  try {
-    const result = userService.changeGroup(username.trim(), group);
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
 io.on('connection', (socket) => {
+  const communication = getEffectiveCommunication();
   socket.emit('init', {
     tags: tagService.getAll(),
     alarms: alarmService.getState(),
     user: userService.getCurrentUser(),
-    communication: driver?.getStatus?.() ?? { connected: false, driver: 'none', quality: 'bad' },
+    communication: {
+      ...(driver?.getStatus?.() ?? { connected: false, driver: 'none', quality: 'bad' }),
+      effectiveDriver: communication.driver || 'simulator',
+      plcIpAddress: communication.plcIpAddress || null,
+      path: communication.path || '0'
+    },
     project: projectService.getActiveProject()
   });
 
   socket.on('subscribe', (tagNames) => {
     tagService.subscribe(tagNames);
+    if (driver?.onSubscriptionsChanged) driver.onSubscriptionsChanged();
     socket.emit('tags', tagService.getSubscribedSnapshot());
   });
 });

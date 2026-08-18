@@ -19,7 +19,8 @@ const state = {
   startupSelectedProjectId: null,
   placement: null,
   propsDialog: { kind: null, snapshot: '', editIndex: null, ref: null },
-  canvasSelection: { index: null },
+  canvasSelection: { indices: [] },
+  clipboard: null,
   canvasHitClick: { index: null, time: 0 },
   canvasEditDrag: null,
   canvasEditOverlayRefresh: null,
@@ -746,6 +747,32 @@ function defaultTemplateConfig(canvas) {
   };
 }
 
+function stripNavShellPersistFields(patch) {
+  if (!patch || typeof patch !== 'object') return patch;
+  const next = { ...patch };
+  delete next.borderColor;
+  delete next.useBorderColor;
+  delete next.borderUsesBackColor;
+  delete next.navSideAccent;
+  delete next.label;
+  delete next.caption;
+  delete next.target;
+  return next;
+}
+
+function getSelectedCanvasIndices() {
+  return Array.isArray(state.canvasSelection.indices) ? state.canvasSelection.indices : [];
+}
+
+function getPrimaryCanvasSelectionIndex() {
+  const indices = getSelectedCanvasIndices();
+  return indices.length ? indices[indices.length - 1] : null;
+}
+
+function canvasSelectionIncludes(index) {
+  return getSelectedCanvasIndices().includes(index);
+}
+
 function isGeometryPatch(patch) {
   const keys = Object.keys(patch || {});
   return keys.length > 0 && keys.every((key) => ['left', 'top', 'width', 'height'].includes(key));
@@ -1052,46 +1079,6 @@ async function patchOpenCanvas(patch) {
   return result;
 }
 
-async function propagateNavShellOverride(canvas, shellKey, buttonName, overrideValue) {
-  const navGroup = canvas?.navGroup;
-  if (!navGroup || !shellKey || !buttonName) return;
-  let subNav = [];
-  try {
-    const nav = await fetchJson(`/api/runtime/navigation?project=${encodeURIComponent(state.activeProject)}`);
-    subNav = nav?.subNav?.[navGroup] || [];
-  } catch {
-    return;
-  }
-  const project = state.activeProject;
-  const currentId = canvas.id;
-  await Promise.all(subNav.map(async (entry) => {
-    const screenId = entry?.screen;
-    if (!screenId || screenId === currentId) return;
-    let shellPatch;
-    if (!overrideValue || !Object.keys(overrideValue).length) {
-      try {
-        const raw = await fetchJson(`/api/runtime/screens/${encodeURIComponent(screenId)}?project=${encodeURIComponent(project)}&raw=1&file=1`);
-        const nextShell = { ...(raw?.[shellKey] || {}) };
-        delete nextShell[buttonName];
-        shellPatch = Object.keys(nextShell).length ? nextShell : {};
-      } catch {
-        return;
-      }
-      await fetchJson(`/api/projects/${encodeURIComponent(project)}/screens/${encodeURIComponent(screenId)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [shellKey]: shellPatch, _replaceNavShell: true })
-      });
-      return;
-    }
-    await fetchJson(`/api/projects/${encodeURIComponent(project)}/screens/${encodeURIComponent(screenId)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [shellKey]: { [buttonName]: overrideValue } })
-    });
-  }));
-}
-
 async function upsertCanvasComponent(component) {
   if (!displayIsOpen()) return false;
   const ref = state.propsDialog.ref;
@@ -1103,12 +1090,11 @@ async function upsertCanvasComponent(component) {
     const shellKey = getNavShellKey(canvas);
     if (!shellKey) return false;
     const base = getNavShellBase(canvas, ref.name) || {};
-    const stored = buildGotoOverrideStore(clean, base);
+    const stored = stripNavShellPersistFields(buildGotoOverrideStore(clean, base));
     const shellOverrides = { ...(canvas[shellKey] || {}) };
     if (!stored || Object.keys(stored).length === 0) delete shellOverrides[ref.name];
     else shellOverrides[ref.name] = stored;
     await patchOpenCanvas({ [shellKey]: shellOverrides });
-    await propagateNavShellOverride(canvas, shellKey, ref.name, shellOverrides[ref.name] || null);
     state.canvasEditCache.raw = { ...canvas, [shellKey]: shellOverrides };
     invalidateCanvasCaches();
     try {
@@ -1408,7 +1394,7 @@ async function applyTextProperties() {
   const comp = readTextPropertiesForm();
   await upsertCanvasComponent(comp);
   commitPropsSnapshot(readTextPropertiesForm, 'applyTextProperties');
-  state.canvasSelection.index = state.propsDialog.editIndex;
+  state.canvasSelection.indices = [state.propsDialog.editIndex];
   setStatus(`Applied ${comp.name} on ${state.selectedScreenId}`);
 }
 
@@ -1417,7 +1403,7 @@ async function saveTextProperties(e) {
   const comp = readTextPropertiesForm();
   await upsertCanvasComponent(comp);
   document.getElementById('textPropertiesDialog').close();
-  state.canvasSelection.index = state.propsDialog.editIndex;
+  state.canvasSelection.indices = [state.propsDialog.editIndex];
   clearPropsDialogState();
   activateSelectTool(`Added ${comp.name} to ${state.selectedScreenId}`);
 }
@@ -1735,7 +1721,7 @@ async function applyMomentaryButton() {
   }
   await upsertCanvasComponent(comp);
   commitPropsSnapshot(readMomentaryButtonForm, 'applyMomentaryButton');
-  state.canvasSelection.index = state.propsDialog.editIndex;
+  state.canvasSelection.indices = [state.propsDialog.editIndex];
   setStatus(`Applied ${comp.name} on ${state.selectedScreenId}`);
 }
 
@@ -1749,7 +1735,7 @@ async function saveMomentaryButton(e) {
   }
   await upsertCanvasComponent(comp);
   document.getElementById('momentaryButtonDialog').close();
-  state.canvasSelection.index = state.propsDialog.editIndex;
+  state.canvasSelection.indices = [state.propsDialog.editIndex];
   clearPropsDialogState();
   activateSelectTool(`Added ${comp.name} to ${state.selectedScreenId}`);
 }
@@ -2059,7 +2045,7 @@ async function applyMaintainedButton() {
   }
   await upsertCanvasComponent(comp);
   commitPropsSnapshot(readMaintainedButtonForm, 'applyMaintainedButton');
-  state.canvasSelection.index = state.propsDialog.editIndex;
+  state.canvasSelection.indices = [state.propsDialog.editIndex];
   setStatus(`Applied ${comp.name} on ${state.selectedScreenId}`);
 }
 
@@ -2073,7 +2059,7 @@ async function saveMaintainedButton(e) {
   }
   await upsertCanvasComponent(comp);
   document.getElementById('maintainedButtonDialog').close();
-  state.canvasSelection.index = state.propsDialog.editIndex;
+  state.canvasSelection.indices = [state.propsDialog.editIndex];
   clearPropsDialogState();
   activateSelectTool(`Added ${comp.name} to ${state.selectedScreenId}`);
 }
@@ -2246,6 +2232,13 @@ function switchGotoButtonTab(tabId) {
   });
 }
 
+function normalizeGotoCaptionColor(useBorderColor, foreColor) {
+  const normalized = String(foreColor || '').trim().toLowerCase();
+  if (useBorderColor) return foreColor || '#000000';
+  if (!normalized || normalized === '#ffffff' || normalized === '#fff') return '#000000';
+  return foreColor || '#000000';
+}
+
 function syncGotoButtonGeneralFields() {
   const borderUsesBack = document.getElementById('gbBorderUsesBackColor')?.checked;
   const useBack = document.getElementById('gbUseBackColor')?.checked;
@@ -2255,6 +2248,13 @@ function syncGotoButtonGeneralFields() {
   const useVarDisplay = document.getElementById('gbUseVariableDisplay')?.checked;
   const displayPos = document.getElementById('gbDisplayPosition')?.checked;
   const paramType = document.querySelector('#gotoButtonForm input[name="gbParameterType"]:checked')?.value || 'file';
+
+  if (!useBorder) {
+    const captionEl = document.getElementById('gbCaptionColor');
+    if (captionEl) {
+      captionEl.value = normalizeGotoCaptionColor(false, captionEl.value);
+    }
+  }
 
   document.getElementById('gbBackColor').disabled = !useBack;
   document.getElementById('gbBorderColor').disabled = !useBorder || Boolean(borderUsesBack);
@@ -2355,7 +2355,7 @@ function fillGotoButtonForm(comp) {
   document.getElementById('gbUseCaptionColor').checked = comp.useCaptionColor !== undefined
     ? Boolean(comp.useCaptionColor)
     : comp.useForeColor !== false;
-  document.getElementById('gbCaptionColor').value = comp.foreColor || '#ffffff';
+  document.getElementById('gbCaptionColor').value = comp.foreColor || '#000000';
   document.getElementById('gbUseCaptionBackColor').checked = Boolean(comp.useCaptionBackColor);
   document.getElementById('gbCaptionBackColor').value = comp.captionBackColor || '#001C38';
   document.getElementById('gbCaptionBlink').checked = Boolean(comp.captionBlink);
@@ -2404,6 +2404,8 @@ function validateGotoButton(comp) {
 function readGotoButtonForm() {
   const alignment = document.querySelector('#gotoButtonForm input[name="gbAlign"]:checked')?.value || 'middleCenter';
   const caption = document.getElementById('gbCaption').value;
+  const useBorderColor = document.getElementById('gbUseBorderColor').checked;
+  const foreColor = normalizeGotoCaptionColor(useBorderColor, document.getElementById('gbCaptionColor').value);
   return {
     type: 'GotoButton',
     name: document.getElementById('gbName').value.trim() || 'GotoDisplayButton1',
@@ -2420,7 +2422,7 @@ function readGotoButtonForm() {
     borderUsesBackColor: document.getElementById('gbBorderUsesBackColor').checked,
     useBackColor: document.getElementById('gbUseBackColor').checked,
     backColor: document.getElementById('gbBackColor').value,
-    useBorderColor: document.getElementById('gbUseBorderColor').checked,
+    useBorderColor,
     borderColor: document.getElementById('gbBorderColor').value,
     usePatternColor: document.getElementById('gbUsePatternColor').checked,
     patternColor: document.getElementById('gbPatternColor').value,
@@ -2449,7 +2451,7 @@ function readGotoButtonForm() {
     bold: document.getElementById('gbBold').classList.contains('active'),
     italic: document.getElementById('gbItalic').classList.contains('active'),
     underline: document.getElementById('gbUnderline').classList.contains('active'),
-    foreColor: document.getElementById('gbCaptionColor').value,
+    foreColor,
     useForeColor: document.getElementById('gbUseCaptionColor').checked,
     useCaptionColor: document.getElementById('gbUseCaptionColor').checked,
     useCaptionBackColor: document.getElementById('gbUseCaptionBackColor').checked,
@@ -2475,7 +2477,7 @@ async function applyGotoButton() {
   if (!validateGotoButton(comp)) return;
   await upsertCanvasComponent(comp);
   commitPropsSnapshot(readGotoButtonForm, 'applyGotoButton');
-  state.canvasSelection.index = state.propsDialog.editIndex;
+  state.canvasSelection.indices = [state.propsDialog.editIndex];
   setStatus(`Applied ${comp.name} on ${state.selectedScreenId}`);
 }
 
@@ -2485,7 +2487,7 @@ async function saveGotoButton(e) {
   if (!validateGotoButton(comp)) return;
   await upsertCanvasComponent(comp);
   document.getElementById('gotoButtonDialog').close();
-  state.canvasSelection.index = state.propsDialog.editIndex;
+  state.canvasSelection.indices = [state.propsDialog.editIndex];
   clearPropsDialogState();
   activateSelectTool(`Added ${comp.name} to ${state.selectedScreenId}`);
 }
@@ -2760,7 +2762,7 @@ async function applyCanvasImageProperties() {
   }
   await upsertCanvasComponent(comp);
   commitPropsSnapshot(readCanvasImagePropertiesForm, 'applyCanvasImageProperties');
-  state.canvasSelection.index = state.propsDialog.editIndex;
+  state.canvasSelection.indices = [state.propsDialog.editIndex];
   setStatus(`Applied ${comp.name} on ${state.selectedScreenId}`);
 }
 
@@ -2774,7 +2776,7 @@ async function saveCanvasImageProperties(e) {
   }
   await upsertCanvasComponent(comp);
   document.getElementById('canvasImagePropertiesDialog').close();
-  state.canvasSelection.index = state.propsDialog.editIndex;
+  state.canvasSelection.indices = [state.propsDialog.editIndex];
   clearPropsDialogState();
   activateSelectTool(`Added ${comp.name} to ${state.selectedScreenId}`);
 }
@@ -3104,35 +3106,53 @@ function previewSetSelection(name) {
 }
 
 function clearCanvasSelection() {
-  if (state.canvasSelection.index == null) {
+  if (!getSelectedCanvasIndices().length) {
     previewSetSelection(null);
     return;
   }
-  state.canvasSelection.index = null;
+  state.canvasSelection.indices = [];
   state.canvasEditDrag = null;
   state.canvasHitClick = { index: null, time: 0 };
   refreshCanvasEditOverlaySelection();
   previewSetSelection(null);
+  updateEditClipboardUI();
 }
 
-function setCanvasSelection(index) {
+function setCanvasSelection(index, options = {}) {
   if (index == null) {
     clearCanvasSelection();
     return;
   }
-  state.canvasSelection.index = index;
+  const { additive = false, range = false } = options;
+  let indices = getSelectedCanvasIndices();
+  if (additive) {
+    indices = indices.includes(index)
+      ? indices.filter((i) => i !== index)
+      : [...indices, index];
+  } else if (range && indices.length) {
+    const anchor = indices[indices.length - 1];
+    const lo = Math.min(anchor, index);
+    const hi = Math.max(anchor, index);
+    indices = [];
+    for (let i = lo; i <= hi; i += 1) indices.push(i);
+  } else {
+    indices = [index];
+  }
+  state.canvasSelection.indices = indices;
   refreshCanvasEditOverlaySelection();
   const entry = state.canvasEditCache?.editComponents?.[index];
   const comp = entry?.comp;
   previewSetSelection(comp?.name || null);
-  setStatus(`Selected ${comp?.name || comp?.type || 'object'}`);
+  const count = indices.length;
+  setStatus(count > 1 ? `Selected ${count} objects` : `Selected ${comp?.name || comp?.type || 'object'}`);
+  updateEditClipboardUI();
 }
 
 function refreshCanvasEditOverlaySelection() {
   if (!canvasEditOverlay) return;
+  const selected = new Set(getSelectedCanvasIndices());
   canvasEditOverlay.querySelectorAll('.canvas-graphic-hit').forEach((el) => {
-    const selected = Number(el.dataset.index) === state.canvasSelection.index;
-    el.classList.toggle('selected', selected);
+    el.classList.toggle('selected', selected.has(Number(el.dataset.index)));
   });
 }
 
@@ -3165,6 +3185,9 @@ function attachPreviewLoadHandler() {
     }
     scheduleRefreshCanvasEditOverlay();
   };
+  previewFrame.onerror = () => {
+    setStatus('Preview failed to load — check server is running (npm start)');
+  };
 }
 
 let canvasOverlayRefreshTimer = null;
@@ -3180,7 +3203,7 @@ function scheduleRefreshCanvasEditOverlay() {
   canvasOverlayRefreshTimer = setTimeout(() => {
     canvasOverlayRefreshTimer = null;
     refreshCanvasEditOverlay().catch(() => {});
-  }, 400);
+  }, 150);
 }
 
 function scheduleRefreshAfterDialogClose() {
@@ -3209,7 +3232,7 @@ async function renderCanvasEditHits(editComponents) {
       hit.className = 'canvas-graphic-hit';
       hit.dataset.index = String(index);
       applyGraphicBoundsStyle(hit, comp);
-      if (index === state.canvasSelection.index) hit.classList.add('selected');
+      if (canvasSelectionIncludes(index)) hit.classList.add('selected');
 
       for (const corner of ['nw', 'ne', 'sw', 'se']) {
         const handle = document.createElement('span');
@@ -3264,8 +3287,9 @@ async function refreshCanvasEditOverlay() {
     await renderCanvasEditHits(editComponents);
     state.canvasEditOverlayStale = false;
 
-    if (state.canvasSelection.index != null) {
-      const selectedName = editComponents[state.canvasSelection.index]?.comp?.name || null;
+    const primaryIndex = getPrimaryCanvasSelectionIndex();
+    if (primaryIndex != null) {
+      const selectedName = editComponents[primaryIndex]?.comp?.name || null;
       previewSetSelection(selectedName);
     } else if (state.pendingGraphicSelection) {
       const pendingName = state.pendingGraphicSelection;
@@ -3292,11 +3316,16 @@ async function updateCanvasComponentBounds(index, bounds) {
     if (!shellKey) return;
     const shellOverrides = {
       ...(canvas[shellKey] || {}),
-      [entry.ref.name]: { ...(canvas[shellKey]?.[entry.ref.name] || {}), ...bounds }
+      [entry.ref.name]: stripNavShellPersistFields({
+        ...(canvas[shellKey]?.[entry.ref.name] || {}),
+        ...bounds
+      })
     };
     await patchOpenCanvas({ [shellKey]: shellOverrides });
     state.canvasEditCache.raw = { ...canvas, [shellKey]: shellOverrides };
-    await updateCanvasPreview({ forceReload: true });
+    if (entry.comp) Object.assign(entry.comp, bounds);
+    updateCanvasEditHitBounds(entry.comp?.name, bounds);
+    await updateCanvasPreview({ name: entry.comp?.name, bounds });
     scheduleRefreshCanvasEditOverlay();
     setCanvasSelection(index);
     return;
@@ -3490,6 +3519,47 @@ async function openPropertiesForComponent(index) {
   }
 }
 
+function handleStudioCanvasKeydown(e) {
+  if (isEditableKeyboardTarget(e.target)) return;
+  const key = e.key.toLowerCase();
+  const hasSelection = getSelectedCanvasIndices().length > 0;
+
+  if (e.ctrlKey && !e.shiftKey && key === 'z') {
+    e.preventDefault();
+    undoEdit().catch((err) => setStatus(`Undo error: ${err.message}`));
+    return;
+  }
+  if (e.ctrlKey && (key === 'y' || (e.shiftKey && key === 'z'))) {
+    e.preventDefault();
+    redoEdit().catch((err) => setStatus(`Redo error: ${err.message}`));
+    return;
+  }
+  if (e.ctrlKey && key === 'c' && hasSelection) {
+    e.preventDefault();
+    copySelectedCanvasComponent().catch((err) => setStatus(`Error: ${err.message}`));
+    return;
+  }
+  if (e.ctrlKey && key === 'x' && hasSelection) {
+    e.preventDefault();
+    cutSelectedCanvasComponent().catch((err) => setStatus(`Error: ${err.message}`));
+    return;
+  }
+  if (e.ctrlKey && key === 'v') {
+    e.preventDefault();
+    pasteClipboardComponents().catch((err) => setStatus(`Error: ${err.message}`));
+    return;
+  }
+  if (e.ctrlKey && key === 'd' && hasSelection) {
+    e.preventDefault();
+    duplicateSelectedCanvasComponent().catch((err) => setStatus(`Error: ${err.message}`));
+    return;
+  }
+  if ((key === 'delete' || key === 'backspace') && hasSelection && !state.placement) {
+    e.preventDefault();
+    deleteSelectedCanvasComponent().catch((err) => setStatus(`Error: ${err.message}`));
+  }
+}
+
 function initCanvasEditOverlay() {
   if (!canvasEditOverlay) return;
 
@@ -3508,7 +3578,13 @@ function initCanvasEditOverlay() {
     e.preventDefault();
     e.stopPropagation();
     const index = Number(hit.dataset.index);
-    setCanvasSelection(index);
+    if (e.ctrlKey || e.metaKey) {
+      setCanvasSelection(index, { additive: true });
+    } else if (e.shiftKey) {
+      setCanvasSelection(index, { range: true });
+    } else if (!canvasSelectionIncludes(index)) {
+      setCanvasSelection(index);
+    }
 
     const comp = state.canvasEditCache?.editComponents?.[index]?.comp;
     const entry = state.canvasEditCache?.editComponents?.[index];
@@ -3527,36 +3603,45 @@ function initCanvasEditOverlay() {
       return;
     }
 
+    const dragIndices = handle
+      ? [index]
+      : (canvasSelectionIncludes(index) ? getSelectedCanvasIndices() : [index]);
+    const origins = {};
+    for (const idx of dragIndices) {
+      const c = state.canvasEditCache?.editComponents?.[idx]?.comp;
+      if (!c) continue;
+      origins[idx] = {
+        left: c.left ?? 0,
+        top: c.top ?? 0,
+        width: c.width ?? 120,
+        height: c.height ?? 32
+      };
+    }
+
     const start = getCanvasPoint(e.clientX, e.clientY);
     if (handle) {
       state.canvasEditDrag = {
         mode: `resize-${handle.dataset.handle}`,
         index,
+        indices: dragIndices,
+        origins,
         start,
         startedAt: now,
         moved: false,
         undoEntry: captureDragUndoEntry(entry),
-        orig: {
-          left: comp.left ?? 0,
-          top: comp.top ?? 0,
-          width: comp.width ?? 120,
-          height: comp.height ?? 32
-        }
+        orig: origins[index]
       };
     } else {
       state.canvasEditDrag = {
         mode: 'move',
         index,
+        indices: dragIndices,
+        origins,
         start,
         startedAt: now,
         moved: false,
         undoEntry: captureDragUndoEntry(entry),
-        orig: {
-          left: comp.left ?? 0,
-          top: comp.top ?? 0,
-          width: comp.width ?? 120,
-          height: comp.height ?? 32
-        }
+        orig: origins[index]
       };
     }
   });
@@ -3586,6 +3671,25 @@ function initCanvasEditOverlay() {
     let top = drag.orig.top;
     let width = drag.orig.width;
     let height = drag.orig.height;
+
+    if (drag.mode === 'move' && drag.indices?.length > 1) {
+      drag.pendingByIndex = drag.pendingByIndex || {};
+      const canvasW = state.previewCanvas.width || 800;
+      const canvasH = state.previewCanvas.height || 600;
+      for (const idx of drag.indices) {
+        const orig = drag.origins?.[idx];
+        if (!orig) continue;
+        let left = snapCanvasValue(orig.left + dx, 'x');
+        let top = snapCanvasValue(orig.top + dy, 'y');
+        left = Math.max(0, Math.min(left, canvasW - orig.width));
+        top = Math.max(0, Math.min(top, canvasH - orig.height));
+        const hitEl = canvasEditOverlay?.querySelector(`.canvas-graphic-hit[data-index="${idx}"]`);
+        if (hitEl) applyGraphicBoundsStyle(hitEl, { left, top, width: orig.width, height: orig.height });
+        drag.pendingByIndex[idx] = { left, top, width: orig.width, height: orig.height };
+      }
+      drag.moved = true;
+      return;
+    }
 
     if (drag.mode === 'move') {
       left = snapCanvasValue(drag.orig.left + dx, 'x');
@@ -3628,7 +3732,8 @@ function initCanvasEditOverlay() {
 
   document.addEventListener('mouseup', () => {
     const drag = state.canvasEditDrag;
-    if (!drag?.pending) {
+    const pendingByIndex = drag?.pendingByIndex || (drag?.pending ? { [drag.index]: drag.pending } : null);
+    if (!pendingByIndex) {
       state.canvasEditDrag = null;
       return;
     }
@@ -3637,19 +3742,14 @@ function initCanvasEditOverlay() {
       state.canvasEditDrag = null;
       return;
     }
-    const bounds = drag.pending;
-    const index = drag.index;
     const undoEntry = drag.undoEntry;
     state.canvasEditDrag = null;
     if (undoEntry) pushUndoEntry(undoEntry);
-    updateCanvasComponentBounds(index, bounds)
-      .catch((err) => setStatus(`Error: ${err.message}`));
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Delete' && state.canvasSelection.index != null && !state.placement) {
-      deleteSelectedCanvasComponent().catch((err) => setStatus(`Error: ${err.message}`));
-    }
+    Promise.all(
+      Object.entries(pendingByIndex).map(([idx, bounds]) =>
+        updateCanvasComponentBounds(Number(idx), bounds)
+      )
+    ).catch((err) => setStatus(`Error: ${err.message}`));
   });
 
   previewCanvasWrap?.addEventListener('mousedown', (e) => {
@@ -3665,47 +3765,61 @@ function initCanvasEditOverlay() {
 }
 
 async function deleteSelectedCanvasComponent() {
-  const editIndex = state.canvasSelection.index;
-  if (editIndex == null) return;
-  const entry = state.canvasEditCache?.editComponents?.[editIndex];
-  if (!entry) return;
-  if (!state.undoSuspended) await pushUndoForEditRef(entry.ref);
+  const indices = [...getSelectedCanvasIndices()];
+  if (!indices.length) return;
 
-  if (entry.ref?.type === 'shell') {
-    const canvas = await fetchOpenCanvas();
-    const shellKey = getNavShellKey(canvas);
-    if (!shellKey) return;
+  const entries = indices
+    .map((idx) => state.canvasEditCache?.editComponents?.[idx])
+    .filter(Boolean);
+  if (!entries.length) return;
+
+  if (!state.undoSuspended) {
+    if (entries.some((entry) => entry.ref?.type === 'display')) {
+      await pushUndoBefore({ screenKeys: ['components'] });
+    } else if (entries.some((entry) => entry.ref?.type === 'shell')) {
+      await pushUndoBefore({ screenKeys: ['navShell'] });
+    } else if (entries.some((entry) => entry.ref?.type === 'template-override')) {
+      await pushUndoBefore({ screenKeys: ['template'] });
+    }
+  }
+
+  let canvas = await fetchOpenCanvas();
+  const shellKey = getNavShellKey(canvas);
+  if (shellKey) {
     const shellOverrides = { ...(canvas[shellKey] || {}) };
-    delete shellOverrides[entry.ref.name];
-    await patchOpenCanvas({ [shellKey]: shellOverrides });
-    state.canvasSelection.index = null;
-    await updateCanvasPreview({ forceReload: true });
-    refreshObjectExplorer();
-    refreshPropertyPanel();
-    scheduleRefreshCanvasEditOverlay();
-    setStatus(`${navShellStatusLabel(canvas)} shell override removed`);
-    return;
+    let shellChanged = false;
+    for (const entry of entries.filter((e) => e.ref?.type === 'shell')) {
+      delete shellOverrides[entry.ref.name];
+      shellChanged = true;
+    }
+    if (shellChanged) {
+      await patchOpenCanvas({ [shellKey]: shellOverrides });
+      canvas = { ...canvas, [shellKey]: shellOverrides };
+    }
   }
 
-  if (entry.ref?.type === 'template-override') {
+  for (const entry of entries.filter((e) => e.ref?.type === 'template-override')) {
     await removeTemplateOverride(entry.ref.name);
-    state.canvasSelection.index = null;
-    setStatus('Template override removed');
-    return;
   }
 
-  const compIndex = entry.ref?.index;
-  if (compIndex == null) return;
-  const canvas = await fetchOpenCanvas();
-  const components = [...(canvas.components || [])];
-  components.splice(compIndex, 1);
-  await patchOpenCanvas({ components });
-  state.canvasSelection.index = null;
-  await updateCanvasPreview({ removedIndex: compIndex, components });
+  const compIndices = entries
+    .filter((entry) => entry.ref?.type === 'display' && entry.ref.index != null)
+    .map((entry) => entry.ref.index)
+    .sort((a, b) => b - a);
+  if (compIndices.length) {
+    const components = [...(canvas.components || [])];
+    for (const compIndex of compIndices) {
+      components.splice(compIndex, 1);
+    }
+    await patchOpenCanvas({ components });
+  }
+
+  state.canvasSelection.indices = [];
+  await updateCanvasPreview({ forceReload: true });
   refreshObjectExplorer();
   refreshPropertyPanel();
   scheduleRefreshCanvasEditOverlay();
-  setStatus('Object deleted');
+  setStatus(entries.length > 1 ? `Deleted ${entries.length} objects` : 'Object deleted');
 }
 
 function handleObjectAction(id) {
@@ -4254,6 +4368,7 @@ function updateEditMenuState() {
   const wallpaperSub = document.querySelector('#editMenu [data-edit-submenu="wallpaper"]');
   if (wallpaperSub) wallpaperSub.classList.toggle('disabled', !displayOpen);
   updateUndoRedoUI();
+  updateEditClipboardUI();
 }
 
 function renderRecentProjectsMenu() {
@@ -4534,6 +4649,105 @@ async function setWallpaper(mode, value) {
   setStatus(`Wallpaper set to ${mode}`);
 }
 
+function updateEditClipboardUI() {
+  const indices = getSelectedCanvasIndices();
+  const canCopy = indices.some((idx) => state.canvasEditCache?.editComponents?.[idx]?.ref?.type === 'display');
+  const canPaste = Boolean(state.clipboard?.components?.length);
+  document.querySelectorAll('[data-edit-action="cut"], [data-edit-action="copy"], [data-tb="cut"], [data-tb="copy"]').forEach((el) => {
+    el.classList.toggle('disabled', !canCopy);
+  });
+  document.querySelectorAll('[data-edit-action="paste"], [data-edit-action="duplicate"], [data-tb="paste"]').forEach((el) => {
+    el.classList.toggle('disabled', !canPaste);
+  });
+  document.querySelectorAll('[data-edit-action="duplicate"]').forEach((el) => {
+    el.classList.toggle('disabled', !canCopy);
+  });
+}
+
+function cloneComponentForClipboard(comp) {
+  return JSON.parse(JSON.stringify(stripComponentMeta(comp)));
+}
+
+function uniquePastedName(components, baseName) {
+  const names = new Set((components || []).map((c) => c.name));
+  if (!names.has(baseName)) return baseName;
+  let i = 2;
+  while (names.has(`${baseName}_${i}`)) i += 1;
+  return `${baseName}_${i}`;
+}
+
+async function copySelectedCanvasComponent() {
+  const indices = getSelectedCanvasIndices();
+  const components = [];
+  for (const idx of indices) {
+    const entry = state.canvasEditCache?.editComponents?.[idx];
+    if (entry?.comp && entry.ref?.type === 'display') {
+      components.push(cloneComponentForClipboard(entry.comp));
+    }
+  }
+  if (!components.length) {
+    setStatus('Select display object(s) to copy');
+    return;
+  }
+  state.clipboard = { components };
+  updateEditClipboardUI();
+  setStatus(`Copied ${components.map((c) => c.name).join(', ')}`);
+}
+
+async function cutSelectedCanvasComponent() {
+  await copySelectedCanvasComponent();
+  if (state.clipboard?.components?.length) {
+    await deleteSelectedCanvasComponent();
+  }
+}
+
+async function pasteClipboardComponents() {
+  if (!state.clipboard?.components?.length) {
+    setStatus('Clipboard empty');
+    return;
+  }
+  if (!displayIsOpen()) return;
+  await pushUndoBefore({ screenKeys: ['components'] });
+  const canvas = await fetchOpenCanvas();
+  const components = [...(canvas.components || [])];
+  const pasted = [];
+  for (const src of state.clipboard.components) {
+    const comp = cloneComponentForClipboard(src);
+    comp.name = uniquePastedName(components, comp.name || 'Object1');
+    comp.left = (Number(comp.left) || 0) + 12;
+    comp.top = (Number(comp.top) || 0) + 12;
+    components.push(comp);
+    pasted.push(comp.name);
+  }
+  await patchOpenCanvas({ components });
+  state.canvasEditCache.raw = { ...canvas, components };
+  await updateCanvasPreview({ forceReload: true });
+  refreshObjectExplorer();
+  refreshPropertyPanel();
+  scheduleRefreshCanvasEditOverlay();
+  setStatus(`Pasted ${pasted.join(', ')}`);
+}
+
+async function duplicateSelectedCanvasComponent() {
+  await copySelectedCanvasComponent();
+  await pasteClipboardComponents();
+}
+
+function selectAllCanvasComponents() {
+  const editComponents = state.canvasEditCache?.editComponents || [];
+  const displayIndexes = editComponents
+    .map((entry, index) => (entry.ref?.type === 'display' ? index : -1))
+    .filter((index) => index >= 0);
+  if (!displayIndexes.length) {
+    setStatus('No display objects on this screen');
+    return;
+  }
+  state.canvasSelection.indices = displayIndexes;
+  refreshCanvasEditOverlaySelection();
+  updateEditClipboardUI();
+  setStatus(`Selected ${displayIndexes.length} display object(s)`);
+}
+
 function handleEditAction(action) {
   closeAllMenus();
   switch (action) {
@@ -4542,6 +4756,18 @@ function handleEditAction(action) {
       break;
     case 'redo':
       redoEdit().catch((err) => setStatus(`Redo error: ${err.message}`));
+      break;
+    case 'cut':
+      cutSelectedCanvasComponent().catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'copy':
+      copySelectedCanvasComponent().catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'paste':
+      pasteClipboardComponents().catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'duplicate':
+      duplicateSelectedCanvasComponent().catch((err) => setStatus(`Error: ${err.message}`));
       break;
     case 'display-settings':
       showDisplaySettingsDialog().catch((err) => setStatus(`Error: ${err.message}`));
@@ -4555,7 +4781,9 @@ function handleEditAction(action) {
       if (url) setWallpaper('image', url);
       break;
     }
-    case 'select-all': setStatus('Select All — visual editor planned'); break;
+    case 'select-all':
+      selectAllCanvasComponents();
+      break;
     case 'clear-all':
       if (state.selectedScreenId && confirm(`Clear all components on "${state.selectedScreenId}"?`)) {
         fetchJson(`/api/projects/${state.activeProject}/screens/${encodeURIComponent(state.selectedScreenId)}`, {
@@ -4810,6 +5038,20 @@ function handleExplorerAction(node) {
     case 'tags':
       openTagsPanel();
       break;
+    case 'tag-item':
+      refreshProjectConfig().then(() => {
+        openTagsPanel(
+          (state.projectConfig?.tags || []).find((t) => t.name === node.tagName)?.folder || '',
+          node.tagName
+        );
+      });
+      break;
+    case 'plc-tag-item':
+      showTagEditDialog(node.tagName);
+      break;
+    case 'tag-folder':
+      openTagsPanel(node.tagFolder || node.label);
+      break;
     case 'alarms':
     case 'local-messages':
       openAlarmsPanel();
@@ -4828,6 +5070,12 @@ function handleExplorerAction(node) {
       openDataLogPanel();
       break;
     case 'parameters':
+    case 'parameters-add':
+      openParametersPanel();
+      break;
+    case 'parameter-file':
+      openParametersPanel(node.parameterFile);
+      break;
     case 'symbol-factory':
     case 'libraries':
     case 'images':
@@ -4873,6 +5121,8 @@ function selectNode(row, node) {
     openGlobalObjectPreview(node.id, node.title);
   } else if (node.type === 'image') {
     showImagePropertiesDialog(node);
+  } else if (node.tagFolder) {
+    openTagsPanel(node.tagFolder);
   } else if (node.action) {
     handleExplorerAction(node);
   } else if (node.type === 'item') {
@@ -4988,7 +5238,7 @@ function openDisplayPreview(screenId, title) {
     });
   });
   state.selectedScreenId = screenId;
-  state.canvasSelection.index = null;
+  state.canvasSelection.indices = [];
   activateSelectTool();
   trackOpenDisplay(screenId);
   setStatus(`Editing display: ${title || screenId}`);
@@ -5018,7 +5268,7 @@ function openGlobalObjectPreview(objectId, title) {
     });
   });
   state.selectedScreenId = objectId;
-  state.canvasSelection.index = null;
+  state.canvasSelection.indices = [];
   activateSelectTool();
   setStatus(`Editing global object: ${title || objectId}`);
   updateEditMenuState();
@@ -5161,7 +5411,7 @@ async function clearAllTagsFromProject() {
     body: JSON.stringify({ tags: [] })
   });
   await refreshProjectConfig();
-  if (panelView.querySelector('h2')?.textContent === 'HMI Tags') {
+  if (panelView.querySelector('.tag-editor-panel')) {
     await openTagsPanel();
   }
   setStatus(`Cleared ${tagCount} tag(s) from project`);
@@ -5169,12 +5419,124 @@ async function clearAllTagsFromProject() {
 
 let tagEditOriginalName = null;
 
+const TAG_FOLDER_ORDER = [
+  'PLC_DI_Discr', 'PLC_DI_No', 'PLC_DI_Tags',
+  'PLC_DO_Discr', 'PLC_DO_No', 'PLC_DO_Tags',
+  'Safety_DI_Discr', 'Safety_DI_No', 'Safety_DI_Tags',
+  'Safety_DO_Discr', 'Safety_DO_No', 'Safety_DO_Tags',
+  'Temp_Tags'
+];
+
+const tagsPanelState = { folder: '', selected: '' };
+
+function getTagFolderList(allDefs) {
+  const folders = new Set();
+  for (const def of allDefs) {
+    if (def.folder) folders.add(def.folder);
+  }
+  const ordered = TAG_FOLDER_ORDER.filter((f) => folders.has(f));
+  const rest = [...folders].filter((f) => !TAG_FOLDER_ORDER.includes(f)).sort((a, b) => a.localeCompare(b));
+  return [...ordered, ...rest];
+}
+
+function sortFolderTags(defs) {
+  return [...defs].sort((a, b) => {
+    const shortA = a.name.includes('.') ? a.name.split('.').pop() : a.name;
+    const shortB = b.name.includes('.') ? b.name.split('.').pop() : b.name;
+    const listA = shortA.startsWith('List_') || shortA.startsWith('Safety_List_');
+    const listB = shortB.startsWith('List_') || shortB.startsWith('Safety_List_');
+    if (listA && !listB) return -1;
+    if (!listA && listB) return 1;
+    if (shortA.startsWith('Data_') && shortB.startsWith('Data_')) {
+      return Number(shortA.slice(5)) - Number(shortB.slice(5));
+    }
+    return shortA.localeCompare(shortB);
+  });
+}
+
+function formatFtTagName(def) {
+  const short = def.name.includes('.') ? def.name.split('.').pop() : def.name;
+  return def.folder ? `${def.folder}\\${short}` : def.name;
+}
+
+function tagShortName(def) {
+  return def.name.includes('.') ? def.name.split('.').pop() : def.name;
+}
+
+function tagGridDescription(def, liveValue) {
+  if (def.type === 'string') {
+    const live = liveValue !== undefined && liveValue !== '' ? String(liveValue) : '';
+    if (live) return live;
+    if (def.initialValue !== undefined && def.initialValue !== '') return String(def.initialValue);
+  }
+  if (def.connection) return def.connection;
+  return def.description || '';
+}
+
+function stringTagLength(def) {
+  const text = def.initialValue !== undefined && def.initialValue !== ''
+    ? String(def.initialValue)
+    : (def.description || '');
+  return Math.max(text.length, 1);
+}
+
+async function saveTagToProject(entry, originalName) {
+  if (!state.activeProject) throw new Error('No active project');
+  await refreshProjectConfig();
+  let tags = [...(state.projectConfig?.tags || [])];
+  if (originalName) {
+    const idx = tags.findIndex((t) => t.name === originalName);
+    if (idx >= 0) tags[idx] = entry;
+    else tags.push(entry);
+  } else {
+    if (tags.some((t) => t.name === entry.name)) {
+      if (!confirm(`Tag "${entry.name}" already exists. Replace it?`)) return false;
+      tags = tags.filter((t) => t.name !== entry.name);
+    }
+    tags.push(entry);
+  }
+  tags.sort((a, b) => a.name.localeCompare(b.name));
+  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tags })
+  });
+  await refreshProjectConfig();
+  if (entry.initialValue !== undefined) {
+    try {
+      await fetchJson('/api/runtime/tags/write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: entry.name, value: entry.initialValue })
+      });
+    } catch {
+      /* runtime may not be loaded */
+    }
+  }
+  return true;
+}
+
 function normalizeTagEntry(raw) {
   const name = String(raw.name || '').trim();
   if (!name) return null;
   const type = ['bool', 'int', 'float', 'string'].includes(raw.type) ? raw.type : 'bool';
   const description = String(raw.description || '').trim();
   const entry = { name, type, description };
+  const folder = String(raw.folder || '').trim();
+  if (folder) entry.folder = folder;
+  const dataSource = String(raw.dataSource || '').trim();
+  if (dataSource) entry.dataSource = dataSource;
+  const connection = String(raw.connection || '').trim();
+  if (connection) entry.connection = connection;
+  const plcAddress = String(raw.plcAddress || '').trim();
+  if (plcAddress) entry.plcAddress = plcAddress;
+  if (raw.initialValue !== undefined && raw.initialValue !== '') {
+    const rawVal = raw.initialValue;
+    if (type === 'int') entry.initialValue = Number.parseInt(rawVal, 10);
+    else if (type === 'float') entry.initialValue = Number.parseFloat(rawVal);
+    else if (type === 'bool') entry.initialValue = rawVal === true || rawVal === 'true' || rawVal === '1';
+    else entry.initialValue = rawVal;
+  }
   if (raw.computed) {
     entry.computed = true;
     entry.logic = String(raw.logic || '').trim();
@@ -5183,7 +5545,7 @@ function normalizeTagEntry(raw) {
   return entry;
 }
 
-function showTagEditDialog(existingName) {
+function showTagEditDialog(existingName, defaultFolder = '') {
   if (!state.activeProject) {
     setStatus('Open an application first');
     return;
@@ -5198,6 +5560,10 @@ function showTagEditDialog(existingName) {
     nameEl.readOnly = Boolean(existing);
     document.getElementById('tagEditType').value = existing?.type || 'bool';
     document.getElementById('tagEditDescription').value = existing?.description || '';
+    document.getElementById('tagEditFolder').value = existing?.folder || defaultFolder || '';
+    document.getElementById('tagEditDataSource').value = existing?.dataSource || (existing?.folder ? 'memory' : 'device');
+    document.getElementById('tagEditConnection').value = existing?.connection || '';
+    document.getElementById('tagEditPlcAddress').value = existing?.plcAddress || '';
     const computed = Boolean(existing?.computed);
     document.getElementById('tagEditComputed').checked = computed;
     document.getElementById('tagEditLogic').value = existing?.logic || '';
@@ -5213,6 +5579,10 @@ async function saveTagEdit(e) {
     name: document.getElementById('tagEditName').value,
     type: document.getElementById('tagEditType').value,
     description: document.getElementById('tagEditDescription').value,
+    folder: document.getElementById('tagEditFolder').value,
+    dataSource: document.getElementById('tagEditDataSource').value,
+    connection: document.getElementById('tagEditConnection').value,
+    plcAddress: document.getElementById('tagEditPlcAddress').value,
     computed: document.getElementById('tagEditComputed').checked,
     logic: document.getElementById('tagEditLogic').value
   });
@@ -5220,28 +5590,10 @@ async function saveTagEdit(e) {
     alert('Tag name is required. Computed tags also need a logic expression.');
     return;
   }
-  await refreshProjectConfig();
-  let tags = [...(state.projectConfig?.tags || [])];
-  if (tagEditOriginalName) {
-    const idx = tags.findIndex((t) => t.name === tagEditOriginalName);
-    if (idx >= 0) tags[idx] = entry;
-    else tags.push(entry);
-  } else {
-    if (tags.some((t) => t.name === entry.name)) {
-      if (!confirm(`Tag "${entry.name}" already exists. Replace it?`)) return;
-      tags = tags.filter((t) => t.name !== entry.name);
-    }
-    tags.push(entry);
-  }
-  tags.sort((a, b) => a.name.localeCompare(b.name));
-  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tags })
-  });
+  const saved = await saveTagToProject(entry, tagEditOriginalName);
+  if (!saved) return;
   document.getElementById('tagEditDialog').close();
-  await refreshProjectConfig();
-  await openTagsPanel();
+  await openTagsPanel(entry.folder || tagsPanelState.folder, entry.name);
   setStatus(`Saved tag: ${entry.name}`);
 }
 
@@ -5263,51 +5615,199 @@ function initTagEditDialog() {
   });
 }
 
-async function openTagsPanel() {
+async function openTagsPanel(folderFilter = '', selectedTagName = '') {
   hidePreviewStage();
   panelView.classList.remove('hidden');
   await refreshProjectConfig();
-  const defs = state.projectConfig?.tags || [];
-  const [runtimeTags, logicInfo] = await Promise.all([
-    fetchJson(`/api/runtime/tags?project=${state.activeProject}`),
-    fetchJson(`/api/runtime/tags/logic?project=${state.activeProject}`).catch(() => ({ engine: 'unknown', rules: [] }))
+  const allDefs = state.projectConfig?.tags || [];
+  const folders = getTagFolderList(allDefs);
+  const activeFolder = folderFilter && (folders.includes(folderFilter) || allDefs.some((d) => d.folder === folderFilter))
+    ? folderFilter
+    : (folders[0] || '');
+  tagsPanelState.folder = activeFolder;
+
+  const folderDefs = activeFolder
+    ? sortFolderTags(allDefs.filter((def) => def.folder === activeFolder))
+    : sortFolderTags(allDefs.filter((def) => !def.folder));
+  const activeTagName = selectedTagName && folderDefs.some((d) => d.name === selectedTagName)
+    ? selectedTagName
+    : (folderDefs[0]?.name || '');
+  tagsPanelState.selected = activeTagName;
+
+  const [runtimeTags] = await Promise.all([
+    fetchJson(`/api/runtime/tags?project=${state.activeProject}`)
   ]);
-  const logicByName = Object.fromEntries((logicInfo.rules || []).map((rule) => [rule.name, rule.logic]));
-  const rows = defs.map((def) => {
+
+  const buildDetailForm = (def) => {
+    if (!def) {
+      return `<p class="hint">Select a tag in the grid, or choose a folder on the left.</p>`;
+    }
     const live = runtimeTags[def.name] || {};
-    const value = live.value !== undefined ? live.value : '—';
-    const quality = live.quality || '—';
-    return `<tr><td>${escapeHtml(def.name)}</td><td>${escapeHtml(def.type || '')}</td><td class="mono">${escapeHtml(String(value))}</td><td>${escapeHtml(quality)}</td><td class="mono tag-logic-cell">${escapeHtml(logicByName[def.name] || (def.computed ? def.logic || 'computed' : '—'))}</td><td>`
-    + `<button type="button" class="btn-link tag-edit-btn" data-tag-name="${escapeHtml(def.name)}">Edit</button> `
-    + `<button type="button" class="btn-link tag-delete-btn" data-tag-name="${escapeHtml(def.name)}" title="Remove from project.json">Remove</button></td></tr>`;
-  }).join('');
-  panelView.innerHTML = `
-    <div class="panel-content">
-      <h2>HMI Tags</h2>
-      <p class="hint">Tags are stored in <code>project.json</code> (${defs.length} defined). The <code>Tag/*-Tags.CSV</code> file is an auto-generated export and is recreated on save.</p>
-      <p class="hint">Logic engine: <strong>${escapeHtml(logicInfo.engine || 'none')}</strong>.</p>
-      <div class="alarm-panel-toolbar">
-        <button type="button" class="dialog-btn" id="tagPanelNew">New Tag…</button>
-        <button type="button" class="dialog-btn" id="tagPanelImportExport">Import and Export…</button>
-        <button type="button" class="dialog-btn" id="tagPanelClear" ${defs.length ? '' : 'disabled'}>Clear All Tags…</button>
+    const liveValue = live.value !== undefined ? live.value : def.initialValue;
+    const dataSource = def.dataSource || (def.folder ? 'memory' : 'device');
+    const desc = tagGridDescription(def, liveValue);
+    const length = def.type === 'string' ? stringTagLength({ ...def, initialValue: liveValue ?? def.initialValue }) : '';
+    return `
+      <div class="tag-editor-detail-grid">
+        <label>Name<input type="text" id="tagDetailName" value="${escapeHtml(formatFtTagName(def))}" readonly title="Tag name cannot be changed" /></label>
+        <label>Type
+          <select id="tagDetailType">
+            <option value="bool"${def.type === 'bool' ? ' selected' : ''}>bool</option>
+            <option value="int"${def.type === 'int' ? ' selected' : ''}>int</option>
+            <option value="float"${def.type === 'float' ? ' selected' : ''}>float</option>
+            <option value="string"${def.type === 'string' ? ' selected' : ''}>String</option>
+          </select>
+        </label>
+        <label>Description<input type="text" id="tagDetailDescription" value="${escapeHtml(desc)}" maxlength="200"${/_No$/i.test(def.folder || '') ? ' title="For _No tags this is the IO number label; use _Discr for text descriptions"' : ''} /></label>
+        ${def.type === 'string' ? `<label>Length<input type="text" id="tagDetailLength" value="${length}" readonly /></label>` : '<span></span>'}
+        <label>Initial value<input type="text" id="tagDetailInitial" value="${escapeHtml(liveValue !== undefined && liveValue !== null ? String(liveValue) : '')}" /></label>
+        <label>Connection<input type="text" id="tagDetailConnection" value="${escapeHtml(def.connection || '')}" placeholder="PLC tag (PLC_*_Tags only)" /></label>
       </div>
-      <table class="data-table"><thead><tr><th>Tag Name</th><th>Type</th><th>Value</th><th>Quality</th><th>Logic</th><th></th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="6">No tags — click New Tag or Import</td></tr>'}</tbody></table>
+      <div class="tag-editor-source-row">
+        <span>Data source:</span>
+        <label class="radio-row"><input type="radio" name="tagDetailSource" value="memory"${dataSource === 'memory' ? ' checked' : ''} /> Memory</label>
+        <label class="radio-row"><input type="radio" name="tagDetailSource" value="device"${dataSource === 'device' ? ' checked' : ''} /> Device</label>
+        <label class="radio-row"><input type="checkbox" id="tagDetailRetentive" disabled /> Retentive</label>
+      </div>`;
+  };
+
+  const activeDef = folderDefs.find((d) => d.name === activeTagName) || null;
+
+  const buildGridRows = () => folderDefs.map((def, idx) => {
+    const live = runtimeTags[def.name] || {};
+    const desc = tagGridDescription(def, live.value);
+    const selected = def.name === tagsPanelState.selected ? ' selected' : '';
+    const typeLabel = def.type === 'string' ? 'String' : (def.type || '');
+    return `<tr class="tag-grid-row${selected}" data-tag-name="${escapeHtml(def.name)}">
+      <td>${idx + 1}</td>
+      <td class="tag-short-name">${escapeHtml(formatFtTagName(def))}</td>
+      <td>${escapeHtml(typeLabel)}</td>
+      <td>${escapeHtml(desc)}</td>
+    </tr>`;
+  }).join('');
+
+  const folderHint = (() => {
+    if (/_No$/i.test(activeFolder)) {
+      return 'This folder holds IO <strong>numbers</strong> (1, 2, 3…). Edit text descriptions in the matching <strong>_Discr</strong> folder, and PLC addresses in <strong>_Tags</strong>.';
+    }
+    if (/_Discr$/i.test(activeFolder)) {
+      return 'Edit IO <strong>descriptions</strong> here (e.g. “DO01 Run Lamp”). Change the IO number in the matching <strong>_No</strong> folder.';
+    }
+    if (/_Tags$/i.test(activeFolder)) {
+      return 'Edit <strong>PLC tag addresses</strong> here (device tags). Descriptions live in <strong>_Discr</strong>.';
+    }
+    return 'Select a tag, edit fields above the grid, then click <strong>Apply</strong>. The grid is read-only — use the form above.';
+  })();
+
+  panelView.innerHTML = `
+    <div class="panel-content tag-editor-panel">
+      <h2>Tag Editor</h2>
+      <p class="hint">${folderHint}</p>
+      <div class="tag-editor-detail" id="tagEditorDetail">
+        ${buildDetailForm(activeDef)}
+        <div class="tag-editor-detail-actions" id="tagDetailActions">
+          <button type="button" class="dialog-btn" id="tagDetailPrev"${folderDefs.length < 2 ? ' disabled' : ''}>Prev</button>
+          <button type="button" class="dialog-btn" id="tagDetailNext"${folderDefs.length < 2 ? ' disabled' : ''}>Next</button>
+          <button type="button" class="dialog-btn" id="tagDetailNew">New</button>
+          <button type="button" class="dialog-btn" id="tagDetailApply">Apply</button>
+          <button type="button" class="dialog-btn" id="tagPanelImportExport">Import/Export…</button>
+          <button type="button" class="dialog-btn" id="tagPanelClear"${allDefs.length ? '' : ' disabled'}>Clear All…</button>
+        </div>
+      </div>
+      <div class="tag-editor-split">
+        <div class="tag-folder-tree" id="tagFolderTree">
+          ${folders.map((folder) => {
+            const count = allDefs.filter((d) => d.folder === folder).length;
+            return `<button type="button" class="tag-folder-btn${folder === activeFolder ? ' active' : ''}" data-folder="${escapeHtml(folder)}">${escapeHtml(folder)} (${count})</button>`;
+          }).join('') || '<p class="hint" style="padding:8px">No folders</p>'}
+          ${allDefs.some((d) => !d.folder) ? `<button type="button" class="tag-folder-btn${!activeFolder ? ' active' : ''}" data-folder="">(No folder)</button>` : ''}
+        </div>
+        <div class="tag-grid-wrap">
+          <table class="data-table tag-grid">
+            <thead><tr><th>#</th><th>Tag Name</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody id="tagGridBody">${buildGridRows() || '<tr><td colspan="4">No tags in this folder</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>
     </div>`;
-  document.getElementById('tagPanelNew')?.addEventListener('click', () => showTagEditDialog(null));
-  document.getElementById('tagPanelImportExport')?.addEventListener('click', () => showTagWizardDialog());
-  document.getElementById('tagPanelClear')?.addEventListener('click', () => {
-    clearAllTagsFromProject().catch((err) => setStatus(`Error: ${err.message}`));
-  });
-  panelView.querySelectorAll('.tag-edit-btn').forEach((btn) => {
-    btn.addEventListener('click', () => showTagEditDialog(btn.dataset.tagName));
-  });
-  panelView.querySelectorAll('.tag-delete-btn').forEach((btn) => {
+
+  const selectTag = (name) => {
+    tagsPanelState.selected = name;
+    const def = folderDefs.find((d) => d.name === name);
+    const detail = document.getElementById('tagEditorDetail');
+    if (detail) {
+      detail.innerHTML = `${buildDetailForm(def || null)}
+        <div class="tag-editor-detail-actions" id="tagDetailActions">
+          <button type="button" class="dialog-btn" id="tagDetailPrev"${folderDefs.length < 2 ? ' disabled' : ''}>Prev</button>
+          <button type="button" class="dialog-btn" id="tagDetailNext"${folderDefs.length < 2 ? ' disabled' : ''}>Next</button>
+          <button type="button" class="dialog-btn" id="tagDetailNew">New</button>
+          <button type="button" class="dialog-btn" id="tagDetailApply"${def ? '' : ' disabled'}>Apply</button>
+          <button type="button" class="dialog-btn" id="tagPanelImportExport">Import/Export…</button>
+          <button type="button" class="dialog-btn" id="tagPanelClear"${allDefs.length ? '' : ' disabled'}>Clear All…</button>
+        </div>`;
+    }
+    document.querySelectorAll('.tag-grid-row').forEach((row) => {
+      row.classList.toggle('selected', row.dataset.tagName === name);
+    });
+  };
+
+  const wireDetailActions = () => {
+    document.getElementById('tagEditorDetail')?.addEventListener('click', (e) => {
+      const id = e.target.closest('button')?.id;
+      if (!id) return;
+      if (id === 'tagDetailApply') saveTagDetailPanel().catch((err) => setStatus(`Error: ${err.message}`));
+      else if (id === 'tagDetailNew') showTagEditDialog(null, activeFolder);
+      else if (id === 'tagDetailPrev') {
+        const idx = folderDefs.findIndex((d) => d.name === tagsPanelState.selected);
+        if (idx > 0) selectTag(folderDefs[idx - 1].name);
+      } else if (id === 'tagDetailNext') {
+        const idx = folderDefs.findIndex((d) => d.name === tagsPanelState.selected);
+        if (idx >= 0 && idx < folderDefs.length - 1) selectTag(folderDefs[idx + 1].name);
+      } else if (id === 'tagPanelImportExport') showTagWizardDialog();
+      else if (id === 'tagPanelClear') clearAllTagsFromProject().catch((err) => setStatus(`Error: ${err.message}`));
+    });
+  };
+
+  async function saveTagDetailPanel() {
+    const def = folderDefs.find((d) => d.name === tagsPanelState.selected);
+    if (!def) return;
+    const type = document.getElementById('tagDetailType')?.value || def.type;
+    const description = document.getElementById('tagDetailDescription')?.value || '';
+    const initialRaw = document.getElementById('tagDetailInitial')?.value;
+    const entry = normalizeTagEntry({
+      name: def.name,
+      type,
+      description,
+      folder: def.folder || '',
+      dataSource: document.querySelector('input[name="tagDetailSource"]:checked')?.value || def.dataSource || 'memory',
+      connection: document.getElementById('tagDetailConnection')?.value || '',
+      initialValue: initialRaw !== undefined && initialRaw !== '' ? initialRaw : description
+    });
+    if (!entry) {
+      alert('Could not save tag.');
+      return;
+    }
+    const saved = await saveTagToProject(entry, def.name);
+    if (!saved) return;
+    setStatus(`Saved tag: ${entry.name}`);
+    await openTagsPanel(tagsPanelState.folder, entry.name);
+  }
+
+  document.querySelectorAll('.tag-folder-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      deleteTagFromProject(btn.dataset.tagName).catch((err) => setStatus(`Error: ${err.message}`));
+      openTagsPanel(btn.dataset.folder || '').catch((err) => setStatus(`Error: ${err.message}`));
     });
   });
-  setStatus(defs.length ? `HMI Tags (${defs.length})` : 'HMI Tags — none defined');
+
+  document.querySelectorAll('.tag-grid-row').forEach((row) => {
+    row.addEventListener('click', () => selectTag(row.dataset.tagName));
+  });
+
+  wireDetailActions();
+
+  setStatus(activeFolder
+    ? `Tag Editor — ${activeFolder} (${folderDefs.length})`
+    : (allDefs.length ? `Tag Editor (${allDefs.length} tags)` : 'Tag Editor — no tags'));
 }
 
 async function openAlarmsPanel() {
@@ -5660,6 +6160,179 @@ function openSystemPanel(node) {
       <p class="hint">Edit <code>projects/${escapeHtml(state.activeProject)}/project.json</code> to change these settings.</p>
     </div>`;
   setStatus(node.label);
+}
+
+async function openParametersPanel(selectedFile = '') {
+  hidePreviewStage();
+  panelView.classList.remove('hidden');
+  if (!state.activeProject) {
+    panelView.innerHTML = '<div class="panel-content"><p>Open an application first.</p></div>';
+    return;
+  }
+  await refreshProjectConfig();
+  let merged = {};
+  try {
+    const res = await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/parameter-files`);
+    merged = res.parameterFiles || {};
+  } catch {
+    merged = state.projectConfig?.parameterFiles || {};
+  }
+  const names = Object.keys(merged).sort((a, b) => a.localeCompare(b));
+  const activeName = selectedFile && merged[selectedFile] ? selectedFile : (names[0] || '');
+
+  const kindLabels = { di: 'PLC DI', do: 'PLC DO', safetyDi: 'Safety DI', safetyDo: 'Safety DO' };
+  const kindsInProject = [...new Set(names.map((n) => merged[n]?.kind).filter(Boolean))];
+
+  const formatParamTag = (tag) => String(tag || '').replace(/\./g, '\\');
+
+  const listRange = (name) => {
+    const ln = merged[name]?.listNum || 1;
+    const ds = (ln - 1) * 8;
+    return { ds, de: ds + 7, ln };
+  };
+
+  const fileOptionLabel = (name) => {
+    const { ds, de } = listRange(name);
+    return `${name}  (Data_${String(ds).padStart(2, '0')}–${String(de).padStart(2, '0')})`;
+  };
+
+  const buildFileOptions = () => kindsInProject.map((kind) => {
+    const groupNames = names.filter((n) => merged[n]?.kind === kind);
+    if (!groupNames.length) return '';
+    return `<optgroup label="${escapeHtml(kindLabels[kind] || kind)}">
+      ${groupNames.map((name) => `<option value="${escapeHtml(name)}"${name === activeName ? ' selected' : ''}>${escapeHtml(fileOptionLabel(name))}</option>`).join('')}
+    </optgroup>`;
+  }).join('');
+
+  const buildTableBody = (name) => {
+    const def = merged[name] || {};
+    const entries = Object.entries(def.replacements || {}).sort(([a], [b]) => Number(a.slice(1)) - Number(b.slice(1)));
+    if (!entries.length) return '<tr><td colspan="2">No mappings</td></tr>';
+    let lastBlock = 0;
+    return entries.map(([key, tag]) => {
+      const block = Math.floor(Number(String(key).slice(1)) / 100);
+      const blockStart = block !== lastBlock;
+      lastBlock = block;
+      return `<tr${blockStart ? ' class="param-block-start"' : ''}>
+        <td><code>${escapeHtml(key)}</code></td>
+        <td class="mono"><input type="text" class="param-tag-input" data-placeholder="${escapeHtml(key)}" value="${escapeHtml(formatParamTag(tag))}" spellcheck="false" /></td>
+      </tr>`;
+    }).join('');
+  };
+
+  const collectReplacements = (fileName) => {
+    const def = merged[fileName] || {};
+    const replacements = { ...(def.replacements || {}) };
+    document.querySelectorAll('.param-tag-input').forEach((input) => {
+      const key = input.dataset.placeholder;
+      if (!key) return;
+      replacements[key] = String(input.value || '').trim().replace(/\\/g, '.');
+    });
+    return replacements;
+  };
+
+  panelView.innerHTML = `
+    <div class="panel-content parameters-panel">
+      <div class="parameters-header">
+        <h2>Parameters</h2>
+        <span class="parameters-count">${names.length} file${names.length === 1 ? '' : 's'}</span>
+      </div>
+      <div class="alarm-panel-toolbar">
+        <label class="hint">Parameter file
+          <select id="parametersFileSelect" class="studio-select">
+            ${buildFileOptions() || '<option value="">—</option>'}
+          </select>
+        </label>
+        <label class="hint">Add list
+          <select id="parametersAddKind" class="studio-select">
+            <option value="di">PLC DI List</option>
+            <option value="do">PLC DO List</option>
+            <option value="safetyDi">Safety DI List</option>
+            <option value="safetyDo">Safety DO List</option>
+          </select>
+        </label>
+        <button type="button" class="dialog-btn" id="parametersAddBtn">Add List…</button>
+        <button type="button" class="dialog-btn" id="parametersSaveBtn"${activeName ? '' : ' disabled'}>Apply Mappings</button>
+        <button type="button" class="dialog-btn" id="parametersRemoveBtn"${activeName ? '' : ' disabled'}>Remove Selected</button>
+      </div>
+      <p class="hint parameters-edit-hint">Edit tag paths below, then click <strong>Apply Mappings</strong>. Edit descriptions and values in <strong>Tag Editor</strong> (HMI Tags).</p>
+      <div class="parameters-table-wrap">
+        <table class="data-table parameters-table" id="parametersReplacementTable">
+          <thead><tr><th>Placeholder</th><th>Internal HMI Tag</th></tr></thead>
+          <tbody>${buildTableBody(activeName)}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  const renderFile = (name) => {
+    const tbody = document.querySelector('#parametersReplacementTable tbody');
+    const select = document.getElementById('parametersFileSelect');
+    const removeBtn = document.getElementById('parametersRemoveBtn');
+    if (select && select.value !== name) select.value = name;
+    if (tbody) tbody.innerHTML = buildTableBody(name);
+    if (removeBtn) removeBtn.disabled = !name;
+  };
+
+  document.getElementById('parametersFileSelect')?.addEventListener('change', (e) => {
+    renderFile(e.target.value);
+  });
+
+  document.getElementById('parametersSaveBtn')?.addEventListener('click', async () => {
+    const name = document.getElementById('parametersFileSelect')?.value;
+    if (!name) return;
+    try {
+      const replacements = collectReplacements(name);
+      await fetchJson(
+        `/api/projects/${encodeURIComponent(state.activeProject)}/parameter-files/${encodeURIComponent(name)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ replacements })
+        }
+      );
+      setStatus(`Saved mappings: ${name}`);
+      await refreshProjectConfig();
+      await openParametersPanel(name);
+    } catch (err) {
+      setStatus(`Error: ${err.message}`);
+    }
+  });
+
+  document.getElementById('parametersAddBtn')?.addEventListener('click', async () => {
+    const kind = document.getElementById('parametersAddKind')?.value || 'di';
+    try {
+      const res = await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/parameter-files`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind })
+      });
+      setStatus(`Added ${res.added}`);
+      await refreshProjectConfig();
+      await loadExplorer(state.activeProject);
+      await openParametersPanel(res.added);
+    } catch (err) {
+      setStatus(`Error: ${err.message}`);
+    }
+  });
+
+  document.getElementById('parametersRemoveBtn')?.addEventListener('click', async () => {
+    const name = document.getElementById('parametersFileSelect')?.value;
+    if (!name || !confirm(`Remove parameter file "${name}"?`)) return;
+    try {
+      await fetchJson(
+        `/api/projects/${encodeURIComponent(state.activeProject)}/parameter-files/${encodeURIComponent(name)}`,
+        { method: 'DELETE' }
+      );
+      setStatus(`Removed ${name}`);
+      await refreshProjectConfig();
+      await loadExplorer(state.activeProject);
+      await openParametersPanel();
+    } catch (err) {
+      setStatus(`Error: ${err.message}`);
+    }
+  });
+
+  setStatus(names.length ? `Parameters (${names.length} files)` : 'Parameters — add a list');
 }
 
 function runRuntime() {
@@ -6934,7 +7607,7 @@ function hideExplorerContextMenu() {
 function getWorkspaceContextMenuItems() {
   if (!displayIsOpen()) return [];
   const zoomDefault = state.viewPrefs.zoom === 100;
-  const hasSelection = state.canvasSelection.index != null;
+  const hasSelection = getSelectedCanvasIndices().length > 0;
   const items = [];
   if (hasSelection) {
     items.push({ action: 'object-properties', label: 'Properties...' });
@@ -7028,8 +7701,9 @@ function hideWorkspaceContextMenu() {
 function runWorkspaceContextAction(action) {
   switch (action) {
     case 'object-properties':
-      if (state.canvasSelection.index != null) {
-        openPropertiesForComponent(state.canvasSelection.index)
+      const primaryIndex = getPrimaryCanvasSelectionIndex();
+      if (primaryIndex != null) {
+        openPropertiesForComponent(primaryIndex)
           .catch((err) => setStatus(`Error: ${err.message}`));
       }
       break;
@@ -7561,16 +8235,8 @@ document.getElementById('closeTransfer').addEventListener('click', () => documen
 
 document.addEventListener('keydown', (e) => {
   if (!isEditableKeyboardTarget(e.target)) {
-    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'z') {
-      e.preventDefault();
-      undoEdit().catch((err) => setStatus(`Undo error: ${err.message}`));
-      return;
-    }
-    if (e.ctrlKey && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
-      e.preventDefault();
-      redoEdit().catch((err) => setStatus(`Redo error: ${err.message}`));
-      return;
-    }
+    handleStudioCanvasKeydown(e);
+    if (e.defaultPrevented) return;
   }
   if (e.ctrlKey && e.key.toLowerCase() === 'k') {
     e.preventDefault();

@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=0.5.5" />
+    <link rel="stylesheet" href="styles.css?v=0.5.6" />
     <script>
       (function () {
         if (new URLSearchParams(location.search).get('embed') !== '1') return;
@@ -53,10 +53,44 @@
       <nav class="hmi-nav" id="navBar"></nav>
     </div>
 
+    <dialog id="runtimeCommDialog" class="dialog runtime-comm-dialog">
+      <form method="dialog" onsubmit="return false">
+        <h3>Communication Mode</h3>
+        <p class="dialog-hint">Switch between offline simulator and live Allen-Bradley PLC (EtherNet/IP).</p>
+        <label class="dialog-field">
+          <span>Mode</span>
+          <select id="runtimeCommDriver">
+            <option value="simulator">Simulator (demo data)</option>
+            <option value="ethernet-ip">Live PLC (EtherNet/IP)</option>
+          </select>
+        </label>
+        <label class="dialog-field hidden" id="runtimeCommIpRow">
+          <span>PLC IP address</span>
+          <input type="text" id="runtimeCommIp" placeholder="192.168.1.10" />
+        </label>
+        <label class="dialog-field hidden" id="runtimeCommPathRow">
+          <span>Processor slot</span>
+          <input type="text" id="runtimeCommPath" value="0" />
+        </label>
+        <label class="dialog-field dialog-check">
+          <input type="checkbox" id="runtimeCommPersist" />
+          <span>Save as project default</span>
+        </label>
+        <div id="runtimeCommStatus" class="runtime-comm-status"></div>
+        <div class="dialog-actions">
+          <button type="button" id="runtimeCommTest">Test Connection</button>
+          <button type="button" id="runtimeCommCancel">Cancel</button>
+          <button type="button" id="runtimeCommApply" class="primary">Apply</button>
+        </div>
+      </form>
+    </dialog>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="expression-eval.js?v=0.1.0"></script>
-    <script src="components/registry.js?v=0.3.53"></script>
-    <script src="template-compose.js?v=0.2.8"></script>
-    <script src="app.js?v=0.2.25"></script>
+    <script src="/shared/parameter-file-builder.js?v=0.1.0"></script>
+    <script src="parameter-files.js?v=0.2.1"></script>
+    <script src="components/registry.js?v=0.3.56"></script>
+    <script src="template-compose.js?v=0.2.16"></script>
+    <script src="app.js?v=0.2.33"></script>
   </body>
 </html>

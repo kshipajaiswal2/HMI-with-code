@@ -7,14 +7,21 @@ const GLOBAL_OBJECT = urlParams.get('globalObject') || '';
 const EMBED_WIDTH = Number(urlParams.get('w')) || null;
 const EMBED_HEIGHT = Number(urlParams.get('h')) || null;
 
+const screenContent = document.getElementById('screenContent');
+const screenTitle = document.getElementById('screenTitle');
+const projectName = document.getElementById('projectName');
+const commStatus = document.getElementById('commStatus');
+const alarmBanner = document.getElementById('alarmBanner');
+const alarmBannerText = document.getElementById('alarmBannerText');
+const navUser = document.getElementById('navUser');
+const headerIndicators = document.getElementById('headerIndicators');
+const navBar = document.getElementById('navBar');
+
 let socket = null;
-const STUDIO_PREVIEW = EMBED_MODE && STUDIO_EDIT;
-if (!STUDIO_PREVIEW) {
-  try {
-    if (typeof io === 'function') socket = io({ transports: ['websocket', 'polling'] });
-  } catch (err) {
-    console.warn('Socket.IO unavailable:', err);
-  }
+try {
+  if (typeof io === 'function') socket = io({ transports: ['websocket', 'polling'] });
+} catch (err) {
+  console.warn('Socket.IO unavailable:', err);
 }
 
 const state = {
@@ -23,19 +30,43 @@ const state = {
   currentScreen: null,
   screenHistory: [],
   loadedScreen: null,
+  activeParameterFile: null,
+  parameterFiles: typeof ParameterFiles !== 'undefined'
+    ? ParameterFiles.mergeParameterFiles()
+    : {},
   currentUser: null,
   navigation: null,
   userCallbacks: [],
   projectId: PROJECT_ID,
   projectRuntime: { width: 800, height: 600 },
   projectSubtitle: '',
-  displaySize: { width: 800, height: 600 }
+  displaySize: { width: 800, height: 600 },
+  communication: { driver: 'simulator', connected: false }
 };
 
 function apiUrl(path) {
-  if (!state.projectId) return path;
+  const pid = state.projectId || PROJECT_ID;
+  if (!pid) return path;
   const sep = path.includes('?') ? '&' : '?';
-  return `${path}${sep}project=${encodeURIComponent(state.projectId)}`;
+  return `${path}${sep}project=${encodeURIComponent(pid)}`;
+}
+
+function apiPost(path, body = {}) {
+  return fetch(apiUrl(path), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+}
+
+async function hydrateTagsFromServer() {
+  try {
+    const res = await fetchWithTimeout(apiUrl('/api/runtime/tags'));
+    if (!res.ok) return;
+    applyTagsSnapshot(await res.json());
+  } catch {
+    /* offline / starting up */
+  }
 }
 
 function fetchWithTimeout(url, ms = 10000) {
@@ -46,29 +77,185 @@ function fetchWithTimeout(url, ms = 10000) {
 
 function updateCommStatusUI(communication) {
   if (!commStatus) return;
+  state.communication = communication || state.communication;
   const label = commStatus.querySelector('span:last-child');
+  const effectiveDriver = communication?.effectiveDriver || communication?.driver || 'simulator';
+  const isSimulator = effectiveDriver === 'simulator';
   if (communication?.connected) {
     commStatus.classList.add('connected');
     if (label) {
-      label.textContent = communication.driver === 'simulator'
-        ? 'Simulator'
-        : (communication.driver || 'Connected');
+      if (isSimulator) {
+        label.textContent = 'Simulator';
+      } else {
+        const ip = communication.plcIpAddress ? ` @ ${communication.plcIpAddress}` : '';
+        label.textContent = `Live PLC${ip}`;
+      }
     }
   } else {
     commStatus.classList.remove('connected');
-    if (label) label.textContent = communication?.quality === 'bad' ? 'Offline' : 'Connecting...';
+    if (label) {
+      if (isSimulator) {
+        label.textContent = 'Simulator';
+      } else {
+        label.textContent = communication?.quality === 'bad' ? 'PLC Offline' : 'Connecting...';
+      }
+    }
+  }
+  syncCommModeDialogFields();
+}
+
+function isValidIpv4(ip) {
+  if (!ip || typeof ip !== 'string') return false;
+  const parts = ip.trim().split('.');
+  if (parts.length !== 4) return false;
+  return parts.every((part) => {
+    if (!/^\d{1,3}$/.test(part)) return false;
+    const n = Number(part);
+    return n >= 0 && n <= 255;
+  });
+}
+
+function syncCommModeDialogFields() {
+  const driverEl = document.getElementById('runtimeCommDriver');
+  const ipRow = document.getElementById('runtimeCommIpRow');
+  const pathRow = document.getElementById('runtimeCommPathRow');
+  const ipEl = document.getElementById('runtimeCommIp');
+  const pathEl = document.getElementById('runtimeCommPath');
+  const statusEl = document.getElementById('runtimeCommStatus');
+  if (!driverEl) return;
+  const comm = state.communication || {};
+  const effectiveDriver = comm.effectiveDriver || comm.driver || 'simulator';
+  driverEl.value = effectiveDriver;
+  if (ipEl && comm.plcIpAddress) ipEl.value = comm.plcIpAddress;
+  if (pathEl && comm.path != null) pathEl.value = comm.path;
+  const isLive = driverEl.value === 'ethernet-ip';
+  ipRow?.classList.toggle('hidden', !isLive);
+  pathRow?.classList.toggle('hidden', !isLive);
+  if (statusEl) {
+    statusEl.textContent = comm.connected
+      ? (isLive ? 'Connected to PLC' : 'Simulator active')
+      : (isLive ? (comm.error || 'PLC not connected') : 'Simulator active');
+    statusEl.className = `runtime-comm-status ${comm.connected || isLive === false ? 'ok' : 'error'}`;
   }
 }
 
-const screenContent = document.getElementById('screenContent');
-const screenTitle = document.getElementById('screenTitle');
-const projectName = document.getElementById('projectName');
-const commStatus = document.getElementById('commStatus');
-const alarmBanner = document.getElementById('alarmBanner');
-const alarmBannerText = document.getElementById('alarmBannerText');
-const navUser = document.getElementById('navUser');
-const headerIndicators = document.getElementById('headerIndicators');
-const navBar = document.getElementById('navBar');
+function openCommModeDialog() {
+  if (EMBED_MODE || STUDIO_EDIT) return;
+  syncCommModeDialogFields();
+  document.getElementById('runtimeCommDialog')?.showModal();
+}
+
+async function applyCommMode(persist = false) {
+  const driverEl = document.getElementById('runtimeCommDriver');
+  const ipEl = document.getElementById('runtimeCommIp');
+  const pathEl = document.getElementById('runtimeCommPath');
+  const persistEl = document.getElementById('runtimeCommPersist');
+  const statusEl = document.getElementById('runtimeCommStatus');
+  const driver = driverEl?.value || 'simulator';
+  const plcIpAddress = ipEl?.value.trim() || '';
+  const path = pathEl?.value.trim() || '0';
+  if (driver === 'ethernet-ip' && !isValidIpv4(plcIpAddress)) {
+    if (statusEl) {
+      statusEl.textContent = 'Enter a valid PLC IP address';
+      statusEl.className = 'runtime-comm-status error';
+    }
+    return;
+  }
+  if (statusEl) {
+    statusEl.textContent = 'Switching...';
+    statusEl.className = 'runtime-comm-status';
+  }
+  try {
+    const res = await apiPost('/api/runtime/communication/mode', {
+      driver,
+      plcIpAddress,
+      path,
+      persist: persist || Boolean(persistEl?.checked)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Switch failed');
+    updateCommStatusUI({
+      ...data.status,
+      effectiveDriver: data.communication?.driver,
+      plcIpAddress: data.communication?.plcIpAddress,
+      path: data.communication?.path
+    });
+    await hydrateTagsFromServer();
+    if (statusEl) {
+      const liveOk = driver === 'ethernet-ip' && data.status?.connected;
+      statusEl.textContent = driver === 'simulator'
+        ? 'Simulator active'
+        : (liveOk ? 'Connected to PLC' : (data.status?.error || 'PLC not connected'));
+      statusEl.className = `runtime-comm-status ${driver === 'simulator' || liveOk ? 'ok' : 'error'}`;
+    }
+    document.getElementById('runtimeCommDialog')?.close();
+  } catch (err) {
+    if (statusEl) {
+      statusEl.textContent = err.message || 'Switch failed';
+      statusEl.className = 'runtime-comm-status error';
+    }
+  }
+}
+
+async function testCommConnection() {
+  const driverEl = document.getElementById('runtimeCommDriver');
+  const ipEl = document.getElementById('runtimeCommIp');
+  const pathEl = document.getElementById('runtimeCommPath');
+  const statusEl = document.getElementById('runtimeCommStatus');
+  const driver = driverEl?.value || 'simulator';
+  if (driver === 'simulator') {
+    if (statusEl) {
+      statusEl.textContent = 'Simulator does not require a PLC connection';
+      statusEl.className = 'runtime-comm-status ok';
+    }
+    return;
+  }
+  const plcIpAddress = ipEl?.value.trim() || '';
+  if (!isValidIpv4(plcIpAddress)) {
+    if (statusEl) {
+      statusEl.textContent = 'Enter a valid PLC IP address';
+      statusEl.className = 'runtime-comm-status error';
+    }
+    return;
+  }
+  if (statusEl) {
+    statusEl.textContent = 'Testing connection...';
+    statusEl.className = 'runtime-comm-status';
+  }
+  try {
+    const res = await apiPost('/api/runtime/communication/test', {
+      driver,
+      plcIpAddress,
+      path: pathEl?.value.trim() || '0'
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Connection failed');
+    if (statusEl) {
+      statusEl.textContent = data.controller
+        ? `Connected — ${data.controller}${data.version ? ` v${data.version}` : ''}`
+        : 'PLC reachable';
+      statusEl.className = 'runtime-comm-status ok';
+    }
+  } catch (err) {
+    if (statusEl) {
+      statusEl.textContent = err.message || 'Connection failed';
+      statusEl.className = 'runtime-comm-status error';
+    }
+  }
+}
+
+function initCommModeDialog() {
+  if (EMBED_MODE) return;
+  commStatus?.addEventListener('click', openCommModeDialog);
+  commStatus?.setAttribute('title', 'Click to switch Simulator / Live PLC');
+  commStatus?.classList.add('comm-status-clickable');
+  document.getElementById('runtimeCommDriver')?.addEventListener('change', syncCommModeDialogFields);
+  document.getElementById('runtimeCommApply')?.addEventListener('click', () => applyCommMode(false));
+  document.getElementById('runtimeCommTest')?.addEventListener('click', testCommConnection);
+  document.getElementById('runtimeCommCancel')?.addEventListener('click', () => {
+    document.getElementById('runtimeCommDialog')?.close();
+  });
+}
 
 function applyDisplayCanvasSize(width, height, backgroundColor) {
   const bg = backgroundColor || '#EBEBEB';
@@ -124,9 +311,18 @@ function createContext() {
     projectId: state.projectId,
     projectSubtitle: state.projectSubtitle,
 
-    navigate: (screenId) => {
+    navigate: (screenId, opts = {}) => {
       if (STUDIO_EDIT) return;
-      loadScreen(screenId);
+      loadScreen(screenId, opts);
+    },
+
+    getActiveParameterFile() {
+      return state.activeParameterFile;
+    },
+
+    resolveTag(ref) {
+      if (typeof ParameterFiles === 'undefined') return ref;
+      return ParameterFiles.resolveTag(ref, state.activeParameterFile, state.parameterFiles);
     },
     navigateBack: () => {
       if (STUDIO_EDIT) return;
@@ -135,7 +331,6 @@ function createContext() {
     },
     closeDisplay: () => {
       if (STUDIO_EDIT) return;
-      closePopup();
       const prev = state.screenHistory?.pop();
       if (prev) loadScreen(prev, { skipHistory: true });
     },
@@ -166,47 +361,32 @@ function createContext() {
     },
 
     async writeTag(tag, value) {
-      await fetch('/api/runtime/tags/write', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag, value })
-      });
+      const res = await apiPost('/api/runtime/tags/write', { tag, value });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Tag write failed');
+      }
     },
 
     async acknowledgeAlarm(alarmId) {
-      await fetch('/api/runtime/alarms/acknowledge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alarmId })
-      });
+      await apiPost('/api/runtime/alarms/acknowledge', { alarmId });
     },
 
     async acknowledgeAllAlarms() {
-      await fetch('/api/runtime/alarms/acknowledge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ all: true })
-      });
+      await apiPost('/api/runtime/alarms/acknowledge', { all: true });
     },
 
     async clearAlarmHistory() {
-      await fetch('/api/runtime/alarms/clear-history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      await apiPost('/api/runtime/alarms/clear-history', {});
     },
 
     async login(username, password) {
-      const res = await fetch('/api/runtime/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
+      const res = await apiPost('/api/runtime/login', { username, password });
       return res.json();
     },
 
     async logout() {
-      await fetch('/api/runtime/logout', { method: 'POST' });
+      await apiPost('/api/runtime/logout', {});
     },
 
     _bindings: bindings
@@ -277,8 +457,32 @@ async function fetchRawScreen(screenId) {
   return res.json();
 }
 
+function resolveScreenParameterFile(screenId, screen, options = {}) {
+  if (options.parameterFile) return options.parameterFile;
+  if (options.clearParameter) return null;
+  if (screen?.defaultParameterFile) return screen.defaultParameterFile;
+  if (screenId === '301_PLC_IO_List') return 'PLC DO List 01';
+  return null;
+}
+
+function applyActiveParameterFile(screen, parameterFile) {
+  if (!parameterFile || typeof ParameterFiles === 'undefined') return screen;
+  return ParameterFiles.applyParameterFile(screen, parameterFile, state.parameterFiles);
+}
+
+async function syncParameterFileTagValues(parameterFile) {
+  if (!parameterFile) return;
+  try {
+    await apiPost('/api/runtime/parameter-file/apply', { parameterFile });
+    await hydrateTagsFromServer();
+  } catch (err) {
+    console.warn('Parameter file tag sync failed:', err);
+  }
+}
+
 async function loadScreen(screenId, options = {}) {
-  if (!options.skipHistory && state.currentScreen && state.currentScreen !== screenId) {
+  const sameScreen = state.currentScreen === screenId;
+  if (!options.skipHistory && state.currentScreen && !sameScreen) {
     state.screenHistory.push(state.currentScreen);
   }
   state.tagBindings = [];
@@ -295,16 +499,18 @@ async function loadScreen(screenId, options = {}) {
     } else if (!screen._composed) {
       screen = await composeWithTemplate(screen);
     }
-    
-    // Check if this screen should be displayed as a popup
-    if (screen.layout === 'popup') {
-      await renderPopupScreen(screen, screenId);
-    } else {
-      await renderLoadedScreen(screen, screenId);
-    }
+
+    const parameterFile = resolveScreenParameterFile(screenId, screen, options);
+    if (parameterFile) state.activeParameterFile = parameterFile;
+    else if (!sameScreen) state.activeParameterFile = null;
+
+    screen = applyActiveParameterFile(screen, state.activeParameterFile);
+    await syncParameterFileTagValues(state.activeParameterFile);
+    await renderLoadedScreen(screen, screenId);
   } catch {
     renderPlaceholder(screenId);
     state.currentScreen = screenId;
+    state.activeParameterFile = null;
     updateNav(null);
     screenTitle.textContent = screenId.replace(/^\d+_/, '').replace(/_/g, ' ');
   }
@@ -328,50 +534,12 @@ async function loadGlobalObject(objectId) {
   }
 }
 
-async function renderPopupScreen(screen, screenId) {
-  const container = ensurePopupContainer();
-  container.innerHTML = '';
-  container.style.display = 'flex';
-  
-  const popupWrapper = document.createElement('div');
-  popupWrapper.style.cssText = `
-    position: relative;
-    background: white;
-    border: 2px solid #999;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  `;
-  
-  const ctx = createContext();
-  ctx.closeDisplay = closePopup;
-  state.activeContext = ctx;
-  
-  const size = resolveScreenSize(screen);
-  popupWrapper.style.width = `${size.width}px`;
-  popupWrapper.style.height = `${size.height}px`;
-  popupWrapper.style.backgroundColor = size.backgroundColor;
-  
-  (screen.components || []).forEach((comp, index) => {
-    try {
-      const el = ComponentRegistry.render(comp, ctx);
-      el.dataset.componentIndex = String(index);
-      if (comp._displayIndex != null) el.dataset.displayIndex = String(comp._displayIndex);
-      if (comp._source) el.dataset.source = comp._source;
-      if (comp.type) el.dataset.componentType = comp.type;
-      popupWrapper.appendChild(el);
-    } catch (err) {
-      console.error(`Popup render failed for ${comp?.type || 'component'}:`, err);
-    }
-  });
-  
-  container.appendChild(popupWrapper);
-  activePopup = { screenId, element: popupWrapper, context: ctx };
-}
-
 async function renderLoadedScreen(screen, screenId) {
   applyTemplateChrome(screen);
 
   state.currentScreen = screenId;
   state.loadedScreen = screen;
+  await hydrateTagsFromServer();
   renderScreen(screen);
   updateNav(screen.navGroup);
   screenTitle.textContent = screen.title;
@@ -379,7 +547,6 @@ async function renderLoadedScreen(screen, screenId) {
   syncTagBindings();
   const tagNames = collectTags(screen.components);
   if (tagNames.length) socket?.emit('subscribe', tagNames);
-  await hydrateTagsFromServer();
 }
 
 function collectTags(components) {
@@ -450,17 +617,18 @@ function renderScreen(screen) {
 }
 
 function attachStudioEditHandlers() {
-  if (!screenContent || screenContent.dataset.studioEditBound === '1') return;
-  screenContent.dataset.studioEditBound = '1';
+  const canvas = document.getElementById('screenContent');
+  if (!canvas || canvas.dataset.studioEditBound === '1') return;
+  canvas.dataset.studioEditBound = '1';
 
-  screenContent.addEventListener('mousedown', (e) => {
+  canvas.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
     const graphic = e.target.closest('.ft-graphic[data-name]');
     if (graphic) return;
     window.parent.postMessage({ type: 'planthmi-embed-canvas-background-click' }, '*');
   });
 
-  screenContent.addEventListener('click', (e) => {
+  canvas.addEventListener('click', (e) => {
     const graphic = e.target.closest('.ft-graphic[data-name]');
     if (!graphic) return;
     window.parent.postMessage({
@@ -472,7 +640,7 @@ function attachStudioEditHandlers() {
     }, '*');
   });
 
-  screenContent.addEventListener('dblclick', (e) => {
+  canvas.addEventListener('dblclick', (e) => {
     const graphic = e.target.closest('.ft-graphic[data-name]');
     if (!graphic) return;
     e.preventDefault();
@@ -626,16 +794,6 @@ function updateNav(activeGroup) {
   });
 }
 
-async function hydrateTagsFromServer() {
-  try {
-    const res = await fetch(apiUrl('/api/runtime/tags'));
-    if (!res.ok) return;
-    applyTagsSnapshot(await res.json());
-  } catch {
-    /* offline / starting up */
-  }
-}
-
 function updateTagBindings(tagName, value) {
   state.activeContext?._bindings?.get(tagName)?.(value);
 }
@@ -688,11 +846,7 @@ navBar.addEventListener('click', (e) => {
 });
 
 document.getElementById('ackBannerBtn').addEventListener('click', () => {
-  fetch('/api/runtime/alarms/acknowledge', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ all: true })
-  });
+  apiPost('/api/runtime/alarms/acknowledge', { all: true });
 });
 
 if (socket) {
@@ -725,97 +879,38 @@ if (socket) {
     state.currentUser = user;
     updateUserUI();
   });
-}
 
-// Popup management system
-let popupContainer = null;
-let activePopup = null;
-
-function ensurePopupContainer() {
-  if (popupContainer) return popupContainer;
-  popupContainer = document.createElement('div');
-  popupContainer.id = 'popupContainer';
-  popupContainer.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 10000;
-  `;
-  popupContainer.addEventListener('click', (e) => {
-    if (e.target === popupContainer) closePopup();
+  socket.on('communication-changed', (communication) => {
+    updateCommStatusUI(communication);
   });
-  document.body.appendChild(popupContainer);
-  return popupContainer;
 }
 
-async function loadPopup(screenId) {
-  if (activePopup) closePopup();
-  
+async function hydrateEmbedRuntimeMeta() {
   try {
-    const res = await fetchWithTimeout(apiUrl(`/api/runtime/screens/${encodeURIComponent(screenId)}?_=${Date.now()}`));
-    if (!res.ok) throw new Error('not found');
-    let screen = await res.json();
-    
-    if (!screen._composed || composedSideShellMissing(screen)) {
-      const raw = await fetchRawScreen(screenId);
-      screen = await composeWithTemplate(raw ? { ...raw, _composed: false } : screen);
-    } else if (!screen._composed) {
-      screen = await composeWithTemplate(screen);
+    const statusRes = await fetchWithTimeout(apiUrl('/api/runtime/status'));
+    if (!statusRes.ok) return;
+    const status = await statusRes.json();
+    state.projectId = status.projectId || state.projectId || PROJECT_ID;
+    state.projectSubtitle = status.projectSubtitle || '';
+    state.projectRuntime = status.runtime || state.projectRuntime;
+    if (status.parameterFiles && typeof ParameterFiles !== 'undefined') {
+      state.parameterFiles = ParameterFiles.mergeParameterFiles(status.parameterFiles);
     }
-    
-    const container = ensurePopupContainer();
-    container.innerHTML = '';
-    container.style.display = 'flex';
-    
-    const popupWrapper = document.createElement('div');
-    popupWrapper.style.cssText = `
-      position: relative;
-      background: white;
-      border: 2px solid #999;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    `;
-    
-    const ctx = createContext();
-    ctx.closeDisplay = closePopup;
-    state.activeContext = ctx;
-    
-    const size = resolveScreenSize(screen);
-    popupWrapper.style.width = `${size.width}px`;
-    popupWrapper.style.height = `${size.height}px`;
-    popupWrapper.style.backgroundColor = size.backgroundColor;
-    
-    (screen.components || []).forEach((comp, index) => {
+    updateCommStatusUI(status.communication);
+    if (EMBED_WIDTH && EMBED_HEIGHT) {
+      state.projectRuntime = { ...state.projectRuntime, width: EMBED_WIDTH, height: EMBED_HEIGHT };
+    }
+    projectName.textContent = status.projectName || 'Plant HMI';
+    updateUserUI();
+    if (!state.navigation) {
       try {
-        const el = ComponentRegistry.render(comp, ctx);
-        el.dataset.componentIndex = String(index);
-        if (comp._displayIndex != null) el.dataset.displayIndex = String(comp._displayIndex);
-        if (comp._source) el.dataset.source = comp._source;
-        if (comp.type) el.dataset.componentType = comp.type;
-        popupWrapper.appendChild(el);
-      } catch (err) {
-        console.error(`Popup render failed for ${comp?.type || 'component'}:`, err);
-      }
-    });
-    
-    container.appendChild(popupWrapper);
-    activePopup = { screenId, element: popupWrapper, context: ctx };
+        const navRes = await fetchWithTimeout(apiUrl('/api/runtime/navigation'));
+        if (navRes.ok) state.navigation = await navRes.json();
+      } catch { /* optional for embed preview */ }
+    }
   } catch (err) {
-    console.error(`Failed to load popup ${screenId}:`, err);
-    closePopup();
+    console.warn('Embed runtime meta load failed:', err);
   }
-}
-
-function closePopup() {
-  if (!popupContainer) return;
-  popupContainer.style.display = 'none';
-  popupContainer.innerHTML = '';
-  activePopup = null;
 }
 
 async function init() {
@@ -827,7 +922,6 @@ async function init() {
     document.getElementById('app')?.classList.add('embed-mode');
     if (STUDIO_EDIT) {
       document.body.classList.add('studio-edit-mode');
-      attachStudioEditHandlers();
     }
     applyDisplayCanvasSize(EMBED_WIDTH, EMBED_HEIGHT);
     document.addEventListener('contextmenu', (e) => {
@@ -838,16 +932,44 @@ async function init() {
       if (e.data?.type !== 'planthmi-preview') return;
       handleStudioPreviewMessage(e.data);
     });
+    if (PROJECT_ID) state.projectId = PROJECT_ID;
+
+    try {
+      if (GLOBAL_OBJECT) {
+        await loadGlobalObject(GLOBAL_OBJECT);
+      } else if (START_SCREEN) {
+        await loadScreen(START_SCREEN);
+      } else {
+        const statusRes = await fetchWithTimeout(apiUrl('/api/runtime/status'));
+        if (statusRes.ok) {
+          const status = await statusRes.json();
+          await loadScreen(status.startupScreen || '100_Overview');
+        }
+      }
+    } catch (err) {
+      console.error('Embed preview load failed:', err);
+      renderPlaceholder(GLOBAL_OBJECT || START_SCREEN || 'Preview');
+      if (screenTitle) screenTitle.textContent = 'Preview error';
+    }
+
+    if (STUDIO_EDIT) {
+      try {
+        attachStudioEditHandlers();
+      } catch (err) {
+        console.error('Studio edit handlers failed:', err);
+      }
+    }
+
+    hydrateEmbedRuntimeMeta().catch(() => {});
+    return;
   }
 
   const clockEl = document.getElementById('clock');
   if (clockEl) clockEl.textContent = new Date().toLocaleString();
-  if (!EMBED_MODE) {
-    setInterval(() => {
-      const clockEl = document.getElementById('clock');
-      if (clockEl) clockEl.textContent = new Date().toLocaleString();
-    }, 1000);
-  }
+  setInterval(() => {
+    const el = document.getElementById('clock');
+    if (el) el.textContent = new Date().toLocaleString();
+  }, 1000);
 
   try {
     const [statusRes, navRes] = await Promise.all([
@@ -861,17 +983,15 @@ async function init() {
     state.projectId = status.projectId || state.projectId || PROJECT_ID;
     state.projectSubtitle = status.projectSubtitle || '';
     state.projectRuntime = status.runtime || { width: 800, height: 600 };
-    updateCommStatusUI(status.communication);
-    if (EMBED_MODE && EMBED_WIDTH && EMBED_HEIGHT) {
-      state.projectRuntime = { ...state.projectRuntime, width: EMBED_WIDTH, height: EMBED_HEIGHT };
+    if (status.parameterFiles && typeof ParameterFiles !== 'undefined') {
+      state.parameterFiles = ParameterFiles.mergeParameterFiles(status.parameterFiles);
     }
+    updateCommStatusUI(status.communication);
     state.navigation = await navRes.json();
     projectName.textContent = status.projectName || 'Plant HMI';
-    if (!EMBED_MODE) buildNavBar();
+    buildNavBar();
     updateUserUI();
-    if (!EMBED_MODE) {
-      applyDisplayCanvasSize(state.projectRuntime.width, state.projectRuntime.height);
-    }
+    applyDisplayCanvasSize(state.projectRuntime.width, state.projectRuntime.height);
     if (GLOBAL_OBJECT) {
       await loadGlobalObject(GLOBAL_OBJECT);
     } else {
@@ -886,6 +1006,5 @@ async function init() {
 }
 
 window.loadScreen = loadScreen;
-window.loadPopup = loadPopup;
-window.closePopup = closePopup;
-init();
+initCommModeDialog();
+init().catch((err) => console.error('Runtime init failed:', err));

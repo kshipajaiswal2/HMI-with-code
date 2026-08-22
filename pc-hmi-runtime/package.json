@@ -9,7 +9,9 @@
     "dev": "node --watch server/index.js",
     "desktop": "electron electron/main.js",
     "desktop:runtime": "electron electron/main.js --runtime",
-    "desktop:kiosk": "electron electron/main.js --runtime --kiosk"
+    "desktop:kiosk": "electron electron/main.js --runtime --kiosk",
+    "test": "node --test test/**/*.test.js",
+    "build:panel": "node scripts/build-panel-package.js"
   },
   "dependencies": {
     "express": "^4.19.2",

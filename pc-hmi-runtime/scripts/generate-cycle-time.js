@@ -1,4 +1,4 @@
-/** Generate 304_Cycle_Time from FactoryTalk 402_Cycletime.xml (scaled 800/1024). */
+/** Generate 305_Cycle_Time from FactoryTalk 402_Cycletime.xml (scaled 800/1024). */
 const fs = require('fs');
 const path = require('path');
 
@@ -182,7 +182,7 @@ function manualTemplateReplace() {
 }
 
 const screen = {
-  id: '304_Cycle_Time',
+  id: '305_Cycle_Time',
   title: 'Cycle Time',
   subtitle: 'Cycle Time',
   navGroup: 'manual',
@@ -196,9 +196,9 @@ const screen = {
 };
 
 const outPaths = [
-  path.join(__dirname, '../screens/304_Cycle_Time.json'),
-  path.join(__dirname, '../projects/_template/Gfx/304_Cycle_Time.json'),
-  path.join(__dirname, '../projects/a/Gfx/304_Cycle_Time.json')
+  path.join(__dirname, '../screens/305_Cycle_Time.json'),
+  path.join(__dirname, '../projects/_template/Gfx/305_Cycle_Time.json'),
+  path.join(__dirname, '../projects/a/Gfx/305_Cycle_Time.json')
 ];
 
 for (const p of outPaths) {

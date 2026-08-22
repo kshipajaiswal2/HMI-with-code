@@ -26,6 +26,7 @@
   const boundInputs = new WeakMap();
   let activeInput = null;
   let activeTrigger = null;
+  let activeInputOpenColor = null;
   let sharedPopover = null;
   let themeGrid = null;
   let recentGrid = null;
@@ -110,9 +111,15 @@
     return hsvToHex(customHue, customSat, customVal);
   }
 
+  function isAchromatic(sat) {
+    return sat < 0.001;
+  }
+
   function updateSpectrumVisuals() {
-    if (!svBg || !svCursor || !hueCursor) return;
-    svBg.style.backgroundColor = `hsl(${customHue}, 100%, 50%)`;
+    if (!svBg || !svCursor || !hueCursor || !svPanel) return;
+    const achromatic = isAchromatic(customSat);
+    svPanel.classList.toggle('ft-color-sv-achromatic', achromatic);
+    svBg.style.backgroundColor = achromatic ? '#ffffff' : `hsl(${customHue}, 100%, 50%)`;
     svCursor.style.left = `${customSat * 100}%`;
     svCursor.style.top = `${(1 - customVal) * 100}%`;
     hueCursor.style.left = `${(customHue / 360) * 100}%`;
@@ -131,7 +138,11 @@
     syncRgbInputsFromColor(hex);
     const { r, g, b } = hexToRgb(hex);
     const { h, s, v } = rgbToHsv(r, g, b);
-    setCustomHsv(h, s, v);
+    if (isAchromatic(s)) {
+      setCustomHsv(customHue, s, v);
+    } else {
+      setCustomHsv(h, s, v);
+    }
     updateSpectrumVisuals();
     if (otherBtn) otherBtn.style.backgroundColor = hex;
     if (nativeInput) nativeInput.value = hex;
@@ -195,8 +206,15 @@
     if (!hueTrack) return;
     const rect = hueTrack.getBoundingClientRect();
     const hue = Math.min(360, Math.max(0, ((e.clientX - rect.left) / rect.width) * 360));
-    setCustomHsv(hue, customSat, customVal);
-    previewCustomColor(customHsvToHex());
+    let sat = customSat;
+    let val = customVal;
+    if (isAchromatic(sat)) {
+      sat = 1;
+      val = Math.max(val, 0.85);
+    }
+    setCustomHsv(hue, sat, val);
+    updateSpectrumVisuals();
+    previewCustomColor(customHsvToHex(), { silent: false });
   }
 
   document.addEventListener('mousemove', (e) => {
@@ -299,9 +317,8 @@
 
     sharedPopover = document.createElement('div');
     sharedPopover.className = 'ft-color-dropdown hidden';
-    if ('showPopover' in HTMLElement.prototype) {
-      sharedPopover.setAttribute('popover', 'manual');
-    }
+    sharedPopover.setAttribute('role', 'dialog');
+    sharedPopover.setAttribute('aria-label', 'Color picker');
     sharedPopover.innerHTML = `
       <div class="ft-color-section">
         <div class="ft-color-section-title">Theme Colors</div>
@@ -317,6 +334,7 @@
       </div>
       <div class="ft-color-custom-section">
         <div class="ft-color-section-title">Spectrum</div>
+        <p class="ft-color-spectrum-hint">Pick hue on the bar below, then saturation and brightness in the box.</p>
         <div class="ft-color-spectrum-wrap">
           <div class="ft-color-sv-panel" title="Drag to adjust saturation and brightness">
             <div class="ft-color-sv-bg"></div>
@@ -416,13 +434,15 @@
       e.stopPropagation();
     });
 
+    themeGrid?.addEventListener('pointerdown', handleThemeSwatchActivate);
+    recentGrid?.addEventListener('pointerdown', handleThemeSwatchActivate);
+
     sharedPopover.addEventListener('click', (e) => {
       e.stopPropagation();
       const swatch = e.target.closest('.ft-color-swatch');
-      if (!swatch || swatch === otherBtn || !activeInput) return;
+      if (!swatch || swatch === otherBtn || swatch.classList.contains('is-empty') || !activeInput) return;
       e.preventDefault();
-      setInputColor(activeInput, swatch.dataset.color || swatch.style.backgroundColor);
-      closeSharedPopover();
+      pickThemeColor(swatch.dataset.color || swatch.style.backgroundColor);
     });
 
     otherBtn.addEventListener('click', (e) => {
@@ -526,26 +546,44 @@
     otherBtn.style.backgroundColor = current;
   }
 
+  function pickThemeColor(raw) {
+    if (!activeInput || raw == null || raw === '') return;
+    setInputColor(activeInput, raw);
+    closeSharedPopover();
+  }
+
+  function handleThemeSwatchActivate(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const swatch = e.target.closest('.ft-color-swatch');
+    if (!swatch || swatch === otherBtn || swatch.classList.contains('is-empty') || !activeInput) return;
+    pickThemeColor(swatch.dataset.color || swatch.style.backgroundColor);
+  }
+
+  /** Modal dialogs mark the rest of the page inert — mount inside the open dialog so clicks work. */
+  function getPopoverHost(trigger) {
+    return trigger?.closest?.('dialog[open]')
+      || activeInput?.closest?.('dialog[open]')
+      || document.querySelector('dialog.dialog[open]')
+      || document.body;
+  }
+
   function mountPopoverForTrigger(trigger) {
     if (!sharedPopover) return;
-    if (typeof sharedPopover.showPopover === 'function') {
-      if (sharedPopover.parentNode !== document.body) {
-        document.body.appendChild(sharedPopover);
-      }
-      return;
-    }
-    const dialog = trigger?.closest?.('dialog[open]');
-    const parent = dialog || document.body;
-    if (sharedPopover.parentNode !== parent) {
-      parent.appendChild(sharedPopover);
+    const host = getPopoverHost(trigger);
+    if (sharedPopover.parentNode !== host) {
+      host.appendChild(sharedPopover);
     }
   }
 
   function closeSharedPopover() {
     if (!sharedPopover) return;
     spectrumDragging = null;
-    if (typeof sharedPopover.hidePopover === 'function') {
-      try { sharedPopover.hidePopover(); } catch { /* not open */ }
+    if (activeInput && activeInputOpenColor != null) {
+      const current = getInputColor(activeInput);
+      if (!colorsMatch(current, activeInputOpenColor)) {
+        setInputColor(activeInput, current);
+      }
     }
     sharedPopover.classList.add('hidden');
     sharedPopover.style.position = '';
@@ -557,6 +595,7 @@
     }
     activeInput = null;
     activeTrigger = null;
+    activeInputOpenColor = null;
   }
 
   function openSharedPopover(input, trigger) {
@@ -564,35 +603,29 @@
     mountPopoverForTrigger(trigger);
     activeInput = input;
     activeTrigger = trigger;
-    const current = getInputColor(input);
+    activeInputOpenColor = getInputColor(input);
+    const current = activeInputOpenColor;
     renderRecentGrid();
     highlightSelected(current);
     otherBtn.style.backgroundColor = current;
     nativeInput.value = current;
     syncCustomControlsFromColor(current);
     sharedPopover.classList.remove('hidden');
-    if (typeof sharedPopover.showPopover === 'function') {
-      try { sharedPopover.showPopover(); } catch { /* already open */ }
-    }
 
     const rect = trigger.getBoundingClientRect();
-    requestAnimationFrame(() => {
-      const dropRect = sharedPopover.getBoundingClientRect();
-      let left = rect.left;
-      let top = rect.bottom + 2;
-      if (left + dropRect.width > window.innerWidth - 8) {
-        left = Math.max(8, window.innerWidth - dropRect.width - 8);
-      }
-      if (top + dropRect.height > window.innerHeight - 8) {
-        top = Math.max(8, rect.top - dropRect.height - 2);
-      }
-      sharedPopover.style.position = 'fixed';
-      sharedPopover.style.left = `${left}px`;
-      sharedPopover.style.top = `${top}px`;
-      if (typeof sharedPopover.showPopover !== 'function') {
-        sharedPopover.style.zIndex = '100000';
-      }
-    });
+    const dropRect = sharedPopover.getBoundingClientRect();
+    let left = rect.left;
+    let top = rect.bottom + 2;
+    if (left + dropRect.width > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - dropRect.width - 8);
+    }
+    if (top + dropRect.height > window.innerHeight - 8) {
+      top = Math.max(8, rect.top - dropRect.height - 2);
+    }
+    sharedPopover.style.position = 'fixed';
+    sharedPopover.style.left = `${left}px`;
+    sharedPopover.style.top = `${top}px`;
+    sharedPopover.style.zIndex = '100000';
   }
 
   function getInputColor(input) {
@@ -606,13 +639,23 @@
     const bound = boundInputs.get(input);
     if (bound) bound.value = hex;
     input.setAttribute('value', hex);
-    const preview = input.parentNode?.querySelector?.('.ft-color-trigger-preview');
+    const preview = input._ftColorPicker?.trigger?.querySelector?.('.ft-color-trigger-preview')
+      || input.parentNode?.querySelector?.('.ft-color-trigger-preview');
     if (preview) preview.style.backgroundColor = hex;
     if (addRecentColor) addRecent(hex);
     if (!silent) {
       input.dispatchEvent(new Event('input', { bubbles: true }));
       input.dispatchEvent(new Event('change', { bubbles: true }));
+      const form = input.closest('form');
+      if (form) {
+        form.dispatchEvent(new Event('input', { bubbles: true }));
+        form.dispatchEvent(new Event('change', { bubbles: true }));
+      }
     }
+  }
+
+  function setValueSilent(input, raw) {
+    setInputColor(input, raw, { addRecentColor: false, silent: true });
   }
 
   function bindColorInput(input) {
@@ -659,7 +702,13 @@
       configurable: true,
       enumerable: true,
       get() { return state.value; },
-      set(v) { setInputColor(input, v, { addRecentColor: false }); }
+      set(v) {
+        if (window.state?.propsFormFill) {
+          setValueSilent(input, v);
+        } else {
+          setInputColor(input, v, { addRecentColor: false });
+        }
+      }
     });
 
     Object.defineProperty(input, 'disabled', {
@@ -698,10 +747,41 @@
     runBatch();
   }
 
+  /** Bind every color input under root immediately (for open property dialogs). */
+  function initAllSync(root = document) {
+    if (!root?.querySelectorAll) return;
+    root.querySelectorAll('input[type="color"], input.ft-color-input:not([data-ft-color-picker="1"])').forEach(bindColorInput);
+  }
+
+  function refreshInput(input) {
+    if (!input) return;
+    const bound = boundInputs.get(input);
+    const hex = normalizeColor(bound?.value ?? input.getAttribute('value') ?? input.value ?? '#000000');
+    if (bound) bound.value = hex;
+    input.setAttribute('value', hex);
+    const preview = input.parentNode?.querySelector?.('.ft-color-trigger-preview')
+      || input._ftColorPicker?.trigger?.querySelector?.('.ft-color-trigger-preview');
+    if (preview) preview.style.backgroundColor = hex;
+  }
+
+  function refreshAll(root = document) {
+    if (!root?.querySelectorAll) return;
+    root.querySelectorAll('input.ft-color-input[data-ft-color-picker="1"]').forEach(refreshInput);
+  }
+
+  function shouldIgnoreOutsidePopoverEvent(e) {
+    const target = e.target;
+    if (target?.closest?.('.ft-color-dropdown')) return true;
+    if (target?.closest?.('.ft-color-picker')) return true;
+    if (target?.closest?.('.ft-color-swatch')) return true;
+    if (!activeInput) return true;
+    if (sharedPopover?.contains(target)) return true;
+    if (activeTrigger?.contains(target)) return true;
+    return false;
+  }
+
   document.addEventListener('click', (e) => {
-    if (!activeInput) return;
-    if (sharedPopover?.contains(e.target)) return;
-    if (activeTrigger?.contains(e.target)) return;
+    if (shouldIgnoreOutsidePopoverEvent(e)) return;
     closeSharedPopover();
   });
 
@@ -715,6 +795,11 @@
 
   window.FtColorPicker = {
     initAll,
+    initAllSync,
+    refreshInput,
+    refreshAll,
+    getInputColor,
+    setValueSilent,
     normalizeColor,
     THEME_COLORS,
     closeAll: closeSharedPopover

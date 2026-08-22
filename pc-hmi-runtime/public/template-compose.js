@@ -57,8 +57,8 @@
     { target: '301_PLC_IO_List', label: 'PLC Input\nOutput List', top: 96 },
     { target: '302_PLC_Architecture', label: 'PLC\nArchitecture', top: 168 },
     { target: '303_Run_Count', label: 'Run\nTime', top: 240 },
-    { target: '304_Cycle_Time', label: 'Cycle\nTime', top: 312 },
-    { target: '305_Network', label: 'Network', top: 384 }
+    { target: '304_Network', label: 'Network', top: 312 },
+    { target: '305_Cycle_Time', label: 'Cycle\nTime', top: 384 }
   ];
 
   const ALARM_NAV_ITEMS = [
@@ -67,8 +67,8 @@
     { target: '402_Alarm_Remedies_Popup', label: 'Alarm\nRemedy', top: 240 }
   ];
 
-  /** Overview nav uses fixed 800×600-friendly sizes (FT 85×45 @ 1024 feels too tight when scaled). */
-  const OVERVIEW_NAV_GEOMETRY = { left: 8, width: 72, height: 40 };
+  /** Overview nav — FT 85×45 @ 1024, scaled to 800-wide display. */
+  const OVERVIEW_NAV_GEOMETRY = { left: 8, width: 66, height: 35 };
   const MANUAL_NAV_GEOMETRY = { left: 8, width: 66, height: 35 };
   const ALARM_NAV_GEOMETRY = { left: 8, width: 66, height: 35 };
 
@@ -86,36 +86,34 @@
     const shell = OVERVIEW_NAV_ITEMS.map((item) => {
       const name = `OverviewNav_${item.target}`;
       const isActive = screenId === item.target;
-      const custom = overrides[name] || {};
+      const layout = pickNavShellLayoutFields(overrides[name] || {});
       return {
         type: 'GotoButton',
         name,
         label: item.label,
+        caption: item.label,
         target: item.target,
-        left: custom.left ?? OVERVIEW_NAV_GEOMETRY.left,
-        top: custom.top ?? scaleCoord(item.top),
-        width: custom.width ?? OVERVIEW_NAV_GEOMETRY.width,
-        height: custom.height ?? OVERVIEW_NAV_GEOMETRY.height,
-        useBackColor: custom.useBackColor ?? true,
-        backColor: custom.backColor ?? '#dcdcdc',
-        backStyle: custom.backStyle ?? 'solid',
-        borderStyle: custom.borderStyle ?? 'raised',
-        borderWidth: custom.borderWidth ?? 2,
-        fontSize: custom.fontSize ?? 9,
-        bold: custom.bold ?? true,
-        alignment: custom.alignment ?? 'middleCenter',
-        visible: custom.visible !== false,
-        audio: custom.audio !== false,
-        ...custom,
-        name,
-        target: item.target,
-        label: custom.label ?? item.label,
-        useBorderColor: custom.useBorderColor ?? isActive,
-        borderColor: custom.borderColor ?? (isActive ? '#F99746' : '#E0E0E0'),
-        borderUsesBackColor: custom.borderUsesBackColor ?? (isActive ? false : true),
-        foreColor: custom.foreColor ?? '#000000',
-        useForeColor: custom.useForeColor !== false,
-        navSideAccent: custom.navSideAccent ?? (isActive && custom.borderColor == null),
+        left: layout.left ?? OVERVIEW_NAV_GEOMETRY.left,
+        top: layout.top ?? scaleCoord(item.top),
+        width: layout.width ?? OVERVIEW_NAV_GEOMETRY.width,
+        height: layout.height ?? OVERVIEW_NAV_GEOMETRY.height,
+        useBackColor: layout.useBackColor ?? true,
+        backColor: layout.backColor ?? '#dcdcdc',
+        backStyle: layout.backStyle ?? 'solid',
+        borderStyle: isActive ? 'line' : (layout.borderStyle ?? 'raised'),
+        borderWidth: layout.borderWidth ?? 3,
+        fontSize: layout.fontSize ?? 9,
+        bold: layout.bold ?? true,
+        alignment: layout.alignment ?? 'middleCenter',
+        wordWrap: layout.wordWrap ?? true,
+        visible: layout.visible !== false,
+        audio: layout.audio !== false,
+        foreColor: layout.foreColor ?? '#000000',
+        useForeColor: layout.useForeColor !== false,
+        useBorderColor: isActive,
+        borderColor: isActive ? '#F99746' : '#E0E0E0',
+        borderUsesBackColor: !isActive,
+        navSideAccent: false,
         _source: 'shell'
       };
     });
@@ -145,6 +143,24 @@
     return shell;
   }
 
+  const NAV_SHELL_LAYOUT_KEYS = new Set([
+    'left', 'top', 'width', 'height',
+    'fontFamily', 'fontSize', 'bold', 'italic', 'underline',
+    'wordWrap', 'alignment', 'visible', 'backColor', 'backStyle',
+    'borderStyle', 'borderWidth', 'audio',
+    'image', 'imageScaled', 'imageAlignment', 'useBackColor',
+    'foreColor', 'useForeColor'
+  ]);
+
+  /** Geometry/style only — never merge label, caption, or active-state styling from overrides. */
+  function pickNavShellLayoutFields(custom = {}) {
+    const picked = {};
+    for (const [key, value] of Object.entries(custom || {})) {
+      if (NAV_SHELL_LAYOUT_KEYS.has(key)) picked[key] = value;
+    }
+    return picked;
+  }
+
   function buildManualShell(rawScreen) {
     if (rawScreen.navGroup !== 'manual') return [];
 
@@ -153,38 +169,34 @@
     const shell = MANUAL_NAV_ITEMS.map((item) => {
       const name = `ManualNav_${item.target}`;
       const isActive = screenId === item.target;
-      const custom = overrides[name] || {};
+      const layout = pickNavShellLayoutFields(overrides[name] || {});
       return {
         type: 'GotoButton',
         name,
         label: item.label,
+        caption: item.label,
         target: item.target,
-        left: custom.left ?? MANUAL_NAV_GEOMETRY.left,
-        top: custom.top ?? scaleCoord(item.top),
-        width: custom.width ?? MANUAL_NAV_GEOMETRY.width,
-        height: custom.height ?? MANUAL_NAV_GEOMETRY.height,
-        useBackColor: custom.useBackColor ?? true,
-        backColor: custom.backColor ?? '#dcdcdc',
-        backStyle: custom.backStyle ?? 'solid',
-        borderStyle: custom.borderStyle ?? 'raised',
-        borderWidth: custom.borderWidth ?? 3,
-        fontSize: custom.fontSize ?? 9,
-        bold: custom.bold ?? true,
-        alignment: custom.alignment ?? 'middleCenter',
-        wordWrap: custom.wordWrap ?? true,
-        visible: custom.visible !== false,
-        audio: custom.audio !== false,
-        ...custom,
-        name,
-        target: item.target,
-        label: custom.label ?? item.label,
-        caption: custom.caption ?? custom.label ?? item.label,
-        foreColor: custom.foreColor ?? '#000000',
-        useForeColor: custom.useForeColor !== false,
-        navSideAccent: custom.navSideAccent ?? (isActive && custom.borderColor == null),
-        useBorderColor: custom.useBorderColor ?? isActive,
-        borderColor: custom.borderColor ?? (isActive ? '#F99746' : '#E0E0E0'),
-        borderUsesBackColor: custom.borderUsesBackColor ?? !isActive,
+        left: layout.left ?? MANUAL_NAV_GEOMETRY.left,
+        top: layout.top ?? scaleCoord(item.top),
+        width: layout.width ?? MANUAL_NAV_GEOMETRY.width,
+        height: layout.height ?? MANUAL_NAV_GEOMETRY.height,
+        useBackColor: layout.useBackColor ?? true,
+        backColor: layout.backColor ?? '#dcdcdc',
+        backStyle: layout.backStyle ?? 'solid',
+        borderStyle: isActive ? 'line' : (layout.borderStyle ?? 'raised'),
+        borderWidth: layout.borderWidth ?? 3,
+        fontSize: layout.fontSize ?? 9,
+        bold: layout.bold ?? true,
+        alignment: layout.alignment ?? 'middleCenter',
+        wordWrap: layout.wordWrap ?? true,
+        visible: layout.visible !== false,
+        audio: layout.audio !== false,
+        foreColor: layout.foreColor ?? '#000000',
+        useForeColor: layout.useForeColor !== false,
+        useBorderColor: isActive,
+        borderColor: isActive ? '#F99746' : '#E0E0E0',
+        borderUsesBackColor: !isActive,
+        navSideAccent: false,
         _source: 'shell'
       };
     });

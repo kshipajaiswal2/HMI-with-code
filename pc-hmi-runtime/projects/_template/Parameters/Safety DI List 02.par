@@ -1,0 +1,32 @@
+!================================================
+! Parameter File
+! Name: Safety DI List 02
+! Syntax: #replacement=tagname
+! List 2 — Data_08…Data_15
+!================================================
+
+#100={Safety_DI_Discr\Safety_List_02}
+#101={Safety_DI_Discr\Data_08}
+#102={Safety_DI_Discr\Data_09}
+#103={Safety_DI_Discr\Data_10}
+#104={Safety_DI_Discr\Data_11}
+#105={Safety_DI_Discr\Data_12}
+#106={Safety_DI_Discr\Data_13}
+#107={Safety_DI_Discr\Data_14}
+#108={Safety_DI_Discr\Data_15}
+#201={Safety_DI_No\Data_08}
+#202={Safety_DI_No\Data_09}
+#203={Safety_DI_No\Data_10}
+#204={Safety_DI_No\Data_11}
+#205={Safety_DI_No\Data_12}
+#206={Safety_DI_No\Data_13}
+#207={Safety_DI_No\Data_14}
+#208={Safety_DI_No\Data_15}
+#301={Safety_DI_Tags\Data_08}
+#302={Safety_DI_Tags\Data_09}
+#303={Safety_DI_Tags\Data_10}
+#304={Safety_DI_Tags\Data_11}
+#305={Safety_DI_Tags\Data_12}
+#306={Safety_DI_Tags\Data_13}
+#307={Safety_DI_Tags\Data_14}
+#308={Safety_DI_Tags\Data_15}

@@ -32,11 +32,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -65,11 +65,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -98,11 +98,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -131,11 +131,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -164,11 +164,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -197,11 +197,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -230,11 +230,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -263,11 +263,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -295,11 +295,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -318,11 +318,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -358,11 +358,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -382,11 +382,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -423,11 +423,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -446,11 +446,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -487,11 +487,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -510,11 +510,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -551,11 +551,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -574,11 +574,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -628,11 +628,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -651,11 +651,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -705,11 +705,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -728,11 +728,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -781,11 +781,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>
@@ -804,11 +804,11 @@
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="0" value="0" backColor="#A0A0A4" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="OFF" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
                 <state stateId="1" value="1" backColor="lime" borderColor="black" patternColor="white" patternStyle="none" blink="false" endColor="white" gradientStop="50" gradientDirection="gradientDirectionHorizontal" gradientShadingStyle="gradientHorizontalFromRight">
-                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="navy" backStyle="transparent" alignment="middleCenter" wordWrap="false" blink="false"/>
+                    <caption fontFamily="Arial" fontSize="8" bold="true" italic="false" underline="false" strikethrough="false" caption="ON" color="black" backColor="gainsboro" backStyle="solid" alignment="middleCenter" wordWrap="false" blink="false"/>
                     <imageSettings imageName="" alignment="middleCenter" backStyle="transparent" color="white" backColor="navy" scaled="false" blink="false"/>
                 </state>
             </states>

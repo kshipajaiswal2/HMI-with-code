@@ -1,0 +1,38 @@
+{
+  "id": "601_Sequence",
+  "title": "Sequence",
+  "subtitle": "Sequence",
+  "navGroup": "sequence",
+  "securityLevel": 0,
+  "components": [
+    {
+      "type": "Image",
+      "name": "SequenceDiagram",
+      "image": "machinesequence1.jpg",
+      "left": 72,
+      "top": 72,
+      "width": 656,
+      "height": 420,
+      "visible": true,
+      "backStyle": "transparent",
+      "imageScaled": true,
+      "imageAlignment": "middleCenter"
+    }
+  ],
+  "displaySettings": {
+    "backgroundColor": "#EBEBEB",
+    "useProjectSize": true
+  },
+  "template": {
+    "enabled": true,
+    "globalObjectId": "Template",
+    "replace": {
+      "NavSequence": {
+        "image": "machinesequence2.jpg",
+        "borderColor": "#F99746",
+        "useBorderColor": true,
+        "borderUsesBackColor": false
+      }
+    }
+  }
+}

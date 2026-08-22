@@ -134,8 +134,9 @@
         })
       });
       if (result.ok) {
-        setCommStatus(`Connected to ${communication.plcIpAddress}`, true);
-        window.setStatus(`PLC reachable at ${communication.plcIpAddress}`);
+        const detail = result.controller ? ` (${result.controller})` : '';
+        setCommStatus(`Connected to ${communication.plcIpAddress}${detail}`, true);
+        window.setStatus(`PLC connected at ${communication.plcIpAddress}${detail}`);
       } else {
         setCommStatus(result.error || 'Connection failed', false);
         window.setStatus(result.error || 'PLC connection test failed');

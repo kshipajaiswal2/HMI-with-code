@@ -1,9 +1,9 @@
-/** Demo / offline tag values for HMI screens until live PLC polling is active. */
 function seedDemoTagValues(tagService) {
   const seeds = {
     'System.AutoMode': true,
     'System.Running': true,
     'System.Healthy': true,
+    'Maintenance_Mode_On': false,
     'Production.Count': 1247,
     'Production.Rate': 342.5,
     'Production.Efficiency': 87.3,
@@ -26,17 +26,17 @@ function seedDemoTagValues(tagService) {
     'Safety.RIO01_SDI_02': true,
     'Safety.RIO01_SDI_03': true,
     'Safety.RIO01_SDI_04': true,
-    'Safety.RIO01_SDI_07': false,
-    'Safety.RIO01_SDI_08': false,
-    'Safety.RIO01_SDI_11': false,
-    'Safety.RIO01_SDI_12': false,
-    'Safety.RIO01_SDI_15': false,
-    'Safety.RIO01_SDI_16': false,
-    'Safety.RIO01_SDI_17': false,
-    'Safety.RIO01_SDI_18': false,
-    'Safety.RIO01_SDI_19': false,
-    'Safety.RIO01_SDI_20': false,
-    'System.All_E_Stop_Healthy': false,
+    'Safety.RIO01_SDI_07': true,
+    'Safety.RIO01_SDI_08': true,
+    'Safety.RIO01_SDI_11': true,
+    'Safety.RIO01_SDI_12': true,
+    'Safety.RIO01_SDI_15': true,
+    'Safety.RIO01_SDI_16': true,
+    'Safety.RIO01_SDI_17': true,
+    'Safety.RIO01_SDI_18': true,
+    'Safety.RIO01_SDI_19': true,
+    'Safety.RIO01_SDI_20': true,
+    'System.All_E_Stop_Healthy': true,
     'Prestart.PowerOK': false,
     'Prestart.AirOK': false,
     'Prestart.SafetyOK': false,
@@ -67,22 +67,6 @@ function seedDemoTagValues(tagService) {
     'IO.DO_002': false,
     'IO.AI_001': 72.5,
     'Temp.IO_LIST': 2,
-    'PLC_IO.Out01_Val': 12345,
-    'PLC_IO.Out02_Val': 0,
-    'PLC_IO.Out03_Val': 10000,
-    'PLC_IO.Out04_Val': 54321,
-    'PLC_IO.Out05_Val': 99999,
-    'PLC_IO.Out06_Val': 11111,
-    'PLC_IO.Out07_Val': 22222,
-    'PLC_IO.Out08_Val': 33333,
-    'PLC_IO.Out01_Desc': 'DO01_Run Lamp @ Main Panel',
-    'PLC_IO.Out02_Desc': 'DO02_Fault Lamp @ Main Panel',
-    'PLC_IO.Out03_Desc': 'DO03_Horn @ Main Panel',
-    'PLC_IO.Out04_Desc': 'DO04_Stack Light Green',
-    'PLC_IO.Out05_Desc': 'DO05_Stack Light Amber',
-    'PLC_IO.Out06_Desc': 'DO06_Stack Light Red',
-    'PLC_IO.Out07_Desc': 'DO07_Conveyor Forward',
-    'PLC_IO.Out08_Desc': 'DO08_Conveyor Reverse',
     'Alarm.EStop': false,
     'Alarm.DoorOpen': false,
     'Alarm.LowAir': false,
@@ -91,7 +75,22 @@ function seedDemoTagValues(tagService) {
     'System.HMI_BuzzerSilence': 0,
     'Alarmtext': 'ABCDE FGHIJK LMNOPQ RSTUV WXYZ ABCDE FGHIJK LMNOPQ RSTUV WXYZ'
   };
+
   for (const [name, value] of Object.entries(seeds)) {
+    if (!tagService.get(name)) {
+      const type = typeof value === 'boolean'
+        ? 'bool'
+        : typeof value === 'number'
+          ? (Number.isInteger(value) ? 'int' : 'float')
+          : 'string';
+      tagService.loadDefinitions([{ name, type, description: name }]);
+    }
+    tagService.set(name, value);
+  }
+
+  const IoListTags = require('../../../shared/io-list-tags');
+  const defaultList = IoListTags.buildListRuntimeValues('do', 1);
+  for (const [name, value] of Object.entries(defaultList)) {
     if (tagService.get(name)) tagService.set(name, value);
   }
 }

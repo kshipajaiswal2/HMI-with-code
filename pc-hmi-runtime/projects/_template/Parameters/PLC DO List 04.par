@@ -1,0 +1,32 @@
+!================================================
+! Parameter File
+! Name: PLC DO List 04
+! Syntax: #replacement=tagname
+! List 4 — Data_24…Data_31
+!================================================
+
+#100={PLC_DO_Discr\List_04}
+#101={PLC_DO_Discr\Data_24}
+#102={PLC_DO_Discr\Data_25}
+#103={PLC_DO_Discr\Data_26}
+#104={PLC_DO_Discr\Data_27}
+#105={PLC_DO_Discr\Data_28}
+#106={PLC_DO_Discr\Data_29}
+#107={PLC_DO_Discr\Data_30}
+#108={PLC_DO_Discr\Data_31}
+#201={PLC_DO_No\Data_24}
+#202={PLC_DO_No\Data_25}
+#203={PLC_DO_No\Data_26}
+#204={PLC_DO_No\Data_27}
+#205={PLC_DO_No\Data_28}
+#206={PLC_DO_No\Data_29}
+#207={PLC_DO_No\Data_30}
+#208={PLC_DO_No\Data_31}
+#301={PLC_DO_Tags\Data_24}
+#302={PLC_DO_Tags\Data_25}
+#303={PLC_DO_Tags\Data_26}
+#304={PLC_DO_Tags\Data_27}
+#305={PLC_DO_Tags\Data_28}
+#306={PLC_DO_Tags\Data_29}
+#307={PLC_DO_Tags\Data_30}
+#308={PLC_DO_Tags\Data_31}

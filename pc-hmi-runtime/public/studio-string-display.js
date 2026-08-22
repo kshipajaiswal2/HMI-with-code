@@ -177,7 +177,6 @@
     if (!validateStringDisplay(comp)) return;
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readStringDisplayForm, 'applyStringDisplay');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
   }
 

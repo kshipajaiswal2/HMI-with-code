@@ -22,6 +22,16 @@ function wireLine(name, left, top, width, height, color = '#008080') {
   };
 }
 
+const PARAM_FILES = [
+  'PLC DO List 01',
+  'PLC DO List 02',
+  'PLC DO List 03',
+  'PLC DO List 04',
+  'PLC DO List 05',
+  'PLC DO List 06',
+  'PLC DI List 07'
+];
+
 function secondaryNav(label, index, active) {
   const tops = [101, 173, 245, 317, 389, 461, 533];
   return {
@@ -29,6 +39,9 @@ function secondaryNav(label, index, active) {
     name: `PlcIoSubNav_${String(index).padStart(2, '0')}`,
     label,
     target: '301_PLC_IO_List',
+    parameterType: 'file',
+    parameterFile: PARAM_FILES[index - 1],
+    parameterList: '',
     left: s(128),
     top: s(tops[index - 1]),
     width: s(85),
@@ -41,6 +54,8 @@ function secondaryNav(label, index, active) {
     borderUsesBackColor: false,
     useBorderColor: true,
     borderColor: active ? '#F99746' : 'silver',
+    foreColor: '#000000',
+    useForeColor: true,
     fontSize: 10,
     bold: true,
     alignment: 'middleCenter',
@@ -122,34 +137,39 @@ function buildPlcIoList() {
     comps.push(wireLine(`PlcIoRowLine_${ftTop}`, tableL + 1, s(ftTop), tableW - 2, 1));
   }
 
-  // Header placeholders — long "S" strings (FT StringDisplay10 @ fontSize 16)
+  // Header labels
   comps.push({
-    type: 'Text', name: 'PlcIoHeaderDesc', caption: 'SSSSSSSSSSSSSSSSSSSSSSSSSSSSSS',
+    type: 'Text', name: 'PlcIoHeaderDesc', caption: 'Description',
     left: s(289), top: s(194), width: s(543), height: s(30),
     fontFamily: 'Arial', fontSize: 16, bold: true, backStyle: 'transparent',
     alignment: 'middleCenter', wordWrap: false
   });
   comps.push({
-    type: 'Text', name: 'PlcIoHeaderVal', caption: 'SSSSS',
+    type: 'Text', name: 'PlcIoHeaderVal', caption: 'Value',
     left: s(766), top: s(194), width: s(105), height: s(30),
     fontFamily: 'Arial', fontSize: 16, bold: true, backStyle: 'transparent',
     alignment: 'middleCenter', wordWrap: false
   });
 
   const rowTops = [238, 280, 325, 370, 414, 460, 509, 559];
-  const rowDescCaption = 'SSSSSSSSSSSSSSSSSSSSSSSSSSSSSS';
 
   rowTops.forEach((ftTop, i) => {
     const row = i + 1;
+    const descParam = `#${100 + row}`;
+    const valParam = `#${300 + row}`;
     comps.push({
-      type: 'Text', name: `PlcIoDesc_${row}`,
-      caption: rowDescCaption,
+      type: 'StringDisplay', name: `PlcIoDesc_${row}`,
+      tag: descParam,
       left: s(243), top: s(ftTop), width: s(504), height: s(29),
-      fontFamily: 'Arial', fontSize: 16, bold: false, backStyle: 'transparent',
-      foreColor: '#000000', alignment: 'middleLeft', wordWrap: false
+      visible: true, borderStyle: 'none', borderWidth: 0, borderUsesBackColor: false,
+      backStyle: 'transparent', useBackColor: false,
+      fontFamily: 'Arial', fontSize: 16, bold: false,
+      foreColor: '#000000', useForeColor: true,
+      alignment: 'middleLeft', wordWrap: false
     });
     comps.push({
       type: 'NumericDisplay', name: `PlcIoVal_${row}`,
+      tag: valParam,
       left: s(767), top: s(ftTop), width: s(105), height: s(35),
       visible: true, backStyle: 'gradient', backColor: '#C6C6C6', endColor: '#E8E8E8',
       gradientStop: 95, gradientShadingStyle: 'gradientHorizontalFromRight',
@@ -199,15 +219,25 @@ function manualTemplateReplace() {
   };
 }
 
+const MANUAL_SHELL = {
+  ManualNav_301_PLC_IO_List: { left: 8, top: 75, width: 66, height: 35 },
+  ManualNav_302_PLC_Architecture: { left: 8, top: 131, width: 66, height: 35 },
+  ManualNav_303_Run_Count: { left: 8, top: 188, width: 66, height: 35 },
+  ManualNav_304_Network: { left: 8, top: 244, width: 66, height: 35 },
+  ManualNav_305_Cycle_Time: { left: 8, top: 300, width: 66, height: 35 }
+};
+
 const screen = {
   id: '301_PLC_IO_List',
   title: 'PLC IO List',
   subtitle: 'PLC IO List',
   navGroup: 'manual',
   securityLevel: 1,
+  defaultParameterFile: 'PLC DO List 01',
   components: buildPlcIoList(),
   displaySettings: { backgroundColor: '#EFEFEF', useProjectSize: true },
-  template: manualTemplateReplace()
+  template: manualTemplateReplace(),
+  manualShell: MANUAL_SHELL
 };
 
 const outDirs = [

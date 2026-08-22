@@ -976,6 +976,49 @@ const ComponentRegistry = {
     el.style.boxSizing = 'border-box';
   },
 
+  applyGotoButtonLayout(btn, imgEl, cap, comp) {
+    const capAlign = comp.alignment || 'middleCenter';
+    const imgAlign = comp.imageAlignment
+      || (imgEl && String(capAlign).includes('bottom') ? 'topCenter' : 'middleCenter');
+    const navStyle = Boolean(imgEl) && imgAlign.startsWith('top') && String(capAlign).includes('bottom');
+
+    btn.style.display = 'flex';
+    btn.style.flexDirection = 'column';
+    btn.style.gap = '0';
+    btn.style.overflow = 'hidden';
+    btn.classList.toggle('ft-goto-btn-nav', navStyle);
+
+    if (navStyle) {
+      btn.style.justifyContent = 'space-between';
+      btn.style.alignItems = imgAlign === 'topLeft' ? 'flex-start' : imgAlign === 'topRight' ? 'flex-end' : 'center';
+      btn.style.padding = '2px 3px 3px';
+      if (imgEl) {
+        imgEl.style.flex = '1 1 auto';
+        imgEl.style.maxHeight = '68%';
+        imgEl.style.marginTop = '1px';
+      }
+      if (cap) {
+        cap.style.flex = '0 0 auto';
+        cap.style.marginBottom = '1px';
+      }
+      return;
+    }
+
+    const align = ComponentRegistry.textAlignment(capAlign, 'column');
+    btn.style.justifyContent = align.justify;
+    btn.style.alignItems = align.align;
+    btn.style.padding = (comp.width != null && comp.width <= 36) ? '1px 2px' : '2px 3px 3px';
+    if (imgEl) {
+      imgEl.style.flex = '';
+      imgEl.style.maxHeight = '';
+      imgEl.style.marginTop = '';
+    }
+    if (cap) {
+      cap.style.flex = '';
+      cap.style.marginBottom = '';
+    }
+  },
+
   applyCaptionStyle(el, comp) {
     el.style.fontFamily = comp.fontFamily || 'Arial Unicode MS';
     el.style.fontSize = `${comp.fontSize ?? 10}px`;
@@ -1084,8 +1127,13 @@ const ComponentRegistry = {
     };
 
     if (comp.tag && !studioEdit) {
-      valueEl.textContent = placeholder;
       ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
+      const current = ctx.getTagValue?.(comp.tag);
+      if (current !== undefined && current !== null) {
+        showValue(current);
+      } else {
+        valueEl.textContent = placeholder;
+      }
     } else {
       valueEl.textContent = placeholder;
     }
@@ -1577,7 +1625,7 @@ const ComponentRegistry = {
     };
 
     const tag = comp.tag || comp.indicatorTag;
-    if (tag) {
+    if (tag && !studioEdit) {
       ComponentRegistry.bindIndicatorRef(tag, showTagState, ctx);
       const current = ctx.getTagValue(tag);
       if (current !== undefined && current !== null) {
@@ -2626,6 +2674,99 @@ const ComponentRegistry = {
     return el;
   },
 
+  lineStyleToCss(lineStyle) {
+    if (lineStyle === 'dash') return 'dashed';
+    if (lineStyle === 'dot') return 'dotted';
+    return 'solid';
+  },
+
+  applyShapeFill(el, comp) {
+    const useBack = comp.useBackColor !== false;
+    if (comp.backStyle === 'gradient' && useBack) {
+      const start = comp.backColor || '#c6c6c6';
+      const end = comp.endColor || '#e8e8e8';
+      const stop = comp.gradientStop ?? 95;
+      const shading = comp.gradientShadingStyle || comp.gradientDirection || '';
+      if (shading === 'gradientHorizontalFromRight') {
+        el.style.background = `linear-gradient(to left, ${start} 0%, ${end} ${stop}%)`;
+      } else if (shading === 'gradientHorizontalFromLeft') {
+        el.style.background = `linear-gradient(to right, ${start} 0%, ${end} ${stop}%)`;
+      } else {
+        el.style.background = `linear-gradient(to bottom, ${start} 0%, ${end} ${stop}%)`;
+      }
+      el.style.backgroundColor = '';
+    } else if (comp.backStyle === 'transparent' || !useBack) {
+      el.style.backgroundColor = 'transparent';
+      el.style.background = 'none';
+    } else {
+      el.style.backgroundColor = comp.backColor || '#ffffff';
+      el.style.background = '';
+    }
+  },
+
+  applyShapePattern(el, comp) {
+    if (!comp.usePatternColor || !comp.patternStyle || comp.patternStyle === 'none') return;
+    const color = comp.patternColor || '#808080';
+    let pattern = '';
+    switch (comp.patternStyle) {
+      case 'horizontal':
+      case 'horizontalLines':
+        pattern = `repeating-linear-gradient(0deg, ${color} 0, ${color} 1px, transparent 1px, transparent 4px)`;
+        break;
+      case 'vertical':
+      case 'verticalLines':
+        pattern = `repeating-linear-gradient(90deg, ${color} 0, ${color} 1px, transparent 1px, transparent 4px)`;
+        break;
+      case 'cross':
+        pattern = `repeating-linear-gradient(0deg, ${color} 0, ${color} 1px, transparent 1px, transparent 4px), repeating-linear-gradient(90deg, ${color} 0, ${color} 1px, transparent 1px, transparent 4px)`;
+        break;
+      case '50Percent':
+      case 'percent50':
+        pattern = `repeating-conic-gradient(${color} 0% 25%, transparent 0% 50%) 0 0 / 4px 4px`;
+        break;
+      default:
+        return;
+    }
+    const existingBg = el.style.background;
+    const existingColor = el.style.backgroundColor;
+    if (existingBg && existingBg !== 'none') {
+      el.style.background = `${pattern}, ${existingBg}`;
+    } else if (existingColor && existingColor !== 'transparent') {
+      el.style.background = `${pattern}, linear-gradient(${existingColor}, ${existingColor})`;
+    } else {
+      el.style.background = pattern;
+    }
+  },
+
+  applyShapeBorder(el, comp, options = {}) {
+    const { borderMode } = options;
+    const borderW = comp.lineWidth ?? comp.borderWidth ?? 1;
+    const borderColor = comp.foreColor || comp.borderColor || '#c6c6c6';
+    const useFore = comp.useForeColor !== false;
+    const lineStyle = ComponentRegistry.lineStyleToCss(comp.lineStyle);
+
+    if (borderMode === 'tableRow') {
+      el.style.border = 'none';
+      el.style.borderBottom = useFore && borderW > 0 ? `${borderW}px ${lineStyle} ${borderColor}` : 'none';
+      return;
+    }
+    if (borderMode === 'tableHeader') {
+      el.style.border = useFore && borderW > 0 ? `${borderW}px ${lineStyle} ${borderColor}` : 'none';
+      el.style.borderBottom = useFore && borderW > 0 ? `${borderW}px ${lineStyle} ${borderColor}` : 'none';
+      return;
+    }
+    if (borderMode === 'tableFrame') {
+      el.style.backgroundColor = 'transparent';
+      el.style.border = useFore && borderW > 0 ? `${borderW}px ${lineStyle} ${borderColor}` : 'none';
+      return;
+    }
+    if (!useFore || borderW <= 0) {
+      el.style.border = 'none';
+      return;
+    }
+    el.style.border = `${borderW}px ${lineStyle} ${borderColor}`;
+  },
+
   Rectangle(comp) {
     const el = document.createElement('div');
     el.className = 'ft-rectangle ft-graphic';
@@ -2640,60 +2781,28 @@ const ComponentRegistry = {
     } else if (comp.name?.includes('BarL') || comp.name?.includes('BarR') || comp.name?.startsWith('SafetyBusDrop') || comp.name?.startsWith('SafetyBusRise')) {
       el.classList.add('ft-ladder-bar');
     }
-    const borderW = comp.lineWidth ?? comp.borderWidth ?? 1;
-    const borderColor = comp.foreColor || comp.borderColor || '#c6c6c6';
-    if (comp.backStyle === 'gradient') {
-      const start = comp.backColor || '#c6c6c6';
-      const end = comp.endColor || '#e8e8e8';
-      const stop = comp.gradientStop ?? 95;
-      const shading = comp.gradientShadingStyle || comp.gradientDirection || '';
-      if (shading === 'gradientHorizontalFromRight') {
-        el.style.background = `linear-gradient(to left, ${start} 0%, ${end} ${stop}%)`;
-      } else if (shading === 'gradientHorizontalFromLeft') {
-        el.style.background = `linear-gradient(to right, ${start} 0%, ${end} ${stop}%)`;
-      } else {
-        el.style.background = `linear-gradient(to bottom, ${start} 0%, ${end} ${stop}%)`;
-      }
-    } else if (comp.backStyle === 'transparent') {
-      el.style.backgroundColor = 'transparent';
-    } else {
-      el.style.backgroundColor = comp.backColor || '#ffffff';
-    }
-    if (comp.borderMode === 'tableRow') {
-      el.style.border = 'none';
-      el.style.borderBottom = `${borderW}px solid ${borderColor}`;
-    } else if (comp.borderMode === 'tableHeader') {
-      el.style.border = `${borderW}px solid ${borderColor}`;
-      el.style.borderBottom = `${borderW}px solid ${borderColor}`;
-    } else if (comp.borderMode === 'tableFrame') {
-      el.style.backgroundColor = 'transparent';
-      el.style.border = `${borderW}px solid ${borderColor}`;
-    } else if (borderW <= 0) {
-      el.style.border = 'none';
-    } else {
-      el.style.border = `${borderW}px solid ${borderColor}`;
-    }
+    const borderMode = comp.borderMode;
+    ComponentRegistry.applyShapeFill(el, comp);
+    ComponentRegistry.applyShapePattern(el, comp);
+    ComponentRegistry.applyShapeBorder(el, comp, { borderMode });
     el.style.boxSizing = 'border-box';
     return el;
   },
 
   Ellipse(comp) {
     const el = document.createElement('div');
-    el.className = 'ft-ellipse ft-status-led ft-graphic';
+    el.className = 'ft-ellipse ft-graphic';
     if (comp.name) el.dataset.name = comp.name;
     if (comp.visible === false) {
       el.style.display = 'none';
       return el;
     }
     ComponentRegistry.applyGraphicsObject(el, comp);
-    const fill = (comp.backColor || '#10EB10').toLowerCase();
-    if (fill === '#f83d3d' || fill === 'red') el.classList.add('ft-status-led--red');
-    else if (fill === 'navy' || fill === '#000080') el.classList.add('ft-status-led--error');
-    else el.classList.add('ft-status-led--green');
-    const lineW = comp.lineWidth ?? comp.borderWidth ?? 0;
-    if (lineW > 0 && comp.useForeColor !== false) {
-      el.style.border = `${lineW}px solid ${comp.foreColor || comp.borderColor || '#000000'}`;
-    }
+    el.style.borderRadius = '50%';
+    ComponentRegistry.applyShapeFill(el, comp);
+    ComponentRegistry.applyShapePattern(el, comp);
+    ComponentRegistry.applyShapeBorder(el, comp);
+    el.style.boxSizing = 'border-box';
     return el;
   },
 
@@ -2859,16 +2968,6 @@ const ComponentRegistry = {
       navSideAccent: comp.navSideAccent,
       studioEdit
     });
-    btn.style.display = 'flex';
-    btn.style.flexDirection = 'column';
-    const alignId = comp.alignment || 'middleCenter';
-    const align = ComponentRegistry.textAlignment(alignId, 'column');
-    btn.style.justifyContent = align.justify;
-    btn.style.alignItems = align.align;
-    btn.style.padding = '2px 3px 3px';
-    btn.style.gap = '0';
-    btn.style.overflow = 'hidden';
-
     let imgEl = null;
     if (comp.image) {
       imgEl = document.createElement('img');
@@ -2883,7 +2982,6 @@ const ComponentRegistry = {
         imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
       }
       imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      btn.appendChild(imgEl);
     }
 
     const cap = document.createElement('span');
@@ -2899,7 +2997,7 @@ const ComponentRegistry = {
       foreColor: comp.foreColor || '#000000',
       useForeColor: useCaptionColor,
       wordWrap: comp.wordWrap !== false,
-      alignment: alignId
+      alignment: comp.alignment || 'middleCenter'
     });
     if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
       cap.style.backgroundColor = comp.captionBackColor || '#001C38';
@@ -2908,6 +3006,9 @@ const ComponentRegistry = {
     cap.style.width = '100%';
     cap.style.lineHeight = '1.15';
     cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
     btn.appendChild(cap);
     btn.classList.toggle('ft-blink', Boolean(comp.blink));
 
@@ -2921,7 +3022,17 @@ const ComponentRegistry = {
 
     const navigateToTarget = () => {
       const target = resolveTarget();
-      if (target) ctx.navigate(target);
+      if (!target) return;
+      const navOpts = {};
+      const pf = String(comp.parameterFile || '').trim();
+      if (pf && (
+        typeof ParameterFiles === 'undefined'
+          ? true
+          : ParameterFiles.usesParameterFile(comp)
+      )) {
+        navOpts.parameterFile = pf;
+      }
+      ctx.navigate(target, navOpts);
     };
 
     if (studioEdit) {
@@ -2948,9 +3059,7 @@ const ComponentRegistry = {
       if (comp.useVariableDisplay && comp.displayNameTag) {
         ComponentRegistry.bindIndicatorRef(comp.displayNameTag, () => {}, ctx);
       }
-      if (comp.userAction) {
-        btn.addEventListener('click', () => ComponentRegistry.handleUserAction(comp.userAction, comp, ctx));
-      } else if (comp.target || comp.useVariableDisplay) {
+      if (comp.target || comp.useVariableDisplay) {
         btn.addEventListener('click', navigateToTarget);
       }
     }
@@ -3746,11 +3855,14 @@ const ComponentRegistry = {
       const renderUser = (user) => showValue(user?.username || comp.caption || 'Guest');
       renderUser(ctx.getCurrentUser?.());
       ctx.onUserChange?.(renderUser);
-    } else if (comp.tag && !studioEdit) {
+    } else if (comp.tag) {
       ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
+      const current = ctx.getTagValue?.(comp.tag);
+      if (current !== undefined && current !== null) showValue(current);
+      else valueEl.textContent = comp.caption || placeholder;
     } else if (studioEdit) {
       valueEl.textContent = comp.useCurrentUser
-        ? placeholder
+        ? (comp.caption || 'Guest')
         : (comp.caption || placeholder);
     } else {
       showValue(comp.caption);
@@ -4010,7 +4122,7 @@ const ComponentRegistry = {
     return el;
   },
 
-  Text(comp) {
+  Text(comp, ctx) {
     const el = document.createElement('div');
     el.className = 'ft-text ft-graphic';
     if (comp.name) el.dataset.name = comp.name;
@@ -4021,7 +4133,10 @@ const ComponentRegistry = {
 
     ComponentRegistry.applyGraphicsObject(el, comp);
 
-    const caption = String(comp.caption ?? comp.label ?? '').replace(/\\n/g, '\n');
+    let caption = String(comp.caption ?? comp.label ?? '').replace(/\\n/g, '\n');
+    if (comp.name === 'Title' && ctx?.projectSubtitle) {
+      caption = ctx.projectSubtitle;
+    }
     el.textContent = caption;
 
     const fontFamily = comp.fontFamily || 'Arial Unicode MS';
@@ -4089,7 +4204,17 @@ const ComponentRegistry = {
         return undefined;
       }
     }
-    return ctx.getTagValue(s);
+    const parsed = window.StudioTagTools?.parseFtTagRef
+      ? window.StudioTagTools.parseFtTagRef(s)
+      : { tag: s };
+    const val = ctx.getTagValue(parsed.tag);
+    if (parsed.bit != null && val != null && typeof val === 'object') {
+      return val[parsed.bit];
+    }
+    if (parsed.bit != null && typeof val === 'number') {
+      return (val >> parsed.bit) & 1;
+    }
+    return val;
   },
 
   bindIndicatorRef(ref, callback, ctx) {
@@ -4097,9 +4222,20 @@ const ComponentRegistry = {
     if (!s) return;
     if (typeof ExpressionEval !== 'undefined' && ExpressionEval.isExpression(s)) {
       ExpressionEval.bindExpression(s, callback, ctx);
-    } else {
-      ctx.bindTag(s, callback);
+      return;
     }
+    const parsed = window.StudioTagTools?.parseFtTagRef
+      ? window.StudioTagTools.parseFtTagRef(s)
+      : { tag: s };
+    ctx.bindTag(parsed.tag, (val) => {
+      if (parsed.bit != null && val != null && typeof val === 'object') {
+        callback(val[parsed.bit]);
+      } else if (parsed.bit != null && typeof val === 'number') {
+        callback((val >> parsed.bit) & 1);
+      } else {
+        callback(val);
+      }
+    });
   },
 
   applyGraphicsObject(el, comp) {

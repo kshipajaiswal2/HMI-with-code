@@ -207,10 +207,39 @@
         "useVariableDisplayPosition": false,
         "horizontalMargin": 0,
         "verticalMargin": 0
-      },
-      "NavRecipe": {
-        "image": "recipe1 1.bmp"
       }
+    }
+  },
+  "manualShell": {
+    "ManualNav_301_PLC_IO_List": {
+      "left": 8,
+      "top": 75,
+      "width": 66,
+      "height": 35
+    },
+    "ManualNav_302_PLC_Architecture": {
+      "left": 8,
+      "top": 131,
+      "width": 66,
+      "height": 35
+    },
+    "ManualNav_303_Run_Count": {
+      "left": 8,
+      "top": 188,
+      "width": 66,
+      "height": 35
+    },
+    "ManualNav_304_Network": {
+      "left": 8,
+      "top": 244,
+      "width": 66,
+      "height": 35
+    },
+    "ManualNav_305_Cycle_Time": {
+      "left": 8,
+      "top": 300,
+      "width": 66,
+      "height": 35
     }
   }
 }

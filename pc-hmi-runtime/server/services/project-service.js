@@ -10,7 +10,7 @@ const DISPLAY_FOLDERS = [
   { id: '400_Active_Alarms', label: '400 Active Alarms', navGroup: 'alarms' },
   { id: '500_Recipe', label: '500 Recipe', navGroup: 'recipe' },
   { id: '600_Legends', label: '600 Legends', navGroup: 'legends' },
-  { id: '800_UserManagement', label: '800 User Management', navGroup: 'users' }
+  { id: '700_User_Management', label: '700 User Management', navGroup: 'users' }
 ];
 
 const WINDOW_SIZE_PRESETS = [
@@ -184,42 +184,6 @@ function readImageFileMeta(filePath) {
     colorType,
     format,
     typeLabel
-  };
-}
-
-/**
- * Validates that screen modifications don't contaminate other screens or the template.
- * Returns { valid: boolean, errors: string[] }
- */
-function validateScreenIsolation(screenData) {
-  const errors = [];
-
-  // Ensure screen doesn't accidentally modify template
-  if (screenData.components && Array.isArray(screenData.components)) {
-    screenData.components.forEach((comp, idx) => {
-      if (comp.name && comp.name.startsWith('Template_')) {
-        errors.push(`Component ${idx} ("${comp.name}"): Components should not start with "Template_" prefix — this may affect global template.`);
-      }
-    });
-  }
-
-  // Ensure template replacements are minimal
-  if (screenData.template && screenData.template.replace) {
-    const replaceKeys = Object.keys(screenData.template.replace);
-    if (replaceKeys.length > 10) {
-      console.warn(`Screen "${screenData.id}" has ${replaceKeys.length} template replacements — ensure these are screen-specific overrides only.`);
-    }
-  }
-
-  // Warn if screen has components that might be shared
-  if (screenData.components && screenData.components.length > 50) {
-    errors.push(`Screen has ${screenData.components.length} components — consider moving shared elements to Global Objects/Template instead.`);
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors,
-    warnings: errors
   };
 }
 
@@ -764,10 +728,11 @@ class ProjectService {
 
     const tagDir = path.join(this.projectPath(projectId), 'Tag');
     fs.mkdirSync(tagDir, { recursive: true });
-    const csvLines = ['Tag Name,Type,Description'];
+    const csvLines = ['Tag Name,Type,Description,PLC Address'];
     for (const t of config.tags || []) {
       const desc = String(t.description || '').replace(/"/g, '""');
-      csvLines.push(`"${t.name}","${t.type}","${desc}"`);
+      const plc = String(t.plcAddress || t.connection || t.alias || '').replace(/"/g, '""');
+      csvLines.push(`"${t.name}","${t.type}","${desc}","${plc}"`);
     }
     fs.writeFileSync(
       path.join(tagDir, `${projectId}-Tags.CSV`),
@@ -908,6 +873,10 @@ class ProjectService {
     return path.join(this.projectsDir, id);
   }
 
+  getDefaultNewProjectSourceId() {
+    return STARTER_REFERENCE_PROJECT;
+  }
+
   projectExists(id) {
     return id && id !== '_template' && fs.existsSync(this.projectPath(id));
   }
@@ -1006,6 +975,38 @@ class ProjectService {
     return null;
   }
 
+  /** Layout/style fields merged across nav-group screens; active-state styling stays per-screen at compose time. */
+  pickSharedNavShellFields(override) {
+    const shared = new Set([
+      'left', 'top', 'width', 'height',
+      'fontFamily', 'fontSize', 'bold', 'italic', 'underline',
+      'wordWrap', 'alignment', 'visible', 'backColor', 'backStyle',
+      'borderStyle', 'borderWidth', 'audio',
+      'image', 'imageScaled', 'imageAlignment'
+    ]);
+    const picked = {};
+    for (const [key, value] of Object.entries(override || {})) {
+      if (shared.has(key)) picked[key] = value;
+    }
+    return picked;
+  }
+
+  /** Drop junk overrides (border state, empty property blobs) — keep geometry/layout only. */
+  sanitizeNavShellOverride(override) {
+    const picked = this.pickSharedNavShellFields(override);
+    const hasGeometry = ['left', 'top', 'width', 'height'].some((key) => picked[key] != null);
+    return hasGeometry ? picked : {};
+  }
+
+  sanitizeNavShellMap(shellMap = {}) {
+    const clean = {};
+    for (const [name, override] of Object.entries(shellMap || {})) {
+      const sanitized = this.sanitizeNavShellOverride(override);
+      if (Object.keys(sanitized).length) clean[name] = sanitized;
+    }
+    return clean;
+  }
+
   /** Nav sidebar overrides edited on one screen should apply across the whole nav group. */
   mergeSharedNavShell(projectId, rawScreen) {
     const shellKey = this.shellKeyForNavGroup(rawScreen?.navGroup);
@@ -1014,6 +1015,7 @@ class ProjectService {
     const nav = this.readNavigation(projectId);
     const subNav = nav.subNav?.[rawScreen.navGroup] || [];
     const merged = {};
+    const currentId = rawScreen?.id;
 
     for (const entry of subNav) {
       const screenId = entry?.screen;
@@ -1025,7 +1027,11 @@ class ProjectService {
         const otherShell = other?.[shellKey] || {};
         for (const [name, override] of Object.entries(otherShell)) {
           if (!override || typeof override !== 'object') continue;
-          merged[name] = { ...(merged[name] || {}), ...override };
+          const patch = screenId === currentId
+            ? this.sanitizeNavShellOverride(override)
+            : this.sanitizeNavShellOverride(this.pickSharedNavShellFields(override));
+          if (!Object.keys(patch).length) continue;
+          merged[name] = { ...(merged[name] || {}), ...patch };
         }
       } catch {
         /* ignore unreadable screen */
@@ -1035,7 +1041,9 @@ class ProjectService {
     const currentShell = rawScreen[shellKey] || {};
     for (const [name, override] of Object.entries(currentShell)) {
       if (!override || typeof override !== 'object') continue;
-      merged[name] = { ...(merged[name] || {}), ...override };
+      const patch = this.sanitizeNavShellOverride(override);
+      if (!Object.keys(patch).length) continue;
+      merged[name] = { ...(merged[name] || {}), ...patch };
     }
 
     if (!Object.keys(merged).length) return rawScreen;
@@ -1209,7 +1217,17 @@ class ProjectService {
     }
     for (const shellKey of ['manualShell', 'overviewShell', 'alarmsShell', 'settingsShell']) {
       if (!patch[shellKey] || typeof patch[shellKey] !== 'object') continue;
-      screen[shellKey] = { ...(screen[shellKey] || {}), ...patch[shellKey] };
+      const mergedShell = { ...(screen[shellKey] || {}) };
+      for (const [name, override] of Object.entries(patch[shellKey])) {
+        if (!override || typeof override !== 'object') {
+          delete mergedShell[name];
+          continue;
+        }
+        const sanitized = this.sanitizeNavShellOverride(override);
+        if (!Object.keys(sanitized).length) delete mergedShell[name];
+        else mergedShell[name] = { ...(mergedShell[name] || {}), ...sanitized };
+      }
+      screen[shellKey] = mergedShell;
       delete patch[shellKey];
     }
     Object.assign(screen, patch);
@@ -1274,8 +1292,60 @@ class ProjectService {
       icon: 'image-file'
     }));
 
-    const host = require('os').hostname();
-    const projectLabel = config.name || projectId;
+    const tagFolders = new Set(config.tagFolders || []);
+    for (const tag of config.tags || []) {
+      const folder = String(tag.folder || '').trim();
+      if (folder) tagFolders.add(folder);
+    }
+
+    let orderedFolders = [];
+    try {
+      const IoListTags = require('../../shared/io-list-tags');
+      orderedFolders = IoListTags.getIoListTagFolders().filter((name) => tagFolders.has(name));
+    } catch {
+      orderedFolders = [];
+    }
+    for (const preferred of ['PLC uploded Tags', 'Temp_Tags']) {
+      if (tagFolders.has(preferred) && !orderedFolders.includes(preferred)) {
+        orderedFolders.push(preferred);
+      }
+    }
+    for (const folderName of [...tagFolders].sort((a, b) => a.localeCompare(b))) {
+      if (!orderedFolders.includes(folderName)) orderedFolders.push(folderName);
+    }
+
+    const hmiTagChildren = orderedFolders.length
+      ? orderedFolders.map((folderName) => ({
+        type: 'folder',
+        id: `tag-folder-${folderName}`,
+        label: folderName,
+        icon: 'folder',
+        tagFolder: folderName
+      }))
+      : [{ type: 'item', id: 'hmi-tags-list', label: 'Tags', icon: 'tags', action: 'tags' }];
+
+    const { isPlcDeviceTag } = require('../../shared/tag-connections');
+    const plcDeviceTags = (config.tags || []).filter(isPlcDeviceTag);
+    const plcTagNodes = plcDeviceTags.slice(0, 200).map((tag) => ({
+      type: 'item',
+      id: `plc-tag-${String(tag.name).replace(/[^a-zA-Z0-9._:-]/g, '_')}`,
+      label: tag.name,
+      tagName: tag.name,
+      icon: 'tag',
+      action: 'plc-tag-item'
+    }));
+    const linxChildren = [
+      { type: 'item', id: 'linx-communications', label: 'Communications Setup', icon: 'comm', action: 'communications' },
+      {
+        type: 'folder',
+        id: 'linx-plc-tags',
+        label: 'PLC Tags',
+        icon: 'folder',
+        children: plcTagNodes.length
+          ? plcTagNodes
+          : [{ type: 'item', id: 'linx-no-plc-tags', label: '(No PLC tags defined)', icon: 'tag' }]
+      }
+    ];
 
     const projectChildren = [
       {
@@ -1298,9 +1368,7 @@ class ProjectService {
         id: 'hmi-tags',
         label: 'HMI Tags',
         icon: 'tags',
-        children: [
-          { type: 'item', id: 'hmi-tags-list', label: 'Tags', icon: 'tags', action: 'tags' }
-        ]
+        children: hmiTagChildren
       },
       {
         type: 'folder',
@@ -1331,7 +1399,28 @@ class ProjectService {
             icon: 'images',
             children: imageNodes
           },
-          { type: 'item', id: 'parameters', label: 'Parameters', icon: 'parameters', action: 'parameters' },
+          (() => {
+            const ParameterFileBuilder = require('../../shared/parameter-file-builder');
+            const parameterFiles = ParameterFileBuilder.mergeProjectParameterFiles(config.parameterFiles);
+            const fileNodes = Object.keys(parameterFiles).sort((a, b) => a.localeCompare(b)).map((name) => ({
+              type: 'item',
+              id: `parameter-file-${name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+              label: name,
+              parameterFile: name,
+              icon: 'parameters',
+              action: 'parameter-file'
+            }));
+            return {
+              type: 'folder',
+              id: 'parameters',
+              label: 'Parameters',
+              icon: 'parameters',
+              children: [
+                ...fileNodes,
+                { type: 'item', id: 'parameters-add', label: 'Add Parameter File…', icon: 'parameters', action: 'parameters-add' }
+              ]
+            };
+          })(),
           { type: 'item', id: 'local-messages', label: 'Local Messages', icon: 'local-messages', action: 'local-messages' }
         ]
       },
@@ -1387,11 +1476,12 @@ class ProjectService {
         id: 'factorytalk-linx',
         label: 'FactoryTalk Linx',
         icon: 'linx',
-        children: [
-          { type: 'item', id: 'linx-communications', label: 'Communications Setup', icon: 'comm', action: 'communications' }
-        ]
+        children: linxChildren
       }
     ];
+
+    const host = require('os').hostname();
+    const projectLabel = config.name || projectId;
 
     const tree = [
       {

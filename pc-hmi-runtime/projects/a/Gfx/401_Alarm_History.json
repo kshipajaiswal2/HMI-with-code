@@ -190,5 +190,57 @@
         "verticalMargin": 0
       }
     }
+  },
+  "alarmsShell": {
+    "AlarmNav_400_Active_Alarms": {
+      "imageScaled": false,
+      "fontFamily": "Arial",
+      "italic": false,
+      "underline": false,
+      "captionBackStyle": "transparent",
+      "useCaptionBackColor": false,
+      "captionBackColor": "#001c38",
+      "captionBlink": false,
+      "shape": "rectangle",
+      "patternStyle": "none",
+      "useVariableDisplay": false,
+      "parameterType": "file",
+      "parameterFile": "",
+      "parameterList": "",
+      "displayPosition": false,
+      "displayTop": 0,
+      "displayLeft": 0,
+      "useVariableDisplayPosition": false,
+      "horizontalMargin": 0,
+      "verticalMargin": 0,
+      "useBackColor": true,
+      "useBorderColor": true,
+      "borderColor": "#f99746"
+    },
+    "AlarmNav_401_Alarm_History": {
+      "imageScaled": false,
+      "fontFamily": "Arial",
+      "italic": false,
+      "underline": false,
+      "captionBackStyle": "transparent",
+      "useCaptionBackColor": false,
+      "captionBackColor": "#001c38",
+      "captionBlink": false,
+      "shape": "rectangle",
+      "patternStyle": "none",
+      "useVariableDisplay": false,
+      "parameterType": "file",
+      "parameterFile": "",
+      "parameterList": "",
+      "displayPosition": false,
+      "displayTop": 0,
+      "displayLeft": 0,
+      "useVariableDisplayPosition": false,
+      "horizontalMargin": 0,
+      "verticalMargin": 0,
+      "useBackColor": true,
+      "useBorderColor": true,
+      "borderColor": "#f99746"
+    }
   }
 }

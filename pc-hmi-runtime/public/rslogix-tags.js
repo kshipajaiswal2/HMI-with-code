@@ -67,6 +67,46 @@
     return cellStr(raw).replace(/\$N/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
+  /** Split Folder\\Tag or Folder.Tag into { folder, name } where name stays Folder.Tag. */
+  function splitHmiTagName(rawName) {
+    const normalized = cellStr(rawName).replace(/\\/g, '.');
+    if (!normalized.includes('.')) {
+      return { name: normalized, folder: '' };
+    }
+    const idx = normalized.lastIndexOf('.');
+    const folder = normalized.slice(0, idx).trim();
+    const short = normalized.slice(idx + 1).trim();
+    if (!folder || !short) return { name: normalized, folder: '' };
+    return { name: `${folder}.${short}`, folder };
+  }
+
+  function mapFactoryTalkDatatype(raw) {
+    const dt = cellStr(raw).toUpperCase();
+    if (!dt) return 'bool';
+    if (dt === 'BOOL' || dt === 'BOOLEAN') return 'bool';
+    if (['DINT', 'SINT', 'INT', 'UINT', 'UDINT', 'LINT', 'USINT', 'DWORD', 'WORD'].includes(dt)) return 'int';
+    if (dt === 'REAL' || dt === 'FLOAT') return 'float';
+    if (dt.startsWith('STRING')) return 'string';
+    return 'bool';
+  }
+
+  function attachFolderAndPlcFields(tag, rawName, plcRaw) {
+    const split = splitHmiTagName(rawName);
+    const plc = cellStr(plcRaw);
+    const next = {
+      ...tag,
+      name: split.name,
+      folder: tag.folder || split.folder || undefined
+    };
+    if (plc) {
+      next.plcAddress = plc;
+      if (!next.connection) next.connection = plc;
+      if (!next.dataSource) next.dataSource = 'device';
+    }
+    if (next.folder) next.folder = String(next.folder);
+    return next;
+  }
+
   /**
    * @param {string} text - RSLogix CSV export text
    * @param {{ controllerOnly?: boolean, skipProgramTags?: boolean, boolOnly?: boolean, includeIoComments?: boolean }} [options]
@@ -169,26 +209,71 @@
     if (!lines.length) return { tags: [], stats: { total: 0 } };
 
     const header = parseRsLogixCsvLine(lines[0]).map((c) => c.toLowerCase());
-    const nameIdx = header.findIndex((h) => h.includes('tag name') || h === 'name');
-    const typeIdx = header.findIndex((h) => h === 'type');
+    const nameIdx = header.findIndex((h) => h.includes('tag name') || h === 'tagname' || h === 'name');
+    const typeIdx = header.findIndex((h) => h === 'type' || h.includes('datatype'));
     const descIdx = header.findIndex((h) => h.includes('description'));
+    const plcIdx = header.findIndex((h) => h.includes('plc address') || h.includes('plcreference') || h === 'plc');
     if (nameIdx < 0 || typeIdx < 0) return { tags: [], stats: { total: 0 } };
 
     const tags = [];
     const seen = new Set();
     for (const line of lines.slice(1)) {
       const cells = parseRsLogixCsvLine(line);
-      const name = cellStr(cells[nameIdx]);
+      const rawName = cellStr(cells[nameIdx]);
       const type = cellStr(cells[typeIdx]).toLowerCase();
-      if (!name || !type || seen.has(name)) continue;
-      seen.add(name);
-      tags.push({
-        name,
+      if (!rawName || !type) continue;
+      const split = splitHmiTagName(rawName);
+      if (!split.name || seen.has(split.name)) continue;
+      seen.add(split.name);
+      tags.push(attachFolderAndPlcFields({
+        name: split.name,
         type,
-        description: descIdx >= 0 ? cellStr(cells[descIdx]) : name
-      });
+        description: descIdx >= 0 ? cellStr(cells[descIdx]) : split.name,
+        folder: split.folder || undefined
+      }, rawName, plcIdx >= 0 ? cells[plcIdx] : ''));
     }
     return { tags, stats: { total: tags.length } };
+  }
+
+  /**
+   * FactoryTalk-style tag CSV: TagName, PLCReference, DataType, Access, Description
+   */
+  function parseFactoryTalkTagCsv(text) {
+    const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter((l) => l.trim());
+    if (!lines.length) return { tags: [], stats: { total: 0 } };
+
+    const header = parseRsLogixCsvLine(lines[0]).map((c) => c.toLowerCase());
+    const nameIdx = header.findIndex((h) => h === 'tagname' || h.includes('tag name'));
+    const plcIdx = header.findIndex((h) => h.includes('plcreference') || h.includes('plc reference') || h.includes('plc address'));
+    const typeIdx = header.findIndex((h) => h.includes('datatype') || h === 'type');
+    const descIdx = header.findIndex((h) => h.includes('description'));
+    if (nameIdx < 0) return { tags: [], stats: { total: 0 } };
+
+    const tags = [];
+    const seen = new Set();
+    for (const line of lines.slice(1)) {
+      const cells = parseRsLogixCsvLine(line);
+      const rawName = cellStr(cells[nameIdx]);
+      if (!rawName || seen.has(rawName)) continue;
+      const split = splitHmiTagName(rawName);
+      if (!split.name || seen.has(split.name)) continue;
+      seen.add(split.name);
+      const plc = plcIdx >= 0 ? cellStr(cells[plcIdx]) : '';
+      tags.push(attachFolderAndPlcFields({
+        name: split.name,
+        type: typeIdx >= 0 ? mapFactoryTalkDatatype(cells[typeIdx]) : 'bool',
+        description: descIdx >= 0 ? cellStr(cells[descIdx]) : split.name,
+        folder: split.folder || undefined,
+        dataSource: plc ? 'device' : 'memory'
+      }, rawName, plc));
+    }
+    return { tags, stats: { total: tags.length } };
+  }
+
+  function isFactoryTalkTagCsv(text) {
+    const header = String(text || '').split(/\r?\n/).find((l) => l.trim()) || '';
+    const lower = header.toLowerCase();
+    return lower.includes('tagname') && (lower.includes('plcreference') || lower.includes('plc reference'));
   }
 
   /**
@@ -207,12 +292,23 @@
       }
       const arr = Array.isArray(parsed) ? parsed : (parsed.tags || []);
       if (!Array.isArray(arr)) throw new Error('Expected a JSON array of tag definitions.');
-      const tags = arr.filter((t) => t?.name).map((t) => ({
-        name: String(t.name),
-        type: String(t.type || 'bool').toLowerCase(),
-        description: String(t.description || t.name)
-      }));
+      const tags = arr.filter((t) => t?.name).map((t) => {
+        const split = splitHmiTagName(String(t.name));
+        const plc = cellStr(t.plcAddress || t.PLCReference || t.connection || '');
+        return attachFolderAndPlcFields({
+          name: split.name,
+          type: String(t.type || 'bool').toLowerCase(),
+          description: String(t.description || split.name),
+          folder: t.folder || split.folder || undefined,
+          dataSource: t.dataSource || (plc ? 'device' : 'memory')
+        }, t.name, plc);
+      });
       return { tags, format: 'json', stats: { total: tags.length } };
+    }
+
+    if (isFactoryTalkTagCsv(text)) {
+      const result = parseFactoryTalkTagCsv(text);
+      return { ...result, format: 'factorytalk-csv' };
     }
 
     if (isRsLogixTagsCsv(text)) {
@@ -226,7 +322,11 @@
     }
 
     throw new Error(
-      'Unrecognized tag file. Use RSLogix 5000 CSV (Studio 5000 export), HMI JSON array, or Tag Name/Type/Description CSV.'
+      'Unrecognized tag file. Supported formats:\n'
+      + '• RSLogix 5000 / Studio 5000 tag CSV export\n'
+      + '• HMI tags JSON array or project *_tags.json export\n'
+      + '• Tag Name, Type, Description CSV (Plant HMI / FactoryTalk Tags.CSV style)\n'
+      + '• TagName, PLCReference, DataType CSV (FactoryTalk tag export template)'
     );
   }
 
@@ -252,9 +352,13 @@
 
   global.RsLogixTags = {
     isRsLogixTagsCsv,
+    isFactoryTalkTagCsv,
+    splitHmiTagName,
     mapRsLogixDatatype,
+    mapFactoryTalkDatatype,
     parseRsLogixTagsForImport,
     parseSimpleTagCsv,
+    parseFactoryTalkTagCsv,
     parseTagImportFile,
     applyTagImportFilters
   };

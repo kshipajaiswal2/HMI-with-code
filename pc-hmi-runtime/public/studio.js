@@ -150,12 +150,17 @@ function exposeStudioGlobals() {
   window.fetchOpenCanvas = fetchOpenCanvas;
   window.resetPropsDialogState = resetPropsDialogState;
   window.updatePropsApplyButton = updatePropsApplyButton;
+  window.flushPropsApplyButton = flushPropsApplyButton;
   window.upsertCanvasComponent = upsertCanvasComponent;
   window.commitPropsSnapshot = commitPropsSnapshot;
+  window.revertPropsDialogPreview = revertPropsDialogPreview;
   window.refreshCanvasEditOverlay = refreshCanvasEditOverlay;
   window.scheduleRefreshCanvasEditOverlay = scheduleRefreshCanvasEditOverlay;
   window.clearPropsDialogState = clearPropsDialogState;
+  window.previewPatchByName = previewPatchByName;
   window.activateSelectTool = activateSelectTool;
+  window.setTemplateEditStatus = setTemplateEditStatus;
+  window.isEditingGlobalObject = isEditingGlobalObject;
   window.showImageBrowserDialog = showImageBrowserDialog;
   window.showDisplayPickerDialog = showDisplayPickerDialog;
   window.fetchJson = fetchJson;
@@ -221,6 +226,8 @@ function studioPreviewUrl(params) {
 
 async function openPropertiesByGraphicName(name, componentType = '', source = '') {
   if (!name || !displayIsOpen()) return;
+  flushDeferredDialogInits();
+  ensureDeferredStudioInits();
 
   let editIndex = state.canvasEditCache?.editComponents?.findIndex(
     (entry) => entry.comp?.name === name
@@ -415,6 +422,7 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       setTemplateEditStatus(name, ref);
     } else if (comp.type === 'Rectangle' || comp.type === 'Ellipse') {
       window.StudioShapeProperties?.openShapePropertiesDialog(comp, ref, null);
+      setTemplateEditStatus(name, ref);
     } else {
       setStatus(`${comp.type} properties not available yet`);
     }
@@ -791,10 +799,11 @@ function buildGotoOverrideStore(comp, base = {}) {
     'left', 'top', 'width', 'height', 'visible', 'target', 'label', 'caption', 'image', 'imageScaled',
     'fontFamily', 'fontSize', 'bold', 'italic', 'underline', 'foreColor', 'useForeColor', 'wordWrap',
     'alignment', 'captionBackStyle', 'useCaptionBackColor', 'captionBackColor', 'captionBlink', 'audio',
-    'borderStyle', 'backStyle', 'shape', 'borderWidth', 'patternStyle',
+    'borderStyle', 'backStyle', 'shape', 'borderWidth', 'lineWidth', 'lineStyle', 'patternStyle',
+    'endColor', 'gradientStop', 'gradientShadingStyle', 'gradientDirection',
     'useVariableDisplay', 'parameterType', 'parameterFile', 'parameterList',
     'displayPosition', 'displayTop', 'displayLeft', 'useVariableDisplayPosition',
-    'horizontalMargin', 'verticalMargin'
+    'horizontalMargin', 'verticalMargin', 'numberOfStates', 'triggerType', 'tag', 'states'
   ].forEach((key) => setOverrideIfDiff(patch, key, comp[key], baseComp));
 
   if (Boolean(comp.borderUsesBackColor) !== Boolean(baseComp.borderUsesBackColor !== false)) {
@@ -977,11 +986,22 @@ async function patchTemplateOverride(name, patch, options = {}) {
   invalidateComposedCanvasCache();
 
   if (options.mergeOnly || isGeometryPatch(patch)) {
-    if (previewUpdateBoundsByName(name, patch)) {
+    if (isGeometryPatch(patch) && previewUpdateBoundsByName(name, patch)) {
       updateCanvasEditHitBounds(name, patch);
       refreshObjectExplorer();
       refreshPropertyPanel();
       return;
+    }
+    if (options.mergeOnly && !isGeometryPatch(patch)) {
+      try {
+        const composed = await fetchComposedCanvasCached();
+        const merged = composed.components?.find((c) => c.name === name);
+        if (merged && previewPatchByName(name, merged)) {
+          refreshObjectExplorer();
+          refreshPropertyPanel();
+          return;
+        }
+      } catch { /* fall back to full reload */ }
     }
   } else {
     try {
@@ -1057,6 +1077,14 @@ async function buildCanvasEditComponents(rawCanvas) {
   return list;
 }
 
+function extractPatchedCanvas(result, fallback) {
+  if (!result || typeof result !== 'object') return fallback;
+  if (result.object && typeof result.object === 'object') return result.object;
+  if (result.screen && typeof result.screen === 'object') return result.screen;
+  if (result.id || Array.isArray(result.components)) return result;
+  return fallback;
+}
+
 async function patchOpenCanvas(patch) {
   const project = state.activeProject;
   const id = state.selectedScreenId;
@@ -1076,14 +1104,63 @@ async function patchOpenCanvas(patch) {
   }
   invalidateCanvasCaches();
   markCanvasEditOverlayStale();
-  return result;
+  return extractPatchedCanvas(result, null);
+}
+
+async function syncEditComponentAfterSave(savedComp, ref) {
+  const editIdx = state.propsDialog.editIndex;
+  if (!savedComp?.name) return;
+
+  if (ref?.type === 'template-override') {
+    const merged = await mergeTemplateOverrideComponent(savedComp, ref);
+    if (editIdx != null && state.canvasEditCache?.editComponents?.[editIdx]) {
+      state.canvasEditCache.editComponents[editIdx] = merged;
+    } else {
+      const idx = state.canvasEditCache?.editComponents?.findIndex((e) => e.comp?.name === savedComp.name);
+      if (idx >= 0) state.canvasEditCache.editComponents[idx] = merged;
+    }
+    return;
+  }
+
+  const patchComp = { ...savedComp };
+  if (editIdx != null && state.canvasEditCache?.editComponents?.[editIdx]) {
+    state.canvasEditCache.editComponents[editIdx].comp = {
+      ...state.canvasEditCache.editComponents[editIdx].comp,
+      ...patchComp
+    };
+    if (ref) state.canvasEditCache.editComponents[editIdx].ref = ref;
+    return;
+  }
+
+  const idx = state.canvasEditCache?.editComponents?.findIndex((e) => e.comp?.name === savedComp.name);
+  if (idx >= 0) {
+    state.canvasEditCache.editComponents[idx].comp = {
+      ...state.canvasEditCache.editComponents[idx].comp,
+      ...patchComp
+    };
+  }
 }
 
 async function upsertCanvasComponent(component) {
   if (!displayIsOpen()) return false;
-  const ref = state.propsDialog.ref;
+  let ref = state.propsDialog.ref;
   const clean = stripComponentMeta(component);
   if (!state.undoSuspended) await pushUndoForEditRef(ref);
+
+  const canvasForRef = await fetchOpenCanvas();
+  if ((!ref || (ref.type === 'display' && ref.index == null)) && clean?.name) {
+    ref = resolveComponentEditRef(clean, canvasForRef, clean._source);
+    state.propsDialog.ref = ref;
+  }
+
+  if (ref?.type === 'template-override') {
+    const useFullMerge = clean.type === 'Rectangle' || clean.type === 'Ellipse'
+      || clean.type === 'MultistateIndicator' || clean.type === 'Text';
+    await patchTemplateOverride(ref.name, clean, useFullMerge ? { mergeOnly: true } : undefined);
+    await syncEditComponentAfterSave(clean, ref);
+    setStatus(`Saved ${clean.name}`);
+    return true;
+  }
 
   if (ref?.type === 'shell') {
     const canvas = await fetchOpenCanvas();
@@ -1122,7 +1199,7 @@ async function upsertCanvasComponent(component) {
     const components = [...(tpl.components || [])];
     const idx = components.findIndex((c) => c.name === ref.name);
     if (idx < 0) return false;
-    components[idx] = clean;
+    components[idx] = { ...components[idx], ...clean };
     await fetchJson(
       `/api/projects/${encodeURIComponent(state.activeProject)}/global-objects/${encodeURIComponent(globalObjectId)}`,
       {
@@ -1150,19 +1227,22 @@ async function upsertCanvasComponent(component) {
     return true;
   }
 
-  if (ref?.type === 'template-override') {
-    await patchTemplateOverride(ref.name, clean);
-    return true;
-  }
-
-  const canvas = await fetchOpenCanvas();
+  const canvas = canvasForRef;
   const components = [...(canvas.components || [])];
-  const resolvedIndex = ref?.type === 'display' ? ref.index : null;
+  let resolvedIndex = ref?.type === 'display' ? ref.index : null;
+  if ((resolvedIndex == null || !canvas.components?.[resolvedIndex]) && clean.name) {
+    const byName = canvas.components?.findIndex((c) => c.name === clean.name);
+    if (byName >= 0) {
+      resolvedIndex = byName;
+      ref = { type: 'display', index: byName };
+      state.propsDialog.ref = ref;
+    }
+  }
   const isNew = resolvedIndex == null || !canvas.components?.[resolvedIndex];
   let index;
   if (!isNew) {
     index = resolvedIndex;
-    components[index] = clean;
+    components[index] = { ...components[index], ...clean };
   } else {
     index = components.length;
     state.propsDialog.editIndex = index;
@@ -1170,16 +1250,23 @@ async function upsertCanvasComponent(component) {
     components.push(clean);
   }
   await patchOpenCanvas({ components });
-  state.canvasEditCache.raw = { ...canvas, components };
+  const savedRaw = (await fetchOpenCanvas({ force: true })) || { ...canvas, components };
+  state.canvasEditCache.raw = savedRaw;
+  const savedComp = savedRaw.components?.[index] || components[index];
+  await syncEditComponentAfterSave(savedComp, state.propsDialog.ref);
+  invalidateComposedCanvasCache();
   if (isNew || isEditingGlobalObject()) {
     await updateCanvasPreview({ forceReload: true });
   } else {
-    await updateCanvasPreview({ name: clean.name, component: clean, mode: 'patch-by-name' });
+    await updateCanvasPreview({ name: clean.name, component: savedComp || clean, mode: 'patch-by-name' });
   }
   refreshObjectExplorer();
   refreshPropertyPanel();
   if (isNew || isEditingGlobalObject()) {
     scheduleRefreshCanvasEditOverlay();
+  }
+  if (isEditingGlobalObject()) {
+    setStatus(`Saved ${clean.name} on Template (applies to all displays)`);
   }
   return true;
 }
@@ -1226,17 +1313,35 @@ function updatePropsApplyButton(readFn, applyBtnId) {
     propsApplyCheckTimer = null;
     const pending = propsApplyCheckPending;
     propsApplyCheckPending = null;
-    if (!pending) return;
-    const applyBtn = document.getElementById(pending.applyBtnId);
-    if (!applyBtn || !state.propsDialog.snapshot) return;
-    applyBtn.disabled = JSON.stringify(pending.readFn()) === state.propsDialog.snapshot;
-  }, 100);
+    if (pending) flushPropsApplyButton(pending.readFn, pending.applyBtnId);
+  }, 50);
+}
+
+function flushPropsApplyButton(readFn, applyBtnId) {
+  if (state.propsFormFill) return;
+  const applyBtn = document.getElementById(applyBtnId);
+  if (!applyBtn || state.propsDialog.kind == null) return;
+  if (!state.propsDialog.snapshot) {
+    applyBtn.disabled = true;
+    return;
+  }
+  applyBtn.disabled = JSON.stringify(readFn()) === state.propsDialog.snapshot;
 }
 
 function commitPropsSnapshot(readFn, applyBtnId) {
   state.propsDialog.snapshot = JSON.stringify(readFn());
   const applyBtn = document.getElementById(applyBtnId);
   if (applyBtn) applyBtn.disabled = true;
+  const idx = state.propsDialog.editIndex;
+  if (idx != null) state.canvasSelection.indices = [idx];
+}
+
+function revertPropsDialogPreview() {
+  if (!state.propsDialog.snapshot) return;
+  try {
+    const comp = JSON.parse(state.propsDialog.snapshot);
+    if (comp?.name) previewPatchByName(comp.name, comp);
+  } catch { /* ignore invalid snapshot */ }
 }
 
 function clearPropsDialogState() {
@@ -1302,6 +1407,57 @@ function defaultTextComponent(overrides = {}) {
     wordWrap: true,
     sizeToFit: true,
     alignment: 'middleCenter',
+    ...overrides
+  };
+}
+
+function nextShapeObjectName(components, type, prefix) {
+  const n = countComponentsByType(components, type) + 1;
+  return `${prefix}${n}`;
+}
+
+function defaultRectangleComponent(overrides = {}) {
+  return {
+    type: 'Rectangle',
+    name: 'Polygon1',
+    left: 0,
+    top: 0,
+    width: 100,
+    height: 50,
+    visible: true,
+    lineStyle: 'solid',
+    backStyle: 'solid',
+    patternStyle: 'none',
+    useForeColor: true,
+    foreColor: '#c6c6c6',
+    useBackColor: true,
+    backColor: '#ffffff',
+    usePatternColor: false,
+    patternColor: '#ffffff',
+    lineWidth: 1,
+    ...overrides
+  };
+}
+
+function defaultEllipseComponent(overrides = {}) {
+  return {
+    type: 'Ellipse',
+    name: 'Ellipse1',
+    left: 0,
+    top: 0,
+    width: 32,
+    height: 32,
+    visible: true,
+    lineStyle: 'solid',
+    backStyle: 'solid',
+    patternStyle: 'none',
+    useForeColor: true,
+    foreColor: '#000000',
+    useBackColor: true,
+    backColor: '#10EB10',
+    usePatternColor: false,
+    patternColor: '#ffffff',
+    lineWidth: 1,
     ...overrides
   };
 }
@@ -2947,6 +3103,10 @@ function startObjectPlacement(kind, defaults = {}) {
     setStatus('Drag on the display to draw an image box (Esc to cancel)');
   } else if (kind === 'string-display') {
     setStatus('Drag on the display to draw a string display box (Esc to cancel)');
+  } else if (kind === 'rectangle') {
+    setStatus('Drag on the display to draw a rectangle (Esc to cancel)');
+  } else if (kind === 'ellipse') {
+    setStatus('Drag on the display to draw an ellipse (Esc to cancel)');
   } else {
     setStatus('Drag on the display to draw a button (Esc to cancel)');
   }
@@ -3042,6 +3202,15 @@ async function completeObjectPlacement(rect) {
         return;
       }
       await showCanvasImagePropertiesDialog({ ...defaults, image: fileName });
+    } else if (kind === 'rectangle' || kind === 'ellipse') {
+      const canvas = await fetchOpenCanvas();
+      const isEllipse = kind === 'ellipse';
+      const type = isEllipse ? 'Ellipse' : 'Rectangle';
+      const prefix = isEllipse ? 'Ellipse' : 'Polygon';
+      const comp = isEllipse
+        ? defaultEllipseComponent({ ...defaults, name: nextShapeObjectName(canvas.components, type, prefix) })
+        : defaultRectangleComponent({ ...defaults, name: nextShapeObjectName(canvas.components, type, prefix) });
+      window.StudioShapeProperties?.openShapePropertiesDialog(comp, null, null);
     }
   } catch (err) {
     cancelObjectPlacement();
@@ -3934,6 +4103,14 @@ function handleObjectAction(id) {
     startObjectPlacement('image', item.imageDefaults || {});
     return;
   }
+  if (item.action === 'rectangle-properties') {
+    startObjectPlacement('rectangle', item.shapeDefaults || {});
+    return;
+  }
+  if (item.action === 'ellipse-properties') {
+    startObjectPlacement('ellipse', item.shapeDefaults || {});
+    return;
+  }
   if (item.component) {
     const comp = JSON.parse(JSON.stringify(item.component));
     addObjectToDisplay(comp)
@@ -4396,7 +4573,7 @@ function handleMenuAction(action) {
     case 'open-project': showOpenProjectDialog(); break;
     case 'delete-project': deleteActiveProject(); break;
     case 'new-display': showAddDisplayDialog(); break;
-    case 'new-parameter': openTagsPanel(); setStatus('Parameters — HMI Tags'); break;
+    case 'new-parameter': openParametersPanel().catch((err) => setStatus(`Error: ${err.message}`)); break;
     case 'new-local-message': openAlarmsPanel(); setStatus('Local Messages — Alarm definitions'); break;
     case 'new-data-log': setStatus('Data Log — configure in project.json (historian planned)'); openSystemPanelById('diagnostics-setup'); break;
     case 'new-macro': setStatus('Macros — planned for Phase 3'); break;
@@ -4827,10 +5004,20 @@ function renderProjectSelect() {
   if (deleteBtn) deleteBtn.disabled = !state.activeProject;
 }
 
+function sanitizeExplorerTree(nodes) {
+  for (const node of nodes || []) {
+    if (node.tagFolder || node.action === 'tag-item') {
+      delete node.children;
+    }
+    if (node.children?.length) sanitizeExplorerTree(node.children);
+  }
+}
+
 async function loadExplorer(projectId) {
   const id = projectId || state.activeProject;
   if (!id) return;
   const data = await fetchJson(`/api/projects/${id}/explorer?_=${Date.now()}`);
+  sanitizeExplorerTree(data.tree);
   explorerProject.textContent = `: ${data.projectName}`;
   explorerTree.innerHTML = '';
   for (const node of data.tree) {
@@ -4850,6 +5037,26 @@ function expandExplorerNode(nodeId) {
     children.classList.remove('collapsed');
     if (toggle?.textContent === '+') toggle.textContent = '−';
   }
+}
+
+/** Highlight the matching HMI Tags folder in the explorer sidebar (visual only). */
+function highlightExplorerTagFolder(folderName) {
+  if (!folderName || !explorerTree) return;
+  for (const id of ['project-root', 'application', 'hmi-tags']) {
+    expandExplorerNode(id);
+  }
+  const nodeId = `tag-folder-${folderName}`;
+  const row = explorerTree.querySelector(`.tree-row[data-node-id="${CSS.escape(nodeId)}"]`);
+  if (!row) return;
+  explorerTree.querySelectorAll('.tree-row').forEach((r) => r.classList.remove('selected'));
+  row.classList.add('selected');
+  state.selectedNode = {
+    type: 'folder',
+    id: nodeId,
+    label: folderName,
+    tagFolder: folderName
+  };
+  row.scrollIntoView({ block: 'nearest' });
 }
 
 function expandDefaultExplorerFolders() {
@@ -5047,7 +5254,10 @@ function handleExplorerAction(node) {
       });
       break;
     case 'plc-tag-item':
-      showTagEditDialog(node.tagName);
+      refreshProjectConfig().then(() => {
+        const tag = (state.projectConfig?.tags || []).find((t) => t.name === node.tagName);
+        openTagsPanel(tag?.folder || '', node.tagName);
+      });
       break;
     case 'tag-folder':
       openTagsPanel(node.tagFolder || node.label);
@@ -5424,19 +5634,320 @@ const TAG_FOLDER_ORDER = [
   'PLC_DO_Discr', 'PLC_DO_No', 'PLC_DO_Tags',
   'Safety_DI_Discr', 'Safety_DI_No', 'Safety_DI_Tags',
   'Safety_DO_Discr', 'Safety_DO_No', 'Safety_DO_Tags',
+  'PLC uploded Tags',
   'Temp_Tags'
 ];
 
-const tagsPanelState = { folder: '', selected: '' };
+/** Folder for tags imported/transferred from the PLC (RSLogix, device CSV, etc.). */
+const PLC_UPLOADED_TAGS_FOLDER = 'PLC uploded Tags';
+
+function isPlcImportFormat(format) {
+  return format === 'rslogix' || format === 'factorytalk-csv';
+}
+
+function shouldAssignPlcUploadedFolder(raw, folder, format) {
+  if (isIoSystemFolder(folder)) return false;
+  if (folder === 'Temp_Tags' || folder === PLC_UPLOADED_TAGS_FOLDER) return false;
+  if (isPlcImportFormat(format)) return true;
+  if (format === 'simple-csv' && folder) return false;
+  if (format === 'json' && folder) return false;
+  const plc = String(raw.plcAddress || raw.PLCReference || raw.connection || '').trim();
+  return Boolean(plc || raw.dataSource === 'device') && !folder;
+}
+
+const IO_SYSTEM_FOLDER_RE = /^(PLC_(DI|DO)|Safety_(DI|DO))_(Discr|No|Tags)$/;
+
+const tagsPanelState = { folder: '', selected: '', mode: 'edit', detailAbort: null, ctx: null };
+
+function tagToolbarBtnClass(action, ctx = tagsPanelState.ctx) {
+  const folder = ctx?.activeFolder || '';
+  const def = ctx?.activeDef;
+  const io = isIoSystemFolder(folder);
+  const internal = isInternalTagFolder(folder);
+  switch (action) {
+    case 'delete':
+      return def && !isIoSystemFolder(def.folder) ? '' : ' tag-tb-muted';
+    case 'duplicate':
+      return def && isInternalTagFolder(def.folder) ? '' : ' tag-tb-muted';
+    case 'insert':
+    case 'new-folder':
+      return io ? ' tag-tb-muted' : '';
+    case 'delete-folder':
+    case 'dup-folder':
+      return internal && folder ? '' : ' tag-tb-muted';
+    default:
+      return '';
+  }
+}
+
+function buildTagEditorToolbar(ctx) {
+  const actions = [
+    ['delete', 'Delete selection', '✕'],
+    ['duplicate', 'Duplicate tag (Ctrl+D)', '⎘'],
+    ['insert', 'New tag / Insert row', '＋'],
+    ['refresh', 'Refresh tag list', '↻'],
+    ['sep'],
+    ['delete-folder', 'Delete tag folder', '✕📁'],
+    ['dup-folder', 'Duplicate tag folder', '⎘📁'],
+    ['new-folder', 'Create tag folder', '＋📁'],
+    ['sep'],
+    ['import', 'Import / Export tags', '⬇'],
+    ['stats', 'Tag statistics', 'Σ']
+  ];
+  return actions.map((item) => {
+    if (item[0] === 'sep') return '<span class="tag-tb-sep"></span>';
+    const [action, title, label] = item;
+    return `<button type="button" class="tag-tb-btn${tagToolbarBtnClass(action, ctx)}" data-tag-action="${action}" title="${escapeHtml(title)}">${label}</button>`;
+  }).join('');
+}
+
+async function handleTagToolbarAction(action) {
+  const ctx = tagsPanelState.ctx;
+  if (!ctx) {
+    setStatus('Tag Editor not ready — reopen HMI Tags or wait for load to finish');
+    return;
+  }
+  const { allDefs, folderDefs, activeFolder, activeDef } = ctx;
+  const io = isIoSystemFolder(activeFolder);
+
+  switch (action) {
+    case 'delete':
+      if (!activeDef || isIoSystemFolder(activeDef.folder)) {
+        setStatus(io ? 'IO list tags — edit values above and click Apply (tags are managed by Parameters)' : 'Select a deletable tag first');
+        return;
+      }
+      await deleteSelectedTagFromEditor(allDefs, folderDefs);
+      break;
+    case 'duplicate':
+      if (!activeDef || !isInternalTagFolder(activeDef.folder)) {
+        setStatus('Duplicate is available for Temp_Tags and custom internal folders only');
+        return;
+      }
+      await duplicateSelectedTagInEditor(folderDefs);
+      break;
+    case 'insert':
+      if (io) {
+        await openTagsPanel('Temp_Tags', '', { createNew: true });
+        setStatus('New internal tags belong in Temp_Tags — opened Temp_Tags for new tag');
+        return;
+      }
+      startNewInternalTagInPanel(activeFolder || 'Temp_Tags');
+      break;
+    case 'refresh':
+      if (tagDetailFormIsDirty() && !confirm('You have unsaved tag changes. Refresh anyway?')) return;
+      await openTagsPanel(tagsPanelState.folder, tagsPanelState.selected);
+      setStatus(`Refreshed: ${activeFolder || 'Tag Editor'}`);
+      break;
+    case 'delete-folder':
+      if (!isInternalTagFolder(activeFolder)) {
+        setStatus('IO list folders cannot be deleted — use Parameters → Remove List');
+        return;
+      }
+      await deleteTagFolderFromEditor(allDefs);
+      break;
+    case 'dup-folder':
+      if (!isInternalTagFolder(activeFolder)) {
+        setStatus('Duplicate folder is for Temp_Tags and custom folders only');
+        return;
+      }
+      await duplicateTagFolderFromEditor(allDefs);
+      break;
+    case 'new-folder':
+      createTagFolderFromEditor(io ? 'Temp_Tags' : undefined);
+      if (io) {
+        setStatus('IO list folders are fixed — enter a custom folder name (e.g. Temp_Tags)');
+      }
+      break;
+    case 'import':
+      showTagWizardDialog();
+      break;
+    case 'stats': {
+      const byFolder = {};
+      for (const t of allDefs) {
+        const f = t.folder || '(none)';
+        byFolder[f] = (byFolder[f] || 0) + 1;
+      }
+      const lines = Object.entries(byFolder).sort(([a], [b]) => a.localeCompare(b)).map(([f, n]) => `${f}: ${n}`);
+      alert(`Tag statistics — ${allDefs.length} total\n\n${lines.join('\n')}`);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+function updateTagEditorToolbar() {
+  const bar = document.querySelector('.tag-editor-toolbar');
+  if (!bar || !tagsPanelState.ctx) return;
+  bar.querySelectorAll('[data-tag-action]').forEach((btn) => {
+    btn.classList.toggle('tag-tb-muted', tagToolbarBtnClass(btn.dataset.tagAction).includes('muted'));
+  });
+}
+
+let tagEditorToolbarGlobalWired = false;
+function tagEditorToolbarClickTarget(e) {
+  const t = e.target;
+  if (t instanceof Element) return t;
+  if (t?.parentElement instanceof Element) return t.parentElement;
+  return null;
+}
+
+function ensureTagEditorToolbarGlobalWired() {
+  if (tagEditorToolbarGlobalWired) return;
+  tagEditorToolbarGlobalWired = true;
+  document.addEventListener('click', (e) => {
+    if (!panelView || panelView.classList.contains('hidden')) return;
+    if (!panelView.querySelector('.tag-editor-toolbar')) return;
+    const el = tagEditorToolbarClickTarget(e);
+    if (!el) return;
+    const btn = el.closest('[data-tag-action]');
+    if (!btn?.closest('.tag-editor-toolbar')) return;
+    e.preventDefault();
+    handleTagToolbarAction(btn.dataset.tagAction).catch((err) => setStatus(`Error: ${err.message}`));
+  });
+  document.addEventListener('keydown', (e) => {
+    if (!panelView?.querySelector('.tag-editor-panel') || panelView.classList.contains('hidden')) return;
+    if (e.ctrlKey && e.key.toLowerCase() === 'd') {
+      e.preventDefault();
+      handleTagToolbarAction('duplicate').catch((err) => setStatus(`Error: ${err.message}`));
+    }
+    if (e.key === 'F5' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+      e.preventDefault();
+      handleTagToolbarAction('refresh').catch((err) => setStatus(`Error: ${err.message}`));
+    }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && !isEditableKeyboardTarget(e.target)) {
+      if (!panelView?.querySelector('.tag-editor-panel') || panelView.classList.contains('hidden')) return;
+      e.preventDefault();
+      handleTagToolbarAction('delete').catch((err) => setStatus(`Error: ${err.message}`));
+    }
+  });
+}
+
+function isIoSystemFolder(folder) {
+  return IO_SYSTEM_FOLDER_RE.test(String(folder || '').trim());
+}
+
+function isInternalTagFolder(folder) {
+  const f = String(folder || '').trim();
+  return Boolean(f) && !isIoSystemFolder(f);
+}
+
+function parseFtTagNameInput(input, defaultFolder = '') {
+  const raw = String(input || '').trim().replace(/\//g, '\\');
+  if (!raw) return null;
+  if (raw.includes('\\')) {
+    const idx = raw.lastIndexOf('\\');
+    const folder = raw.slice(0, idx).trim();
+    const shortName = raw.slice(idx + 1).trim();
+    if (!folder || !shortName) return null;
+    return { folder, shortName, name: `${folder}.${shortName}` };
+  }
+  const folder = String(defaultFolder || '').trim();
+  if (!folder) return null;
+  return { folder, shortName: raw, name: `${folder}.${raw}` };
+}
+
+function coerceInternalEditorType(type) {
+  if (type === 'int') return 'float';
+  if (type === 'float' || type === 'string' || type === 'bool') return type;
+  return 'bool';
+}
+
+function internalTypeLabel(type) {
+  switch (coerceInternalEditorType(type)) {
+    case 'float': return 'Analog';
+    case 'bool': return 'Digital';
+    case 'string': return 'String';
+    default: return type || '';
+  }
+}
+
+function buildInternalTypeOptions(selectedType = 'bool') {
+  const type = coerceInternalEditorType(selectedType);
+  const types = [
+    ['bool', 'Digital'],
+    ['float', 'Analog'],
+    ['string', 'String']
+  ];
+  return types.map(([value, label]) =>
+    `<option value="${value}"${type === value ? ' selected' : ''}>${label}</option>`
+  ).join('');
+}
+
+function buildFtDataTypeOptions(selected = '') {
+  const value = normalizeFtDataTypeValue(selected);
+  const options = [
+    ['', '(Default)'],
+    ['UINT', 'Unsigned Integer'],
+    ['INT', 'Integer'],
+    ['DINT', 'Long Integer'],
+    ['REAL', 'Floating Point'],
+    ['BYTE', 'Byte'],
+    ['BCD3', '3-Digit BCD'],
+    ['BCD4', '4-Digit BCD']
+  ];
+  return options.map(([v, label]) =>
+    `<option value="${v}"${value === v ? ' selected' : ''}>${label}</option>`
+  ).join('');
+}
+
+function normalizeFtDataTypeValue(value) {
+  const v = String(value || '').trim();
+  const aliases = {
+    Real: 'REAL',
+    real: 'REAL',
+    Float: 'REAL',
+    float: 'REAL',
+    'Floating Point': 'REAL',
+    'Unsigned Integer': 'UINT',
+    'Long Integer': 'DINT',
+    Integer: 'INT',
+    Byte: 'BYTE',
+    '3-Digit BCD': 'BCD3',
+    '4-Digit BCD': 'BCD4'
+  };
+  return aliases[v] || v;
+}
+
+function updateInternalTagTypePanels(type) {
+  const t = coerceInternalEditorType(type);
+  document.getElementById('tagDetailLengthWrap')?.classList.toggle('hidden', t !== 'string');
+  document.getElementById('tagDetailAnalogWrap')?.classList.toggle('hidden', t !== 'float');
+}
 
 function getTagFolderList(allDefs) {
   const folders = new Set();
+  for (const name of state.projectConfig?.tagFolders || []) {
+    if (name) folders.add(String(name));
+  }
   for (const def of allDefs) {
     if (def.folder) folders.add(def.folder);
   }
   const ordered = TAG_FOLDER_ORDER.filter((f) => folders.has(f));
   const rest = [...folders].filter((f) => !TAG_FOLDER_ORDER.includes(f)).sort((a, b) => a.localeCompare(b));
   return [...ordered, ...rest];
+}
+
+async function persistTagFolders(folderNames) {
+  if (!state.activeProject) return;
+  const tagFolders = [...new Set(folderNames.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tagFolders })
+  });
+  await refreshProjectConfig();
+}
+
+async function addTagFolderToProject(folder) {
+  const existing = getTagFolderList(state.projectConfig?.tags || []);
+  if (existing.includes(folder)) return;
+  await persistTagFolders([...existing, folder]);
+}
+
+async function removeTagFolderFromProject(folder) {
+  const existing = getTagFolderList(state.projectConfig?.tags || []);
+  await persistTagFolders(existing.filter((f) => f !== folder));
 }
 
 function sortFolderTags(defs) {
@@ -5468,12 +5979,506 @@ function tagGridDescription(def, liveValue) {
     const live = liveValue !== undefined && liveValue !== '' ? String(liveValue) : '';
     if (live) return live;
     if (def.initialValue !== undefined && def.initialValue !== '') return String(def.initialValue);
+    return def.description || '';
   }
   if (def.connection) return def.connection;
   return def.description || '';
 }
 
+function isIoDiscrTag(def) {
+  return def?.type === 'string' && /_Discr$/i.test(def.folder || '');
+}
+
+function isIoNoTag(def) {
+  return def?.type === 'int' && /_No$/i.test(def.folder || '');
+}
+
+function isIoDeviceTag(def) {
+  return /_Tags$/i.test(def?.folder || '');
+}
+
+/** Values written when saving from the Tag Editor detail form. */
+function resolveTagEditorSaveValues(def, type, description, initialRaw, connection) {
+  const folder = def.folder || '';
+  if (type === 'string' && /_Discr$/i.test(folder)) {
+    const text = String(description || '').trim();
+    return { description: text, initialValue: text, connection: '' };
+  }
+  if (/_Tags$/i.test(folder)) {
+    const conn = String(connection || description || '').trim();
+    return {
+      description: conn || String(def.description || '').trim(),
+      connection: conn,
+      initialValue: def.initialValue
+    };
+  }
+  if (type === 'int' && /_No$/i.test(folder)) {
+    const fromInitial = initialRaw !== undefined && initialRaw !== ''
+      ? Number.parseInt(String(initialRaw), 10)
+      : NaN;
+    const fromDesc = Number.parseInt(String(description || '').trim(), 10);
+    const initialValue = Number.isFinite(fromInitial)
+      ? fromInitial
+      : Number.isFinite(fromDesc)
+        ? fromDesc
+        : def.initialValue;
+    return { description: String(initialValue), initialValue, connection: '' };
+  }
+  const resolved = { description: String(description || '').trim(), connection: String(connection || '').trim() };
+  if (initialRaw !== undefined && initialRaw !== '') {
+    resolved.initialValue = initialRaw;
+  } else if (type === 'string' && resolved.description) {
+    resolved.initialValue = resolved.description;
+  }
+  return resolved;
+}
+
+function tagDetailFormIsDirty() {
+  const form = document.getElementById('tagEditorDetail');
+  if (!form || form.dataset.dirty !== '1') return false;
+  return true;
+}
+
+function markTagDetailFormDirty() {
+  const form = document.getElementById('tagEditorDetail');
+  if (form) form.dataset.dirty = '1';
+}
+
+function clearTagDetailFormDirty() {
+  const form = document.getElementById('tagEditorDetail');
+  if (form) form.dataset.dirty = '0';
+}
+
+function wireTagDetailFormInputs() {
+  document.getElementById('tagEditorDetail')?.querySelectorAll(
+    'input:not([readonly]):not([disabled]), select:not([disabled]), textarea:not([readonly]):not([disabled])'
+  ).forEach((el) => {
+    el.addEventListener('input', markTagDetailFormDirty);
+    el.addEventListener('change', markTagDetailFormDirty);
+  });
+}
+
+function buildIoTagDetailForm(def, runtimeTags) {
+  const live = runtimeTags[def.name] || {};
+  const liveValue = live.value !== undefined ? live.value : def.initialValue;
+  const discr = isIoDiscrTag(def);
+  const ioNo = isIoNoTag(def);
+  const device = isIoDeviceTag(def);
+  const desc = tagGridDescription(def, liveValue);
+  const typeLabel = def.type === 'string' ? 'String' : def.type === 'bool' ? 'Digital' : def.type === 'int' ? 'Integer' : (def.type || '');
+  const length = def.type === 'string'
+    ? stringTagLength({ ...def, initialValue: liveValue ?? def.initialValue })
+    : '';
+
+  let tagFields = `
+    <label class="tag-field-name">Name<input type="text" id="tagDetailName" value="${escapeHtml(formatFtTagName(def))}" readonly /></label>
+    <label>Type<input type="text" id="tagDetailType" value="${escapeHtml(typeLabel)}" readonly data-type="${escapeHtml(def.type)}" /></label>`;
+
+  if (discr) {
+    tagFields += `
+    <label class="tag-field-wide">Description<input type="text" id="tagDetailDescription" value="${escapeHtml(desc)}" maxlength="200" /></label>
+    <label>Length<input type="text" id="tagDetailLength" value="${length}" readonly tabindex="-1" /></label>`;
+  } else if (ioNo) {
+    tagFields += `
+    <label>IO number<input type="text" id="tagDetailInitial" value="${escapeHtml(liveValue !== undefined && liveValue !== null ? String(liveValue) : '')}" inputmode="numeric" /></label>`;
+  } else if (device) {
+    tagFields += `
+    <label class="tag-field-wide">Description<input type="text" id="tagDetailDescription" value="${escapeHtml(def.description || '')}" readonly tabindex="-1" /></label>`;
+  }
+
+  const dataSourceBlock = device
+    ? `<fieldset class="tag-editor-fieldset">
+        <legend>Data Source</legend>
+        <div class="tag-editor-source-row">
+          <span>Type:</span>
+          <label class="radio-row"><input type="radio" name="tagDetailSource" value="device" checked disabled /> Device</label>
+          <label class="radio-row"><input type="radio" name="tagDetailSource" value="memory" disabled /> Memory</label>
+        </div>
+        <label class="tag-editor-address-row">Address
+          <span class="tag-editor-address-input">
+            <input type="text" id="tagDetailConnection" value="${escapeHtml(def.connection || desc)}" placeholder="PLC tag path" />
+            <button type="button" class="ft-mini-btn" id="tagDetailBrowse" title="Tag browser">…</button>
+          </span>
+        </label>
+      </fieldset>`
+    : `<fieldset class="tag-editor-fieldset">
+        <legend>Data Source</legend>
+        <div class="tag-editor-source-row">
+          <span>Type:</span>
+          <label class="radio-row"><input type="radio" name="tagDetailSource" value="memory" checked disabled /> Memory</label>
+          <label class="radio-row"><input type="radio" name="tagDetailSource" value="device" disabled /> Device</label>
+          <label class="radio-row"><input type="checkbox" id="tagDetailRetentive" disabled /> Retentive</label>
+        </div>
+      </fieldset>`;
+
+  return `<div class="tag-editor-detail-form">
+    <fieldset class="tag-editor-fieldset">
+      <legend>Tag</legend>
+      <div class="tag-editor-detail-grid tag-editor-detail-grid-io">${tagFields}</div>
+    </fieldset>
+    ${dataSourceBlock}
+  </div>`;
+}
+
+function wrapTagDetailBody(formHtml, actionsHtml) {
+  return `<div class="tag-editor-detail-body">${formHtml}${actionsHtml}</div>`;
+}
+
+function buildInternalTagDetailForm(def, runtimeTags, { isNew = false, defaultFolder = '' } = {}) {
+  const live = def ? (runtimeTags[def.name] || {}) : {};
+  const liveValue = def && live.value !== undefined ? live.value : def?.initialValue;
+  const dataSource = def?.dataSource || 'memory';
+  const type = coerceInternalEditorType(def?.type || 'bool');
+  const nameValue = isNew
+    ? (defaultFolder ? `${defaultFolder}\\` : '')
+    : formatFtTagName(def);
+  const desc = def ? (def.description || '') : '';
+  const stringLen = type === 'string'
+    ? (def ? stringTagLength({ ...def, initialValue: liveValue ?? def.initialValue }) : 82)
+    : '';
+  const address = def?.dataSource === 'device' ? (def.plcAddress || def.connection || '') : (def?.connection || '0');
+  const min = def?.min ?? 0;
+  const max = def?.max ?? 100;
+  const scale = def?.scale ?? 1;
+  const offset = def?.offset ?? 0;
+  const dataType = def?.dataType ?? '';
+  return `<div class="tag-editor-detail-form">
+    <fieldset class="tag-editor-fieldset">
+      <legend>Tag</legend>
+      <div class="tag-editor-detail-grid tag-editor-detail-grid-internal">
+        <label class="tag-field-name">Name<input type="text" id="tagDetailName" value="${escapeHtml(nameValue)}" placeholder="Folder\\TagName" maxlength="120" /></label>
+        <label>Type<select id="tagDetailType">${buildInternalTypeOptions(type)}</select></label>
+        <label class="tag-field-wide">Description<input type="text" id="tagDetailDescription" value="${escapeHtml(desc)}" maxlength="200" /></label>
+        <label id="tagDetailLengthWrap"${type === 'string' ? '' : ' class="hidden"'}>Length<input type="text" id="tagDetailLength" value="${stringLen}" inputmode="numeric" /></label>
+        <div id="tagDetailAnalogWrap" class="tag-editor-analog-grid${type === 'float' ? '' : ' hidden'}">
+          <label>Minimum<input type="text" id="tagDetailMin" value="${escapeHtml(String(min))}" inputmode="decimal" /></label>
+          <label>Maximum<input type="text" id="tagDetailMax" value="${escapeHtml(String(max))}" inputmode="decimal" /></label>
+          <label>Scale<input type="text" id="tagDetailScale" value="${escapeHtml(String(scale))}" inputmode="decimal" /></label>
+          <label>Offset<input type="text" id="tagDetailOffset" value="${escapeHtml(String(offset))}" inputmode="decimal" /></label>
+          <label class="tag-field-wide">Data Type<select id="tagDetailDataType">${buildFtDataTypeOptions(dataType)}</select></label>
+        </div>
+      </div>
+    </fieldset>
+    <fieldset class="tag-editor-fieldset">
+      <legend>Data Source</legend>
+      <div class="tag-editor-source-row">
+        <span>Type:</span>
+        <label class="radio-row"><input type="radio" name="tagDetailSource" value="device"${dataSource === 'device' ? ' checked' : ''} /> Device</label>
+        <label class="radio-row"><input type="radio" name="tagDetailSource" value="memory"${dataSource !== 'device' ? ' checked' : ''} /> Memory</label>
+      </div>
+      <label class="tag-editor-address-row">Address
+        <span class="tag-editor-address-input">
+          <input type="text" id="tagDetailAddress" value="${escapeHtml(address)}" placeholder="0" />
+          <button type="button" class="ft-mini-btn" id="tagDetailBrowse" title="Tag browser">…</button>
+        </span>
+      </label>
+    </fieldset>
+  </div>`;
+}
+
+function buildInternalTagDetailActionsHtml() {
+  return `<div class="tag-editor-detail-actions-col" id="tagDetailActions">
+    <button type="button" class="dialog-btn" id="tagDetailClose">Close</button>
+    <button type="button" class="dialog-btn primary" id="tagDetailApply">Accept</button>
+    <button type="button" class="dialog-btn" id="tagDetailDiscard">Discard</button>
+    <button type="button" class="dialog-btn" id="tagDetailNew">New</button>
+    <button type="button" class="dialog-btn" id="tagDetailHelp">Help</button>
+  </div>`;
+}
+
+function wireInternalTagTypeFields() {
+  const typeEl = document.getElementById('tagDetailType');
+  const applyPanels = () => updateInternalTagTypePanels(typeEl?.value || 'bool');
+  typeEl?.addEventListener('change', applyPanels);
+  applyPanels();
+  document.getElementById('tagDetailBrowse')?.addEventListener('click', () => {
+    if (window.StudioTagTools?.openTagBrowser) {
+      StudioTagTools.openTagBrowser(document.getElementById('tagDetailAddress'));
+    }
+  });
+}
+
+function readInternalTagDetailForm(defaultFolder = '') {
+  const nameInput = document.getElementById('tagDetailName')?.value;
+  const parsed = parseFtTagNameInput(nameInput, defaultFolder);
+  if (!parsed) return { error: 'Enter tag name as Folder\\TagName (e.g. Temp_Tags\\Alarm).' };
+  if (isIoSystemFolder(parsed.folder)) {
+    return { error: 'IO list folders (PLC_* / Safety_*) are managed by Parameters — use Temp_Tags or a custom folder for internal tags.' };
+  }
+  const type = coerceInternalEditorType(document.getElementById('tagDetailType')?.value || 'bool');
+  const description = document.getElementById('tagDetailDescription')?.value || '';
+  const dataSource = document.querySelector('input[name="tagDetailSource"]:checked')?.value || 'memory';
+  const address = document.getElementById('tagDetailAddress')?.value?.trim() || '0';
+  const lengthRaw = document.getElementById('tagDetailLength')?.value;
+  const entry = normalizeTagEntry({
+    name: parsed.name,
+    type,
+    description,
+    folder: parsed.folder,
+    dataSource,
+    connection: dataSource === 'memory' ? address : '',
+    plcAddress: dataSource === 'device' ? address : '',
+    initialValue: type === 'string' ? description : undefined,
+    min: type === 'float' ? document.getElementById('tagDetailMin')?.value : undefined,
+    max: type === 'float' ? document.getElementById('tagDetailMax')?.value : undefined,
+    scale: type === 'float' ? document.getElementById('tagDetailScale')?.value : undefined,
+    offset: type === 'float' ? document.getElementById('tagDetailOffset')?.value : undefined,
+    dataType: type === 'float' ? document.getElementById('tagDetailDataType')?.value : undefined,
+    stringLength: type === 'string' ? lengthRaw : undefined
+  });
+  if (!entry) return { error: 'Could not build tag definition.' };
+  if (type === 'string' && lengthRaw) {
+    const len = Number.parseInt(lengthRaw, 10);
+    if (Number.isFinite(len) && len > 0) {
+      entry.stringLength = len;
+      const text = String(entry.initialValue || entry.description || '');
+      entry.initialValue = text.padEnd(len, ' ').slice(0, len);
+    }
+  }
+  return { entry, parsed };
+}
+
+async function saveInternalTagFromDetail(originalName = null) {
+  const result = readInternalTagDetailForm(tagsPanelState.folder);
+  if (result.error) {
+    alert(result.error);
+    return false;
+  }
+  const { entry, parsed } = result;
+  await refreshProjectConfig();
+  const exists = (state.projectConfig?.tags || []).some((t) => t.name === entry.name);
+  if (!originalName && exists) {
+    if (!confirm(`Tag "${entry.name}" already exists. Replace it?`)) return false;
+  } else if (originalName && originalName !== entry.name && exists) {
+    if (!confirm(`Tag "${entry.name}" already exists. Replace it?`)) return false;
+  }
+  const saved = await saveTagToProject(entry, originalName);
+  if (!saved) return false;
+  await addTagFolderToProject(parsed.folder);
+  clearTagDetailFormDirty();
+  tagsPanelState.mode = 'edit';
+  setStatus(`Saved tag: ${formatFtTagName(entry)}`);
+  await loadExplorer(state.activeProject);
+  await openTagsPanel(parsed.folder, entry.name);
+  return true;
+}
+
+function startNewInternalTagInPanel(folder) {
+  if (isIoSystemFolder(folder)) {
+    setStatus('Create internal tags in Temp_Tags or a custom folder — IO list folders are auto-generated');
+    folder = 'Temp_Tags';
+  }
+  tagsPanelState.mode = 'new';
+  tagsPanelState.selected = '';
+  tagsPanelState.folder = folder || 'Temp_Tags';
+  const detail = document.getElementById('tagEditorDetail');
+  if (!detail) {
+    openTagsPanel(tagsPanelState.folder, '', { createNew: true }).catch((err) => setStatus(`Error: ${err.message}`));
+    return;
+  }
+  detail.innerHTML = wrapTagDetailBody(
+    buildInternalTagDetailForm(null, {}, { isNew: true, defaultFolder: tagsPanelState.folder }),
+    buildInternalTagDetailActionsHtml()
+  );
+  wireTagDetailFormInputs();
+  wireInternalTagTypeFields();
+  clearTagDetailFormDirty();
+  document.getElementById('tagDetailName')?.focus();
+  setStatus(`New internal tag — ${tagsPanelState.folder}\\…`);
+}
+
+async function deleteSelectedTagFromEditor(allDefs, folderDefs) {
+  const name = tagsPanelState.selected;
+  if (!name) {
+    setStatus('Select a tag to delete');
+    return;
+  }
+  const def = folderDefs.find((d) => d.name === name);
+  if (def && isIoSystemFolder(def.folder)) {
+    alert('IO list tags are managed by Parameters — delete the parameter list instead.');
+    return;
+  }
+  await deleteTagFromProject(name);
+}
+
+async function duplicateSelectedTagInEditor(folderDefs) {
+  const def = folderDefs.find((d) => d.name === tagsPanelState.selected);
+  if (!def) {
+    setStatus('Select a tag to duplicate');
+    return;
+  }
+  if (isIoSystemFolder(def.folder)) {
+    alert('IO list tags cannot be duplicated here.');
+    return;
+  }
+  const short = tagShortName(def);
+  let copyShort = `${short}_Copy`;
+  let copyName = `${def.folder}.${copyShort}`;
+  const all = state.projectConfig?.tags || [];
+  let n = 2;
+  while (all.some((t) => t.name === copyName)) {
+    copyShort = `${short}_Copy${n++}`;
+    copyName = `${def.folder}.${copyShort}`;
+  }
+  const entry = normalizeTagEntry({ ...def, name: copyName, folder: def.folder, description: def.description || '' });
+  await saveTagToProject(entry, null);
+  setStatus(`Duplicated tag: ${formatFtTagName(entry)}`);
+  await loadExplorer(state.activeProject);
+  await openTagsPanel(def.folder, copyName);
+}
+
+async function createTagFolderFromEditor(defaultName) {
+  const seed = defaultName
+    ?? (tagsPanelState.folder && isInternalTagFolder(tagsPanelState.folder)
+      ? tagsPanelState.folder
+      : 'Temp_Tags');
+  showTagFolderDialog(seed);
+}
+
+function sanitizeTagFolderName(raw) {
+  let name = String(raw || '').trim();
+  name = name.replace(/\\/g, '').replace(/\//g, '').trim();
+  name = name.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^_+|_+$/g, '');
+  return name.slice(0, 60);
+}
+
+function validateTagFolderName(folder) {
+  if (!folder) return 'Folder name is required.';
+  if (/\\|\//.test(String(folder))) return 'Folder name cannot contain \\ or /.';
+  if (isIoSystemFolder(folder)) {
+    return `"${folder}" is an IO list folder — it is created automatically when you add Parameter lists. Use Temp_Tags or a custom name for internal tags.`;
+  }
+  const knownIo = ['PLC_DI_NO', 'PLC_DO_NO', 'PLC_DI_DISCR', 'PLC_DO_DISCR'];
+  if (knownIo.includes(folder.toUpperCase())) {
+    return `"${folder}" matches a reserved IO folder name. Use Temp_Tags for custom internal tags.`;
+  }
+  return '';
+}
+
+function showTagFolderDialog(defaultName = 'Temp_Tags') {
+  const dlg = document.getElementById('tagFolderDialog');
+  const input = document.getElementById('tagFolderName');
+  const err = document.getElementById('tagFolderError');
+  if (!dlg || !input) return;
+  const seed = sanitizeTagFolderName(defaultName) || 'Temp_Tags';
+  input.value = seed;
+  if (err) {
+    err.textContent = '';
+    err.classList.add('hidden');
+  }
+  dlg.showModal();
+  input.focus();
+  input.select();
+}
+
+async function submitTagFolderDialog(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('tagFolderError');
+  const raw = document.getElementById('tagFolderName')?.value || '';
+  const folder = sanitizeTagFolderName(raw);
+  const error = validateTagFolderName(folder);
+  if (error) {
+    if (errEl) {
+      errEl.textContent = error;
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+  document.getElementById('tagFolderDialog')?.close();
+  await addTagFolderToProject(folder);
+  await loadExplorer(state.activeProject);
+  await openTagsPanel(folder, '', { createNew: true });
+  setStatus(`Created folder: ${folder} — enter first tag name and click Accept`);
+}
+
+let tagFolderDialogInited = false;
+function initTagFolderDialog() {
+  if (tagFolderDialogInited) return;
+  tagFolderDialogInited = true;
+  document.getElementById('tagFolderForm')?.addEventListener('submit', (e) => {
+    submitTagFolderDialog(e).catch((err) => setStatus(`Error: ${err.message}`));
+  });
+  document.getElementById('tagFolderCancel')?.addEventListener('click', () => {
+    document.getElementById('tagFolderDialog')?.close();
+  });
+  document.getElementById('tagFolderHelp')?.addEventListener('click', () => {
+    alert(
+      'New HMI Tag Folder\n\n'
+      + 'Enter a folder name for internal (memory) tags.\n\n'
+      + '• Do not include \\ or tag names — folder only (e.g. Temp_Tags)\n'
+      + '• PLC_DI_*, PLC_DO_*, Safety_* folders are created by Parameters\n'
+      + '• After OK, add your first tag as Folder\\TagName'
+    );
+  });
+  document.getElementById('tagFolderName')?.addEventListener('input', () => {
+    document.getElementById('tagFolderError')?.classList.add('hidden');
+  });
+}
+
+async function deleteTagFolderFromEditor(allDefs) {
+  const folder = tagsPanelState.folder;
+  if (!folder) return;
+  if (isIoSystemFolder(folder)) {
+    alert('IO list folders cannot be deleted here — use Parameters → Remove List.');
+    return;
+  }
+  const tags = allDefs.filter((t) => t.folder === folder);
+  const label = tags.length
+    ? `Delete folder "${folder}" and all ${tags.length} tag(s)?`
+    : `Remove empty folder "${folder}"?`;
+  if (!confirm(label)) return;
+  const nextTags = allDefs.filter((t) => t.folder !== folder);
+  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tags: nextTags })
+  });
+  await removeTagFolderFromProject(folder);
+  await refreshProjectConfig();
+  await loadExplorer(state.activeProject);
+  await openTagsPanel(getTagFolderList(nextTags)[0] || '');
+  setStatus(`Deleted folder: ${folder}`);
+}
+
+async function duplicateTagFolderFromEditor(allDefs) {
+  const folder = tagsPanelState.folder;
+  if (!folder || isIoSystemFolder(folder)) {
+    alert('Select a custom internal tag folder to duplicate.');
+    return;
+  }
+  const newName = prompt('Duplicate folder as:', `${folder}_Copy`);
+  if (!newName?.trim()) return;
+  const target = newName.trim().replace(/[^a-zA-Z0-9_]/g, '_');
+  const sourceTags = allDefs.filter((t) => t.folder === folder);
+  if (!sourceTags.length) {
+    setStatus(`Folder "${folder}" is empty`);
+    return;
+  }
+  const newTags = sourceTags.map((t) => {
+    const short = tagShortName(t);
+    return normalizeTagEntry({ ...t, name: `${target}.${short}`, folder: target });
+  }).filter(Boolean);
+  let tags = [...allDefs];
+  for (const entry of newTags) {
+    tags = tags.filter((t) => t.name !== entry.name);
+    tags.push(entry);
+  }
+  tags.sort((a, b) => a.name.localeCompare(b.name));
+  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tags })
+  });
+  await refreshProjectConfig();
+  await loadExplorer(state.activeProject);
+  await openTagsPanel(target);
+  setStatus(`Duplicated folder: ${folder} → ${target}`);
+}
+
 function stringTagLength(def) {
+  if (def?.stringLength && Number.isFinite(def.stringLength)) {
+    return Math.max(Number(def.stringLength), 1);
+  }
   const text = def.initialValue !== undefined && def.initialValue !== ''
     ? String(def.initialValue)
     : (def.description || '');
@@ -5542,6 +6547,28 @@ function normalizeTagEntry(raw) {
     entry.logic = String(raw.logic || '').trim();
     if (!entry.logic) return null;
   }
+  if (raw.min !== undefined && raw.min !== '') {
+    const n = Number.parseFloat(raw.min);
+    if (Number.isFinite(n)) entry.min = n;
+  }
+  if (raw.max !== undefined && raw.max !== '') {
+    const n = Number.parseFloat(raw.max);
+    if (Number.isFinite(n)) entry.max = n;
+  }
+  if (raw.scale !== undefined && raw.scale !== '') {
+    const n = Number.parseFloat(raw.scale);
+    if (Number.isFinite(n)) entry.scale = n;
+  }
+  if (raw.offset !== undefined && raw.offset !== '') {
+    const n = Number.parseFloat(raw.offset);
+    if (Number.isFinite(n)) entry.offset = n;
+  }
+  const dataType = String(raw.dataType || '').trim();
+  if (dataType) entry.dataType = normalizeFtDataTypeValue(dataType);
+  if (raw.stringLength !== undefined && raw.stringLength !== '') {
+    const len = Number.parseInt(raw.stringLength, 10);
+    if (Number.isFinite(len) && len > 0) entry.stringLength = len;
+  }
   return entry;
 }
 
@@ -5556,13 +6583,21 @@ function showTagEditDialog(existingName, defaultFolder = '') {
     tagEditOriginalName = existing?.name || null;
     document.getElementById('tagEditTitle').textContent = existing ? 'Edit HMI Tag' : 'New HMI Tag';
     const nameEl = document.getElementById('tagEditName');
-    nameEl.value = existing?.name || '';
-    nameEl.readOnly = Boolean(existing);
-    document.getElementById('tagEditType').value = existing?.type || 'bool';
+    const folder = existing?.folder || defaultFolder || 'Temp_Tags';
+    nameEl.value = existing ? formatFtTagName(existing) : (folder ? `${folder}\\` : '');
+    nameEl.readOnly = Boolean(existing && isIoSystemFolder(existing.folder));
+    document.getElementById('tagEditType').value = coerceInternalEditorType(existing?.type || 'bool');
     document.getElementById('tagEditDescription').value = existing?.description || '';
-    document.getElementById('tagEditFolder').value = existing?.folder || defaultFolder || '';
-    document.getElementById('tagEditDataSource').value = existing?.dataSource || (existing?.folder ? 'memory' : 'device');
-    document.getElementById('tagEditConnection').value = existing?.connection || '';
+    document.getElementById('tagEditFolder').value = folder;
+    const dataSource = existing?.dataSource || 'memory';
+    document.querySelectorAll('input[name="tagEditSourceKind"]').forEach((el) => {
+      el.checked = el.value === dataSource;
+    });
+    const address = dataSource === 'device'
+      ? (existing?.plcAddress || existing?.connection || '')
+      : (existing?.connection || '');
+    document.getElementById('tagEditConnection').value = address;
+    document.getElementById('tagEditDataSource').value = dataSource;
     document.getElementById('tagEditPlcAddress').value = existing?.plcAddress || '';
     const computed = Boolean(existing?.computed);
     document.getElementById('tagEditComputed').checked = computed;
@@ -5575,14 +6610,24 @@ function showTagEditDialog(existingName, defaultFolder = '') {
 
 async function saveTagEdit(e) {
   e.preventDefault();
+  const parsed = parseFtTagNameInput(
+    document.getElementById('tagEditName').value,
+    document.getElementById('tagEditFolder').value
+  );
+  if (!parsed) {
+    alert('Enter tag name as Folder\\TagName (e.g. Temp_Tags\\Alarm).');
+    return;
+  }
+  const dataSource = document.querySelector('input[name="tagEditSourceKind"]:checked')?.value || 'memory';
+  const address = document.getElementById('tagEditConnection').value?.trim() || '';
   const entry = normalizeTagEntry({
-    name: document.getElementById('tagEditName').value,
+    name: parsed.name,
     type: document.getElementById('tagEditType').value,
     description: document.getElementById('tagEditDescription').value,
-    folder: document.getElementById('tagEditFolder').value,
-    dataSource: document.getElementById('tagEditDataSource').value,
-    connection: document.getElementById('tagEditConnection').value,
-    plcAddress: document.getElementById('tagEditPlcAddress').value,
+    folder: parsed.folder,
+    dataSource,
+    connection: dataSource === 'memory' ? address : '',
+    plcAddress: dataSource === 'device' ? address : '',
     computed: document.getElementById('tagEditComputed').checked,
     logic: document.getElementById('tagEditLogic').value
   });
@@ -5593,11 +6638,15 @@ async function saveTagEdit(e) {
   const saved = await saveTagToProject(entry, tagEditOriginalName);
   if (!saved) return;
   document.getElementById('tagEditDialog').close();
+  await loadExplorer(state.activeProject);
   await openTagsPanel(entry.folder || tagsPanelState.folder, entry.name);
-  setStatus(`Saved tag: ${entry.name}`);
+  setStatus(`Saved tag: ${formatFtTagName(entry)}`);
 }
 
+let tagEditDialogInited = false;
 function initTagEditDialog() {
+  if (tagEditDialogInited) return;
+  tagEditDialogInited = true;
   document.getElementById('tagEditComputed')?.addEventListener('change', (e) => {
     document.getElementById('tagEditLogicWrap').classList.toggle('hidden', !e.target.checked);
   });
@@ -5615,13 +6664,16 @@ function initTagEditDialog() {
   });
 }
 
-async function openTagsPanel(folderFilter = '', selectedTagName = '') {
+async function openTagsPanel(folderFilter = '', selectedTagName = '', options = {}) {
   hidePreviewStage();
   panelView.classList.remove('hidden');
+  try {
   await refreshProjectConfig();
   const allDefs = state.projectConfig?.tags || [];
   const folders = getTagFolderList(allDefs);
-  const activeFolder = folderFilter && (folders.includes(folderFilter) || allDefs.some((d) => d.folder === folderFilter))
+  const activeFolder = folderFilter && (
+    folders.includes(folderFilter) || allDefs.some((d) => d.folder === folderFilter)
+  )
     ? folderFilter
     : (folders[0] || '');
   tagsPanelState.folder = activeFolder;
@@ -5629,55 +6681,49 @@ async function openTagsPanel(folderFilter = '', selectedTagName = '') {
   const folderDefs = activeFolder
     ? sortFolderTags(allDefs.filter((def) => def.folder === activeFolder))
     : sortFolderTags(allDefs.filter((def) => !def.folder));
-  const activeTagName = selectedTagName && folderDefs.some((d) => d.name === selectedTagName)
-    ? selectedTagName
-    : (folderDefs[0]?.name || '');
+
+  if (options.createNew) {
+    tagsPanelState.mode = 'new';
+    tagsPanelState.selected = '';
+  } else if (selectedTagName !== '__new__') {
+    tagsPanelState.mode = 'edit';
+  }
+
+  const activeTagName = tagsPanelState.mode === 'new'
+    ? ''
+    : (selectedTagName && selectedTagName !== '__new__' && folderDefs.some((d) => d.name === selectedTagName)
+      ? selectedTagName
+      : (folderDefs[0]?.name || ''));
   tagsPanelState.selected = activeTagName;
 
   const [runtimeTags] = await Promise.all([
-    fetchJson(`/api/runtime/tags?project=${state.activeProject}`)
+    fetchJson(`/api/runtime/tags?project=${state.activeProject}`).catch(() => ({}))
   ]);
 
+  const canManageInternal = isInternalTagFolder(activeFolder) || !activeFolder;
+
   const buildDetailForm = (def) => {
-    if (!def) {
-      return `<p class="hint">Select a tag in the grid, or choose a folder on the left.</p>`;
+    if (tagsPanelState.mode === 'new') {
+      return buildInternalTagDetailForm(null, runtimeTags, { isNew: true, defaultFolder: activeFolder || 'Temp_Tags' });
     }
-    const live = runtimeTags[def.name] || {};
-    const liveValue = live.value !== undefined ? live.value : def.initialValue;
-    const dataSource = def.dataSource || (def.folder ? 'memory' : 'device');
-    const desc = tagGridDescription(def, liveValue);
-    const length = def.type === 'string' ? stringTagLength({ ...def, initialValue: liveValue ?? def.initialValue }) : '';
-    return `
-      <div class="tag-editor-detail-grid">
-        <label>Name<input type="text" id="tagDetailName" value="${escapeHtml(formatFtTagName(def))}" readonly title="Tag name cannot be changed" /></label>
-        <label>Type
-          <select id="tagDetailType">
-            <option value="bool"${def.type === 'bool' ? ' selected' : ''}>bool</option>
-            <option value="int"${def.type === 'int' ? ' selected' : ''}>int</option>
-            <option value="float"${def.type === 'float' ? ' selected' : ''}>float</option>
-            <option value="string"${def.type === 'string' ? ' selected' : ''}>String</option>
-          </select>
-        </label>
-        <label>Description<input type="text" id="tagDetailDescription" value="${escapeHtml(desc)}" maxlength="200"${/_No$/i.test(def.folder || '') ? ' title="For _No tags this is the IO number label; use _Discr for text descriptions"' : ''} /></label>
-        ${def.type === 'string' ? `<label>Length<input type="text" id="tagDetailLength" value="${length}" readonly /></label>` : '<span></span>'}
-        <label>Initial value<input type="text" id="tagDetailInitial" value="${escapeHtml(liveValue !== undefined && liveValue !== null ? String(liveValue) : '')}" /></label>
-        <label>Connection<input type="text" id="tagDetailConnection" value="${escapeHtml(def.connection || '')}" placeholder="PLC tag (PLC_*_Tags only)" /></label>
-      </div>
-      <div class="tag-editor-source-row">
-        <span>Data source:</span>
-        <label class="radio-row"><input type="radio" name="tagDetailSource" value="memory"${dataSource === 'memory' ? ' checked' : ''} /> Memory</label>
-        <label class="radio-row"><input type="radio" name="tagDetailSource" value="device"${dataSource === 'device' ? ' checked' : ''} /> Device</label>
-        <label class="radio-row"><input type="checkbox" id="tagDetailRetentive" disabled /> Retentive</label>
-      </div>`;
+    if (!def) {
+      return `<p class="hint">Select a tag in the grid, or click <strong>New Tag</strong> to create an internal memory tag (e.g. <code>Temp_Tags\\Alarm</code>).</p>`;
+    }
+    if (isInternalTagFolder(def.folder)) {
+      return buildInternalTagDetailForm(def, runtimeTags);
+    }
+    return buildIoTagDetailForm(def, runtimeTags);
   };
 
-  const activeDef = folderDefs.find((d) => d.name === activeTagName) || null;
+  const activeDef = tagsPanelState.mode === 'new' ? null : (folderDefs.find((d) => d.name === activeTagName) || null);
+  tagsPanelState.ctx = { allDefs, folderDefs, activeFolder, activeDef };
+  ensureTagEditorToolbarGlobalWired();
 
   const buildGridRows = () => folderDefs.map((def, idx) => {
     const live = runtimeTags[def.name] || {};
     const desc = tagGridDescription(def, live.value);
     const selected = def.name === tagsPanelState.selected ? ' selected' : '';
-    const typeLabel = def.type === 'string' ? 'String' : (def.type || '');
+    const typeLabel = def.type === 'string' ? 'String' : internalTypeLabel(def.type) || def.type || '';
     return `<tr class="tag-grid-row${selected}" data-tag-name="${escapeHtml(def.name)}">
       <td>${idx + 1}</td>
       <td class="tag-short-name">${escapeHtml(formatFtTagName(def))}</td>
@@ -5687,6 +6733,12 @@ async function openTagsPanel(folderFilter = '', selectedTagName = '') {
   }).join('');
 
   const folderHint = (() => {
+    if (activeFolder === PLC_UPLOADED_TAGS_FOLDER) {
+      return 'Tags transferred from the PLC (RSLogix / Studio 5000 import). Each tag shows as <code>PLC uploded Tags\\</code> + controller tag name. Your manual IO tags stay in <strong>PLC_DI_*</strong> / <strong>Temp_Tags</strong> folders.';
+    }
+    if (isInternalTagFolder(activeFolder)) {
+      return 'Internal HMI tags (FactoryTalk-style). Use toolbar <strong>＋ New tag</strong> or <strong>＋📁 Create folder</strong>. Name: <code>Folder\\TagName</code>. Set <strong>Data Source → Memory</strong> for internal tags.';
+    }
     if (/_No$/i.test(activeFolder)) {
       return 'This folder holds IO <strong>numbers</strong> (1, 2, 3…). Edit text descriptions in the matching <strong>_Discr</strong> folder, and PLC addresses in <strong>_Tags</strong>.';
     }
@@ -5696,23 +6748,34 @@ async function openTagsPanel(folderFilter = '', selectedTagName = '') {
     if (/_Tags$/i.test(activeFolder)) {
       return 'Edit <strong>PLC tag addresses</strong> here (device tags). Descriptions live in <strong>_Discr</strong>.';
     }
-    return 'Select a tag, edit fields above the grid, then click <strong>Apply</strong>. The grid is read-only — use the form above.';
+    return 'Select a tag, edit fields above the grid, then click <strong>Accept</strong>. Use the toolbar for New Tag, folders, and delete.';
   })();
+
+  const buildDetailActionsHtml = (def) => {
+    if (tagsPanelState.mode === 'new' || (def && isInternalTagFolder(def.folder))) {
+      return buildInternalTagDetailActionsHtml();
+    }
+    return `<div class="tag-editor-detail-actions-col" id="tagDetailActions">
+      <button type="button" class="dialog-btn" id="tagDetailPrev"${folderDefs.length < 2 ? ' disabled' : ''}>Prev</button>
+      <button type="button" class="dialog-btn" id="tagDetailNext"${folderDefs.length < 2 ? ' disabled' : ''}>Next</button>
+      <button type="button" class="dialog-btn" id="tagDetailNew"${canManageInternal ? '' : ' disabled'}>New</button>
+      <button type="button" class="dialog-btn primary" id="tagDetailApply"${def ? '' : ' disabled'}>Apply</button>
+      <button type="button" class="dialog-btn" id="tagPanelImportExport">Import/Export…</button>
+      <button type="button" class="dialog-btn" id="tagPanelClear"${allDefs.length ? '' : ' disabled'}>Clear All…</button>
+    </div>`;
+  };
+
+  const ioFolder = isIoSystemFolder(activeFolder);
 
   panelView.innerHTML = `
     <div class="panel-content tag-editor-panel">
-      <h2>Tag Editor</h2>
-      <p class="hint">${folderHint}</p>
+      <div class="tag-editor-toolbar" role="toolbar" aria-label="Tag editor">
+        ${buildTagEditorToolbar(tagsPanelState.ctx)}
+      </div>
+      <h2 class="tag-editor-title">${activeFolder ? escapeHtml(activeFolder) : 'Tag Editor'}</h2>
+      ${folderHint && !ioFolder ? `<p class="hint tag-editor-hint">${folderHint}</p>` : ''}
       <div class="tag-editor-detail" id="tagEditorDetail">
-        ${buildDetailForm(activeDef)}
-        <div class="tag-editor-detail-actions" id="tagDetailActions">
-          <button type="button" class="dialog-btn" id="tagDetailPrev"${folderDefs.length < 2 ? ' disabled' : ''}>Prev</button>
-          <button type="button" class="dialog-btn" id="tagDetailNext"${folderDefs.length < 2 ? ' disabled' : ''}>Next</button>
-          <button type="button" class="dialog-btn" id="tagDetailNew">New</button>
-          <button type="button" class="dialog-btn" id="tagDetailApply">Apply</button>
-          <button type="button" class="dialog-btn" id="tagPanelImportExport">Import/Export…</button>
-          <button type="button" class="dialog-btn" id="tagPanelClear"${allDefs.length ? '' : ' disabled'}>Clear All…</button>
-        </div>
+        ${wrapTagDetailBody(buildDetailForm(activeDef), buildDetailActionsHtml(activeDef))}
       </div>
       <div class="tag-editor-split">
         <div class="tag-folder-tree" id="tagFolderTree">
@@ -5731,33 +6794,68 @@ async function openTagsPanel(folderFilter = '', selectedTagName = '') {
       </div>
     </div>`;
 
-  const selectTag = (name) => {
+  const wireDetailFormExtras = (def) => {
+    wireTagDetailFormInputs();
+    if (tagsPanelState.mode === 'new' || (def && isInternalTagFolder(def.folder))) {
+      wireInternalTagTypeFields();
+    } else if (def && isIoDeviceTag(def)) {
+      document.getElementById('tagDetailBrowse')?.addEventListener('click', () => {
+        if (window.StudioTagTools?.openTagBrowser) {
+          StudioTagTools.openTagBrowser(document.getElementById('tagDetailConnection'));
+        }
+      });
+    }
+  };
+
+  const selectTag = (name, force = false) => {
+    if (!force && name !== tagsPanelState.selected && tagDetailFormIsDirty()) {
+      if (!confirm('You have unsaved tag changes. Switch tag anyway?')) return;
+    }
+    tagsPanelState.mode = 'edit';
     tagsPanelState.selected = name;
     const def = folderDefs.find((d) => d.name === name);
     const detail = document.getElementById('tagEditorDetail');
     if (detail) {
-      detail.innerHTML = `${buildDetailForm(def || null)}
-        <div class="tag-editor-detail-actions" id="tagDetailActions">
-          <button type="button" class="dialog-btn" id="tagDetailPrev"${folderDefs.length < 2 ? ' disabled' : ''}>Prev</button>
-          <button type="button" class="dialog-btn" id="tagDetailNext"${folderDefs.length < 2 ? ' disabled' : ''}>Next</button>
-          <button type="button" class="dialog-btn" id="tagDetailNew">New</button>
-          <button type="button" class="dialog-btn" id="tagDetailApply"${def ? '' : ' disabled'}>Apply</button>
-          <button type="button" class="dialog-btn" id="tagPanelImportExport">Import/Export…</button>
-          <button type="button" class="dialog-btn" id="tagPanelClear"${allDefs.length ? '' : ' disabled'}>Clear All…</button>
-        </div>`;
+      detail.innerHTML = wrapTagDetailBody(buildDetailForm(def || null), buildDetailActionsHtml(def || null));
+      wireDetailFormExtras(def || null);
+      clearTagDetailFormDirty();
     }
     document.querySelectorAll('.tag-grid-row').forEach((row) => {
       row.classList.toggle('selected', row.dataset.tagName === name);
     });
+    tagsPanelState.ctx = { ...tagsPanelState.ctx, activeDef: def || null, folderDefs };
+    updateTagEditorToolbar();
   };
+
+  if (tagsPanelState.detailAbort) tagsPanelState.detailAbort.abort();
+  tagsPanelState.detailAbort = new AbortController();
+  const detailSignal = tagsPanelState.detailAbort.signal;
 
   const wireDetailActions = () => {
     document.getElementById('tagEditorDetail')?.addEventListener('click', (e) => {
       const id = e.target.closest('button')?.id;
       if (!id) return;
       if (id === 'tagDetailApply') saveTagDetailPanel().catch((err) => setStatus(`Error: ${err.message}`));
-      else if (id === 'tagDetailNew') showTagEditDialog(null, activeFolder);
-      else if (id === 'tagDetailPrev') {
+      else if (id === 'tagDetailClose') {
+        if (tagDetailFormIsDirty() && !confirm('You have unsaved tag changes. Close anyway?')) return;
+        panelView.classList.add('hidden');
+        setStatus('Tag Editor closed');
+      } else if (id === 'tagDetailDiscard') {
+        tagsPanelState.mode = 'edit';
+        if (tagsPanelState.selected) selectTag(tagsPanelState.selected, true);
+        else openTagsPanel(tagsPanelState.folder).catch((err) => setStatus(`Error: ${err.message}`));
+      } else if (id === 'tagDetailNew') startNewInternalTagInPanel(activeFolder || 'Temp_Tags');
+      else if (id === 'tagDetailHelp') {
+        alert(
+          'HMI Tag Editor\n\n'
+          + 'Types: Digital, Analog, String (FactoryTalk-style).\n\n'
+          + '• Digital — on/off memory or device tag\n'
+          + '• Analog — Min/Max/Scale/Offset for numeric values\n'
+          + '• String — fixed Length field (default 82)\n\n'
+          + 'Name format: Folder\\TagName (e.g. Temp_Tags\\Alarm)\n'
+          + 'Data Source → Memory for internal tags, Device for PLC addresses.'
+        );
+      } else if (id === 'tagDetailPrev') {
         const idx = folderDefs.findIndex((d) => d.name === tagsPanelState.selected);
         if (idx > 0) selectTag(folderDefs[idx - 1].name);
       } else if (id === 'tagDetailNext') {
@@ -5765,23 +6863,35 @@ async function openTagsPanel(folderFilter = '', selectedTagName = '') {
         if (idx >= 0 && idx < folderDefs.length - 1) selectTag(folderDefs[idx + 1].name);
       } else if (id === 'tagPanelImportExport') showTagWizardDialog();
       else if (id === 'tagPanelClear') clearAllTagsFromProject().catch((err) => setStatus(`Error: ${err.message}`));
-    });
+    }, { signal: detailSignal });
   };
 
   async function saveTagDetailPanel() {
+    if (tagsPanelState.mode === 'new') {
+      await saveInternalTagFromDetail(null);
+      return;
+    }
     const def = folderDefs.find((d) => d.name === tagsPanelState.selected);
     if (!def) return;
-    const type = document.getElementById('tagDetailType')?.value || def.type;
-    const description = document.getElementById('tagDetailDescription')?.value || '';
+    if (isInternalTagFolder(def.folder)) {
+      await saveInternalTagFromDetail(def.name);
+      return;
+    }
+    const typeEl = document.getElementById('tagDetailType');
+    const type = typeEl?.dataset?.type || (typeEl?.tagName === 'SELECT' ? (typeEl.value || def.type) : def.type);
+    const description = document.getElementById('tagDetailDescription')?.value ?? '';
     const initialRaw = document.getElementById('tagDetailInitial')?.value;
+    const connection = document.getElementById('tagDetailConnection')?.value ?? '';
+    const resolved = resolveTagEditorSaveValues(def, type, description, initialRaw, connection);
     const entry = normalizeTagEntry({
       name: def.name,
       type,
-      description,
+      description: resolved.description,
       folder: def.folder || '',
       dataSource: document.querySelector('input[name="tagDetailSource"]:checked')?.value || def.dataSource || 'memory',
-      connection: document.getElementById('tagDetailConnection')?.value || '',
-      initialValue: initialRaw !== undefined && initialRaw !== '' ? initialRaw : description
+      connection: resolved.connection ?? connection,
+      plcAddress: isIoDeviceTag(def) ? (resolved.connection ?? connection) : undefined,
+      initialValue: resolved.initialValue !== undefined ? resolved.initialValue : initialRaw
     });
     if (!entry) {
       alert('Could not save tag.');
@@ -5789,12 +6899,14 @@ async function openTagsPanel(folderFilter = '', selectedTagName = '') {
     }
     const saved = await saveTagToProject(entry, def.name);
     if (!saved) return;
+    clearTagDetailFormDirty();
     setStatus(`Saved tag: ${entry.name}`);
     await openTagsPanel(tagsPanelState.folder, entry.name);
   }
 
   document.querySelectorAll('.tag-folder-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
+      if (tagDetailFormIsDirty() && !confirm('You have unsaved tag changes. Switch folder anyway?')) return;
       openTagsPanel(btn.dataset.folder || '').catch((err) => setStatus(`Error: ${err.message}`));
     });
   });
@@ -5804,10 +6916,23 @@ async function openTagsPanel(folderFilter = '', selectedTagName = '') {
   });
 
   wireDetailActions();
+  wireDetailFormExtras(activeDef);
+  clearTagDetailFormDirty();
+
+  if (activeFolder) highlightExplorerTagFolder(activeFolder);
 
   setStatus(activeFolder
     ? `Tag Editor — ${activeFolder} (${folderDefs.length})`
     : (allDefs.length ? `Tag Editor (${allDefs.length} tags)` : 'Tag Editor — no tags'));
+  } catch (err) {
+    console.error('Tag Editor failed:', err);
+    panelView.innerHTML = `<div class="panel-content tag-editor-panel">
+      <h2>Tag Editor</h2>
+      <p class="hint" style="color:#800">Could not open Tag Editor: ${escapeHtml(err.message)}</p>
+      <p class="hint">Restart the server (<code>npm start</code>) and hard-refresh (Ctrl+F5).</p>
+    </div>`;
+    setStatus(`Tag Editor error: ${err.message}`);
+  }
 }
 
 async function openAlarmsPanel() {
@@ -6204,20 +7329,35 @@ async function openParametersPanel(selectedFile = '') {
     </optgroup>`;
   }).join('');
 
+  const blockSectionLabel = (block) => {
+    if (block === 1) return 'Descriptions — Discr tags (#101–#108)';
+    if (block === 2) return 'IO numbers — No tags (#201–#208)';
+    if (block === 3) return 'PLC connections — Tags (#301–#308)';
+    return `Block #${block}00`;
+  };
+
   const buildTableBody = (name) => {
     const def = merged[name] || {};
     const entries = Object.entries(def.replacements || {}).sort(([a], [b]) => Number(a.slice(1)) - Number(b.slice(1)));
     if (!entries.length) return '<tr><td colspan="2">No mappings</td></tr>';
     let lastBlock = 0;
-    return entries.map(([key, tag]) => {
-      const block = Math.floor(Number(String(key).slice(1)) / 100);
-      const blockStart = block !== lastBlock;
-      lastBlock = block;
-      return `<tr${blockStart ? ' class="param-block-start"' : ''}>
-        <td><code>${escapeHtml(key)}</code></td>
-        <td class="mono"><input type="text" class="param-tag-input" data-placeholder="${escapeHtml(key)}" value="${escapeHtml(formatParamTag(tag))}" spellcheck="false" /></td>
-      </tr>`;
-    }).join('');
+    const rows = [];
+    for (const [key, tag] of entries) {
+      const num = Number(String(key).slice(1));
+      const isListTitle = key === '#100';
+      if (!isListTitle) {
+        const block = num >= 300 ? 3 : num >= 200 ? 2 : 1;
+        if (block !== lastBlock) {
+          rows.push(`<tr class="param-section-row"><td colspan="2">${escapeHtml(blockSectionLabel(block))}</td></tr>`);
+          lastBlock = block;
+        }
+      }
+      rows.push(`<tr class="${isListTitle ? 'param-list-title-row' : ''}">
+        <td><span class="param-placeholder">${escapeHtml(key)}</span></td>
+        <td><input type="text" class="param-tag-input" data-placeholder="${escapeHtml(key)}" value="${escapeHtml(formatParamTag(tag))}" spellcheck="false"${isListTitle ? ' placeholder="List title tag"' : ''} /></td>
+      </tr>`);
+    }
+    return rows.join('');
   };
 
   const collectReplacements = (fileName) => {
@@ -6234,30 +7374,39 @@ async function openParametersPanel(selectedFile = '') {
   panelView.innerHTML = `
     <div class="panel-content parameters-panel">
       <div class="parameters-header">
-        <h2>Parameters</h2>
-        <span class="parameters-count">${names.length} file${names.length === 1 ? '' : 's'}</span>
+        <div>
+          <h2>Parameters</h2>
+          <p class="parameters-subtitle">Map display placeholders to internal HMI tags for the active IO list.</p>
+        </div>
+        <span class="parameters-count">${names.length} list${names.length === 1 ? '' : 's'}</span>
       </div>
-      <div class="alarm-panel-toolbar">
-        <label class="hint">Parameter file
-          <select id="parametersFileSelect" class="studio-select">
-            ${buildFileOptions() || '<option value="">—</option>'}
-          </select>
-        </label>
-        <label class="hint">Add list
-          <select id="parametersAddKind" class="studio-select">
-            <option value="di">PLC DI List</option>
-            <option value="do">PLC DO List</option>
-            <option value="safetyDi">Safety DI List</option>
-            <option value="safetyDo">Safety DO List</option>
-          </select>
-        </label>
-        <button type="button" class="dialog-btn" id="parametersAddBtn">Add List…</button>
-        <button type="button" class="dialog-btn" id="parametersSaveBtn"${activeName ? '' : ' disabled'}>Apply Mappings</button>
-        <button type="button" class="dialog-btn" id="parametersRemoveBtn"${activeName ? '' : ' disabled'}>Remove Selected</button>
+      <div class="parameters-toolbar">
+        <div class="parameters-toolbar-fields">
+          <label class="parameters-field">
+            <span>Parameter file</span>
+            <select id="parametersFileSelect" class="studio-select parameters-file-select">
+              ${buildFileOptions() || '<option value="">—</option>'}
+            </select>
+          </label>
+          <label class="parameters-field parameters-field-add">
+            <span>Add list</span>
+            <select id="parametersAddKind" class="studio-select">
+              <option value="di">PLC DI List</option>
+              <option value="do">PLC DO List</option>
+              <option value="safetyDi">Safety DI List</option>
+              <option value="safetyDo">Safety DO List</option>
+            </select>
+          </label>
+        </div>
+        <div class="parameters-toolbar-actions">
+          <button type="button" class="dialog-btn" id="parametersAddBtn">Add List…</button>
+          <button type="button" class="dialog-btn parameters-btn-remove" id="parametersRemoveBtn"${activeName ? '' : ' disabled'}>Remove</button>
+          <button type="button" class="dialog-btn primary" id="parametersSaveBtn"${activeName ? '' : ' disabled'}>Apply Mappings</button>
+        </div>
       </div>
-      <p class="hint parameters-edit-hint">Edit tag paths below, then click <strong>Apply Mappings</strong>. Edit descriptions and values in <strong>Tag Editor</strong> (HMI Tags).</p>
+      <p class="parameters-edit-hint">Edit tag paths in the table, then click <strong>Apply Mappings</strong>. Change descriptions and values in <strong>Tag Editor</strong> (HMI Tags).</p>
       <div class="parameters-table-wrap">
-        <table class="data-table parameters-table" id="parametersReplacementTable">
+        <table class="parameters-table" id="parametersReplacementTable">
           <thead><tr><th>Placeholder</th><th>Internal HMI Tag</th></tr></thead>
           <tbody>${buildTableBody(activeName)}</tbody>
         </table>
@@ -6273,8 +7422,21 @@ async function openParametersPanel(selectedFile = '') {
     if (removeBtn) removeBtn.disabled = !name;
   };
 
+  const currentParameterFile = () => document.getElementById('parametersFileSelect')?.value || activeName;
+  const parametersSnapshot = () => JSON.stringify(collectReplacements(currentParameterFile()));
+  let parametersCurrentFile = activeName;
+  let parametersSavedSnapshot = parametersSnapshot();
+
   document.getElementById('parametersFileSelect')?.addEventListener('change', (e) => {
+    if (parametersSnapshot() !== parametersSavedSnapshot) {
+      if (!confirm('You have unsaved parameter mappings. Switch file anyway?')) {
+        e.target.value = parametersCurrentFile;
+        return;
+      }
+    }
     renderFile(e.target.value);
+    parametersCurrentFile = e.target.value;
+    parametersSavedSnapshot = parametersSnapshot();
   });
 
   document.getElementById('parametersSaveBtn')?.addEventListener('click', async () => {
@@ -6291,6 +7453,7 @@ async function openParametersPanel(selectedFile = '') {
         }
       );
       setStatus(`Saved mappings: ${name}`);
+      parametersSavedSnapshot = JSON.stringify(replacements);
       await refreshProjectConfig();
       await openParametersPanel(name);
     } catch (err) {
@@ -6786,7 +7949,16 @@ function formatTagImportPreview(parsed) {
   const { tags, stats, format } = parsed;
   const count = tags?.length || 0;
   if (!count) {
-    return { text: 'No importable tags found with current filters.', kind: 'warn' };
+    let hint = 'No importable tags found in this file.';
+    if (format === 'rslogix' && stats) {
+      const skipped = (stats.skippedProgram || 0) + (stats.skippedAlias || 0) + (stats.skippedDatatype || 0);
+      if (skipped) {
+        hint += ` ${skipped} RSLogix rows were skipped (program tags, aliases, or AB: module types). Try unchecking "Controller tags only" or export BOOL/DINT tags.`;
+      }
+    } else {
+      hint += ' Check that the file matches RSLogix CSV, Tag Name/Type/Description CSV, or JSON tag array format.';
+    }
+    return { text: hint, kind: 'warn' };
   }
 
   const parts = [`Found ${count} tag${count === 1 ? '' : 's'}`];
@@ -6798,6 +7970,9 @@ function formatTagImportPreview(parsed) {
     if (detail.length) parts.push(`(${detail.join(', ')})`);
     const skipped = (stats.skippedProgram || 0) + (stats.skippedAlias || 0) + (stats.skippedDatatype || 0);
     if (skipped) parts.push(`— ${skipped} rows skipped`);
+  }
+  if (isPlcImportFormat(format)) {
+    parts.push(`→ "${PLC_UPLOADED_TAGS_FOLDER}" folder`);
   }
   parts.push(`Import ${count}?`);
   return { text: parts.join(' '), kind: 'ok' };
@@ -6833,31 +8008,95 @@ function reparseTagWizardFileFromFilters() {
   });
 }
 
-async function mergeTagsIntoProject(imported, sourceLabel) {
+async function mergeTagsIntoProject(imported, sourceLabel, options = {}) {
   if (!imported?.length) {
     throw new Error('No tags to import.');
+  }
+  const importFormat = options.format || tagWizardState.format || '';
+  const usesPlcFolder = isPlcImportFormat(importFormat)
+    || imported.some((raw) => shouldAssignPlcUploadedFolder(raw, String(raw?.folder || '').trim(), importFormat));
+  if (usesPlcFolder) {
+    await addTagFolderToProject(PLC_UPLOADED_TAGS_FOLDER);
   }
   await refreshProjectConfig();
   const existing = state.projectConfig?.tags || [];
   const byName = new Map(existing.map((t) => [t.name, t]));
   let added = 0;
   let updated = 0;
-  for (const t of imported) {
+  let skippedIo = 0;
+  for (const raw of imported) {
+    const t = normalizeImportedTag(raw, { format: importFormat });
     if (!t?.name) continue;
-    if (byName.has(t.name)) updated += 1;
+    const prev = byName.get(t.name);
+    const ioFolder = isIoSystemFolder(t.folder) || isIoSystemFolder(prev?.folder);
+    if (ioFolder) {
+      skippedIo += 1;
+      continue;
+    }
+    if (prev) updated += 1;
     else added += 1;
-    byName.set(t.name, { ...byName.get(t.name), ...t });
+    byName.set(t.name, { ...prev, ...t });
   }
-  await fetchJson(`/api/projects/${state.activeProject}/config`, {
+  const tags = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tags: [...byName.values()] })
+    body: JSON.stringify({ tags })
   });
   await refreshProjectConfig();
-  const msg = `Imported ${imported.length} tag${imported.length === 1 ? '' : 's'} from ${sourceLabel} (${added} new, ${updated} updated) — ${byName.size} total in project`;
+  await loadExplorer(state.activeProject);
+  const openFolder = usesPlcFolder ? PLC_UPLOADED_TAGS_FOLDER : tagsPanelState.folder;
+  if (panelView?.querySelector('.tag-editor-panel') && !panelView.classList.contains('hidden')) {
+    await openTagsPanel(openFolder, tagsPanelState.selected);
+  } else if (usesPlcFolder && added + updated > 0) {
+    await openTagsPanel(PLC_UPLOADED_TAGS_FOLDER);
+  }
+  let msg = `Imported ${added + updated} tag${added + updated === 1 ? '' : 's'} from ${sourceLabel} (${added} new, ${updated} updated) — ${tags.length} total`;
+  if (usesPlcFolder) msg += ` → folder "${PLC_UPLOADED_TAGS_FOLDER}"`;
+  if (skippedIo) msg += ` — ${skippedIo} IO list tag(s) skipped`;
   setTagWizardStatus(msg, 'ok');
   setStatus(msg);
-  return { added, updated, total: byName.size };
+  return { added, updated, total: tags.length, skippedIo };
+}
+
+function normalizeImportedTag(raw, options = {}) {
+  if (!raw?.name) return null;
+  let name = String(raw.name).trim();
+  let folder = String(raw.folder || '').trim();
+  const format = options.format || '';
+
+  if (!folder && !isPlcImportFormat(format) && !name.includes(':')) {
+    if (globalThis.RsLogixTags?.splitHmiTagName) {
+      const split = RsLogixTags.splitHmiTagName(name);
+      if (split.folder) {
+        name = split.name;
+        folder = split.folder;
+      }
+    } else if (name.includes('.')) {
+      const idx = name.lastIndexOf('.');
+      folder = name.slice(0, idx);
+      name = `${folder}.${name.slice(idx + 1)}`;
+    }
+  }
+
+  if (shouldAssignPlcUploadedFolder(raw, folder, format)) {
+    const shortName = folder && name.startsWith(`${folder}.`)
+      ? name.slice(folder.length + 1)
+      : name;
+    folder = PLC_UPLOADED_TAGS_FOLDER;
+    name = `${folder}.${shortName}`;
+  }
+
+  const plc = String(raw.plcAddress || raw.PLCReference || raw.connection || '').trim();
+  const shortName = name.includes('.') ? name.split('.').pop() : name;
+  return normalizeTagEntry({
+    ...raw,
+    name,
+    folder,
+    connection: raw.connection || plc || shortName,
+    plcAddress: raw.plcAddress || plc || shortName,
+    dataSource: raw.dataSource || (plc || isPlcImportFormat(format) ? 'device' : undefined)
+  });
 }
 
 async function importProjectTagsFromFile() {
@@ -6866,7 +8105,7 @@ async function importProjectTagsFromFile() {
   const label = tagWizardState.fileName || 'file';
   const preview = formatTagImportPreview({ tags, format: tagWizardState.format });
   if (!confirm(`${preview.text}\n\nMerge into project "${state.activeProject}"?`)) return;
-  await mergeTagsIntoProject(tags, label);
+  await mergeTagsIntoProject(tags, label, { format: tagWizardState.format });
 }
 
 async function importProjectTags() {
@@ -6883,17 +8122,13 @@ async function importProjectTags() {
     alert('Expected a JSON array of tag definitions.');
     return;
   }
-  const tags = imported.filter((t) => t?.name).map((t) => ({
-    name: String(t.name),
-    type: String(t.type || 'bool').toLowerCase(),
-    description: String(t.description || t.name)
-  }));
+  const tags = imported.filter((t) => t?.name);
   if (!tags.length) {
     alert('No valid tag entries in JSON.');
     return;
   }
   if (!confirm(`Import ${tags.length} tag${tags.length === 1 ? '' : 's'} into project "${state.activeProject}"?`)) return;
-  await mergeTagsIntoProject(tags, 'JSON paste');
+  await mergeTagsIntoProject(tags, 'JSON paste', { format: 'json' });
 }
 
 const gfxWizardState = { step: 0, preselect: null, targets: [], scope: 'all' };
@@ -7080,7 +8315,27 @@ async function exportProjectTags() {
   a.download = `${state.activeProject}_tags.json`;
   a.click();
   URL.revokeObjectURL(a.href);
-  const msg = `Exported ${tags.length} tags`;
+  const msg = `Exported ${tags.length} tags as JSON`;
+  setTagWizardStatus(msg, 'ok');
+  setStatus(msg);
+}
+
+async function exportProjectTagsCsv() {
+  await refreshProjectConfig();
+  const tags = [...(state.projectConfig?.tags || [])].sort((a, b) => a.name.localeCompare(b.name));
+  const lines = ['Tag Name,Type,Description,PLC Address'];
+  for (const t of tags) {
+    const desc = String(t.description || '').replace(/"/g, '""');
+    const plc = String(t.plcAddress || t.connection || t.alias || '').replace(/"/g, '""');
+    lines.push(`"${t.name}","${t.type}","${desc}","${plc}"`);
+  }
+  const blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${state.activeProject}-Tags.CSV`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  const msg = `Exported ${tags.length} tags as CSV`;
   setTagWizardStatus(msg, 'ok');
   setStatus(msg);
 }
@@ -7777,7 +9032,7 @@ function runExplorerContextAction(action, node) {
       else setStatus('Add Component — select a display folder or display');
       break;
     case 'new-tag':
-      showTagEditDialog(null);
+      openTagsPanel('Temp_Tags', '', { createNew: true }).catch((err) => setStatus(`Error: ${err.message}`));
       break;
     case 'clear-all-tags':
       clearAllTagsFromProject().catch((err) => setStatus(`Error: ${err.message}`));
@@ -8191,6 +9446,12 @@ document.getElementById('exportTagsBtn').addEventListener('click', () => {
     setStatus(`Error: ${err.message}`);
   });
 });
+document.getElementById('exportTagsCsvBtn')?.addEventListener('click', () => {
+  exportProjectTagsCsv().catch((err) => {
+    setTagWizardStatus(`Error: ${err.message}`, 'error');
+    setStatus(`Error: ${err.message}`);
+  });
+});
 document.getElementById('importTagsBtn').addEventListener('click', () => {
   importProjectTags().catch((err) => {
     setTagWizardStatus(`Error: ${err.message}`, 'error');
@@ -8319,6 +9580,7 @@ function runDeferredStudioInits() {
       () => window.StudioShapeProperties?.initShapePropertiesDialog(),
       initAlarmWizardDialog,
       initTagEditDialog,
+      initTagFolderDialog,
       () => { if (window.StudioTagTools) StudioTagTools.wirePickButtons(); },
       initDisplayPickerDialog,
       initGraphicsImportExportWizard
@@ -8365,6 +9627,9 @@ async function init() {
     loadViewPrefs();
     initStartupDialog();
     initStudioEmbedBridge();
+    initTagFolderDialog();
+    initTagEditDialog();
+    ensureTagEditorToolbarGlobalWired();
     applyViewPrefs();
     runWhenIdle(runDeferredStudioInits, 400);
     await loadProjects();

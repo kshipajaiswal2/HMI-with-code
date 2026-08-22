@@ -208,7 +208,6 @@
     const comp = readReturnToButtonForm();
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readReturnToButtonForm, 'applyReturnToButton');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
   }
 

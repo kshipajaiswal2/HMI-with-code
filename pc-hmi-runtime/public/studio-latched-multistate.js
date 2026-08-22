@@ -287,7 +287,6 @@
     }
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readLatchedButtonForm, 'applyLatchedButton');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
   }
 
@@ -607,7 +606,6 @@
     }
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readMultistateButtonForm, 'applyMultistateButton');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
   }
 
@@ -917,7 +915,6 @@
     }
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readInterlockedButtonForm, 'applyInterlockedButton');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
   }
 
@@ -1193,7 +1190,6 @@
     }
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readRampButtonForm, 'applyRampButton');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
   }
 

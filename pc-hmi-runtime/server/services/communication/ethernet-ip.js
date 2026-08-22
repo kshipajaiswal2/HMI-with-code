@@ -1,5 +1,12 @@
 const net = require('net');
-const { EtherIP } = require('st-ethernet-ip');
+const { Controller, TagGroup } = require('st-ethernet-ip');
+const {
+  isSystemTag,
+  collectPollTagNames,
+  createPlcTag,
+  coercePlcValue,
+  coerceWriteValue
+} = require('./plc-tag-utils');
 
 const DEFAULT_PORT = 44818;
 const CONNECT_TIMEOUT_MS = 4000;
@@ -48,154 +55,99 @@ class EthernetIpDriver {
     this.interval = null;
     this.reconnectTimer = null;
     this.plc = null;
-    this.readTags = [];
-    this.writePending = {};
-    this.lastWriteTime = {};
+    this.tagGroup = new TagGroup();
+    this.plcTagMap = new Map();
+    this.pollInFlight = false;
+    this.pollDirty = true;
+    this.sessionId = 0;
+    this.disposed = false;
   }
 
   get ipAddress() {
     return String(this.config.plcIpAddress || '').trim();
   }
 
+  get slot() {
+    const path = String(this.config.path ?? '0').trim();
+    const n = Number(path);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  isActiveSession(sessionId) {
+    return !this.disposed && sessionId === this.sessionId;
+  }
+
   async connect() {
+    this.disposed = false;
+    this.sessionId += 1;
+    const sessionId = this.sessionId;
     this.stopTimers();
     const ip = this.ipAddress;
     if (!ip) {
       this.connected = false;
       this.lastError = 'PLC IP address is not configured';
       this.syncCommTags(false);
-      this.scheduleReconnect();
+      this.scheduleReconnect(sessionId);
       return { connected: false, driver: 'ethernet-ip', error: this.lastError };
     }
 
     try {
-      // Initialize EtherNet/IP controller
-      this.plc = new EtherIP.Controller();
-      this.plc.setEngineMode(0, true); // Slot 0, Backplane
-      
-      // Attempt connection
-      await this.plc.connect(ip, this.config.plcPort || DEFAULT_PORT);
+      if (this.plc) {
+        try { this.plc.destroy?.(); } catch { /* ignore */ }
+        this.plc = null;
+      }
+      this.plc = new Controller();
+      await this.plc.connect(ip, this.slot);
+      if (!this.isActiveSession(sessionId)) {
+        try { this.plc.destroy?.(); } catch { /* ignore */ }
+        return { connected: false, driver: 'ethernet-ip', error: 'Connection superseded' };
+      }
       this.connected = true;
       this.lastError = '';
+      this.pollDirty = true;
       this.syncCommTags(true);
-      
-      // Build read tag list from tag service definitions
-      this.readTags = this.buildReadTagList();
-      
-      // Start polling
-      this.interval = setInterval(() => this.poll(), this.config.pollIntervalMs || 200);
-      
+      await this.refreshPollTags();
+      const pollMs = this.config.pollIntervalMs || 200;
+      this.interval = setInterval(() => {
+        this.poll(sessionId).catch(() => {});
+      }, pollMs);
+      await this.poll(sessionId);
       return {
         connected: true,
         driver: 'ethernet-ip',
         plcIpAddress: ip,
-        path: this.config.path || '0',
-        tagCount: this.readTags.length
+        path: String(this.slot),
+        quality: 'good'
       };
     } catch (err) {
+      if (!this.isActiveSession(sessionId)) {
+        return { connected: false, driver: 'ethernet-ip', error: 'Connection superseded' };
+      }
       this.connected = false;
-      this.lastError = err.message || 'Failed to connect to PLC';
+      this.lastError = err.message || 'PLC connection failed';
       this.syncCommTags(false);
-      this.scheduleReconnect();
-      
+      this.scheduleReconnect(sessionId);
       return {
         connected: false,
         driver: 'ethernet-ip',
         plcIpAddress: ip,
+        path: String(this.slot),
         error: this.lastError
       };
     }
   }
 
-  buildReadTagList() {
-    // Extract all PLC-bound tags that should be read from the controller
-    const tags = [];
-    for (const [tagName, tagDef] of this.tagService.tags.entries()) {
-      // Skip system and computed tags
-      if (!tagName.startsWith('Comm.') && !tagName.startsWith('System.') && 
-          !this.tagLogicService?.isComputed?.(tagName)) {
-        // Use tag name as EtherNet/IP tag reference
-        tags.push(tagName);
-      }
-    }
-    return tags;
-  }
-
-  async poll() {
-    if (!this.connected || !this.plc) return;
-
-    try {
-      // Read tags from PLC
-      if (this.readTags.length > 0) {
-        const values = await this.plc.readTag(this.readTags);
-        if (values && Array.isArray(values.values)) {
-          values.values.forEach((val, idx) => {
-            const tagName = this.readTags[idx];
-            if (val !== undefined && val !== null) {
-              this.tagService.set(tagName, val);
-            }
-          });
-        }
-      }
-
-      // Process any pending writes
-      this.processPendingWrites();
-
-      // Update scan rate
-      this.tagService.set('Comm.ScanRate', this.config.pollIntervalMs || 200);
-
-      if (this.tagLogicService) {
-        this.tagLogicService.evaluate();
-      }
-      this.alarmService?.evaluate?.();
-    } catch (err) {
-      console.error('EtherNet/IP poll error:', err.message);
-      this.connected = false;
-      this.lastError = err.message;
-      this.syncCommTags(false);
-      this.scheduleReconnect();
-    }
-  }
-
-  async processPendingWrites() {
-    const now = Date.now();
-    const tagsToWrite = Object.entries(this.writePending)
-      .filter(([tag, info]) => now - info.time > 50) // Batch writes every 50ms
-      .map(([tag]) => tag);
-
-    if (tagsToWrite.length === 0) return;
-
-    try {
-      const writeOps = tagsToWrite.map(tag => ({
-        tag,
-        value: this.writePending[tag].value
-      }));
-
-      await this.plc.writeTag(writeOps);
-
-      // Clear written tags
-      tagsToWrite.forEach(tag => delete this.writePending[tag]);
-    } catch (err) {
-      console.error('EtherNet/IP write error:', err.message);
-    }
-  }
-
-  writeTagToPLC(tag, value) {
-    if (!this.connected || !this.plc) {
-      throw new Error('PLC not connected');
-    }
-    // Queue write operation
-    this.writePending[tag] = { value, time: Date.now() };
-  }
-
   disconnect() {
+    this.disposed = true;
+    this.sessionId += 1;
     this.stopTimers();
+    this.connected = false;
+    this.plcTagMap.clear();
+    this.tagGroup = new TagGroup();
     if (this.plc) {
-      this.plc.destroy?.();
+      try { this.plc.destroy?.(); } catch { /* ignore */ }
       this.plc = null;
     }
-    this.connected = false;
-    this.writePending = {};
     this.syncCommTags(false);
   }
 
@@ -210,9 +162,11 @@ class EthernetIpDriver {
     }
   }
 
-  scheduleReconnect() {
+  scheduleReconnect(sessionId) {
+    if (this.disposed) return;
     const delay = this.config.reconnectIntervalMs || 5000;
     this.reconnectTimer = setTimeout(() => {
+      if (!this.isActiveSession(sessionId)) return;
       this.connect().catch(() => {});
     }, delay);
   }
@@ -224,21 +178,142 @@ class EthernetIpDriver {
     if (this.alarmService) this.alarmService.evaluate();
   }
 
+  onSubscriptionsChanged() {
+    this.pollDirty = true;
+    if (this.connected && !this.disposed) {
+      this.poll(this.sessionId).catch(() => {});
+    }
+  }
+
+  async refreshPollTags() {
+    const names = collectPollTagNames(this.tagService, this.alarmService, this.tagLogicService);
+    this.tagGroup = new TagGroup();
+    this.plcTagMap.clear();
+    for (const name of names) {
+      try {
+        const plcTag = createPlcTag(this.tagService, name);
+        this.plcTagMap.set(name, plcTag);
+        this.tagGroup.add(plcTag);
+      } catch {
+        /* skip invalid tag names */
+      }
+    }
+    this.pollDirty = false;
+  }
+
+  async poll(sessionId = this.sessionId) {
+    if (!this.isActiveSession(sessionId)) return;
+    if (!this.connected || !this.plc || this.pollInFlight) return;
+    if (this.pollDirty || this.plcTagMap.size === 0) {
+      await this.refreshPollTags();
+    }
+    if (!this.isActiveSession(sessionId) || this.plcTagMap.size === 0) return;
+
+    this.pollInFlight = true;
+    try {
+      await this.plc.readTagGroup(this.tagGroup);
+      if (!this.isActiveSession(sessionId)) return;
+      for (const [name, plcTag] of this.plcTagMap) {
+        const hmiTag = this.tagService.get(name);
+        if (!hmiTag) continue;
+        const value = coercePlcValue(plcTag.value, hmiTag.type);
+        this.tagService.set(name, value, 'good');
+      }
+      this.tagService.set('Comm.PLCConnected', true, 'good');
+      this.tagService.set('Comm.ScanRate', this.config.pollIntervalMs || 200, 'good');
+      if (this.tagLogicService) this.tagLogicService.evaluate();
+      if (this.alarmService) this.alarmService.evaluate();
+    } catch (err) {
+      if (this.isActiveSession(sessionId)) this.handlePollError(err, sessionId);
+    } finally {
+      this.pollInFlight = false;
+    }
+  }
+
+  handlePollError(err, sessionId) {
+    if (!this.isActiveSession(sessionId)) return;
+    this.lastError = err.message || 'PLC poll failed';
+    this.connected = false;
+    for (const name of this.plcTagMap.keys()) {
+      const tag = this.tagService.get(name);
+      if (tag) {
+        tag.quality = 'bad';
+        tag.timestamp = Date.now();
+        this.tagService.emit('change', {
+          name,
+          value: tag.value,
+          quality: 'bad',
+          timestamp: tag.timestamp
+        });
+      }
+    }
+    this.tagService.set('Comm.PLCConnected', false, 'bad');
+    if (this.tagLogicService) this.tagLogicService.evaluate();
+    if (this.alarmService) this.alarmService.evaluate();
+    this.scheduleReconnect(sessionId);
+  }
+
+  async writeTag(name, value) {
+    if (isSystemTag(name)) throw new Error(`${name} is read-only`);
+    if (this.tagLogicService?.isComputed?.(name)) {
+      throw new Error(`${name} is computed and cannot be written`);
+    }
+    const hmiTag = this.tagService.get(name);
+    if (!hmiTag) throw new Error(`Unknown tag: ${name}`);
+    if (!this.connected || !this.plc || this.disposed) throw new Error('PLC not connected');
+
+    let plcTag = this.plcTagMap.get(name);
+    if (!plcTag) {
+      plcTag = createPlcTag(this.tagService, name);
+      this.plcTagMap.set(name, plcTag);
+      this.tagGroup.add(plcTag);
+    }
+
+    try {
+      await this.plc.readTag(plcTag);
+    } catch {
+      /* write may still succeed for atomic types */
+    }
+
+    const writeValue = coerceWriteValue(value, hmiTag.type);
+    plcTag.value = writeValue;
+    await this.plc.writeTag(plcTag);
+    this.tagService.set(name, writeValue, 'good');
+    if (this.tagLogicService) this.tagLogicService.evaluate();
+    if (this.alarmService) this.alarmService.evaluate();
+    return true;
+  }
+
   getStatus() {
     return {
       connected: this.connected,
       driver: 'ethernet-ip',
       plcIpAddress: this.ipAddress || null,
-      path: this.config.path || '0',
+      path: String(this.slot),
       quality: this.connected ? 'good' : 'bad',
       error: this.lastError || undefined,
-      tagCount: this.readTags.length,
-      pendingWrites: Object.keys(this.writePending).length
+      pollTags: this.plcTagMap.size
     };
   }
 
-  static async testConnection(ip, port = DEFAULT_PORT) {
-    return probePlc(ip, port);
+  static async testConnection(ip, port = DEFAULT_PORT, slot = 0) {
+    if (!isValidIpv4(ip)) return { ok: false, error: 'Invalid IP address' };
+    const probe = await probePlc(ip, port);
+    if (!probe.ok) return probe;
+    const plc = new Controller();
+    try {
+      await plc.connect(ip, slot);
+      const props = plc.properties || {};
+      plc.destroy?.();
+      return {
+        ok: true,
+        controller: props.name || 'Connected',
+        version: props.version || undefined
+      };
+    } catch (err) {
+      try { plc.destroy?.(); } catch { /* ignore */ }
+      return { ok: false, error: err.message || 'EtherNet/IP session failed' };
+    }
   }
 }
 

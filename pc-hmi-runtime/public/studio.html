@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Plant HMI Studio</title>
-    <link rel="stylesheet" href="studio.css?v=0.3.13" />
+    <link rel="stylesheet" href="studio.css?v=0.3.26" />
   </head>
   <body>
     <div class="studio-app">
@@ -51,8 +51,8 @@
             <button type="button" class="menu-entry disabled" data-edit-action="undo"><span>Undo</span><span class="shortcut">Ctrl+Z</span></button>
             <button type="button" class="menu-entry disabled" data-edit-action="redo"><span>Redo</span><span class="shortcut">Ctrl+Y</span></button>
             <div class="menu-sep"></div>
-            <button type="button" class="menu-entry disabled" data-edit-action="cut"><span>Cut</span><span class="shortcut">Ctrl+X</span></button>
-            <button type="button" class="menu-entry disabled" data-edit-action="copy"><span>Copy</span><span class="shortcut">Ctrl+C</span></button>
+            <button type="button" class="menu-entry" data-edit-action="cut"><span>Cut</span><span class="shortcut">Ctrl+X</span></button>
+            <button type="button" class="menu-entry" data-edit-action="copy"><span>Copy</span><span class="shortcut">Ctrl+C</span></button>
             <button type="button" class="menu-entry disabled" data-edit-action="paste"><span>Paste</span><span class="shortcut">Ctrl+V</span></button>
             <button type="button" class="menu-entry disabled" data-edit-action="paste-no-strings">Paste without localized strings</button>
             <button type="button" class="menu-entry disabled" data-edit-action="delete"><span>Delete</span></button>
@@ -631,8 +631,8 @@
       </div>
       <div class="dialog-tab-panel active" data-tag-panel="file">
         <div class="runtime-steps tag-wizard-help">
-          <p><strong>Studio 5000 / RSLogix 5000</strong> — In Controller Organizer, right-click <em>Tags</em> → <em>Export</em> → CSV. Browse that file here.</p>
-          <p>Also accepts HMI <code>tags.json</code> or a simple CSV with <code>Tag Name, Type, Description</code> columns.</p>
+          <p><strong>Studio 5000 / RSLogix 5000</strong> — In Controller Organizer, right-click <em>Tags</em> → <em>Export</em> → CSV. Browse that file here. Imported PLC tags are placed in folder <strong>PLC uploded Tags</strong>.</p>
+          <p>Also accepts HMI <code>tags.json</code>, project <code>*-Tags.CSV</code> export, FactoryTalk <code>TagName,PLCReference,DataType</code> CSV, or simple CSV with <code>Tag Name, Type, Description</code> columns.</p>
         </div>
         <div class="tag-wizard-file-row">
           <input type="file" id="tagImportFile" accept=".csv,.json,.txt" class="hidden" />
@@ -654,7 +654,7 @@
         <div class="runtime-steps">
           <p>Paste a JSON array of tag definitions. Tags are merged into the project by name (existing tags are updated).</p>
         </div>
-        <label>Import tags (JSON array)<textarea id="tagImportJson" rows="8" placeholder='[{"name":"My.Tag","type":"bool","description":""}]'></textarea></label>
+        <label>Import tags (JSON array)<textarea id="tagImportJson" rows="8" placeholder='[{"name":"Production.Count","type":"int","plcAddress":"Program:MainProgram.ProductionCount","description":""}]'></textarea></label>
         <p id="tagPastePreview" class="tag-wizard-preview hidden"></p>
         <div class="dialog-actions">
           <button type="button" class="dialog-btn primary" id="importTagsBtn">Import Tags</button>
@@ -662,10 +662,12 @@
       </div>
       <div class="dialog-tab-panel" data-tag-panel="export">
         <div class="runtime-steps">
-          <p><strong>Export tags</strong> — downloads all tag definitions from the active project as <code>&lt;project&gt;_tags.json</code>.</p>
+          <p><strong>Export tags</strong> — download all tag definitions from the active project.</p>
+          <p>CSV matches FactoryTalk <code>*-Tags.CSV</code> layout (Tag Name, Type, Description, PLC Address).</p>
         </div>
         <div class="dialog-actions">
-          <button type="button" class="dialog-btn primary" id="exportTagsBtn">Export Tags</button>
+          <button type="button" class="dialog-btn primary" id="exportTagsCsvBtn">Export Tags CSV</button>
+          <button type="button" class="dialog-btn" id="exportTagsBtn">Export JSON</button>
         </div>
       </div>
       <p id="tagWizardStatus" class="tag-wizard-status" role="status" aria-live="polite"></p>
@@ -678,16 +680,27 @@
       <form id="tagEditForm">
         <h3 id="tagEditTitle">New HMI Tag</h3>
         <fieldset class="ft-fieldset">
-          <label>Tag name<input type="text" id="tagEditName" required maxlength="120" placeholder="e.g. Manual.PumpRun" /></label>
+          <legend>Tag</legend>
+          <label>Name<input type="text" id="tagEditName" required maxlength="120" placeholder="Temp_Tags\\Alarm" /></label>
           <label>Type
             <select id="tagEditType">
-              <option value="bool" selected>bool</option>
-              <option value="int">int</option>
-              <option value="float">float</option>
-              <option value="string">string</option>
+              <option value="bool" selected>Digital</option>
+              <option value="float">Analog</option>
+              <option value="string">String</option>
             </select>
           </label>
           <label>Description<input type="text" id="tagEditDescription" maxlength="200" placeholder="Optional description" /></label>
+          <label id="tagEditFolderWrap">Folder<input type="text" id="tagEditFolder" maxlength="120" placeholder="Temp_Tags" /></label>
+        </fieldset>
+        <fieldset class="ft-fieldset">
+          <legend>Data Source</legend>
+          <label class="radio-row"><input type="radio" name="tagEditSourceKind" value="memory" checked /> Memory (internal HMI tag)</label>
+          <label class="radio-row"><input type="radio" name="tagEditSourceKind" value="device" /> Device (PLC tag)</label>
+          <label>Address<input type="text" id="tagEditConnection" maxlength="255" placeholder="0 or PLC tag path" /></label>
+          <input type="hidden" id="tagEditDataSource" value="memory" />
+          <input type="hidden" id="tagEditPlcAddress" value="" />
+        </fieldset>
+        <fieldset class="ft-fieldset">
           <label class="radio-row"><input type="checkbox" id="tagEditComputed" /> Computed tag (Python expression)</label>
           <label id="tagEditLogicWrap" class="hidden">Logic expression
             <div class="ft-tag-expr-row">
@@ -697,8 +710,26 @@
           </label>
         </fieldset>
         <div class="dialog-actions">
-          <button type="submit" class="dialog-btn primary">OK</button>
-          <button type="button" class="dialog-btn" id="cancelTagEdit">Cancel</button>
+          <button type="submit" class="dialog-btn primary">Accept</button>
+          <button type="button" class="dialog-btn" id="cancelTagEdit">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="tagFolderDialog" class="dialog dialog-ft dialog-tag-folder">
+      <form id="tagFolderForm">
+        <div class="tag-folder-dialog-body">
+          <div class="tag-folder-dialog-fields">
+            <h3>New HMI Tag Folder</h3>
+            <label>Name<input type="text" id="tagFolderName" maxlength="120" placeholder="Temp_Tags" required autocomplete="off" /></label>
+            <p id="tagFolderError" class="tag-folder-error hidden" role="alert"></p>
+            <p class="ft-field-hint">Enter a folder name only (no <code>\</code>). Examples: <code>Temp_Tags</code>, <code>Alarms</code>, <code>Manual</code>.</p>
+          </div>
+          <div class="tag-folder-dialog-actions">
+            <button type="submit" class="dialog-btn primary">OK</button>
+            <button type="button" class="dialog-btn" id="tagFolderCancel">Cancel</button>
+            <button type="button" class="dialog-btn" id="tagFolderHelp">Help</button>
+          </div>
         </div>
       </form>
     </dialog>
@@ -787,10 +818,16 @@
 
     <dialog id="transferDialog" class="dialog dialog-wide">
       <h3>Transfer Utility</h3>
-      <p class="dialog-hint">Deploy the active project to a panel PC or runtime station.</p>
-      <p>Plant HMI transfer packages the <code>projects/&lt;id&gt;/</code> folder. Copy it to the target machine and run <code>npm start</code> or the Electron runtime.</p>
-      <p class="dialog-hint">Automated FTP/USB deployment is planned.</p>
+      <p class="dialog-hint">Deploy the active project to a panel PC as a self-contained runtime package.</p>
+      <label class="dialog-field">
+        <span>Panel destination folder</span>
+        <input type="text" id="transferTargetPath" placeholder="D:\PanelHMI or \\PANEL-PC\Share\PlantHMI" spellcheck="false" />
+      </label>
+      <p class="dialog-hint">Leave blank to build a package only (download ZIP). The package includes runtime + project + start scripts.</p>
+      <div id="transferStatus" class="runtime-comm-status"></div>
       <div class="dialog-actions">
+        <button type="button" class="dialog-btn" id="transferBuildBtn">Build Package</button>
+        <button type="button" class="dialog-btn primary" id="transferDeployBtn">Deploy to Panel</button>
         <button type="button" class="dialog-btn" id="closeTransfer">Close</button>
       </div>
     </dialog>
@@ -2977,7 +3014,7 @@
       </form>
     </dialog>
 
-    <dialog id="multistateIndicatorDialog" class="dialog dialog-ft dialog-maintained-props">
+    <dialog id="multistateIndicatorDialog" class="dialog dialog-ft dialog-maintained-props dialog-multistate-indicator">
       <form id="multistateIndicatorForm">
         <h3>Multistate Indicator Properties</h3>
         <div class="dialog-tabs" role="tablist">
@@ -2989,15 +3026,15 @@
         <div class="dialog-tab-panel active" data-mi-tab-panel="general">
           <fieldset class="ft-fieldset"><legend>Appearance</legend>
             <div class="goto-props-grid">
-              <label>Border style<select id="miBorderStyle"><option value="line">Line</option><option value="raisedInset" selected>RaisedInset</option><option value="raised">Raised</option><option value="none">None</option></select></label>
-              <label>Border width<input type="number" id="miBorderWidth" min="0" max="20" value="1" /></label>
+              <label>Border style<select id="miBorderStyle"><option value="line">Line</option><option value="raisedInset">RaisedInset</option><option value="raised">Raised</option><option value="none" selected>None</option></select></label>
+              <label>Border width<input type="number" id="miBorderWidth" min="0" max="20" value="8" /></label>
               <label>Back style<select id="miBackStyle"><option value="solid" selected>Solid</option><option value="transparent">Transparent</option></select></label>
-              <label>Shape<select id="miShape"><option value="rectangle" selected>Rectangle</option><option value="circle">Circle</option></select></label>
+              <label>Shape<select id="miShape"><option value="rectangle">Rectangle</option><option value="circle" selected>Circle</option></select></label>
             </div>
             <label class="color-check-row"><input type="checkbox" id="miBorderUsesBackColor" checked /> Border uses back color</label>
           </fieldset>
           <fieldset class="ft-fieldset"><legend>State settings</legend>
-            <label>Number of states<select id="miNumberOfStates"><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
+            <label>Number of states<select id="miNumberOfStates"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
             <label>Trigger type<select id="miTriggerType"><option value="value" selected>Value</option></select></label>
           </fieldset>
         </div>
@@ -3005,7 +3042,7 @@
           <div class="ft-states-layout">
             <div class="ft-states-sidebar">
               <label class="ft-states-list-label">Select state:</label>
-              <select id="miStateSelect" class="ft-states-list" size="6"></select>
+              <select id="miStateSelect" class="ft-states-list" size="7"></select>
               <div class="ft-states-copy-row ft-states-mgmt-row">
                 <button type="button" class="dialog-btn" id="miInsertState">Insert State</button>
                 <button type="button" class="dialog-btn" id="miDeleteState">Delete State</button>
@@ -3029,16 +3066,20 @@
               </fieldset>
               <fieldset class="ft-fieldset"><legend>Caption</legend>
                 <textarea id="miStateCaption" rows="3" class="text-props-caption"></textarea>
-                <button type="button" class="dialog-btn ft-insert-var-btn" id="miInsertVariable" disabled>Insert Variable…</button>
+                <button type="button" class="dialog-btn ft-insert-var-btn" id="miInsertVariable">Insert Variable…</button>
                 <div class="text-props-font-row">
-                  <label>Font<select id="miFont"><option>Tahoma</option><option>Arial</option><option>Arial Unicode MS</option><option>Segoe UI</option></select></label>
+                  <label>Font<select id="miFont"><option selected>Tahoma</option><option>Arial</option><option>Arial Unicode MS</option><option>Segoe UI</option></select></label>
                   <label>Size<select id="miFontSize"><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="12">12</option><option value="13" selected>13</option><option value="14">14</option></select></label>
-                  <div class="text-style-btns"><button type="button" class="text-style-btn" id="miBold">B</button><button type="button" class="text-style-btn" id="miItalic"><em>I</em></button><button type="button" class="text-style-btn" id="miUnderline"><u>U</u></button></div>
+                  <div class="text-style-btns"><button type="button" class="text-style-btn active" id="miBold">B</button><button type="button" class="text-style-btn" id="miItalic"><em>I</em></button><button type="button" class="text-style-btn" id="miUnderline"><u>U</u></button></div>
                 </div>
-                <label class="color-check-row"><input type="checkbox" id="miStateUseCaptionColor" checked /> Caption color<input type="hidden" class="ft-color-input" id="miStateCaptionColor" value="#ffffff" /></label>
-                <label class="color-check-row"><input type="checkbox" id="miStateUseCaptionBackColor" /> Caption back color<input type="hidden" class="ft-color-input" id="miStateCaptionBackColor" value="#001C38" /></label>
-                <label class="radio-row"><input type="checkbox" id="miStateCaptionBlink" /> Caption blink</label>
-                <label class="radio-row"><input type="checkbox" id="miStateWordWrap" checked /> Word wrap</label>
+                <div class="ft-caption-color-row">
+                  <label class="color-check-row"><input type="checkbox" id="miStateUseCaptionColor" checked /> Caption color<input type="hidden" class="ft-color-input" id="miStateCaptionColor" value="#ffffff" /></label>
+                  <label class="color-check-row"><input type="checkbox" id="miStateUseCaptionBackColor" /> Caption back color<input type="hidden" class="ft-color-input" id="miStateCaptionBackColor" value="#001C38" /></label>
+                </div>
+                <div class="ft-caption-options-row">
+                  <label class="radio-row"><input type="checkbox" id="miStateCaptionBlink" /> Caption blink</label>
+                  <label class="radio-row"><input type="checkbox" id="miStateWordWrap" checked /> Word wrap</label>
+                </div>
                 <label>Caption back style<select id="miStateCaptionBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
                 <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
                   <div class="text-align-grid mi-state-align-grid">
@@ -3056,10 +3097,14 @@
               </fieldset>
               <fieldset class="ft-fieldset"><legend>Image settings</legend>
                 <label class="browse-row">Image<input type="text" id="miStateImage" placeholder="Browse image…" /><button type="button" class="dialog-btn" id="miBrowseStateImage">…</button></label>
-                <label class="color-check-row"><input type="checkbox" id="miStateUseImageColor" /> Image color<input type="hidden" class="ft-color-input" id="miStateImageColor" value="#ffffff" /></label>
-                <label class="color-check-row"><input type="checkbox" id="miStateUseImageBackColor" /> Image back color<input type="hidden" class="ft-color-input" id="miStateImageBackColor" value="#001C38" /></label>
-                <label class="radio-row"><input type="checkbox" id="miStateImageBlink" /> Image blink</label>
-                <label class="radio-row"><input type="checkbox" id="miStateImageScaled" /> Image scaled</label>
+                <div class="ft-caption-color-row">
+                  <label class="color-check-row"><input type="checkbox" id="miStateUseImageColor" /> Image color<input type="hidden" class="ft-color-input" id="miStateImageColor" value="#ffffff" /></label>
+                  <label class="color-check-row"><input type="checkbox" id="miStateUseImageBackColor" /> Image back color<input type="hidden" class="ft-color-input" id="miStateImageBackColor" value="#001C38" /></label>
+                </div>
+                <div class="ft-caption-options-row">
+                  <label class="radio-row"><input type="checkbox" id="miStateImageBlink" /> Image blink</label>
+                  <label class="radio-row"><input type="checkbox" id="miStateImageScaled" /> Image scaled</label>
+                </div>
                 <label>Image back style<select id="miStateImageBackStyle"><option value="transparent" selected>Transparent</option><option value="solid">Solid</option></select></label>
                 <fieldset class="ft-fieldset text-align-fieldset"><legend>Alignment</legend>
                   <div class="text-align-grid mi-state-image-align-grid">
@@ -3079,7 +3124,7 @@
           </div>
         </div>
         <div class="dialog-tab-panel" data-mi-tab-panel="common">
-          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="miHeight" value="33" /></label><label>Width<input type="number" id="miWidth" value="71" /></label></div></fieldset>
+          <fieldset class="ft-fieldset"><legend>Size</legend><div class="ps-size-row"><label>Height<input type="number" id="miHeight" value="24" /></label><label>Width<input type="number" id="miWidth" value="24" /></label></div></fieldset>
           <fieldset class="ft-fieldset"><legend>Position</legend><div class="ps-size-row"><label>Top<input type="number" id="miTop" value="16" /></label><label>Left<input type="number" id="miLeft" value="16" /></label></div></fieldset>
           <fieldset class="ft-fieldset"><legend>Other</legend>
             <label>Name<input type="text" id="miName" value="MultistateIndicator1" /></label>
@@ -3609,27 +3654,32 @@
               <label>Pattern style
                 <select id="spPatternStyle">
                   <option value="none" selected>None</option>
+                  <option value="horizontal">Horizontal</option>
+                  <option value="vertical">Vertical</option>
+                  <option value="cross">Cross</option>
+                  <option value="50Percent">50 Percent</option>
                 </select>
               </label>
             </div>
             <div class="shape-props-colors">
-              <label class="color-check-row shape-props-color-row">
-                <input type="checkbox" id="spUseForeColor" checked /> Fore color
+              <div class="color-check-row shape-props-color-row">
+                <label class="shape-props-color-label"><input type="checkbox" id="spUseForeColor" checked /> Fore color</label>
                 <input type="hidden" class="ft-color-input" id="spForeColor" value="#c6c6c6" />
-              </label>
-              <label class="color-check-row shape-props-color-row">
-                <input type="checkbox" id="spUseBackColor" checked /> Back color
-                <input type="hidden" class="ft-color-input" id="spBackColor" value="#c6c6c6" />
-              </label>
-              <label class="color-check-row shape-props-color-row">
-                <input type="checkbox" id="spUsePatternColor" /> Pattern color
+              </div>
+              <div class="color-check-row shape-props-color-row">
+                <label class="shape-props-color-label"><input type="checkbox" id="spUseBackColor" checked /> Back color</label>
+                <input type="hidden" class="ft-color-input" id="spBackColor" value="#ffffff" />
+              </div>
+              <div class="color-check-row shape-props-color-row">
+                <label class="shape-props-color-label"><input type="checkbox" id="spUsePatternColor" /> Pattern color</label>
                 <input type="hidden" class="ft-color-input" id="spPatternColor" value="#ffffff" />
-              </label>
+              </div>
+              <p class="ft-field-hint" id="spForeColorHint">Fore color is the border only. With line width 0, change <strong>Back color</strong> for the fill.</p>
               <div id="spGradientExtras" class="shape-props-gradient-extra hidden">
-                <label class="color-check-row shape-props-color-row" id="spEndColorRow">
-                  End color
+                <div class="color-check-row shape-props-color-row" id="spEndColorRow">
+                  <span class="shape-props-color-label">End color</span>
                   <input type="hidden" class="ft-color-input" id="spEndColor" value="#e8e8e8" />
-                </label>
+                </div>
                 <label id="spGradientStopRow">Gradient stop
                   <input type="number" id="spGradientStop" min="0" max="100" value="95" />
                 </label>
@@ -3811,12 +3861,12 @@
       </div>
     </dialog>
 
-    <script src="template-compose.js?v=0.2.8"></script>
+    <script src="template-compose.js?v=0.2.13"></script>
     <script src="studio-objects-menu.js?v=0.3.9"></script>
-    <script src="studio-color-picker.js?v=0.2.5"></script>
-    <script src="rslogix-tags.js?v=0.1.0"></script>
+    <script src="studio-color-picker.js?v=0.3.1"></script>
+    <script src="rslogix-tags.js?v=0.1.1"></script>
     <script src="expression-eval.js?v=0.1.0"></script>
-    <script src="studio-tag-tools.js?v=0.1.1"></script>
+    <script src="studio-tag-tools.js?v=0.1.2"></script>
     <script src="studio-numeric-input.js?v=0.1.1"></script>
     <script src="studio-numeric-display.js?v=0.1.0"></script>
     <script src="studio-string-display.js?v=0.1.0"></script>
@@ -3825,15 +3875,15 @@
     <script src="studio-return-button.js?v=0.1.0"></script>
     <script src="studio-close-button.js?v=0.1.0"></script>
     <script src="studio-display-list-selector.js?v=0.1.0"></script>
-    <script src="studio-multistate-indicator.js?v=0.1.6"></script>
+    <script src="studio-multistate-indicator.js?v=0.1.7"></script>
     <script src="studio-symbol-indicator.js?v=0.1.0"></script>
     <script src="studio-list-indicator.js?v=0.1.0"></script>
     <script src="studio-bar-graph.js?v=0.1.0"></script>
     <script src="studio-recipeplus-button.js?v=0.1.0"></script>
     <script src="studio-recipeplus-selector.js?v=0.1.0"></script>
-    <script src="studio-communications-setup.js?v=0.1.1"></script>
+    <script src="studio-communications-setup.js?v=0.1.2"></script>
     <script src="studio-latched-multistate.js?v=0.1.2"></script>
-    <script src="studio-shape-properties.js?v=0.1.3"></script>
-    <script src="studio.js?v=0.5.37"></script>
+    <script src="studio-shape-properties.js?v=0.1.8"></script>
+    <script src="studio.js?v=0.5.65"></script>
   </body>
 </html>

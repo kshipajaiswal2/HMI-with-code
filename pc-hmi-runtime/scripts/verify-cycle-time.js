@@ -1,9 +1,9 @@
-/** Verify 304_Cycle_Time compose + placeholder formatting */
+/** Verify 305_Cycle_Time compose + placeholder formatting */
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const screen = JSON.parse(fs.readFileSync(path.join(__dirname, '../screens/304_Cycle_Time.json'), 'utf8'));
+const screen = JSON.parse(fs.readFileSync(path.join(__dirname, '../screens/305_Cycle_Time.json'), 'utf8'));
 const templateComposeSrc = fs.readFileSync(path.join(__dirname, '../public/template-compose.js'), 'utf8');
 const registrySrc = fs.readFileSync(path.join(__dirname, '../public/components/registry.js'), 'utf8');
 
@@ -32,11 +32,11 @@ const footer = screen.components.find((c) => c.caption === 'All Parameters In se
 const samplePlaceholder = numericDisplayPlaceholder(nums[0]);
 
 const composed = composeScreen(screen, { components: [{ name: 'FooterBar', top: 500 }] }, {});
-const hasManualNav = composed.components.some((c) => c.name === 'ManualNav_304_Cycle_Time');
+const hasManualNav = composed.components.some((c) => c.name === 'ManualNav_305_Cycle_Time');
 
 const checks = [
   ['nav item count', navLabels.length === 5, navLabels.join(', ')],
-  ['active nav Cycle Time', activeNav?.target === '304_Cycle_Time', activeNav?.target],
+  ['active nav Cycle Time', activeNav?.target === '305_Cycle_Time', activeNav?.target],
   ['subtitle Cycle Time', subtitle?.caption === 'Cycle Time', subtitle?.caption],
   ['8 column headers', headers.length === 8, headers.length],
   ['152 numeric cells', nums.length === 152, nums.length],

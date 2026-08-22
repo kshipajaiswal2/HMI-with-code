@@ -10,12 +10,12 @@ window.OBJECTS_MENU = [
       { id: 'draw-panel', label: 'Panel', component: { type: 'Panel', style: { className: 'panel-box' }, children: [] } },
       { sep: true },
       { id: 'draw-arc', label: 'Arc', planned: true },
-      { id: 'draw-ellipse', label: 'Ellipse', planned: true },
+      { id: 'draw-ellipse', label: 'Ellipse', action: 'ellipse-properties' },
       { id: 'draw-freehand', label: 'Freehand', planned: true },
       { id: 'draw-line', label: 'Line', planned: true },
       { id: 'draw-polygon', label: 'Polygon', planned: true },
       { id: 'draw-polyline', label: 'Polyline', planned: true },
-      { id: 'draw-rectangle', label: 'Rectangle', planned: true },
+      { id: 'draw-rectangle', label: 'Rectangle', action: 'rectangle-properties' },
       { id: 'draw-rounded-rect', label: 'Rounded Rectangle', planned: true },
       { id: 'draw-wedge', label: 'Wedge', planned: true }
     ]

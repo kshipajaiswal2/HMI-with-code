@@ -9,6 +9,25 @@
     return document.getElementById(id);
   }
 
+  function formatFtTagRef(tagName) {
+    const s = String(tagName || '').trim();
+    if (!s) return '';
+    if (s.startsWith('PLC uploded Tags.')) return `{[PLC]${s.slice('PLC uploded Tags.'.length)}}`;
+    return s;
+  }
+
+  function parseFtTagRef(ref) {
+    const s = String(ref || '').trim();
+    const m = s.match(/^\{\[PLC\](.+)\}$/);
+    if (!m) return { tag: s };
+    const inner = m[1];
+    const bitMatch = inner.match(/^(.+)\.(\d+)$/);
+    if (bitMatch) {
+      return { tag: `PLC uploded Tags.${bitMatch[1]}`, bit: Number(bitMatch[2]) };
+    }
+    return { tag: `PLC uploded Tags.${inner}` };
+  }
+
   async function loadProjectTags() {
     const project = window.StudioState?.activeProject;
     if (!project) return [];
@@ -232,7 +251,14 @@
     wirePickButtons();
   }
 
-  window.StudioTagTools = { init, openTagBrowser, openExpressionEditor, wirePickButtons };
+  window.StudioTagTools = {
+    init,
+    openTagBrowser,
+    openExpressionEditor,
+    wirePickButtons,
+    formatFtTagRef,
+    parseFtTagRef
+  };
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

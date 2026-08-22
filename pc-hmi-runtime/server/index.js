@@ -569,7 +569,8 @@ app.get('/api/runtime/global-objects/:id', (req, res) => {
   res.json(obj);
 });
 
-app.get('/api/runtime/tags', (_req, res) => {
+app.get('/api/runtime/tags', async (req, res) => {
+  await ensureRuntimeLoaded(req);
   res.json(tagService.getAll());
 });
 

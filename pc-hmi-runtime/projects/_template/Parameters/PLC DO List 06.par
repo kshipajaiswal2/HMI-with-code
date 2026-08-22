@@ -1,0 +1,32 @@
+!================================================
+! Parameter File
+! Name: PLC DO List 06
+! Syntax: #replacement=tagname
+! List 6 — Data_40…Data_47
+!================================================
+
+#100={PLC_DO_Discr\List_06}
+#101={PLC_DO_Discr\Data_40}
+#102={PLC_DO_Discr\Data_41}
+#103={PLC_DO_Discr\Data_42}
+#104={PLC_DO_Discr\Data_43}
+#105={PLC_DO_Discr\Data_44}
+#106={PLC_DO_Discr\Data_45}
+#107={PLC_DO_Discr\Data_46}
+#108={PLC_DO_Discr\Data_47}
+#201={PLC_DO_No\Data_40}
+#202={PLC_DO_No\Data_41}
+#203={PLC_DO_No\Data_42}
+#204={PLC_DO_No\Data_43}
+#205={PLC_DO_No\Data_44}
+#206={PLC_DO_No\Data_45}
+#207={PLC_DO_No\Data_46}
+#208={PLC_DO_No\Data_47}
+#301={PLC_DO_Tags\Data_40}
+#302={PLC_DO_Tags\Data_41}
+#303={PLC_DO_Tags\Data_42}
+#304={PLC_DO_Tags\Data_43}
+#305={PLC_DO_Tags\Data_44}
+#306={PLC_DO_Tags\Data_45}
+#307={PLC_DO_Tags\Data_46}
+#308={PLC_DO_Tags\Data_47}

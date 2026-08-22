@@ -283,7 +283,6 @@
     if (!validateListIndicator(comp)) return;
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readListIndicatorForm, 'applyListIndicator');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
   }
 

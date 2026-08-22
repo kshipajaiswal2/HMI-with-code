@@ -283,7 +283,6 @@
     if (!validateDisplayListSelector(comp)) return;
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readDisplayListSelectorForm, 'applyDisplayListSelector');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
   }
 

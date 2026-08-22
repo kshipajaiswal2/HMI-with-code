@@ -91,7 +91,6 @@
     const comp = readTimeDateDisplayForm();
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readTimeDateDisplayForm, 'applyTimeDateDisplay');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name}`);
   }
 

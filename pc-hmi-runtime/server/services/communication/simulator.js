@@ -71,7 +71,21 @@ class SimulatorDriver {
       this.tagLogicService.evaluate();
     }
 
+    this.tagService.syncConnections();
     this.alarmService.evaluate();
+  }
+
+  writeTag(name, value) {
+    const { isSystemTag } = require('./plc-tag-utils');
+    if (isSystemTag(name)) throw new Error(`${name} is read-only`);
+    if (this.tagLogicService?.isComputed?.(name)) {
+      throw new Error(`${name} is computed and cannot be written`);
+    }
+    const ok = this.tagService.set(name, value);
+    if (!ok) throw new Error(`Unknown tag: ${name}`);
+    if (this.tagLogicService) this.tagLogicService.evaluate();
+    if (this.alarmService) this.alarmService.evaluate();
+    return true;
   }
 
   getStatus() {
@@ -79,7 +93,8 @@ class SimulatorDriver {
       connected: this.connected,
       driver: 'simulator',
       plcIpAddress: this.config.plcIpAddress || null,
-      quality: 'good'
+      quality: 'good',
+      mode: 'simulator'
     };
   }
 }

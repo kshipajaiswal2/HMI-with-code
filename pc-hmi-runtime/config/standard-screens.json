@@ -12,14 +12,15 @@
     { "id": "301_PLC_IO_List", "folder": "300_Manual_Operation", "title": "PLC IO List", "navGroup": "manual" },
     { "id": "302_PLC_Architecture", "folder": "300_Manual_Operation", "title": "PLC Architecture", "navGroup": "manual" },
     { "id": "303_Run_Count", "folder": "300_Manual_Operation", "title": "Run Count", "navGroup": "manual" },
-    { "id": "304_Cycle_Time", "folder": "300_Manual_Operation", "title": "Cycle Time", "navGroup": "manual" },
-    { "id": "305_Network", "folder": "300_Manual_Operation", "title": "Network", "navGroup": "manual" },
+    { "id": "304_Network", "folder": "300_Manual_Operation", "title": "Network", "navGroup": "manual" },
+    { "id": "305_Cycle_Time", "folder": "300_Manual_Operation", "title": "Cycle Time", "navGroup": "manual" },
     { "id": "400_Active_Alarms", "folder": "400_Active_Alarms", "title": "Active Alarms", "navGroup": "alarms" },
     { "id": "401_Alarm_History", "folder": "400_Active_Alarms", "title": "Alarm History", "navGroup": "alarms" },
     { "id": "402_Alarm_Remedies_Popup", "folder": "400_Active_Alarms", "title": "Alarm Remedies", "navGroup": "alarms" },
     { "id": "500_Recipe", "folder": "500_Recipe", "title": "Recipe", "navGroup": "recipe" },
     { "id": "500_Recipe_1", "folder": "500_Recipe", "title": "Recipe Detail", "navGroup": "recipe" },
     { "id": "600_Legends", "folder": "600_Legends", "title": "Legends", "navGroup": "legends" },
-    { "id": "800_UserManagement", "folder": "800_UserManagement", "title": "User Management", "navGroup": "users" }
+    { "id": "601_Sequence", "folder": "601_Sequence", "title": "Sequence", "navGroup": "sequence" },
+    { "id": "700_User_Management", "folder": "700_User_Management", "title": "User Management", "navGroup": "users" }
   ]
 }

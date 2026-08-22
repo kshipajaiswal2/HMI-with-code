@@ -211,7 +211,6 @@
     const comp = readRecipePlusButtonForm();
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readRecipePlusButtonForm, 'applyRecipePlusButton');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
   }
 

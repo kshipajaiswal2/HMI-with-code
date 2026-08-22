@@ -1,10 +1,47 @@
 /** Rectangle / Ellipse (Polygon) property dialogs — FactoryTalk-style */
 (function () {
   let editingType = 'Rectangle';
+  let shapePreviewTimer = null;
+
+  function scheduleShapeLivePreview() {
+    if (window.state?.propsFormFill) return;
+    if (shapePreviewTimer) clearTimeout(shapePreviewTimer);
+    shapePreviewTimer = setTimeout(() => {
+      shapePreviewTimer = null;
+      const comp = readShapePropertiesForm();
+      if (comp.name && window.previewPatchByName) {
+        window.previewPatchByName(comp.name, comp);
+      }
+      window.updatePropsApplyButton?.(readShapePropertiesForm, 'applyShapeProperties');
+    }, 100);
+  }
+
+  function notifyShapeFormChange() {
+    scheduleShapeLivePreview();
+    window.flushPropsApplyButton?.(readShapePropertiesForm, 'applyShapeProperties');
+    window.updatePropsApplyButton?.(readShapePropertiesForm, 'applyShapeProperties');
+  }
+
+  function wireColorInputs() {
+    document.querySelectorAll('#shapePropertiesForm .ft-color-input').forEach((input) => {
+      if (input.dataset.spColorWired === '1') return;
+      input.dataset.spColorWired = '1';
+      input.addEventListener('input', notifyShapeFormChange);
+      input.addEventListener('change', notifyShapeFormChange);
+    });
+  }
 
   function titleForType(type) {
     if (type === 'Ellipse') return 'Ellipse Properties';
     return 'Polygon Properties';
+  }
+
+  function syncForeColorHint() {
+    const lineW = Number(document.getElementById('spLineWidth')?.value) || 0;
+    const hint = document.getElementById('spForeColorHint');
+    if (hint) {
+      hint.classList.toggle('hidden', lineW > 0);
+    }
   }
 
   function switchTab(tabId) {
@@ -26,11 +63,6 @@
   }
 
   function syncShapeTypeFields() {
-    const isEllipse = editingType === 'Ellipse';
-    const backStyle = document.getElementById('spBackStyle');
-    const gradientOpt = backStyle?.querySelector('option[value="gradient"]');
-    if (gradientOpt) gradientOpt.hidden = isEllipse;
-    if (isEllipse && backStyle?.value === 'gradient') backStyle.value = 'solid';
     syncGradientFields();
   }
 
@@ -43,39 +75,69 @@
   }
 
   function wireTools() {
-    if (window.FtColorPicker) window.FtColorPicker.initAll(document.getElementById('shapePropertiesDialog'));
+    const dialog = document.getElementById('shapePropertiesDialog');
+    if (window.FtColorPicker) {
+      window.FtColorPicker.initAllSync(dialog);
+      window.FtColorPicker.refreshAll(dialog);
+    }
+    wireColorInputs();
     syncColorFields();
+    syncForeColorHint();
+    if (window.FtColorPicker) window.FtColorPicker.refreshAll(dialog);
   }
 
   function fillShapePropertiesForm(comp) {
-    editingType = comp.type === 'Ellipse' ? 'Ellipse' : 'Rectangle';
-    document.getElementById('shapePropertiesTitle').textContent = titleForType(editingType);
-    const isEllipse = editingType === 'Ellipse';
-    document.getElementById('spLineStyle').value = comp.lineStyle || 'solid';
-    document.getElementById('spBackStyle').value = comp.backStyle || (isEllipse ? 'solid' : 'gradient');
-    document.getElementById('spPatternStyle').value = comp.patternStyle || 'none';
-    document.getElementById('spUseForeColor').checked = comp.useForeColor !== false;
-    document.getElementById('spForeColor').value = comp.foreColor || comp.borderColor || (isEllipse ? '#10EB10' : '#c6c6c6');
-    document.getElementById('spUseBackColor').checked = comp.useBackColor !== false;
-    document.getElementById('spBackColor').value = comp.backColor || (isEllipse ? '#10EB10' : '#c6c6c6');
-    document.getElementById('spEndColor').value = comp.endColor || '#e8e8e8';
-    document.getElementById('spGradientStop').value = comp.gradientStop ?? 95;
-    document.getElementById('spGradientDir').value = comp.gradientShadingStyle || comp.gradientDirection || 'gradientHorizontalFromRight';
-    document.getElementById('spUsePatternColor').checked = Boolean(comp.usePatternColor);
-    document.getElementById('spPatternColor').value = comp.patternColor || '#ffffff';
-    document.getElementById('spLineWidth').value = comp.lineWidth ?? comp.borderWidth ?? (isEllipse ? 1 : 2);
-    document.getElementById('spHeight').value = comp.height ?? 34;
-    document.getElementById('spWidth').value = comp.width ?? 262;
-    document.getElementById('spTop').value = comp.top ?? 0;
-    document.getElementById('spLeft').value = comp.left ?? 0;
-    document.getElementById('spName').value = comp.name || (editingType === 'Ellipse' ? 'Ellipse1' : 'Rectangle1');
-    document.getElementById('spVisible').checked = comp.visible !== false;
-    syncShapeTypeFields();
-    syncColorFields();
+    if (window.state) window.state.propsFormFill = true;
+    try {
+      editingType = comp.type === 'Ellipse' ? 'Ellipse' : 'Rectangle';
+      document.getElementById('shapePropertiesTitle').textContent = titleForType(editingType);
+      const isEllipse = editingType === 'Ellipse';
+      document.getElementById('spLineStyle').value = comp.lineStyle || 'solid';
+      document.getElementById('spBackStyle').value = comp.backStyle || (isEllipse ? 'solid' : 'solid');
+      document.getElementById('spPatternStyle').value = comp.patternStyle || 'none';
+      document.getElementById('spUseForeColor').checked = comp.useForeColor !== false;
+      setColorFieldValue('spForeColor', comp.foreColor || comp.borderColor || (isEllipse ? '#10EB10' : '#c6c6c6'));
+      document.getElementById('spUseBackColor').checked = comp.useBackColor !== false;
+      setColorFieldValue('spBackColor', comp.backColor || (isEllipse ? '#10EB10' : '#ffffff'));
+      setColorFieldValue('spEndColor', comp.endColor || '#e8e8e8');
+      document.getElementById('spGradientStop').value = comp.gradientStop ?? 95;
+      document.getElementById('spGradientDir').value = comp.gradientShadingStyle || comp.gradientDirection || 'gradientHorizontalFromRight';
+      document.getElementById('spUsePatternColor').checked = Boolean(comp.usePatternColor);
+      setColorFieldValue('spPatternColor', comp.patternColor || '#ffffff');
+      document.getElementById('spLineWidth').value = comp.lineWidth ?? comp.borderWidth ?? (isEllipse ? 1 : 2);
+      document.getElementById('spHeight').value = comp.height ?? 34;
+      document.getElementById('spWidth').value = comp.width ?? 262;
+      document.getElementById('spTop').value = comp.top ?? 0;
+      document.getElementById('spLeft').value = comp.left ?? 0;
+      document.getElementById('spName').value = comp.name || (editingType === 'Ellipse' ? 'Ellipse1' : 'Rectangle1');
+      document.getElementById('spVisible').checked = comp.visible !== false;
+      syncShapeTypeFields();
+      syncColorFields();
+      syncForeColorHint();
+    } finally {
+      if (window.state) window.state.propsFormFill = false;
+    }
+  }
+
+  function setColorFieldValue(id, raw) {
+    const input = document.getElementById(id);
+    if (!input) return;
+    if (window.FtColorPicker?.setValueSilent) {
+      window.FtColorPicker.setValueSilent(input, raw);
+    } else {
+      input.value = raw;
+    }
+  }
+
+  function getColorFieldValue(id) {
+    const input = document.getElementById(id);
+    if (!input) return '#000000';
+    return window.FtColorPicker?.getInputColor?.(input) ?? input.value;
   }
 
   function readShapePropertiesForm() {
     const backStyle = document.getElementById('spBackStyle').value;
+    const norm = window.FtColorPicker?.normalizeColor || ((v) => v);
     const comp = {
       type: editingType,
       name: document.getElementById('spName').value.trim() || (editingType === 'Ellipse' ? 'Ellipse1' : 'Rectangle1'),
@@ -88,15 +150,15 @@
       backStyle,
       patternStyle: document.getElementById('spPatternStyle').value,
       useForeColor: document.getElementById('spUseForeColor').checked,
-      foreColor: document.getElementById('spForeColor').value,
+      foreColor: norm(getColorFieldValue('spForeColor')),
       useBackColor: document.getElementById('spUseBackColor').checked,
-      backColor: document.getElementById('spBackColor').value,
+      backColor: norm(getColorFieldValue('spBackColor')),
       usePatternColor: document.getElementById('spUsePatternColor').checked,
-      patternColor: document.getElementById('spPatternColor').value,
+      patternColor: norm(getColorFieldValue('spPatternColor')),
       lineWidth: Number(document.getElementById('spLineWidth').value) || 0
     };
     if (backStyle === 'gradient') {
-      comp.endColor = document.getElementById('spEndColor').value;
+      comp.endColor = norm(getColorFieldValue('spEndColor'));
       comp.gradientStop = Number(document.getElementById('spGradientStop').value) || 95;
       comp.gradientShadingStyle = document.getElementById('spGradientDir').value;
     }
@@ -105,16 +167,23 @@
 
   async function applyShapeProperties() {
     const comp = readShapePropertiesForm();
-    await window.upsertCanvasComponent(comp);
+    const ok = await window.upsertCanvasComponent(comp);
+    if (!ok) {
+      window.setStatus('Could not apply — open a display or global object first');
+      return;
+    }
     window.commitPropsSnapshot(readShapePropertiesForm, 'applyShapeProperties');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name}`);
   }
 
   async function saveShapeProperties(e) {
     e.preventDefault();
     const comp = readShapePropertiesForm();
-    await window.upsertCanvasComponent(comp);
+    const ok = await window.upsertCanvasComponent(comp);
+    if (!ok) {
+      window.setStatus('Could not save — open a display or global object first');
+      return;
+    }
     document.getElementById('shapePropertiesDialog').close();
     window.clearPropsDialogState();
     window.setStatus(`Saved ${comp.name}`);
@@ -127,14 +196,21 @@
     document.getElementById('applyShapeProperties')?.addEventListener('click', () => {
       applyShapeProperties().catch((err) => window.setStatus(`Error: ${err.message}`));
     });
-    form.addEventListener('input', () => window.updatePropsApplyButton(readShapePropertiesForm, 'applyShapeProperties'));
+    form.addEventListener('input', () => {
+      syncForeColorHint();
+      scheduleShapeLivePreview();
+      window.flushPropsApplyButton?.(readShapePropertiesForm, 'applyShapeProperties');
+    });
     form.addEventListener('change', () => {
       syncShapeTypeFields();
       syncColorFields();
-      window.updatePropsApplyButton(readShapePropertiesForm, 'applyShapeProperties');
+      syncForeColorHint();
+      scheduleShapeLivePreview();
+      window.flushPropsApplyButton?.(readShapePropertiesForm, 'applyShapeProperties');
     });
     document.getElementById('spBackStyle')?.addEventListener('change', syncShapeTypeFields);
     document.getElementById('cancelShapeProperties')?.addEventListener('click', () => {
+      window.revertPropsDialogPreview?.();
       document.getElementById('shapePropertiesDialog')?.close();
       window.clearPropsDialogState();
     });
@@ -147,11 +223,14 @@
   }
 
   function openShapePropertiesDialog(comp, ref, editIndex) {
+    window.flushDeferredDialogInits?.();
     fillShapePropertiesForm(comp);
+    wireTools();
     window.resetPropsDialogState('shape', readShapePropertiesForm, 'applyShapeProperties', editIndex, ref);
     switchTab('general');
-    wireTools();
+    window.setTemplateEditStatus?.(comp.name, ref);
     document.getElementById('shapePropertiesDialog')?.showModal();
+    window.flushPropsApplyButton?.(readShapePropertiesForm, 'applyShapeProperties');
   }
 
   window.StudioShapeProperties = {

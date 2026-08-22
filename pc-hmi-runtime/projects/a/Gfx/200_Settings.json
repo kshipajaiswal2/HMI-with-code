@@ -207,6 +207,12 @@
         "useVariableDisplayPosition": false,
         "horizontalMargin": 0,
         "verticalMargin": 0
+      },
+      "HeaderBar": {
+        "left": 0,
+        "top": 0,
+        "width": 800,
+        "height": 63
       }
     }
   }

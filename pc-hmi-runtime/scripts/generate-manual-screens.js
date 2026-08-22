@@ -1,4 +1,4 @@
-/** Generate 300_Manual_Operation shell + 305_Network ladder screen */
+/** Generate 300_Manual_Operation shell + 304_Network ladder screen */
 const fs = require('fs');
 const path = require('path');
 const { buildLegend, wireRect, s } = require('./equipment-status-legend');
@@ -166,6 +166,16 @@ function manualTemplateReplace() {
   };
 }
 
+const { buildLegend } = require('./equipment-status-legend');
+
+const MANUAL_SHELL = {
+  ManualNav_301_PLC_IO_List: { left: 8, top: 75, width: 66, height: 35 },
+  ManualNav_302_PLC_Architecture: { left: 8, top: 131, width: 66, height: 35 },
+  ManualNav_303_Run_Count: { left: 8, top: 188, width: 66, height: 35 },
+  ManualNav_304_Network: { left: 8, top: 244, width: 66, height: 35 },
+  ManualNav_305_Cycle_Time: { left: 8, top: 300, width: 66, height: 35 }
+};
+
 const screens = {
   '300_Manual_Operation.json': {
     id: '300_Manual_Operation',
@@ -173,12 +183,13 @@ const screens = {
     subtitle: 'Manual Operation',
     navGroup: 'manual',
     securityLevel: 1,
-    components: buildLegend(),
+    components: buildLegend('ManualLegend'),
     displaySettings: { backgroundColor: '#EBEBEB', useProjectSize: true },
-    template: manualTemplateReplace()
+    template: manualTemplateReplace(),
+    manualShell: MANUAL_SHELL
   },
-  '305_Network.json': {
-    id: '305_Network',
+  '304_Network.json': {
+    id: '304_Network',
     title: 'Network',
     subtitle: 'Network',
     navGroup: 'manual',

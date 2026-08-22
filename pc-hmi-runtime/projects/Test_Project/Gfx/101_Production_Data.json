@@ -8,5 +8,31 @@
   "displaySettings": {
     "backgroundColor": "#EBEBEB",
     "useProjectSize": true
+  },
+  "overviewShell": {
+    "OverviewNav_101_Production_Data": {
+      "left": 8,
+      "top": 75,
+      "width": 66,
+      "height": 35
+    },
+    "OverviewNav_102_Prestart": {
+      "left": 8,
+      "top": 131,
+      "width": 66,
+      "height": 35
+    },
+    "OverviewNav_103_Safety": {
+      "left": 8,
+      "top": 188,
+      "width": 66,
+      "height": 35
+    },
+    "OverviewNav_104_Mimic_Screen": {
+      "left": 8,
+      "top": 244,
+      "width": 66,
+      "height": 35
+    }
   }
 }

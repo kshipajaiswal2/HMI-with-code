@@ -13,14 +13,5 @@
   "displaySettings": {
     "backgroundColor": "#EBEBEB",
     "useProjectSize": true
-  },
-  "template": {
-    "enabled": true,
-    "globalObjectId": "Template",
-    "replace": {
-      "NavRecipe": {
-        "image": "recipe2.jpg"
-      }
-    }
   }
 }

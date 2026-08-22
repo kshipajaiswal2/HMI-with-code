@@ -10,59 +10,29 @@
     "useProjectSize": true
   },
   "overviewShell": {
-    "OverviewNav_104_Mimic_Screen": {
-      "left": 7,
-      "caption": "Mimic\nScreen",
-      "imageScaled": false,
-      "fontFamily": "Arial",
-      "italic": false,
-      "underline": false,
-      "wordWrap": true,
-      "captionBackStyle": "transparent",
-      "useCaptionBackColor": false,
-      "captionBackColor": "#002952",
-      "captionBlink": false,
-      "shape": "rectangle",
-      "patternStyle": "none",
-      "useVariableDisplay": false,
-      "parameterType": "file",
-      "parameterFile": "",
-      "parameterList": "",
-      "displayPosition": false,
-      "displayTop": 0,
-      "displayLeft": 0,
-      "useVariableDisplayPosition": false,
-      "horizontalMargin": 0,
-      "verticalMargin": 0,
-      "borderUsesBackColor": false,
-      "useBackColor": true
-    },
     "OverviewNav_101_Production_Data": {
-      "caption": "Production\nData",
-      "imageScaled": false,
-      "fontFamily": "Arial",
-      "italic": false,
-      "underline": false,
-      "wordWrap": true,
-      "captionBackStyle": "transparent",
-      "useCaptionBackColor": false,
-      "captionBackColor": "#002952",
-      "captionBlink": false,
-      "shape": "rectangle",
-      "patternStyle": "none",
-      "useVariableDisplay": false,
-      "parameterType": "file",
-      "parameterFile": "",
-      "parameterList": "",
-      "displayPosition": false,
-      "displayTop": 0,
-      "displayLeft": 0,
-      "useVariableDisplayPosition": false,
-      "horizontalMargin": 0,
-      "verticalMargin": 0,
-      "useBackColor": true,
-      "useBorderColor": true,
-      "borderColor": "#f99746"
+      "left": 8,
+      "top": 75,
+      "width": 66,
+      "height": 35
+    },
+    "OverviewNav_102_Prestart": {
+      "left": 8,
+      "top": 131,
+      "width": 66,
+      "height": 35
+    },
+    "OverviewNav_103_Safety": {
+      "left": 8,
+      "top": 188,
+      "width": 66,
+      "height": 35
+    },
+    "OverviewNav_104_Mimic_Screen": {
+      "left": 8,
+      "top": 244,
+      "width": 66,
+      "height": 35
     }
   },
   "template": {

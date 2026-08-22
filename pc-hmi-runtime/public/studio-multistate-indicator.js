@@ -112,8 +112,15 @@
     return `MultistateIndicator${n}`;
   }
 
+  function formatTagForDisplay(tag) {
+    if (window.StudioTagTools?.formatFtTagRef) return window.StudioTagTools.formatFtTagRef(tag);
+    const s = String(tag || '').trim();
+    if (s.startsWith('PLC uploded Tags.')) return `{[PLC]${s.slice('PLC uploded Tags.'.length)}}`;
+    return s;
+  }
+
   function defaultMultistateIndicatorComponent(overrides = {}) {
-    const count = overrides.numberOfStates ?? 2;
+    const count = overrides.numberOfStates ?? 5;
     return {
       type: 'MultistateIndicator',
       name: 'MultistateIndicator1',
@@ -122,17 +129,17 @@
       triggerType: 'value',
       left: 16,
       top: 16,
-      width: 71,
-      height: 33,
+      width: 24,
+      height: 24,
       visible: true,
-      borderStyle: 'raisedInset',
-      borderWidth: 1,
+      borderStyle: 'none',
+      borderWidth: 8,
       borderUsesBackColor: true,
       backStyle: 'solid',
-      shape: 'rectangle',
-      fontFamily: 'Arial Unicode MS',
+      shape: 'circle',
+      fontFamily: 'Tahoma',
       fontSize: 13,
-      bold: false,
+      bold: true,
       italic: false,
       underline: false,
       states: defaultMultistateIndicatorStates(count),
@@ -178,7 +185,34 @@
     document.getElementById('miDeleteState').disabled = userCount <= 2;
   }
 
+  function insertAtCaptionCursor(text) {
+    const ta = document.getElementById('miStateCaption');
+    if (!ta) return;
+    const start = ta.selectionStart ?? ta.value.length;
+    const end = ta.selectionEnd ?? start;
+    ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
+    const pos = start + text.length;
+    ta.selectionStart = ta.selectionEnd = pos;
+    ta.focus();
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function wireMiTagPick() {
+    const btn = document.querySelector('[data-tag-pick="miTag"]');
+    const input = document.getElementById('miTag');
+    if (!btn || !input || btn.dataset.tagPickWired === '1') return;
+    btn.dataset.tagPickWired = '1';
+    btn.addEventListener('click', () => {
+      window.StudioTagTools?.openTagBrowser(input, (sel) => {
+        input.value = formatTagForDisplay(sel);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+  }
+
   function wireTools() {
+    wireMiTagPick();
     if (window.StudioTagTools) StudioTagTools.wirePickButtons();
     if (window.FtColorPicker) window.FtColorPicker.initAll(document.getElementById('multistateIndicatorDialog'));
     syncMiFields();
@@ -294,21 +328,21 @@
     miStateClipboard = null;
     document.getElementById('miStatePaste').disabled = true;
 
-    document.getElementById('miBorderStyle').value = comp.borderStyle || 'line';
-    document.getElementById('miBorderWidth').value = comp.borderWidth ?? 4;
+    document.getElementById('miBorderStyle').value = comp.borderStyle || 'none';
+    document.getElementById('miBorderWidth').value = comp.borderWidth ?? 8;
     document.getElementById('miBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
     document.getElementById('miBackStyle').value = comp.backStyle || 'solid';
-    document.getElementById('miShape').value = comp.shape || 'rectangle';
+    document.getElementById('miShape').value = comp.shape || 'circle';
     document.getElementById('miNumberOfStates').value = String(count);
     document.getElementById('miTriggerType').value = comp.triggerType || 'value';
-    document.getElementById('miTag').value = comp.tag || '';
+    document.getElementById('miTag').value = formatTagForDisplay(comp.tag || '');
     document.getElementById('miFont').value = comp.fontFamily || 'Tahoma';
     document.getElementById('miFontSize').value = String(comp.fontSize ?? 13);
     document.getElementById('miBold').classList.toggle('active', Boolean(comp.bold));
     document.getElementById('miItalic').classList.toggle('active', Boolean(comp.italic));
     document.getElementById('miUnderline').classList.toggle('active', Boolean(comp.underline));
-    document.getElementById('miHeight').value = comp.height ?? 33;
-    document.getElementById('miWidth').value = comp.width ?? 71;
+    document.getElementById('miHeight').value = comp.height ?? 24;
+    document.getElementById('miWidth').value = comp.width ?? 24;
     document.getElementById('miTop').value = comp.top ?? 16;
     document.getElementById('miLeft').value = comp.left ?? 16;
     document.getElementById('miName').value = comp.name || 'MultistateIndicator1';
@@ -327,11 +361,11 @@
       triggerType: document.getElementById('miTriggerType').value,
       left: Number(document.getElementById('miLeft').value) || 0,
       top: Number(document.getElementById('miTop').value) || 0,
-      width: Number(document.getElementById('miWidth').value) || 71,
-      height: Number(document.getElementById('miHeight').value) || 33,
+      width: Number(document.getElementById('miWidth').value) || 24,
+      height: Number(document.getElementById('miHeight').value) || 24,
       visible: document.getElementById('miVisible').checked,
       borderStyle: document.getElementById('miBorderStyle').value,
-      borderWidth: Number(document.getElementById('miBorderWidth').value) || 4,
+      borderWidth: Number(document.getElementById('miBorderWidth').value ?? 8),
       borderUsesBackColor: document.getElementById('miBorderUsesBackColor').checked,
       backStyle: document.getElementById('miBackStyle').value,
       shape: document.getElementById('miShape').value,
@@ -375,7 +409,6 @@
     if (!validateMultistateIndicator(comp)) return;
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readMultistateIndicatorForm, 'applyMultistateIndicator');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
   }
 
@@ -479,6 +512,12 @@
         window.updatePropsApplyButton(readMultistateIndicatorForm, 'applyMultistateIndicator');
       });
     }
+    document.getElementById('miInsertVariable')?.addEventListener('click', () => {
+      window.StudioTagTools?.openTagBrowser(null, (sel) => {
+        insertAtCaptionCursor(formatTagForDisplay(sel));
+        window.updatePropsApplyButton(readMultistateIndicatorForm, 'applyMultistateIndicator');
+      });
+    });
   }
 
   window.StudioMultistateIndicator = {

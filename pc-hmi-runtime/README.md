@@ -123,6 +123,21 @@ Studio saves JSON  →  projects/MyPlant/  →  Runtime on panel PC  →  PLC (t
 
 JSON does **not** go to the PLC. Only tag read/write traffic crosses the network.
 
+### PLC tag aliases
+
+When the HMI tag name differs from the Logix controller tag, set **`plcAddress`** on the tag definition:
+
+```json
+{
+  "name": "Production.Count",
+  "type": "int",
+  "plcAddress": "Program:MainProgram.ProductionCount",
+  "description": "Parts produced"
+}
+```
+
+Edit in Studio → Tags → New/Edit Tag → **PLC Address**, or import via JSON. Exported CSV includes a **PLC Address** column.
+
 ---
 
 ## Features
@@ -142,9 +157,12 @@ JSON does **not** go to the PLC. Only tag read/write traffic crosses the network
 | User login / security | Done |
 | Windows desktop (Electron) | Done |
 | PLC simulator (offline dev) | Done |
+| EtherNet/IP live PLC (Allen-Bradley) | Implemented — tag poll + write via `st-ethernet-ip` |
+| PLC tag aliases (`plcAddress`) | Implemented — map HMI tag names to Logix paths |
+| Panel deploy package | `npm run build:panel -- <projectId>` or Transfer Utility |
 | OPC UA live PLC | Planned |
-| Automated FTP/USB transfer | Planned |
-| Packaged `.exe` installer | Planned |
+| Automated FTP/USB transfer | Implemented — Transfer Utility builds ZIP + folder deploy |
+| Packaged panel runtime | Implemented — `deploy/packages/<project>-panel-*.zip` with start scripts |
 | Faceplate library | Planned |
 | Trending + historian | Planned |
 | Recipe PLC download | Planned |

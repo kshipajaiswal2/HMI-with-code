@@ -54,8 +54,17 @@ html, body {
 .header-right { display: flex; align-items: center; gap: 12px; }
 .clock { font-family: var(--mono); font-size: 12px; }
 .comm-status { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
+.comm-status-clickable { cursor: pointer; user-select: none; }
+.comm-status-clickable:hover { color: var(--text); }
 .comm-status .dot { width: 7px; height: 7px; border-radius: 50%; background: #999; }
 .comm-status.connected .dot { background: var(--ok); }
+.runtime-comm-dialog { max-width: 420px; }
+.runtime-comm-dialog .dialog-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.runtime-comm-dialog .dialog-field span { font-size: 12px; color: var(--text-muted); }
+.runtime-comm-dialog .dialog-check { flex-direction: row; align-items: center; gap: 8px; }
+.runtime-comm-status { min-height: 1.2em; font-size: 12px; margin: 8px 0 12px; }
+.runtime-comm-status.ok { color: var(--ok); }
+.runtime-comm-status.error { color: var(--danger, #c0392b); }
 .header-indicator {
   padding: 4px 10px; border-radius: 4px;
   font-size: 11px; font-weight: 700; color: #fff;
@@ -179,6 +188,11 @@ html.embed-root body {
   box-sizing: border-box;
   pointer-events: none;
 }
+.ft-ellipse {
+  box-sizing: border-box;
+  border-radius: 50%;
+  pointer-events: none;
+}
 @keyframes ft-blink {
   50% { opacity: 0.35; }
 }
@@ -227,6 +241,18 @@ body.studio-edit-mode .ft-graphic.studio-selected {
   text-overflow: clip;
   pointer-events: none;
   text-align: center;
+}
+.ft-goto-btn.ft-goto-btn-nav {
+  padding: 2px 3px 3px;
+}
+.ft-goto-btn.ft-goto-btn-nav .ft-goto-btn-icon {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 68%;
+  margin-top: 1px;
+}
+.ft-goto-btn.ft-goto-btn-nav .ft-goto-btn-caption {
+  margin-bottom: 1px;
 }
 .ft-time-date,
 .ft-alarm-ticker {

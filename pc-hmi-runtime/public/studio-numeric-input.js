@@ -219,7 +219,6 @@
     }
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readNumericInputForm, 'applyNumericInput');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
   }
 
@@ -537,7 +536,6 @@
     }
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readNumericInputCursorForm, 'applyNumericInputCursor');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
   }
 

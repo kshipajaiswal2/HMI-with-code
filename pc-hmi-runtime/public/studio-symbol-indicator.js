@@ -252,7 +252,6 @@
     if (!validateSymbolIndicator(comp)) return;
     await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readSymbolIndicatorForm, 'applySymbolIndicator');
-    window.state.canvasSelection.index = window.state.propsDialog.editIndex;
     window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
   }
 

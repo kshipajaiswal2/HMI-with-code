@@ -1,6 +1,5 @@
-/** Rectangle / Ellipse (Polygon) property dialogs — FactoryTalk-style */
+/** Rectangle (Polygon) property dialog — FactoryTalk-style */
 (function () {
-  let editingType = 'Rectangle';
   let shapePreviewTimer = null;
 
   function scheduleShapeLivePreview() {
@@ -31,8 +30,7 @@
     });
   }
 
-  function titleForType(type) {
-    if (type === 'Ellipse') return 'Ellipse Properties';
+  function titleForType() {
     return 'Polygon Properties';
   }
 
@@ -89,27 +87,25 @@
   function fillShapePropertiesForm(comp) {
     if (window.state) window.state.propsFormFill = true;
     try {
-      editingType = comp.type === 'Ellipse' ? 'Ellipse' : 'Rectangle';
-      document.getElementById('shapePropertiesTitle').textContent = titleForType(editingType);
-      const isEllipse = editingType === 'Ellipse';
+      document.getElementById('shapePropertiesTitle').textContent = titleForType();
       document.getElementById('spLineStyle').value = comp.lineStyle || 'solid';
-      document.getElementById('spBackStyle').value = comp.backStyle || (isEllipse ? 'solid' : 'solid');
+      document.getElementById('spBackStyle').value = comp.backStyle || 'solid';
       document.getElementById('spPatternStyle').value = comp.patternStyle || 'none';
       document.getElementById('spUseForeColor').checked = comp.useForeColor !== false;
-      setColorFieldValue('spForeColor', comp.foreColor || comp.borderColor || (isEllipse ? '#10EB10' : '#c6c6c6'));
+      setColorFieldValue('spForeColor', comp.foreColor || comp.borderColor || '#c6c6c6');
       document.getElementById('spUseBackColor').checked = comp.useBackColor !== false;
-      setColorFieldValue('spBackColor', comp.backColor || (isEllipse ? '#10EB10' : '#ffffff'));
+      setColorFieldValue('spBackColor', comp.backColor || '#ffffff');
       setColorFieldValue('spEndColor', comp.endColor || '#e8e8e8');
       document.getElementById('spGradientStop').value = comp.gradientStop ?? 95;
       document.getElementById('spGradientDir').value = comp.gradientShadingStyle || comp.gradientDirection || 'gradientHorizontalFromRight';
       document.getElementById('spUsePatternColor').checked = Boolean(comp.usePatternColor);
       setColorFieldValue('spPatternColor', comp.patternColor || '#ffffff');
-      document.getElementById('spLineWidth').value = comp.lineWidth ?? comp.borderWidth ?? (isEllipse ? 1 : 2);
+      document.getElementById('spLineWidth').value = comp.lineWidth ?? comp.borderWidth ?? 1;
       document.getElementById('spHeight').value = comp.height ?? 34;
       document.getElementById('spWidth').value = comp.width ?? 262;
       document.getElementById('spTop').value = comp.top ?? 0;
       document.getElementById('spLeft').value = comp.left ?? 0;
-      document.getElementById('spName').value = comp.name || (editingType === 'Ellipse' ? 'Ellipse1' : 'Rectangle1');
+      document.getElementById('spName').value = comp.name || 'Rectangle1';
       document.getElementById('spVisible').checked = comp.visible !== false;
       syncShapeTypeFields();
       syncColorFields();
@@ -139,8 +135,8 @@
     const backStyle = document.getElementById('spBackStyle').value;
     const norm = window.FtColorPicker?.normalizeColor || ((v) => v);
     const comp = {
-      type: editingType,
-      name: document.getElementById('spName').value.trim() || (editingType === 'Ellipse' ? 'Ellipse1' : 'Rectangle1'),
+      type: 'Rectangle',
+      name: document.getElementById('spName').value.trim() || 'Rectangle1',
       left: Number(document.getElementById('spLeft').value) || 0,
       top: Number(document.getElementById('spTop').value) || 0,
       width: Number(document.getElementById('spWidth').value) || 64,
@@ -215,7 +211,7 @@
       window.clearPropsDialogState();
     });
     document.getElementById('helpShapeProperties')?.addEventListener('click', () => {
-      alert('Polygon / Ellipse Properties define line style, fill, pattern, and border width — matching FactoryTalk View graphic objects.');
+      alert('Polygon Properties define line style, fill, pattern, and border width — matching FactoryTalk View rectangle objects.');
     });
     document.querySelectorAll('#shapePropertiesDialog .dialog-tab').forEach((tab) => {
       tab.addEventListener('click', () => switchTab(tab.dataset.spTab));

@@ -2566,7 +2566,21 @@ const ComponentRegistry = {
 
   Panel(comp, ctx) {
     const panel = document.createElement('div');
-    panel.className = comp.style?.className || 'panel';
+    const isPlaced = ComponentRegistry.isPlacedGraphic(comp)
+      || comp.width != null
+      || comp.height != null
+      || comp.backColor != null
+      || comp.borderStyle != null;
+    panel.className = isPlaced ? 'ft-panel ft-graphic' : (comp.style?.className || 'panel');
+    if (comp.name) panel.dataset.name = comp.name;
+    if (comp.visible === false) {
+      panel.style.display = 'none';
+      return panel;
+    }
+    if (isPlaced) {
+      ComponentRegistry.applyGraphicsObject(panel, comp);
+      ComponentRegistry.applyPanelAppearance(panel, comp);
+    }
     for (const child of comp.children || []) {
       panel.appendChild(ComponentRegistry.render(child, ctx));
     }
@@ -2675,9 +2689,20 @@ const ComponentRegistry = {
   },
 
   lineStyleToCss(lineStyle) {
+    if (lineStyle === 'none') return 'none';
     if (lineStyle === 'dash') return 'dashed';
     if (lineStyle === 'dot') return 'dotted';
+    if (lineStyle === 'dashDot' || lineStyle === 'dashDotDot') return 'dashed';
     return 'solid';
+  },
+
+  lineStyleToDashArray(lineStyle, lineWidth = 1) {
+    const w = Math.max(1, Number(lineWidth) || 1);
+    if (lineStyle === 'dash') return `${w * 8},${w * 4}`;
+    if (lineStyle === 'dot') return `${w},${w * 3}`;
+    if (lineStyle === 'dashDot') return `${w * 8},${w * 4},${w},${w * 4}`;
+    if (lineStyle === 'dashDotDot') return `${w * 8},${w * 4},${w},${w * 4},${w},${w * 4}`;
+    return '';
   },
 
   applyShapeFill(el, comp) {
@@ -2707,15 +2732,22 @@ const ComponentRegistry = {
   applyShapePattern(el, comp) {
     if (!comp.usePatternColor || !comp.patternStyle || comp.patternStyle === 'none') return;
     const color = comp.patternColor || '#808080';
+    const style = comp.patternStyle;
     let pattern = '';
-    switch (comp.patternStyle) {
+    switch (style) {
       case 'horizontal':
       case 'horizontalLines':
         pattern = `repeating-linear-gradient(0deg, ${color} 0, ${color} 1px, transparent 1px, transparent 4px)`;
         break;
+      case 'wideHorizontalLines':
+        pattern = `repeating-linear-gradient(0deg, ${color} 0, ${color} 2px, transparent 2px, transparent 8px)`;
+        break;
       case 'vertical':
       case 'verticalLines':
         pattern = `repeating-linear-gradient(90deg, ${color} 0, ${color} 1px, transparent 1px, transparent 4px)`;
+        break;
+      case 'wideVerticalLines':
+        pattern = `repeating-linear-gradient(90deg, ${color} 0, ${color} 2px, transparent 2px, transparent 8px)`;
         break;
       case 'cross':
         pattern = `repeating-linear-gradient(0deg, ${color} 0, ${color} 1px, transparent 1px, transparent 4px), repeating-linear-gradient(90deg, ${color} 0, ${color} 1px, transparent 1px, transparent 4px)`;
@@ -2723,6 +2755,51 @@ const ComponentRegistry = {
       case '50Percent':
       case 'percent50':
         pattern = `repeating-conic-gradient(${color} 0% 25%, transparent 0% 50%) 0 0 / 4px 4px`;
+        break;
+      case 'dots':
+        pattern = `radial-gradient(circle, ${color} 1px, transparent 1px) 0 0 / 4px 4px`;
+        break;
+      case 'checks':
+        pattern = `linear-gradient(45deg, ${color} 25%, transparent 25%, transparent 75%, ${color} 75%) 0 0 / 6px 6px, linear-gradient(45deg, ${color} 25%, transparent 25%, transparent 75%, ${color} 75%) 3px 3px / 6px 6px`;
+        break;
+      case 'smallBoxes':
+        pattern = `linear-gradient(${color} 1px, transparent 1px) 0 0 / 4px 4px, linear-gradient(90deg, ${color} 1px, transparent 1px) 0 0 / 4px 4px`;
+        break;
+      case 'mediumBoxes':
+        pattern = `linear-gradient(${color} 1px, transparent 1px) 0 0 / 8px 8px, linear-gradient(90deg, ${color} 1px, transparent 1px) 0 0 / 8px 8px`;
+        break;
+      case 'largeBoxes':
+        pattern = `linear-gradient(${color} 1px, transparent 1px) 0 0 / 12px 12px, linear-gradient(90deg, ${color} 1px, transparent 1px) 0 0 / 12px 12px`;
+        break;
+      case 'rightDiagonal':
+        pattern = `repeating-linear-gradient(45deg, ${color} 0, ${color} 1px, transparent 1px, transparent 6px)`;
+        break;
+      case 'wideRightDiagonal':
+        pattern = `repeating-linear-gradient(45deg, ${color} 0, ${color} 2px, transparent 2px, transparent 10px)`;
+        break;
+      case 'leftDiagonal':
+        pattern = `repeating-linear-gradient(-45deg, ${color} 0, ${color} 1px, transparent 1px, transparent 6px)`;
+        break;
+      case 'wideLeftDiagonal':
+        pattern = `repeating-linear-gradient(-45deg, ${color} 0, ${color} 2px, transparent 2px, transparent 10px)`;
+        break;
+      case 'hatch':
+        pattern = `repeating-linear-gradient(45deg, ${color} 0, ${color} 1px, transparent 1px, transparent 4px), repeating-linear-gradient(-45deg, ${color} 0, ${color} 1px, transparent 1px, transparent 4px)`;
+        break;
+      case 'bricks':
+        pattern = `linear-gradient(${color} 1px, transparent 1px) 0 0 / 12px 6px, linear-gradient(90deg, ${color} 1px, transparent 1px) 0 0 / 12px 6px`;
+        break;
+      case 'ovals':
+        pattern = `radial-gradient(ellipse, ${color} 1px, transparent 1px) 0 0 / 8px 6px`;
+        break;
+      case 'diamonds':
+        pattern = `repeating-conic-gradient(from 45deg, ${color} 0% 25%, transparent 0% 50%) 0 0 / 8px 8px`;
+        break;
+      case 'scales':
+        pattern = `repeating-radial-gradient(circle at 0 100%, ${color} 0, ${color} 1px, transparent 1px, transparent 6px)`;
+        break;
+      case 'waves':
+        pattern = `repeating-radial-gradient(circle at 50% 0, ${color} 0, ${color} 1px, transparent 1px, transparent 8px)`;
         break;
       default:
         return;
@@ -2736,6 +2813,41 @@ const ComponentRegistry = {
     } else {
       el.style.background = pattern;
     }
+  },
+
+  applyPanelAppearance(el, comp) {
+    ComponentRegistry.applyShapeFill(el, comp);
+    ComponentRegistry.applyShapePattern(el, comp);
+
+    const borderWidth = comp.borderWidth ?? 1;
+    const borderStyle = comp.borderStyle || 'line';
+    const backColor = comp.backColor || '#001C38';
+    let borderColor = comp.borderColor || backColor;
+    if (comp.borderUsesBackColor !== false) borderColor = backColor;
+
+    el.style.boxShadow = '';
+    if (borderStyle === 'none') {
+      el.style.border = 'none';
+    } else if (borderStyle === 'raised') {
+      el.style.borderStyle = 'solid';
+      el.style.borderWidth = `${borderWidth}px`;
+      el.style.borderColor = '#ffffff #808080 #808080 #ffffff';
+    } else if (borderStyle === 'inset') {
+      el.style.borderStyle = 'solid';
+      el.style.borderWidth = `${borderWidth}px`;
+      el.style.borderColor = '#808080 #ffffff #ffffff #808080';
+    } else if (borderStyle === 'raisedInset') {
+      el.style.borderStyle = 'solid';
+      el.style.borderWidth = `${borderWidth}px`;
+      el.style.borderColor = '#808080 #ffffff #ffffff #808080';
+      el.style.boxShadow = 'inset 1px 1px 0 #808080, inset -1px -1px 0 #ffffff';
+    } else {
+      el.style.border = `${borderWidth}px solid ${borderColor}`;
+    }
+
+    el.classList.toggle('ft-blink', Boolean(comp.blink));
+    el.style.boxSizing = 'border-box';
+    el.style.overflow = 'hidden';
   },
 
   applyShapeBorder(el, comp, options = {}) {
@@ -2760,11 +2872,180 @@ const ComponentRegistry = {
       el.style.border = useFore && borderW > 0 ? `${borderW}px ${lineStyle} ${borderColor}` : 'none';
       return;
     }
-    if (!useFore || borderW <= 0) {
+    if (!useFore || borderW <= 0 || comp.lineStyle === 'none') {
       el.style.border = 'none';
       return;
     }
     el.style.border = `${borderW}px ${lineStyle} ${borderColor}`;
+  },
+
+  applyArcAppearance(el, comp) {
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.display = '';
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    el.style.borderRadius = '50%';
+    el.style.border = 'none';
+    el.style.boxSizing = 'border-box';
+    el.style.overflow = 'hidden';
+    ComponentRegistry.applyShapeFill(el, comp);
+    ComponentRegistry.applyShapePattern(el, comp);
+
+    el.querySelector('svg')?.remove();
+
+    const w = comp.width || 100;
+    const h = comp.height || 100;
+    const lineW = comp.lineWidth ?? 1;
+    const lineStyle = comp.lineStyle || 'solid';
+    const useFore = comp.useForeColor !== false && lineStyle !== 'none';
+    if (!useFore || lineW <= 0) return;
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.style.cssText = 'position:absolute;left:0;top:0;display:block;pointer-events:none';
+    const cx = w / 2;
+    const cy = h / 2;
+    const rx = Math.max(0, w / 2 - lineW / 2);
+    const ry = Math.max(0, h / 2 - lineW / 2);
+    const ell = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    ell.setAttribute('cx', String(cx));
+    ell.setAttribute('cy', String(cy));
+    ell.setAttribute('rx', String(rx));
+    ell.setAttribute('ry', String(ry));
+    ell.setAttribute('fill', 'none');
+    ell.setAttribute('stroke', comp.foreColor || '#000000');
+    ell.setAttribute('stroke-width', String(lineW));
+    const dash = ComponentRegistry.lineStyleToDashArray(lineStyle, lineW);
+    if (dash) ell.setAttribute('stroke-dasharray', dash);
+    svg.appendChild(ell);
+    el.appendChild(svg);
+  },
+
+  Arc(comp) {
+    const el = document.createElement('div');
+    el.className = 'ft-arc ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+    ComponentRegistry.applyArcAppearance(el, comp);
+    return el;
+  },
+
+  freehandPathData(points, close = false) {
+    if (!points?.length) return '';
+    return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+      + (close && points.length > 2 ? ' Z' : '');
+  },
+
+  freehandShouldClosePath(comp) {
+    const useBack = comp.useBackColor !== false;
+    return useBack && (comp.backStyle === 'solid' || comp.backStyle === 'gradient');
+  },
+
+  freehandFillColor(comp) {
+    const useBack = comp.useBackColor !== false;
+    if (comp.backStyle === 'transparent' || !useBack) return 'none';
+    if (comp.backStyle === 'gradient') return `url(#fh-grad-${comp.name || 'shape'})`;
+    return comp.backColor || '#808080';
+  },
+
+  applyFreehandAppearance(el, comp) {
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.display = '';
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    el.style.border = 'none';
+    el.style.background = 'none';
+    el.style.boxSizing = 'border-box';
+    el.style.overflow = 'visible';
+
+    el.querySelector('svg')?.remove();
+
+    const w = comp.width || 100;
+    const h = comp.height || 100;
+    const points = comp.points || [];
+    if (points.length < 2) return;
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.style.cssText = 'position:absolute;left:0;top:0;display:block;pointer-events:none;overflow:visible';
+
+    const gradId = `fh-grad-${comp.name || 'shape'}`;
+    if (comp.backStyle === 'gradient' && comp.useBackColor !== false) {
+      const start = comp.backColor || '#808080';
+      const end = comp.endColor || '#e8e8e8';
+      const stop = comp.gradientStop ?? 95;
+      const shading = comp.gradientShadingStyle || comp.gradientDirection || '';
+      const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+      grad.setAttribute('id', gradId);
+      if (shading === 'gradientHorizontalFromRight') {
+        grad.setAttribute('x1', '100%'); grad.setAttribute('y1', '0%');
+        grad.setAttribute('x2', '0%'); grad.setAttribute('y2', '0%');
+      } else if (shading === 'gradientHorizontalFromLeft') {
+        grad.setAttribute('x1', '0%'); grad.setAttribute('y1', '0%');
+        grad.setAttribute('x2', '100%'); grad.setAttribute('y2', '0%');
+      } else {
+        grad.setAttribute('x1', '0%'); grad.setAttribute('y1', '0%');
+        grad.setAttribute('x2', '0%'); grad.setAttribute('y2', '100%');
+      }
+      const s0 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+      s0.setAttribute('offset', '0%');
+      s0.setAttribute('stop-color', start);
+      const s1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+      s1.setAttribute('offset', `${stop}%`);
+      s1.setAttribute('stop-color', end);
+      grad.appendChild(s0);
+      grad.appendChild(s1);
+      const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      defs.appendChild(grad);
+      svg.appendChild(defs);
+    }
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', ComponentRegistry.freehandPathData(points, ComponentRegistry.freehandShouldClosePath(comp)));
+    path.setAttribute('fill', ComponentRegistry.freehandFillColor(comp));
+    path.setAttribute('fill-rule', 'evenodd');
+
+    const lineW = comp.lineWidth ?? 1;
+    const lineStyle = comp.lineStyle || 'solid';
+    const useFore = comp.useForeColor !== false && lineStyle !== 'none';
+    if (useFore && lineW > 0) {
+      path.setAttribute('stroke', comp.foreColor || '#000000');
+      path.setAttribute('stroke-width', String(lineW));
+      path.setAttribute('stroke-linejoin', 'round');
+      path.setAttribute('stroke-linecap', 'round');
+      const dash = ComponentRegistry.lineStyleToDashArray(lineStyle, lineW);
+      if (dash) path.setAttribute('stroke-dasharray', dash);
+    } else {
+      path.setAttribute('stroke', 'none');
+    }
+
+    svg.appendChild(path);
+    el.appendChild(svg);
+  },
+
+  Freehand(comp) {
+    const el = document.createElement('div');
+    el.className = 'ft-freehand ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+    ComponentRegistry.applyFreehandAppearance(el, comp);
+    return el;
   },
 
   Rectangle(comp) {
@@ -2797,12 +3078,7 @@ const ComponentRegistry = {
       el.style.display = 'none';
       return el;
     }
-    ComponentRegistry.applyGraphicsObject(el, comp);
-    el.style.borderRadius = '50%';
-    ComponentRegistry.applyShapeFill(el, comp);
-    ComponentRegistry.applyShapePattern(el, comp);
-    ComponentRegistry.applyShapeBorder(el, comp);
-    el.style.boxSizing = 'border-box';
+    ComponentRegistry.applyArcAppearance(el, comp);
     return el;
   },
 

@@ -698,7 +698,13 @@ function updatePreviewComponentBounds(index, bounds) {
   const el = screenContent.querySelector(`[data-component-index="${index}"]`);
   if (!comp || !el) return false;
   Object.assign(comp, bounds);
-  ComponentRegistry.applyGraphicsObject(el, comp);
+  if (comp.type === 'Arc' || comp.type === 'Ellipse') {
+    ComponentRegistry.applyArcAppearance(el, comp);
+  } else if (comp.type === 'Freehand') {
+    ComponentRegistry.applyFreehandAppearance(el, comp);
+  } else {
+    ComponentRegistry.applyGraphicsObject(el, comp);
+  }
   return true;
 }
 
@@ -714,22 +720,69 @@ function findPreviewGraphicByName(name) {
 function updatePreviewComponentBoundsByName(name, bounds) {
   const hit = findPreviewGraphicByName(name);
   if (!hit?.comp || !hit.el) return false;
-  Object.assign(hit.comp, bounds);
-  ComponentRegistry.applyGraphicsObject(hit.el, hit.comp);
+  let patch = { ...bounds };
+  if (hit.comp.type === 'Freehand' && hit.comp.points?.length) {
+    const oldW = hit.comp.width || 1;
+    const oldH = hit.comp.height || 1;
+    const newW = bounds.width ?? hit.comp.width ?? oldW;
+    const newH = bounds.height ?? hit.comp.height ?? oldH;
+    if (bounds.width != null || bounds.height != null) {
+      const sx = newW / oldW;
+      const sy = newH / oldH;
+      if (Math.abs(sx - 1) > 0.0001 || Math.abs(sy - 1) > 0.0001) {
+        patch.points = hit.comp.points.map((p) => ({ x: p.x * sx, y: p.y * sy }));
+      }
+    }
+  }
+  Object.assign(hit.comp, patch);
+  if (hit.comp.type === 'Arc' || hit.comp.type === 'Ellipse') {
+    ComponentRegistry.applyArcAppearance(hit.el, hit.comp);
+  } else if (hit.comp.type === 'Freehand') {
+    ComponentRegistry.applyFreehandAppearance(hit.el, hit.comp);
+  } else {
+    ComponentRegistry.applyGraphicsObject(hit.el, hit.comp);
+  }
   return true;
 }
 
 function patchPreviewComponentByName(name, comp) {
-  const hit = findPreviewGraphicByName(name);
-  if (!hit?.comp || !hit.el || hit.index == null) return false;
+  if (!state.loadedScreen || !name) return false;
   const ctx = state.activeContext || createContext();
-  const merged = { ...hit.comp, ...comp, name: hit.comp.name || name };
+  const hit = findPreviewGraphicByName(name);
+
+  if (hit?.el && hit.index != null) {
+    const merged = { ...(hit.comp || {}), ...comp, name: hit.comp?.name || name };
+    const el = ComponentRegistry.render(merged, ctx);
+    el.dataset.componentIndex = String(hit.index);
+    if (merged.type) el.dataset.componentType = merged.type;
+    if (merged._source) el.dataset.source = merged._source;
+    hit.el.replaceWith(el);
+    if (!state.loadedScreen.components) state.loadedScreen.components = [];
+    state.loadedScreen.components[hit.index] = merged;
+    return true;
+  }
+
+  if (!state.loadedScreen.components) state.loadedScreen.components = [];
+  const index = state.loadedScreen.components.length;
+  const merged = { ...comp, name: comp.name || name };
   const el = ComponentRegistry.render(merged, ctx);
-  el.dataset.componentIndex = String(hit.index);
+  el.dataset.componentIndex = String(index);
   if (merged.type) el.dataset.componentType = merged.type;
   if (merged._source) el.dataset.source = merged._source;
-  hit.el.replaceWith(el);
-  state.loadedScreen.components[hit.index] = merged;
+  screenContent.appendChild(el);
+  state.loadedScreen.components.push(merged);
+  return true;
+}
+
+function removePreviewComponentByName(name) {
+  const hit = findPreviewGraphicByName(name);
+  if (!hit?.el || hit.index == null) return false;
+  hit.el.remove();
+  state.loadedScreen.components.splice(hit.index, 1);
+  screenContent.querySelectorAll('[data-component-index]').forEach((node) => {
+    const i = Number(node.dataset.componentIndex);
+    if (i > hit.index) node.dataset.componentIndex = String(i - 1);
+  });
   return true;
 }
 
@@ -765,6 +818,8 @@ function handleStudioPreviewMessage(data) {
       return updatePreviewComponentBoundsByName(data.name, data.bounds);
     case 'patch-by-name':
       return patchPreviewComponentByName(data.name, data.component);
+    case 'remove-by-name':
+      return removePreviewComponentByName(data.name);
     case 'sync-components':
       return syncPreviewComponents(data.components);
     case 'selection':

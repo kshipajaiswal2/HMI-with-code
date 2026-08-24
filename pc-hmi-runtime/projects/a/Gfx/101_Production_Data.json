@@ -3,7 +3,27 @@
   "title": "Production Data",
   "navGroup": "overview",
   "securityLevel": 0,
-  "components": [],
+  "components": [
+    {
+      "type": "Ellipse",
+      "name": "Ellipse1",
+      "left": 286,
+      "top": 179,
+      "width": 48,
+      "height": 48,
+      "visible": true,
+      "lineStyle": "solid",
+      "backStyle": "solid",
+      "patternStyle": "none",
+      "useForeColor": true,
+      "foreColor": "#000000",
+      "useBackColor": true,
+      "backColor": "#10eb10",
+      "usePatternColor": false,
+      "patternColor": "#ffffff",
+      "lineWidth": 1
+    }
+  ],
   "displaySettings": {
     "backgroundColor": "#EBEBEB",
     "useProjectSize": true

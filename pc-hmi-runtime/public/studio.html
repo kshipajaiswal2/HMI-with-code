@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Plant HMI Studio</title>
-    <link rel="stylesheet" href="studio.css?v=0.3.26" />
+    <link rel="stylesheet" href="studio.css?v=0.3.38" />
   </head>
   <body>
     <div class="studio-app">
@@ -277,6 +277,7 @@
               <div class="object-placement-overlay hidden" id="objectPlacementOverlay" aria-hidden="true">
                 <div class="placement-rubberband hidden" id="placementRubberband"></div>
               </div>
+              <svg class="freehand-stroke-preview hidden" id="freehandStrokePreview" aria-hidden="true"></svg>
               <div class="canvas-edit-overlay hidden" id="canvasEditOverlay" aria-hidden="true"></div>
             </div>
           </div>
@@ -3729,6 +3730,418 @@
       </form>
     </dialog>
 
+    <dialog id="freehandPropertiesDialog" class="dialog dialog-ft dialog-maintained-props dialog-freehand-props">
+      <form id="freehandPropertiesForm">
+        <h3>Freehand Properties</h3>
+        <input type="hidden" id="freehandPointsData" value="[]" />
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-fh-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-fh-tab="common">Common</button>
+        </div>
+        <div class="dialog-tab-panel active" data-fh-tab-panel="general">
+          <div class="freehand-props-general">
+            <div class="freehand-props-col freehand-props-col--styles">
+              <label class="freehand-props-field">Line style
+                <select id="fhLineStyle">
+                  <option value="none">None</option>
+                  <option value="solid" selected>Solid</option>
+                  <option value="dash">Dash</option>
+                  <option value="dot">Dot</option>
+                  <option value="dashDot">Dash-Dot</option>
+                  <option value="dashDotDot">Dash-Dot-Dot</option>
+                </select>
+              </label>
+              <label class="freehand-props-field">Back style
+                <select id="fhBackStyle">
+                  <option value="solid">Solid</option>
+                  <option value="transparent" selected>Transparent</option>
+                  <option value="gradient">Gradient</option>
+                </select>
+              </label>
+              <label class="freehand-props-field">Pattern style
+                <select id="fhPatternStyle"></select>
+              </label>
+            </div>
+            <div class="freehand-props-col freehand-props-col--colors">
+              <div class="freehand-props-color-row">
+                <input type="hidden" class="ft-color-input" id="fhForeColor" value="#808080" />
+                <span class="freehand-props-color-label">Fore color</span>
+              </div>
+              <div class="freehand-props-color-row">
+                <input type="hidden" class="ft-color-input" id="fhBackColor" value="#808080" />
+                <span class="freehand-props-color-label">Back color</span>
+              </div>
+              <div class="freehand-props-color-row">
+                <input type="hidden" class="ft-color-input" id="fhPatternColor" value="#808080" />
+                <span class="freehand-props-color-label">Pattern color</span>
+              </div>
+              <input type="checkbox" id="fhUsePatternColor" hidden tabindex="-1" aria-hidden="true" />
+              <div id="fhGradientExtras" class="freehand-props-gradient-extra hidden">
+                <div class="freehand-props-color-row">
+                  <input type="hidden" class="ft-color-input" id="fhEndColor" value="#e8e8e8" />
+                  <span class="freehand-props-color-label">End color</span>
+                </div>
+                <label class="freehand-props-field">Gradient stop
+                  <input type="number" id="fhGradientStop" min="0" max="100" value="95" />
+                </label>
+                <label class="freehand-props-field">Gradient direction
+                  <select id="fhGradientDir">
+                    <option value="gradientHorizontalFromRight" selected>Horizontal from right</option>
+                    <option value="gradientHorizontalFromLeft">Horizontal from left</option>
+                    <option value="gradientVertical">Vertical</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="freehand-props-col freehand-props-col--width">
+              <label class="freehand-props-field">Line width
+                <input type="number" id="fhLineWidth" min="0" max="20" value="1" />
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-tab-panel" data-fh-tab-panel="common">
+          <fieldset class="ft-fieldset">
+            <legend>Size</legend>
+            <div class="ps-size-row">
+              <label>Height<input type="number" id="fhHeight" min="1" max="4096" value="71" /></label>
+              <label>Width<input type="number" id="fhWidth" min="1" max="4096" value="166" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Position</legend>
+            <div class="ps-size-row">
+              <label>Top<input type="number" id="fhTop" min="0" max="4096" value="0" /></label>
+              <label>Left<input type="number" id="fhLeft" min="0" max="4096" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Other</legend>
+            <label>Name<input type="text" id="fhName" maxlength="40" value="Freehand1" /></label>
+            <label class="radio-row"><input type="checkbox" id="fhVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelFreehandProperties">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyFreehandProperties" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpFreehandProperties">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="ellipsePropertiesDialog" class="dialog dialog-ft dialog-maintained-props dialog-ellipse-props">
+      <form id="ellipsePropertiesForm">
+        <h3>Ellipse Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-ep-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-ep-tab="common">Common</button>
+        </div>
+        <div class="dialog-tab-panel active" data-ep-tab-panel="general">
+          <div class="ellipse-props-general">
+            <div class="ellipse-props-col ellipse-props-col--styles">
+              <label class="ellipse-props-field">Line style
+                <select id="epLineStyle">
+                  <option value="none">None</option>
+                  <option value="solid" selected>Solid</option>
+                  <option value="dash">Dash</option>
+                  <option value="dot">Dot</option>
+                  <option value="dashDot">Dash-Dot</option>
+                  <option value="dashDotDot">Dash-Dot-Dot</option>
+                </select>
+              </label>
+              <label class="ellipse-props-field">Back style
+                <select id="epBackStyle">
+                  <option value="solid" selected>Solid</option>
+                  <option value="transparent">Transparent</option>
+                  <option value="gradient">Gradient</option>
+                </select>
+              </label>
+              <label class="ellipse-props-field">Pattern style
+                <select id="epPatternStyle"></select>
+              </label>
+            </div>
+            <div class="ellipse-props-col ellipse-props-col--colors">
+              <div class="ellipse-props-color-row">
+                <input type="hidden" class="ft-color-input" id="epForeColor" value="#808080" />
+                <span class="ellipse-props-color-label">Fore color</span>
+              </div>
+              <div class="ellipse-props-color-row">
+                <input type="hidden" class="ft-color-input" id="epBackColor" value="#808080" />
+                <span class="ellipse-props-color-label">Back color</span>
+              </div>
+              <div class="ellipse-props-color-row">
+                <input type="hidden" class="ft-color-input" id="epPatternColor" value="#ffffff" />
+                <span class="ellipse-props-color-label">Pattern color</span>
+              </div>
+              <input type="checkbox" id="epUsePatternColor" hidden tabindex="-1" aria-hidden="true" />
+              <div id="epGradientExtras" class="ellipse-props-gradient-extra hidden">
+                <div class="ellipse-props-color-row">
+                  <input type="hidden" class="ft-color-input" id="epEndColor" value="#e8e8e8" />
+                  <span class="ellipse-props-color-label">End color</span>
+                </div>
+                <label class="ellipse-props-field">Gradient stop
+                  <input type="number" id="epGradientStop" min="0" max="100" value="95" />
+                </label>
+                <label class="ellipse-props-field">Gradient direction
+                  <select id="epGradientDir">
+                    <option value="gradientHorizontalFromRight" selected>Horizontal from right</option>
+                    <option value="gradientHorizontalFromLeft">Horizontal from left</option>
+                    <option value="gradientVertical">Vertical</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="ellipse-props-col ellipse-props-col--width">
+              <label class="ellipse-props-field">Line width
+                <input type="number" id="epLineWidth" min="0" max="20" value="1" />
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-tab-panel" data-ep-tab-panel="common">
+          <fieldset class="ft-fieldset">
+            <legend>Size</legend>
+            <div class="ps-size-row">
+              <label>Height<input type="number" id="epHeight" min="1" max="4096" value="116" /></label>
+              <label>Width<input type="number" id="epWidth" min="1" max="4096" value="121" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Position</legend>
+            <div class="ps-size-row">
+              <label>Top<input type="number" id="epTop" min="0" max="4096" value="0" /></label>
+              <label>Left<input type="number" id="epLeft" min="0" max="4096" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Other</legend>
+            <label>Name<input type="text" id="epName" maxlength="40" value="Ellipse1" /></label>
+            <label class="radio-row"><input type="checkbox" id="epVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelEllipseProperties">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyEllipseProperties" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpEllipseProperties">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="arcPropertiesDialog" class="dialog dialog-ft dialog-maintained-props dialog-arc-props">
+      <form id="arcPropertiesForm">
+        <h3>Arc Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-ap-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-ap-tab="common">Common</button>
+        </div>
+        <div class="dialog-tab-panel active" data-ap-tab-panel="general">
+          <div class="arc-props-general">
+            <div class="arc-props-col arc-props-col--styles">
+              <label class="arc-props-field">Line style
+                <select id="apLineStyle">
+                  <option value="none">None</option>
+                  <option value="solid" selected>Solid</option>
+                  <option value="dash">Dash</option>
+                  <option value="dot">Dot</option>
+                  <option value="dashDot">Dash-Dot</option>
+                  <option value="dashDotDot">Dash-Dot-Dot</option>
+                </select>
+              </label>
+              <label class="arc-props-field">Back style
+                <select id="apBackStyle">
+                  <option value="solid">Solid</option>
+                  <option value="transparent" selected>Transparent</option>
+                  <option value="gradient">Gradient</option>
+                </select>
+              </label>
+              <label class="arc-props-field">Pattern style
+                <select id="apPatternStyle"></select>
+              </label>
+            </div>
+            <div class="arc-props-col arc-props-col--colors">
+              <div class="arc-props-color-row">
+                <input type="hidden" class="ft-color-input" id="apForeColor" value="#808080" />
+                <span class="arc-props-color-label">Fore color</span>
+              </div>
+              <div class="arc-props-color-row">
+                <input type="hidden" class="ft-color-input" id="apBackColor" value="#c0c0c0" />
+                <span class="arc-props-color-label">Back color</span>
+              </div>
+              <div class="arc-props-color-row">
+                <input type="hidden" class="ft-color-input" id="apPatternColor" value="#ffffff" />
+                <span class="arc-props-color-label">Pattern color</span>
+              </div>
+              <input type="checkbox" id="apUsePatternColor" hidden tabindex="-1" aria-hidden="true" />
+              <div id="apGradientExtras" class="arc-props-gradient-extra hidden">
+                <div class="arc-props-color-row">
+                  <input type="hidden" class="ft-color-input" id="apEndColor" value="#e8e8e8" />
+                  <span class="arc-props-color-label">End color</span>
+                </div>
+                <label class="arc-props-field">Gradient stop
+                  <input type="number" id="apGradientStop" min="0" max="100" value="95" />
+                </label>
+                <label class="arc-props-field">Gradient direction
+                  <select id="apGradientDir">
+                    <option value="gradientHorizontalFromRight" selected>Horizontal from right</option>
+                    <option value="gradientHorizontalFromLeft">Horizontal from left</option>
+                    <option value="gradientVertical">Vertical</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="arc-props-col arc-props-col--width">
+              <label class="arc-props-field">Line width
+                <input type="number" id="apLineWidth" min="0" max="20" value="1" />
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-tab-panel" data-ap-tab-panel="common">
+          <fieldset class="ft-fieldset">
+            <legend>Size</legend>
+            <div class="ps-size-row">
+              <label>Height<input type="number" id="apHeight" min="1" max="4096" value="194" /></label>
+              <label>Width<input type="number" id="apWidth" min="1" max="4096" value="202" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Position</legend>
+            <div class="ps-size-row">
+              <label>Top<input type="number" id="apTop" min="0" max="4096" value="0" /></label>
+              <label>Left<input type="number" id="apLeft" min="0" max="4096" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Other</legend>
+            <label>Name<input type="text" id="apName" maxlength="40" value="Arc1" /></label>
+            <label class="radio-row"><input type="checkbox" id="apVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelArcProperties">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyArcProperties" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpArcProperties">Help</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="panelPropertiesDialog" class="dialog dialog-ft dialog-maintained-props dialog-panel-props">
+      <form id="panelPropertiesForm">
+        <h3>Panel Properties</h3>
+        <div class="dialog-tabs" role="tablist">
+          <button type="button" class="dialog-tab active" data-pp-tab="general">General</button>
+          <button type="button" class="dialog-tab" data-pp-tab="common">Common</button>
+        </div>
+        <div class="dialog-tab-panel active" data-pp-tab-panel="general">
+          <fieldset class="ft-fieldset">
+            <legend>Appearance</legend>
+            <div class="panel-props-appearance">
+              <div class="panel-props-col panel-props-col--styles">
+                <label class="panel-props-field">Border style
+                  <select id="ppBorderStyle">
+                    <option value="none">None</option>
+                    <option value="raised">Raised</option>
+                    <option value="inset">Inset</option>
+                    <option value="raisedInset">RaisedInset</option>
+                    <option value="line" selected>Line</option>
+                  </select>
+                </label>
+                <label class="panel-props-field">Back style
+                  <select id="ppBackStyle">
+                    <option value="solid" selected>Solid</option>
+                    <option value="transparent">Transparent</option>
+                    <option value="gradient">Gradient</option>
+                  </select>
+                </label>
+              </div>
+              <div class="panel-props-col panel-props-col--sizes">
+                <label class="panel-props-field">Border width
+                  <input type="number" id="ppBorderWidth" min="0" max="20" value="1" />
+                </label>
+                <label class="panel-props-field">Pattern style
+                  <select id="ppPatternStyle"></select>
+                </label>
+              </div>
+              <div class="panel-props-col panel-props-col--colors">
+                <div class="panel-props-options">
+                  <div class="panel-props-opt-row panel-props-opt-row--wide">
+                    <input type="checkbox" id="ppBorderUsesBackColor" checked />
+                    <label for="ppBorderUsesBackColor">Border uses back color</label>
+                  </div>
+                  <div class="panel-props-opt-row">
+                    <input type="checkbox" id="ppUsePatternColor" />
+                    <label for="ppUsePatternColor">Pattern color</label>
+                    <input type="hidden" class="ft-color-input" id="ppPatternColor" value="#ffffff" />
+                  </div>
+                  <div class="panel-props-opt-row">
+                    <span class="panel-props-opt-spacer" aria-hidden="true"></span>
+                    <span class="panel-props-opt-text">Back color</span>
+                    <input type="hidden" class="ft-color-input" id="ppBackColor" value="#001C38" />
+                  </div>
+                  <div class="panel-props-opt-row">
+                    <span class="panel-props-opt-spacer" aria-hidden="true"></span>
+                    <span class="panel-props-opt-text">Border color</span>
+                    <input type="hidden" class="ft-color-input" id="ppBorderColor" value="#001C38" />
+                  </div>
+                  <div class="panel-props-opt-row panel-props-opt-row--wide">
+                    <input type="checkbox" id="ppBlink" />
+                    <label for="ppBlink">Blink</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="ppGradientExtras" class="panel-props-gradient-extra hidden">
+              <div class="panel-props-opt-row">
+                <span class="panel-props-opt-spacer" aria-hidden="true"></span>
+                <span class="panel-props-opt-text">End color</span>
+                <input type="hidden" class="ft-color-input" id="ppEndColor" value="#e8e8e8" />
+              </div>
+              <label>Gradient stop
+                <input type="number" id="ppGradientStop" min="0" max="100" value="95" />
+              </label>
+              <label>Gradient direction
+                <select id="ppGradientDir">
+                  <option value="gradientHorizontalFromRight" selected>Horizontal from right</option>
+                  <option value="gradientHorizontalFromLeft">Horizontal from left</option>
+                  <option value="gradientVertical">Vertical</option>
+                </select>
+              </label>
+            </div>
+          </fieldset>
+        </div>
+        <div class="dialog-tab-panel" data-pp-tab-panel="common">
+          <fieldset class="ft-fieldset">
+            <legend>Size</legend>
+            <div class="ps-size-row">
+              <label>Height<input type="number" id="ppHeight" min="1" max="4096" value="103" /></label>
+              <label>Width<input type="number" id="ppWidth" min="1" max="4096" value="228" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Position</legend>
+            <div class="ps-size-row">
+              <label>Top<input type="number" id="ppTop" min="0" max="4096" value="0" /></label>
+              <label>Left<input type="number" id="ppLeft" min="0" max="4096" value="0" /></label>
+            </div>
+          </fieldset>
+          <fieldset class="ft-fieldset">
+            <legend>Other</legend>
+            <label>Name<input type="text" id="ppName" maxlength="40" value="Panel1" /></label>
+            <label class="radio-row"><input type="checkbox" id="ppVisible" checked /> Visible</label>
+          </fieldset>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="dialog-btn primary">OK</button>
+          <button type="button" class="dialog-btn" id="cancelPanelProperties">Cancel</button>
+          <button type="button" class="dialog-btn" id="applyPanelProperties" disabled>Apply</button>
+          <button type="button" class="dialog-btn" id="helpPanelProperties">Help</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="canvasImagePropertiesDialog" class="dialog dialog-ft dialog-canvas-image-props">
       <form id="canvasImagePropertiesForm">
         <h3>Image Properties</h3>
@@ -3883,7 +4296,11 @@
     <script src="studio-recipeplus-selector.js?v=0.1.0"></script>
     <script src="studio-communications-setup.js?v=0.1.2"></script>
     <script src="studio-latched-multistate.js?v=0.1.2"></script>
-    <script src="studio-shape-properties.js?v=0.1.8"></script>
-    <script src="studio.js?v=0.5.65"></script>
+    <script src="studio-shape-properties.js?v=0.1.9"></script>
+    <script src="studio-freehand-properties.js?v=0.1.4"></script>
+    <script src="studio-ellipse-properties.js?v=0.1.0"></script>
+    <script src="studio-arc-properties.js?v=0.1.1"></script>
+    <script src="studio-panel-properties.js?v=0.1.1"></script>
+    <script src="studio.js?v=0.5.74"></script>
   </body>
 </html>

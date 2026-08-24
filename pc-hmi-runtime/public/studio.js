@@ -122,11 +122,12 @@ const previewCanvasWrap = document.getElementById('previewCanvasWrap');
 const objectPlacementOverlay = document.getElementById('objectPlacementOverlay');
 const placementRubberband = document.getElementById('placementRubberband');
 const canvasEditOverlay = document.getElementById('canvasEditOverlay');
+const freehandStrokePreview = document.getElementById('freehandStrokePreview');
 
 const CANVAS_GRAPHIC_TYPES = new Set([
   'Text', 'Image', 'NumericDisplay', 'NumericInputEnable', 'NumericInputCursorPoint', 'StringDisplay', 'StringInputEnable', 'MomentaryButton', 'MaintainedButton', 'LatchedButton', 'MultistateButton', 'InterlockedButton', 'RampButton',
   'MultistateIndicator', 'SymbolIndicator', 'ListIndicator', 'BarGraph', 'RecipePlusButton', 'RecipePlusSelector',
-  'GotoButton', 'ReturnToButton', 'CloseDisplayButton', 'DisplayListSelector', 'TimeDateDisplay', 'StringDisplay', 'AlarmTicker', 'Rectangle', 'Ellipse',
+  'GotoButton', 'ReturnToButton', 'CloseDisplayButton', 'DisplayListSelector', 'TimeDateDisplay', 'StringDisplay', 'AlarmTicker', 'Rectangle', 'Ellipse', 'Arc', 'Freehand', 'Panel',
   'SafetyLadderDiagram'
 ]);
 const displayGrid = document.getElementById('displayGrid');
@@ -154,10 +155,15 @@ function exposeStudioGlobals() {
   window.upsertCanvasComponent = upsertCanvasComponent;
   window.commitPropsSnapshot = commitPropsSnapshot;
   window.revertPropsDialogPreview = revertPropsDialogPreview;
-  window.refreshCanvasEditOverlay = refreshCanvasEditOverlay;
   window.scheduleRefreshCanvasEditOverlay = scheduleRefreshCanvasEditOverlay;
+  window.refreshCanvasEditOverlay = refreshCanvasEditOverlay;
   window.clearPropsDialogState = clearPropsDialogState;
   window.previewPatchByName = previewPatchByName;
+  window.updateFreehandStudioPreview = updateFreehandStudioPreview;
+  window.hideFreehandStudioPreview = hideFreehandStrokePreview;
+  window.showCanvasPropsDialog = showCanvasPropsDialog;
+  window.resolveEditComponentIndex = resolveEditComponentIndex;
+  window.refreshCanvasEditOverlaySelection = refreshCanvasEditOverlaySelection;
   window.activateSelectTool = activateSelectTool;
   window.setTemplateEditStatus = setTemplateEditStatus;
   window.isEditingGlobalObject = isEditingGlobalObject;
@@ -420,8 +426,20 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       switchCanvasImagePropertiesTab('general');
       document.getElementById('canvasImagePropertiesDialog')?.showModal();
       setTemplateEditStatus(name, ref);
-    } else if (comp.type === 'Rectangle' || comp.type === 'Ellipse') {
+    } else if (comp.type === 'Rectangle') {
       window.StudioShapeProperties?.openShapePropertiesDialog(comp, ref, null);
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'Ellipse') {
+      window.StudioEllipseProperties?.openEllipsePropertiesDialog(comp, ref, null);
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'Arc') {
+      window.StudioArcProperties?.openArcPropertiesDialog(comp, ref, null);
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'Freehand') {
+      window.StudioFreehandProperties?.openFreehandPropertiesDialog(comp, ref, null);
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'Panel') {
+      window.StudioPanelProperties?.openPanelPropertiesDialog(comp, ref, null);
       setTemplateEditStatus(name, ref);
     } else {
       setStatus(`${comp.type} properties not available yet`);
@@ -1107,14 +1125,51 @@ async function patchOpenCanvas(patch) {
   return extractPatchedCanvas(result, null);
 }
 
+function resolveEditComponentIndex(comp, ref = null) {
+  const cache = state.canvasEditCache?.editComponents;
+  const name = comp?.name;
+  if (!cache?.length || !name) return -1;
+  const hinted = state.propsDialog?.editIndex;
+  if (hinted != null && cache[hinted]?.comp?.name === name) return hinted;
+  const useRef = ref || state.propsDialog?.ref;
+  if (useRef?.type === 'display' && useRef.index != null) {
+    const byRef = cache.findIndex((e) => e.ref?.type === 'display' && e.ref.index === useRef.index);
+    if (byRef >= 0) return byRef;
+  }
+  if (useRef?.type === 'template-override' && useRef.name) {
+    const byTpl = cache.findIndex((e) => e.ref?.type === 'template-override' && e.ref.name === useRef.name);
+    if (byTpl >= 0) return byTpl;
+  }
+  if (useRef?.type === 'shell' && useRef.name) {
+    const byShell = cache.findIndex((e) => e.ref?.type === 'shell' && e.ref.name === useRef.name);
+    if (byShell >= 0) return byShell;
+  }
+  return cache.findIndex((e) => e.comp?.name === name);
+}
+
+function showCanvasPropsDialog(dialogEl) {
+  if (!dialogEl || dialogEl.open) return;
+  dialogEl.show();
+  if (!dialogEl.classList.contains('is-positioned')) {
+    dialogEl.classList.add('is-positioned');
+    dialogEl.style.margin = '0';
+    dialogEl.style.position = 'fixed';
+    const w = dialogEl.offsetWidth || 420;
+    const h = dialogEl.offsetHeight || 320;
+    dialogEl.style.left = `${Math.max(8, (window.innerWidth - w) / 2)}px`;
+    dialogEl.style.top = `${Math.max(8, (window.innerHeight - h) / 2)}px`;
+  }
+}
+
 async function syncEditComponentAfterSave(savedComp, ref) {
-  const editIdx = state.propsDialog.editIndex;
+  const editIdx = resolveEditComponentIndex(savedComp, ref);
   if (!savedComp?.name) return;
 
   if (ref?.type === 'template-override') {
     const merged = await mergeTemplateOverrideComponent(savedComp, ref);
-    if (editIdx != null && state.canvasEditCache?.editComponents?.[editIdx]) {
+    if (editIdx >= 0) {
       state.canvasEditCache.editComponents[editIdx] = merged;
+      state.propsDialog.editIndex = editIdx;
     } else {
       const idx = state.canvasEditCache?.editComponents?.findIndex((e) => e.comp?.name === savedComp.name);
       if (idx >= 0) state.canvasEditCache.editComponents[idx] = merged;
@@ -1123,12 +1178,13 @@ async function syncEditComponentAfterSave(savedComp, ref) {
   }
 
   const patchComp = { ...savedComp };
-  if (editIdx != null && state.canvasEditCache?.editComponents?.[editIdx]) {
+  if (editIdx >= 0 && state.canvasEditCache?.editComponents?.[editIdx]) {
     state.canvasEditCache.editComponents[editIdx].comp = {
       ...state.canvasEditCache.editComponents[editIdx].comp,
       ...patchComp
     };
     if (ref) state.canvasEditCache.editComponents[editIdx].ref = ref;
+    state.propsDialog.editIndex = editIdx;
     return;
   }
 
@@ -1138,6 +1194,7 @@ async function syncEditComponentAfterSave(savedComp, ref) {
       ...state.canvasEditCache.editComponents[idx].comp,
       ...patchComp
     };
+    state.propsDialog.editIndex = idx;
   }
 }
 
@@ -1154,7 +1211,7 @@ async function upsertCanvasComponent(component) {
   }
 
   if (ref?.type === 'template-override') {
-    const useFullMerge = clean.type === 'Rectangle' || clean.type === 'Ellipse'
+    const useFullMerge = clean.type === 'Rectangle' || clean.type === 'Ellipse' || clean.type === 'Arc' || clean.type === 'Freehand' || clean.type === 'Panel'
       || clean.type === 'MultistateIndicator' || clean.type === 'Text';
     await patchTemplateOverride(ref.name, clean, useFullMerge ? { mergeOnly: true } : undefined);
     await syncEditComponentAfterSave(clean, ref);
@@ -1264,6 +1321,16 @@ async function upsertCanvasComponent(component) {
   refreshPropertyPanel();
   if (isNew || isEditingGlobalObject()) {
     scheduleRefreshCanvasEditOverlay();
+    if (isNew) {
+      await refreshCanvasEditOverlay().catch(() => {});
+      state.propsDialog.ref = { type: 'display', index };
+      const editIdx = resolveEditComponentIndex(savedComp || clean, state.propsDialog.ref);
+      if (editIdx >= 0) {
+        state.propsDialog.editIndex = editIdx;
+        state.canvasSelection.indices = [editIdx];
+        refreshCanvasEditOverlaySelection();
+      }
+    }
   }
   if (isEditingGlobalObject()) {
     setStatus(`Saved ${clean.name} on Template (applies to all displays)`);
@@ -1281,6 +1348,86 @@ function isUiWorkSuspended() {
     state.canvasEditDrag ||
     document.querySelector('dialog.dialog[open]')
   );
+}
+
+function isCanvasOverlayRefreshBlocked() {
+  if (state.propsFormFill || state.canvasEditDrag) return true;
+  const dlg = document.querySelector('dialog.dialog[open]');
+  if (!dlg) return false;
+  return !dlg.classList.contains('dialog-maintained-props');
+}
+
+function syncOpenPropsDialogBounds(comp) {
+  const { kind, editIndex } = state.propsDialog || {};
+  if (editIndex == null || !comp?.name) return;
+  const entry = state.canvasEditCache?.editComponents?.[editIndex];
+  if (!entry || entry.comp?.name !== comp.name) return;
+
+  state.propsFormFill = true;
+  try {
+    if (kind === 'arc') {
+      const apHeight = document.getElementById('apHeight');
+      const apWidth = document.getElementById('apWidth');
+      const apTop = document.getElementById('apTop');
+      const apLeft = document.getElementById('apLeft');
+      if (!apHeight) return;
+      apHeight.value = comp.height ?? apHeight.value;
+      apWidth.value = comp.width ?? apWidth.value;
+      apTop.value = comp.top ?? apTop.value;
+      apLeft.value = comp.left ?? apLeft.value;
+      window.flushPropsApplyButton?.(window.StudioArcProperties.readArcPropertiesForm, 'applyArcProperties');
+    } else if (kind === 'ellipse') {
+      const epHeight = document.getElementById('epHeight');
+      const epWidth = document.getElementById('epWidth');
+      const epTop = document.getElementById('epTop');
+      const epLeft = document.getElementById('epLeft');
+      if (!epHeight) return;
+      epHeight.value = comp.height ?? epHeight.value;
+      epWidth.value = comp.width ?? epWidth.value;
+      epTop.value = comp.top ?? epTop.value;
+      epLeft.value = comp.left ?? epLeft.value;
+      window.flushPropsApplyButton?.(window.StudioEllipseProperties.readEllipsePropertiesForm, 'applyEllipseProperties');
+    } else if (kind === 'shape') {
+      const spHeight = document.getElementById('spHeight');
+      const spWidth = document.getElementById('spWidth');
+      const spTop = document.getElementById('spTop');
+      const spLeft = document.getElementById('spLeft');
+      if (!spHeight) return;
+      spHeight.value = comp.height ?? spHeight.value;
+      spWidth.value = comp.width ?? spWidth.value;
+      spTop.value = comp.top ?? spTop.value;
+      spLeft.value = comp.left ?? spLeft.value;
+      window.flushPropsApplyButton?.(window.StudioShapeProperties.readShapePropertiesForm, 'applyShapeProperties');
+    } else if (kind === 'freehand') {
+      const fhHeight = document.getElementById('fhHeight');
+      const fhWidth = document.getElementById('fhWidth');
+      const fhTop = document.getElementById('fhTop');
+      const fhLeft = document.getElementById('fhLeft');
+      if (!fhHeight) return;
+      fhHeight.value = comp.height ?? fhHeight.value;
+      fhWidth.value = comp.width ?? fhWidth.value;
+      fhTop.value = comp.top ?? fhTop.value;
+      fhLeft.value = comp.left ?? fhLeft.value;
+      if (Array.isArray(comp.points)) {
+        document.getElementById('freehandPointsData').value = JSON.stringify(comp.points);
+      }
+      window.updateFreehandStudioPreview?.(window.StudioFreehandProperties.readFreehandPropertiesForm());
+      window.flushPropsApplyButton?.(window.StudioFreehandProperties.readFreehandPropertiesForm, 'applyFreehandProperties');
+    } else if (kind === 'panel') {
+      const ppHeight = document.getElementById('ppHeight');
+      const ppWidth = document.getElementById('ppWidth');
+      const ppTop = document.getElementById('ppTop');
+      const ppLeft = document.getElementById('ppLeft');
+      if (!ppHeight) return;
+      ppHeight.value = comp.height ?? ppHeight.value;
+      ppWidth.value = comp.width ?? ppWidth.value;
+      ppTop.value = comp.top ?? ppTop.value;
+      ppLeft.value = comp.left ?? ppLeft.value;
+      window.flushPropsApplyButton?.(window.StudioPanelProperties.readPanelPropertiesForm, 'applyPanelProperties');
+    }
+  } finally {
+    state.propsFormFill = false;
+  }
 }
 
 function resetPropsDialogState(kind, readFn, applyBtnId, editIndex = null, ref = null) {
@@ -1340,7 +1487,12 @@ function revertPropsDialogPreview() {
   if (!state.propsDialog.snapshot) return;
   try {
     const comp = JSON.parse(state.propsDialog.snapshot);
-    if (comp?.name) previewPatchByName(comp.name, comp);
+    if (!comp?.name) return;
+    if (state.propsDialog.editIndex == null) {
+      previewRemoveComponentByName(comp.name);
+    } else {
+      previewPatchByName(comp.name, comp);
+    }
   } catch { /* ignore invalid snapshot */ }
 }
 
@@ -1445,19 +1597,93 @@ function defaultEllipseComponent(overrides = {}) {
     name: 'Ellipse1',
     left: 0,
     top: 0,
-    width: 32,
-    height: 32,
+    width: 121,
+    height: 116,
     visible: true,
     lineStyle: 'solid',
     backStyle: 'solid',
     patternStyle: 'none',
     useForeColor: true,
-    foreColor: '#000000',
+    foreColor: '#808080',
     useBackColor: true,
-    backColor: '#10EB10',
+    backColor: '#808080',
     usePatternColor: false,
     patternColor: '#ffffff',
     lineWidth: 1,
+    ...overrides
+  };
+}
+
+function defaultFreehandComponent(overrides = {}) {
+  return {
+    type: 'Freehand',
+    name: 'Freehand1',
+    left: 0,
+    top: 0,
+    width: 166,
+    height: 71,
+    visible: true,
+    lineStyle: 'solid',
+    backStyle: 'transparent',
+    patternStyle: 'none',
+    useForeColor: true,
+    foreColor: '#000000',
+    useBackColor: false,
+    backColor: '#808080',
+    usePatternColor: false,
+    patternColor: '#808080',
+    lineWidth: 1,
+    points: [],
+    ...overrides
+  };
+}
+
+function defaultArcComponent(overrides = {}) {
+  return {
+    type: 'Arc',
+    name: 'Arc1',
+    left: 0,
+    top: 0,
+    width: 202,
+    height: 194,
+    visible: true,
+    lineStyle: 'solid',
+    backStyle: 'transparent',
+    patternStyle: 'none',
+    useForeColor: true,
+    foreColor: '#000000',
+    useBackColor: false,
+    backColor: '#c0c0c0',
+    usePatternColor: false,
+    patternColor: '#ffffff',
+    lineWidth: 1,
+    startAngle: 0,
+    sweepAngle: 360,
+    ...overrides
+  };
+}
+
+function defaultPanelComponent(overrides = {}) {
+  return {
+    type: 'Panel',
+    name: 'Panel1',
+    left: 0,
+    top: 0,
+    width: 228,
+    height: 103,
+    visible: true,
+    borderStyle: 'line',
+    backStyle: 'solid',
+    borderWidth: 1,
+    patternStyle: 'none',
+    borderUsesBackColor: true,
+    usePatternColor: false,
+    patternColor: '#ffffff',
+    backColor: '#001C38',
+    borderColor: '#001C38',
+    useBackColor: true,
+    blink: false,
+    children: [],
     ...overrides
   };
 }
@@ -3078,6 +3304,135 @@ function updatePlacementRubberband(rect) {
   placementRubberband.style.height = `${rect.height}px`;
 }
 
+function hideFreehandStrokePreview() {
+  if (!freehandStrokePreview) return;
+  freehandStrokePreview.classList.add('hidden');
+  freehandStrokePreview.setAttribute('aria-hidden', 'true');
+  freehandStrokePreview.innerHTML = '';
+}
+
+function freehandPreviewDashAttr(lineStyle, lineWidth) {
+  const w = Math.max(1, Number(lineWidth) || 1);
+  if (lineStyle === 'dash') return ` stroke-dasharray="${w * 8},${w * 4}"`;
+  if (lineStyle === 'dot') return ` stroke-dasharray="${w},${w * 3}"`;
+  if (lineStyle === 'dashDot') return ` stroke-dasharray="${w * 8},${w * 4},${w},${w * 4}"`;
+  if (lineStyle === 'dashDotDot') return ` stroke-dasharray="${w * 8},${w * 4},${w},${w * 4},${w},${w * 4}"`;
+  return '';
+}
+
+function freehandPreviewPathAbsolute(comp) {
+  const points = comp?.points || [];
+  if (points.length < 2) return '';
+  const left = comp.left || 0;
+  const top = comp.top || 0;
+  const close = comp.backStyle === 'solid' || comp.backStyle === 'gradient';
+  return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${left + p.x} ${top + p.y}`).join(' ')
+    + (close && points.length > 2 ? ' Z' : '');
+}
+
+function patchFreehandBounds(comp, bounds) {
+  if (!comp?.points?.length) return { ...bounds };
+  const oldW = comp.width || 1;
+  const oldH = comp.height || 1;
+  const newW = bounds.width ?? comp.width ?? oldW;
+  const newH = bounds.height ?? comp.height ?? oldH;
+  const patch = { ...bounds };
+  if (bounds.width != null || bounds.height != null) {
+    const sx = newW / oldW;
+    const sy = newH / oldH;
+    if (Math.abs(sx - 1) > 0.0001 || Math.abs(sy - 1) > 0.0001) {
+      patch.points = comp.points.map((p) => ({ x: p.x * sx, y: p.y * sy }));
+    }
+  }
+  return patch;
+}
+
+function updateFreehandStudioPreview(comp) {
+  if (!freehandStrokePreview || !comp?.points?.length || comp.points.length < 2 || comp.visible === false) {
+    hideFreehandStrokePreview();
+    return;
+  }
+  const w = state.previewCanvas.width || 800;
+  const h = state.previewCanvas.height || 600;
+  const d = freehandPreviewPathAbsolute(comp);
+  if (!d) {
+    hideFreehandStrokePreview();
+    return;
+  }
+  freehandStrokePreview.classList.remove('hidden');
+  freehandStrokePreview.setAttribute('aria-hidden', 'false');
+  freehandStrokePreview.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  freehandStrokePreview.setAttribute('width', '100%');
+  freehandStrokePreview.setAttribute('height', '100%');
+  const useBack = comp.useBackColor !== false && comp.backStyle !== 'transparent';
+  const fill = useBack && (comp.backStyle === 'solid' || comp.backStyle === 'gradient')
+    ? (comp.backColor || '#808080')
+    : 'none';
+  const lineStyle = comp.lineStyle || 'solid';
+  const lineW = comp.lineWidth ?? 1;
+  const useFore = comp.useForeColor !== false && lineStyle !== 'none' && lineW > 0;
+  const stroke = useFore ? (comp.foreColor || '#000000') : 'none';
+  const dash = useFore ? freehandPreviewDashAttr(lineStyle, lineW) : '';
+  freehandStrokePreview.innerHTML =
+    `<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${lineW}"` +
+    ` stroke-linecap="round" stroke-linejoin="round" fill-rule="evenodd"${dash}/>`;
+}
+
+function updateFreehandStrokePreview(points) {
+  if (!freehandStrokePreview || !points?.length) return;
+  const w = state.previewCanvas.width || 800;
+  const h = state.previewCanvas.height || 600;
+  freehandStrokePreview.classList.remove('hidden');
+  freehandStrokePreview.setAttribute('aria-hidden', 'false');
+  freehandStrokePreview.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  freehandStrokePreview.setAttribute('width', '100%');
+  freehandStrokePreview.setAttribute('height', '100%');
+  const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  freehandStrokePreview.innerHTML = `<path d="${d}" fill="none" stroke="#000" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+
+function boundsFromFreehandPoints(points, pad = 2) {
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const left = Math.max(0, minX - pad);
+  const top = Math.max(0, minY - pad);
+  const width = Math.max(8, maxX - minX + pad * 2);
+  const height = Math.max(8, maxY - minY + pad * 2);
+  const normalized = points.map((p) => ({ x: p.x - left, y: p.y - top }));
+  return { left, top, width, height, points: normalized };
+}
+
+async function completeFreehandDrawing(canvasPoints) {
+  const placement = state.placement;
+  if (!placement || placement.kind !== 'freehand') return;
+  hideFreehandStrokePreview();
+  objectPlacementOverlay?.classList.add('hidden');
+  previewCanvasWrap?.classList.remove('placement-active');
+  state.placement = null;
+
+  if (!canvasPoints || canvasPoints.length < 2) {
+    activateSelectTool('Freehand cancelled — draw at least two points');
+    return;
+  }
+
+  try {
+    const bounds = boundsFromFreehandPoints(canvasPoints, 2);
+    const canvas = await fetchOpenCanvas();
+    const comp = defaultFreehandComponent({
+      ...placement.defaults,
+      ...bounds,
+      name: nextShapeObjectName(canvas.components, 'Freehand', 'Freehand')
+    });
+    window.StudioFreehandProperties?.openFreehandPropertiesDialog(comp, null, null);
+  } catch (err) {
+    activateSelectTool(`Error: ${err.message}`);
+  }
+}
+
 function hidePlacementRubberband() {
   placementRubberband?.classList.add('hidden');
   placementRubberband?.classList.remove('image-preview');
@@ -3089,10 +3444,11 @@ function startObjectPlacement(kind, defaults = {}) {
     return;
   }
   state.placement = { kind, defaults, dragging: false, start: null };
-  objectPlacementOverlay?.classList.remove('hidden', 'tool-text', 'tool-momentary', 'tool-image');
+  objectPlacementOverlay?.classList.remove('hidden', 'tool-text', 'tool-momentary', 'tool-image', 'tool-freehand');
   if (kind === 'text') objectPlacementOverlay?.classList.add('tool-text');
   else if (kind === 'image') objectPlacementOverlay?.classList.add('tool-image');
   else if (kind === 'string-display') objectPlacementOverlay?.classList.add('tool-text');
+  else if (kind === 'freehand') objectPlacementOverlay?.classList.add('tool-freehand');
   else objectPlacementOverlay?.classList.add('tool-momentary');
   objectPlacementOverlay?.setAttribute('aria-hidden', 'false');
   previewCanvasWrap?.classList.add('placement-active');
@@ -3107,6 +3463,12 @@ function startObjectPlacement(kind, defaults = {}) {
     setStatus('Drag on the display to draw a rectangle (Esc to cancel)');
   } else if (kind === 'ellipse') {
     setStatus('Drag on the display to draw an ellipse (Esc to cancel)');
+  } else if (kind === 'panel') {
+    setStatus('Drag on the display to draw a panel (Esc to cancel)');
+  } else if (kind === 'arc') {
+    setStatus('Drag on the display to draw an arc (Esc to cancel)');
+  } else if (kind === 'freehand') {
+    setStatus('Draw on the display with the mouse (Esc to cancel)');
   } else {
     setStatus('Drag on the display to draw a button (Esc to cancel)');
   }
@@ -3115,10 +3477,11 @@ function startObjectPlacement(kind, defaults = {}) {
 function cancelObjectPlacement() {
   state.placement = null;
   objectPlacementOverlay?.classList.add('hidden');
-  objectPlacementOverlay?.classList.remove('tool-text', 'tool-momentary', 'tool-image');
+  objectPlacementOverlay?.classList.remove('tool-text', 'tool-momentary', 'tool-image', 'tool-freehand');
   objectPlacementOverlay?.setAttribute('aria-hidden', 'true');
   previewCanvasWrap?.classList.remove('placement-active');
   hidePlacementRubberband();
+  hideFreehandStrokePreview();
 }
 
 function activateSelectTool(statusMessage) {
@@ -3202,15 +3565,34 @@ async function completeObjectPlacement(rect) {
         return;
       }
       await showCanvasImagePropertiesDialog({ ...defaults, image: fileName });
-    } else if (kind === 'rectangle' || kind === 'ellipse') {
+    } else if (kind === 'rectangle') {
       const canvas = await fetchOpenCanvas();
-      const isEllipse = kind === 'ellipse';
-      const type = isEllipse ? 'Ellipse' : 'Rectangle';
-      const prefix = isEllipse ? 'Ellipse' : 'Polygon';
-      const comp = isEllipse
-        ? defaultEllipseComponent({ ...defaults, name: nextShapeObjectName(canvas.components, type, prefix) })
-        : defaultRectangleComponent({ ...defaults, name: nextShapeObjectName(canvas.components, type, prefix) });
+      const comp = defaultRectangleComponent({
+        ...defaults,
+        name: nextShapeObjectName(canvas.components, 'Rectangle', 'Polygon')
+      });
       window.StudioShapeProperties?.openShapePropertiesDialog(comp, null, null);
+    } else if (kind === 'ellipse') {
+      const canvas = await fetchOpenCanvas();
+      const comp = defaultEllipseComponent({
+        ...defaults,
+        name: nextShapeObjectName(canvas.components, 'Ellipse', 'Ellipse')
+      });
+      window.StudioEllipseProperties?.openEllipsePropertiesDialog(comp, null, null);
+    } else if (kind === 'panel') {
+      const canvas = await fetchOpenCanvas();
+      const comp = defaultPanelComponent({
+        ...defaults,
+        name: nextShapeObjectName(canvas.components, 'Panel', 'Panel')
+      });
+      window.StudioPanelProperties?.openPanelPropertiesDialog(comp, null, null);
+    } else if (kind === 'arc') {
+      const canvas = await fetchOpenCanvas();
+      const comp = defaultArcComponent({
+        ...defaults,
+        name: nextShapeObjectName(canvas.components, 'Arc', 'Arc')
+      });
+      window.StudioArcProperties?.openArcPropertiesDialog(comp, null, null);
     }
   } catch (err) {
     cancelObjectPlacement();
@@ -3224,6 +3606,13 @@ function initObjectPlacement() {
   objectPlacementOverlay.addEventListener('mousedown', (e) => {
     if (!state.placement || e.button !== 0) return;
     e.preventDefault();
+    if (state.placement.kind === 'freehand') {
+      const pt = getCanvasPoint(e.clientX, e.clientY);
+      state.placement.drawing = true;
+      state.placement.points = [pt];
+      updateFreehandStrokePreview([pt]);
+      return;
+    }
     const start = getCanvasPoint(e.clientX, e.clientY);
     state.placement.dragging = true;
     state.placement.start = start;
@@ -3231,6 +3620,17 @@ function initObjectPlacement() {
   });
 
   document.addEventListener('mousemove', (e) => {
+    if (state.placement?.kind === 'freehand' && state.placement.drawing) {
+      const pt = getCanvasPoint(e.clientX, e.clientY);
+      const points = state.placement.points || [];
+      const last = points[points.length - 1];
+      if (!last || Math.hypot(pt.x - last.x, pt.y - last.y) >= 3) {
+        points.push(pt);
+        state.placement.points = points;
+        updateFreehandStrokePreview(points);
+      }
+      return;
+    }
     if (!state.placement?.dragging || !state.placement.start) return;
     const current = getCanvasPoint(e.clientX, e.clientY);
     const start = state.placement.start;
@@ -3240,6 +3640,12 @@ function initObjectPlacement() {
   });
 
   document.addEventListener('mouseup', (e) => {
+    if (state.placement?.kind === 'freehand' && state.placement.drawing) {
+      state.placement.drawing = false;
+      const points = [...(state.placement.points || [])];
+      completeFreehandDrawing(points).catch((err) => setStatus(`Error: ${err.message}`));
+      return;
+    }
     if (!state.placement?.dragging || !state.placement.start) return;
     const current = getCanvasPoint(e.clientX, e.clientY);
     const start = state.placement.start;
@@ -3363,7 +3769,7 @@ let canvasOverlayRefreshTimer = null;
 let canvasOverlayRefreshPending = false;
 
 function scheduleRefreshCanvasEditOverlay() {
-  if (isUiWorkSuspended()) {
+  if (isCanvasOverlayRefreshBlocked()) {
     canvasOverlayRefreshPending = true;
     return;
   }
@@ -3376,7 +3782,7 @@ function scheduleRefreshCanvasEditOverlay() {
 }
 
 function scheduleRefreshAfterDialogClose() {
-  if (!canvasOverlayRefreshPending || isUiWorkSuspended()) return;
+  if (!canvasOverlayRefreshPending || isCanvasOverlayRefreshBlocked()) return;
   scheduleRefreshCanvasEditOverlay();
 }
 
@@ -3483,25 +3889,42 @@ async function updateCanvasComponentBounds(index, bounds) {
     const canvas = await fetchOpenCanvas();
     const shellKey = getNavShellKey(canvas);
     if (!shellKey) return;
+    let patch = { ...bounds };
+    if (entry.comp?.type === 'Freehand') patch = patchFreehandBounds(entry.comp, bounds);
     const shellOverrides = {
       ...(canvas[shellKey] || {}),
       [entry.ref.name]: stripNavShellPersistFields({
         ...(canvas[shellKey]?.[entry.ref.name] || {}),
-        ...bounds
+        ...patch
       })
     };
     await patchOpenCanvas({ [shellKey]: shellOverrides });
     state.canvasEditCache.raw = { ...canvas, [shellKey]: shellOverrides };
-    if (entry.comp) Object.assign(entry.comp, bounds);
-    updateCanvasEditHitBounds(entry.comp?.name, bounds);
-    await updateCanvasPreview({ name: entry.comp?.name, bounds });
+    if (entry.comp) Object.assign(entry.comp, patch);
+    updateCanvasEditHitBounds(entry.comp?.name, patch);
+    if (entry.comp?.type === 'Freehand') {
+      await updateCanvasPreview({ name: entry.comp.name, component: { ...entry.comp }, mode: 'patch-by-name' });
+    } else {
+      await updateCanvasPreview({ name: entry.comp?.name, bounds: patch });
+    }
+    syncOpenPropsDialogBounds(entry.comp);
     scheduleRefreshCanvasEditOverlay();
     setCanvasSelection(index);
     return;
   }
 
   if (entry.ref?.type === 'template-override') {
-    await patchTemplateOverride(entry.ref.name, bounds, { mergeOnly: true });
+    let patch = { ...bounds };
+    if (entry.comp?.type === 'Freehand') patch = patchFreehandBounds(entry.comp, bounds);
+    await patchTemplateOverride(entry.ref.name, patch, { mergeOnly: true });
+    if (entry.comp) Object.assign(entry.comp, patch);
+    updateCanvasEditHitBounds(entry.comp?.name, patch);
+    if (entry.comp?.type === 'Freehand') {
+      await updateCanvasPreview({ name: entry.comp.name, component: { ...entry.comp }, mode: 'patch-by-name' });
+    } else {
+      await updateCanvasPreview({ name: entry.comp?.name, bounds: patch });
+    }
+    syncOpenPropsDialogBounds(entry.comp);
     setCanvasSelection(index);
     return;
   }
@@ -3510,12 +3933,21 @@ async function updateCanvasComponentBounds(index, bounds) {
   const components = [...(canvas.components || [])];
   const compIndex = entry.ref?.index;
   if (compIndex == null || !components[compIndex]) return;
-  components[compIndex] = { ...components[compIndex], ...bounds };
+  let patch = { ...bounds };
+  if (entry.comp?.type === 'Freehand') {
+    patch = patchFreehandBounds(entry.comp, bounds);
+  }
+  components[compIndex] = { ...components[compIndex], ...patch };
   await patchOpenCanvas({ components });
   state.canvasEditCache.raw = { ...canvas, components };
-  if (entry.comp) Object.assign(entry.comp, bounds);
-  updateCanvasEditHitBounds(entry.comp?.name, bounds);
-  await updateCanvasPreview({ name: entry.comp?.name, bounds });
+  if (entry.comp) Object.assign(entry.comp, patch);
+  updateCanvasEditHitBounds(entry.comp?.name, patch);
+  if (entry.comp?.type === 'Freehand') {
+    await updateCanvasPreview({ name: entry.comp.name, component: { ...entry.comp }, mode: 'patch-by-name' });
+  } else {
+    await updateCanvasPreview({ name: entry.comp?.name, bounds: patch });
+  }
+  syncOpenPropsDialogBounds(entry.comp);
   setCanvasSelection(index);
   return;
 }
@@ -3678,8 +4110,16 @@ async function openPropertiesForComponent(index) {
       switchCanvasImagePropertiesTab('general');
       document.getElementById('canvasImagePropertiesDialog')?.showModal();
       setTemplateEditStatus(comp.name, ref);
-    } else if (comp.type === 'Rectangle' || comp.type === 'Ellipse') {
+    } else if (comp.type === 'Rectangle') {
       window.StudioShapeProperties?.openShapePropertiesDialog(comp, ref, index);
+    } else if (comp.type === 'Ellipse') {
+      window.StudioEllipseProperties?.openEllipsePropertiesDialog(comp, ref, index);
+    } else if (comp.type === 'Arc') {
+      window.StudioArcProperties?.openArcPropertiesDialog(comp, ref, index);
+    } else if (comp.type === 'Freehand') {
+      window.StudioFreehandProperties?.openFreehandPropertiesDialog(comp, ref, index);
+    } else if (comp.type === 'Panel') {
+      window.StudioPanelProperties?.openPanelPropertiesDialog(comp, ref, index);
     } else {
       setStatus(`${comp.type} properties — double-click supported types: Text, shapes, buttons, indicators, Clock`);
     }
@@ -3897,6 +4337,13 @@ function initCanvasEditOverlay() {
     applyGraphicBoundsStyle(hit, { left, top, width, height });
     drag.moved = true;
     drag.pending = { left, top, width, height };
+    if (comp.type === 'Freehand' && state.propsDialog?.kind === 'freehand') {
+      let previewComp = { ...comp, ...drag.pending };
+      if (drag.mode !== 'move' && (drag.mode.startsWith('resize-'))) {
+        previewComp = { ...previewComp, ...patchFreehandBounds(comp, drag.pending) };
+      }
+      updateFreehandStudioPreview(previewComp);
+    }
   });
 
   document.addEventListener('mouseup', () => {
@@ -4109,6 +4556,18 @@ function handleObjectAction(id) {
   }
   if (item.action === 'ellipse-properties') {
     startObjectPlacement('ellipse', item.shapeDefaults || {});
+    return;
+  }
+  if (item.action === 'panel-properties') {
+    startObjectPlacement('panel', item.panelDefaults || {});
+    return;
+  }
+  if (item.action === 'arc-properties') {
+    startObjectPlacement('arc', item.arcDefaults || {});
+    return;
+  }
+  if (item.action === 'freehand-properties') {
+    startObjectPlacement('freehand', item.freehandDefaults || {});
     return;
   }
   if (item.component) {
@@ -4485,6 +4944,10 @@ function previewUpdateBoundsByName(name, bounds) {
 
 function previewPatchByName(name, component) {
   return previewPost('patch-by-name', { name, component });
+}
+
+function previewRemoveComponentByName(name) {
+  return previewPost('remove-by-name', { name });
 }
 
 function previewSyncComponents(components) {
@@ -9578,6 +10041,10 @@ function runDeferredStudioInits() {
       () => window.StudioRecipePlusSelector?.initRecipePlusSelectorDialog(),
       () => window.StudioCommunicationsSetup?.initCommunicationsSetupDialog(),
       () => window.StudioShapeProperties?.initShapePropertiesDialog(),
+      () => window.StudioFreehandProperties?.initFreehandPropertiesDialog(),
+      () => window.StudioEllipseProperties?.initEllipsePropertiesDialog(),
+      () => window.StudioArcProperties?.initArcPropertiesDialog(),
+      () => window.StudioPanelProperties?.initPanelPropertiesDialog(),
       initAlarmWizardDialog,
       initTagEditDialog,
       initTagFolderDialog,

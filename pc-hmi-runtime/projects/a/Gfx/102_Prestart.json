@@ -461,6 +461,13 @@
           "caption": "Error"
         }
       ]
+    },
+    {
+      "type": "Panel",
+      "style": {
+        "className": "panel-box"
+      },
+      "children": []
     }
   ],
   "displaySettings": {

@@ -4,10 +4,8 @@
   "startupScreen": "100_Overview",
   "communication": {
     "driver": "simulator",
-    "plcIpAddress": "",
-    "path": "0",
     "opcua": {
-      "port": 4840,
+      "endpoint": "opc.tcp://localhost:4840",
       "securityMode": "None",
       "securityPolicy": "None"
     },
@@ -268,6 +266,6 @@
   },
   "studio": {
     "lastOpenedWith": "Plant HMI Studio 1.0",
-    "lastOpenedAt": "2026-08-11T09:29:13.800Z"
+    "lastOpenedAt": "2026-08-27T10:17:45.573Z"
   }
 }

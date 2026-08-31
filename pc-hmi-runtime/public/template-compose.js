@@ -67,7 +67,7 @@
     { target: '402_Alarm_Remedies_Popup', label: 'Alarm\nRemedy', top: 240 }
   ];
 
-  /** Overview nav — FT 85×45 @ 1024, scaled to 800-wide display. */
+  /** Overview nav — FT 85×45 @ 1024, stored in 800×600 display space. */
   const OVERVIEW_NAV_GEOMETRY = { left: 8, width: 66, height: 35 };
   const MANUAL_NAV_GEOMETRY = { left: 8, width: 66, height: 35 };
   const ALARM_NAV_GEOMETRY = { left: 8, width: 66, height: 35 };
@@ -78,9 +78,22 @@
     return Math.round(value * DISPLAY_SCALE);
   }
 
-  function buildOverviewShell(rawScreen) {
+  function displayLayoutScale(runtime = {}) {
+    const width = Number(runtime.width) || 800;
+    const height = Number(runtime.height) || 600;
+    return { sx: width / 800, sy: height / 600 };
+  }
+
+  function layoutPx(value, factor, min = 0) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return value;
+    return Math.max(min, Math.round(n * factor));
+  }
+
+  function buildOverviewShell(rawScreen, runtime = {}) {
     if (rawScreen.navGroup !== 'overview') return [];
 
+    const { sx, sy } = displayLayoutScale(runtime);
     const overrides = rawScreen.overviewShell || {};
     const screenId = rawScreen.id;
     const shell = OVERVIEW_NAV_ITEMS.map((item) => {
@@ -93,16 +106,16 @@
         label: item.label,
         caption: item.label,
         target: item.target,
-        left: layout.left ?? OVERVIEW_NAV_GEOMETRY.left,
-        top: layout.top ?? scaleCoord(item.top),
-        width: layout.width ?? OVERVIEW_NAV_GEOMETRY.width,
-        height: layout.height ?? OVERVIEW_NAV_GEOMETRY.height,
+        left: layout.left ?? layoutPx(OVERVIEW_NAV_GEOMETRY.left, sx),
+        top: layout.top ?? layoutPx(scaleCoord(item.top), sy),
+        width: layout.width ?? layoutPx(OVERVIEW_NAV_GEOMETRY.width, sx, 1),
+        height: layout.height ?? layoutPx(OVERVIEW_NAV_GEOMETRY.height, sy, 1),
         useBackColor: layout.useBackColor ?? true,
         backColor: layout.backColor ?? '#dcdcdc',
         backStyle: layout.backStyle ?? 'solid',
         borderStyle: isActive ? 'line' : (layout.borderStyle ?? 'raised'),
         borderWidth: layout.borderWidth ?? 3,
-        fontSize: layout.fontSize ?? 9,
+        fontSize: layout.fontSize ?? layoutPx(9, (sx + sy) / 2, 6),
         bold: layout.bold ?? true,
         alignment: layout.alignment ?? 'middleCenter',
         wordWrap: layout.wordWrap ?? true,
@@ -123,12 +136,12 @@
       type: 'Text',
       name: 'ScreenSubtitle',
       caption: subtitleOverride.caption ?? rawScreen.subtitle ?? rawScreen.title ?? '',
-      left: subtitleOverride.left ?? scaleCoord(437),
-      top: subtitleOverride.top ?? scaleCoord(34),
-      width: subtitleOverride.width ?? scaleCoord(151),
-      height: subtitleOverride.height ?? scaleCoord(22),
+      left: subtitleOverride.left ?? layoutPx(scaleCoord(437), sx),
+      top: subtitleOverride.top ?? layoutPx(scaleCoord(34), sy),
+      width: subtitleOverride.width ?? layoutPx(scaleCoord(151), sx, 1),
+      height: subtitleOverride.height ?? layoutPx(scaleCoord(22), sy, 1),
       fontFamily: subtitleOverride.fontFamily ?? 'Arial',
-      fontSize: subtitleOverride.fontSize ?? 14,
+      fontSize: subtitleOverride.fontSize ?? layoutPx(14, (sx + sy) / 2, 6),
       bold: subtitleOverride.bold ?? true,
       foreColor: subtitleOverride.foreColor ?? '#000000',
       backStyle: subtitleOverride.backStyle ?? 'transparent',
@@ -161,9 +174,10 @@
     return picked;
   }
 
-  function buildManualShell(rawScreen) {
+  function buildManualShell(rawScreen, runtime = {}) {
     if (rawScreen.navGroup !== 'manual') return [];
 
+    const { sx, sy } = displayLayoutScale(runtime);
     const overrides = rawScreen.manualShell || {};
     const screenId = rawScreen.id;
     const shell = MANUAL_NAV_ITEMS.map((item) => {
@@ -176,16 +190,16 @@
         label: item.label,
         caption: item.label,
         target: item.target,
-        left: layout.left ?? MANUAL_NAV_GEOMETRY.left,
-        top: layout.top ?? scaleCoord(item.top),
-        width: layout.width ?? MANUAL_NAV_GEOMETRY.width,
-        height: layout.height ?? MANUAL_NAV_GEOMETRY.height,
+        left: layout.left ?? layoutPx(MANUAL_NAV_GEOMETRY.left, sx),
+        top: layout.top ?? layoutPx(scaleCoord(item.top), sy),
+        width: layout.width ?? layoutPx(MANUAL_NAV_GEOMETRY.width, sx, 1),
+        height: layout.height ?? layoutPx(MANUAL_NAV_GEOMETRY.height, sy, 1),
         useBackColor: layout.useBackColor ?? true,
         backColor: layout.backColor ?? '#dcdcdc',
         backStyle: layout.backStyle ?? 'solid',
         borderStyle: isActive ? 'line' : (layout.borderStyle ?? 'raised'),
         borderWidth: layout.borderWidth ?? 3,
-        fontSize: layout.fontSize ?? 9,
+        fontSize: layout.fontSize ?? layoutPx(9, (sx + sy) / 2, 6),
         bold: layout.bold ?? true,
         alignment: layout.alignment ?? 'middleCenter',
         wordWrap: layout.wordWrap ?? true,
@@ -206,12 +220,12 @@
       type: 'Text',
       name: 'ScreenSubtitle',
       caption: subtitleOverride.caption ?? rawScreen.subtitle ?? rawScreen.title ?? '',
-      left: subtitleOverride.left ?? scaleCoord(437),
-      top: subtitleOverride.top ?? scaleCoord(34),
-      width: subtitleOverride.width ?? scaleCoord(151),
-      height: subtitleOverride.height ?? scaleCoord(22),
+      left: subtitleOverride.left ?? layoutPx(scaleCoord(437), sx),
+      top: subtitleOverride.top ?? layoutPx(scaleCoord(34), sy),
+      width: subtitleOverride.width ?? layoutPx(scaleCoord(151), sx, 1),
+      height: subtitleOverride.height ?? layoutPx(scaleCoord(22), sy, 1),
       fontFamily: subtitleOverride.fontFamily ?? 'Arial',
-      fontSize: subtitleOverride.fontSize ?? 14,
+      fontSize: subtitleOverride.fontSize ?? layoutPx(14, (sx + sy) / 2, 6),
       bold: subtitleOverride.bold ?? true,
       foreColor: subtitleOverride.foreColor ?? '#000000',
       backStyle: subtitleOverride.backStyle ?? 'transparent',
@@ -226,9 +240,10 @@
     return shell;
   }
 
-  function buildAlarmsShell(rawScreen) {
+  function buildAlarmsShell(rawScreen, runtime = {}) {
     if (rawScreen.navGroup !== 'alarms') return [];
 
+    const { sx, sy } = displayLayoutScale(runtime);
     const overrides = rawScreen.alarmsShell || {};
     const screenId = rawScreen.id;
     const shell = ALARM_NAV_ITEMS.map((item) => {
@@ -241,16 +256,16 @@
         label: item.label,
         caption: item.label,
         target: item.target,
-        left: custom.left ?? ALARM_NAV_GEOMETRY.left,
-        top: custom.top ?? scaleCoord(item.top),
-        width: custom.width ?? ALARM_NAV_GEOMETRY.width,
-        height: custom.height ?? ALARM_NAV_GEOMETRY.height,
+        left: custom.left ?? layoutPx(ALARM_NAV_GEOMETRY.left, sx),
+        top: custom.top ?? layoutPx(scaleCoord(item.top), sy),
+        width: custom.width ?? layoutPx(ALARM_NAV_GEOMETRY.width, sx, 1),
+        height: custom.height ?? layoutPx(ALARM_NAV_GEOMETRY.height, sy, 1),
         useBackColor: custom.useBackColor ?? true,
         backColor: custom.backColor ?? '#dcdcdc',
         backStyle: custom.backStyle ?? 'solid',
         borderStyle: custom.borderStyle ?? 'raised',
         borderWidth: custom.borderWidth ?? 3,
-        fontSize: custom.fontSize ?? 9,
+        fontSize: custom.fontSize ?? layoutPx(9, (sx + sy) / 2, 6),
         bold: custom.bold ?? true,
         foreColor: custom.foreColor ?? '#000000',
         useForeColor: custom.useForeColor !== false,
@@ -278,12 +293,12 @@
       type: 'Text',
       name: 'ScreenSubtitle',
       caption: subtitleOverride.caption ?? rawScreen.subtitle ?? rawScreen.title ?? '',
-      left: subtitleOverride.left ?? scaleCoord(448),
-      top: subtitleOverride.top ?? scaleCoord(34),
-      width: subtitleOverride.width ?? scaleCoord(128),
-      height: subtitleOverride.height ?? scaleCoord(22),
+      left: subtitleOverride.left ?? layoutPx(scaleCoord(448), sx),
+      top: subtitleOverride.top ?? layoutPx(scaleCoord(34), sy),
+      width: subtitleOverride.width ?? layoutPx(scaleCoord(128), sx, 1),
+      height: subtitleOverride.height ?? layoutPx(scaleCoord(22), sy, 1),
       fontFamily: subtitleOverride.fontFamily ?? 'Arial',
-      fontSize: subtitleOverride.fontSize ?? 14,
+      fontSize: subtitleOverride.fontSize ?? layoutPx(14, (sx + sy) / 2, 6),
       bold: subtitleOverride.bold ?? true,
       foreColor: subtitleOverride.foreColor ?? '#000000',
       backStyle: subtitleOverride.backStyle ?? 'transparent',
@@ -298,21 +313,22 @@
     return shell;
   }
 
-  function buildSettingsShell(rawScreen) {
+  function buildSettingsShell(rawScreen, runtime = {}) {
     if (rawScreen.navGroup !== 'settings') return [];
 
+    const { sx, sy } = displayLayoutScale(runtime);
     const overrides = rawScreen.settingsShell || {};
     const subtitleOverride = overrides.ScreenSubtitle || {};
     return [{
       type: 'Text',
       name: 'ScreenSubtitle',
       caption: subtitleOverride.caption ?? rawScreen.subtitle ?? rawScreen.title ?? '',
-      left: subtitleOverride.left ?? scaleCoord(476),
-      top: subtitleOverride.top ?? scaleCoord(44),
-      width: subtitleOverride.width ?? scaleCoord(73),
-      height: subtitleOverride.height ?? scaleCoord(24),
+      left: subtitleOverride.left ?? layoutPx(scaleCoord(476), sx),
+      top: subtitleOverride.top ?? layoutPx(scaleCoord(44), sy),
+      width: subtitleOverride.width ?? layoutPx(scaleCoord(73), sx, 1),
+      height: subtitleOverride.height ?? layoutPx(scaleCoord(24), sy, 1),
       fontFamily: subtitleOverride.fontFamily ?? 'Arial',
-      fontSize: subtitleOverride.fontSize ?? 14,
+      fontSize: subtitleOverride.fontSize ?? layoutPx(14, (sx + sy) / 2, 6),
       bold: subtitleOverride.bold ?? true,
       foreColor: subtitleOverride.foreColor ?? '#000000',
       backStyle: subtitleOverride.backStyle ?? 'transparent',
@@ -439,10 +455,10 @@
       return top >= splitY;
     });
 
-    const overviewShell = buildOverviewShell(rawScreen);
-    const manualShell = buildManualShell(rawScreen);
-    const settingsShell = buildSettingsShell(rawScreen);
-    const alarmsShell = buildAlarmsShell(rawScreen);
+    const overviewShell = buildOverviewShell(rawScreen, runtime);
+    const manualShell = buildManualShell(rawScreen, runtime);
+    const settingsShell = buildSettingsShell(rawScreen, runtime);
+    const alarmsShell = buildAlarmsShell(rawScreen, runtime);
     const sideShell = overviewShell.length
       ? overviewShell
       : manualShell.length

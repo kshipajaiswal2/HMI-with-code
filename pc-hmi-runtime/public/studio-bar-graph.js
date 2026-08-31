@@ -1,5 +1,24 @@
-/** Bar Graph property dialog */
+/** Bar Graph property dialog — FactoryTalk View parity */
 (function () {
+  let bgrPreviewTimer = null;
+  let bgrDialogCommitted = false;
+
+  function bgrSetColor(id, raw) {
+    if (window.StudioPropsShared?.setColorFieldValue) {
+      window.StudioPropsShared.setColorFieldValue(id, raw);
+    } else {
+      const el = document.getElementById(id);
+      if (el) el.value = raw;
+    }
+  }
+
+  function bgrGetColor(id, fallback) {
+    if (window.StudioPropsShared?.getColorFieldValue) {
+      return window.StudioPropsShared.getColorFieldValue(id) || fallback;
+    }
+    return document.getElementById(id)?.value || fallback;
+  }
+
   function switchTab(tabId) {
     document.querySelectorAll('#barGraphDialog .dialog-tab').forEach((el) => {
       el.classList.toggle('active', el.dataset.bgrTab === tabId);
@@ -14,10 +33,17 @@
     return `BarGraph${n}`;
   }
 
+  function formatTagForDisplay(tag) {
+    if (window.StudioTagTools?.formatFtTagRef) return window.StudioTagTools.formatFtTagRef(tag);
+    const s = String(tag || '').trim();
+    if (s.startsWith('PLC uploded Tags.')) return `{[PLC]${s.slice('PLC uploded Tags.'.length)}}`;
+    return s;
+  }
+
   function defaultThresholds() {
     return [
-      { value: 50, useFillColor: false, fillColor: '#ffff00', blink: false },
-      { value: 75, useFillColor: false, fillColor: '#ffb6c1', blink: false }
+      { value: 50, fillColor: '#ffff00', blink: false },
+      { value: 75, fillColor: '#ff0000', blink: false }
     ];
   }
 
@@ -40,7 +66,7 @@
       useBackColor: true,
       useBorderColor: true,
       borderColor: '#001C38',
-      fillColor: '#0066cc',
+      fillColor: '#99CCFF',
       useFillColor: true,
       minValue: 0,
       maxValue: 100,
@@ -52,62 +78,145 @@
     };
   }
 
+  function scheduleBarGraphLivePreview() {
+    if (window.state?.propsFormFill) return;
+    if (bgrPreviewTimer) clearTimeout(bgrPreviewTimer);
+    bgrPreviewTimer = setTimeout(() => {
+      bgrPreviewTimer = null;
+      if (!document.getElementById('barGraphDialog')?.open) return;
+      const comp = readBarGraphForm();
+      if (window.patchShapeLivePreview) window.patchShapeLivePreview(comp);
+      else if (comp?.name) window.previewPatchByName?.(comp.name, comp);
+      window.updatePropsApplyButton?.(readBarGraphForm, 'applyBarGraph');
+    }, 80);
+  }
+
   function syncBarGraphFields() {
-    document.getElementById('bgrBackColor').disabled = !document.getElementById('bgrUseBackColor')?.checked;
-    document.getElementById('bgrBorderColor').disabled = !document.getElementById('bgrUseBorderColor')?.checked;
-    document.getElementById('bgrFillColor').disabled = !document.getElementById('bgrUseFillColor')?.checked;
     const count = Number(document.getElementById('bgrNumberOfThresholds')?.value) || 0;
-    document.getElementById('bgrThreshold1Value').disabled = count < 1;
-    document.getElementById('bgrThreshold1UseFillColor').disabled = count < 1;
-    document.getElementById('bgrThreshold1FillColor').disabled = count < 1 || !document.getElementById('bgrThreshold1UseFillColor')?.checked;
-    document.getElementById('bgrThreshold1Blink').disabled = count < 1;
-    document.getElementById('bgrThreshold2Value').disabled = count < 2;
-    document.getElementById('bgrThreshold2UseFillColor').disabled = count < 2;
-    document.getElementById('bgrThreshold2FillColor').disabled = count < 2 || !document.getElementById('bgrThreshold2UseFillColor')?.checked;
-    document.getElementById('bgrThreshold2Blink').disabled = count < 2;
-    document.getElementById('bgrThresholdType').disabled = count < 1;
+    const t1On = count >= 1;
+    const t2On = count >= 2;
+    const t1Val = document.getElementById('bgrThreshold1Value');
+    const t1Blink = document.getElementById('bgrThreshold1Blink');
+    const t1Color = document.getElementById('bgrThreshold1FillColor');
+    const t2Val = document.getElementById('bgrThreshold2Value');
+    const t2Blink = document.getElementById('bgrThreshold2Blink');
+    const t2Color = document.getElementById('bgrThreshold2FillColor');
+    if (t1Val) t1Val.disabled = !t1On;
+    if (t1Blink) t1Blink.disabled = !t1On;
+    if (t1Color) t1Color.disabled = !t1On;
+    if (t2Val) t2Val.disabled = !t2On;
+    if (t2Blink) t2Blink.disabled = !t2On;
+    if (t2Color) t2Color.disabled = !t2On;
+    document.querySelectorAll('.bgr-threshold-row').forEach((row, i) => {
+      row.classList.toggle('is-disabled', i === 0 ? !t1On : !t2On);
+    });
+  }
+
+  function wireBgrTagPick() {
+    const btn = document.querySelector('[data-tag-pick="bgrTag"]');
+    const input = document.getElementById('bgrTag');
+    if (!btn || !input || btn.dataset.tagPickWired === '1') return;
+    btn.dataset.tagPickWired = '1';
+    btn.addEventListener('click', () => {
+      window.StudioTagTools?.openTagBrowser(input, (sel) => {
+        input.value = formatTagForDisplay(sel);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        scheduleBarGraphLivePreview();
+      });
+    });
   }
 
   function wireTools() {
+    wireBgrTagPick();
     if (window.StudioTagTools) StudioTagTools.wirePickButtons();
-    if (window.FtColorPicker) window.FtColorPicker.initAll(document.getElementById('barGraphDialog'));
+    const dlg = document.getElementById('barGraphDialog');
+    if (window.FtColorPicker && dlg) {
+      if (window.FtColorPicker.initAllSync) window.FtColorPicker.initAllSync(dlg);
+      else window.FtColorPicker.initAll(dlg);
+      window.FtColorPicker.refreshAll?.(dlg);
+    }
+    document.querySelectorAll('#barGraphForm .ft-color-input').forEach((input) => {
+      if (input.dataset.bgrPreviewWired === '1') return;
+      input.dataset.bgrPreviewWired = '1';
+      input.addEventListener('input', scheduleBarGraphLivePreview);
+      input.addEventListener('change', scheduleBarGraphLivePreview);
+    });
     syncBarGraphFields();
   }
 
+  function presentBarGraphDialog() {
+    const dialog = document.getElementById('barGraphDialog');
+    if (!dialog) {
+      window.setStatus('Bar Graph Properties dialog is missing from Studio');
+      return;
+    }
+    if (dialog.open) return;
+    bgrDialogCommitted = false;
+    dialog.classList.add('is-positioned');
+    dialog.style.position = 'fixed';
+    dialog.style.margin = '0';
+    dialog.style.left = '24px';
+    dialog.style.top = '36px';
+    dialog.style.right = 'auto';
+    dialog.style.bottom = 'auto';
+    dialog.style.transform = 'none';
+    dialog.style.zIndex = '30000';
+    dialog.style.maxHeight = 'calc(100vh - 48px)';
+    dialog.style.overflow = 'auto';
+    try {
+      dialog.showModal();
+    } catch (err) {
+      document.querySelectorAll('dialog[open]').forEach((other) => {
+        if (other !== dialog) {
+          try { other.close(); } catch (_) { /* ignore */ }
+        }
+      });
+      try {
+        dialog.showModal();
+      } catch (err2) {
+        dialog.setAttribute('open', '');
+        dialog.style.display = 'block';
+        window.setStatus(`Opened Bar Graph properties without modal: ${err2.message}`);
+      }
+    }
+  }
+
   function fillBarGraphForm(comp) {
-    document.getElementById('bgrBorderStyle').value = comp.borderStyle || 'line';
-    document.getElementById('bgrBorderWidth').value = comp.borderWidth ?? 4;
-    document.getElementById('bgrBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
-    document.getElementById('bgrBackStyle').value = comp.backStyle || 'solid';
-    document.getElementById('bgrFillStyle').value = comp.fillStyle || 'solid';
-    document.getElementById('bgrUseBackColor').checked = comp.useBackColor !== false;
-    document.getElementById('bgrBackColor').value = comp.backColor || '#001C38';
-    document.getElementById('bgrUseBorderColor').checked = comp.useBorderColor !== false;
-    document.getElementById('bgrBorderColor').value = comp.borderColor || '#001C38';
-    document.getElementById('bgrUseFillColor').checked = comp.useFillColor !== false;
-    document.getElementById('bgrFillColor').value = comp.fillColor || '#0066cc';
-    document.getElementById('bgrMinValue').value = comp.minValue ?? 0;
-    document.getElementById('bgrMaxValue').value = comp.maxValue ?? 100;
-    document.getElementById('bgrFillDirection').value = comp.fillDirection || 'bottomToTop';
-    document.getElementById('bgrNumberOfThresholds').value = String(comp.numberOfThresholds ?? 0);
-    document.getElementById('bgrThresholdType').value = comp.thresholdType || 'value';
-    const thresholds = comp.thresholds?.length ? comp.thresholds : defaultThresholds();
-    document.getElementById('bgrThreshold1Value').value = thresholds[0]?.value ?? 50;
-    document.getElementById('bgrThreshold1UseFillColor').checked = Boolean(thresholds[0]?.useFillColor);
-    document.getElementById('bgrThreshold1FillColor').value = thresholds[0]?.fillColor || '#ffff00';
-    document.getElementById('bgrThreshold1Blink').checked = Boolean(thresholds[0]?.blink);
-    document.getElementById('bgrThreshold2Value').value = thresholds[1]?.value ?? 75;
-    document.getElementById('bgrThreshold2UseFillColor').checked = Boolean(thresholds[1]?.useFillColor);
-    document.getElementById('bgrThreshold2FillColor').value = thresholds[1]?.fillColor || '#ffb6c1';
-    document.getElementById('bgrThreshold2Blink').checked = Boolean(thresholds[1]?.blink);
-    document.getElementById('bgrTag').value = comp.tag || '';
-    document.getElementById('bgrHeight').value = comp.height ?? 120;
-    document.getElementById('bgrWidth').value = comp.width ?? 80;
-    document.getElementById('bgrTop').value = comp.top ?? 16;
-    document.getElementById('bgrLeft').value = comp.left ?? 16;
-    document.getElementById('bgrName').value = comp.name || 'BarGraph1';
-    document.getElementById('bgrVisible').checked = comp.visible !== false;
-    syncBarGraphFields();
+    if (window.state) window.state.propsFormFill = true;
+    try {
+      document.getElementById('bgrBorderStyle').value = comp.borderStyle || 'line';
+      document.getElementById('bgrBorderWidth').value = comp.borderWidth ?? 4;
+      document.getElementById('bgrBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
+      const backStyle = ['solid', 'transparent', 'gradient'].includes(comp.backStyle) ? comp.backStyle : 'solid';
+      document.getElementById('bgrBackStyle').value = backStyle;
+      document.getElementById('bgrFillStyle').value = comp.fillStyle === 'gradient' ? 'gradient' : 'solid';
+      bgrSetColor('bgrBackColor', comp.backColor || '#001C38');
+      bgrSetColor('bgrBorderColor', comp.borderColor || '#001C38');
+      bgrSetColor('bgrFillColor', comp.fillColor || '#99CCFF');
+      document.getElementById('bgrMinValue').value = comp.minValue ?? 0;
+      document.getElementById('bgrMaxValue').value = comp.maxValue ?? 100;
+      document.getElementById('bgrFillDirection').value = comp.fillDirection || 'bottomToTop';
+      document.getElementById('bgrNumberOfThresholds').value = String(comp.numberOfThresholds ?? 0);
+      document.getElementById('bgrThresholdType').value = (comp.thresholdType || 'value').toLowerCase() === 'percentage' ? 'percentage' : 'value';
+      const thresholds = comp.thresholds?.length ? comp.thresholds : defaultThresholds();
+      document.getElementById('bgrThreshold1Value').value = thresholds[0]?.value ?? 50;
+      bgrSetColor('bgrThreshold1FillColor', thresholds[0]?.fillColor || '#ffff00');
+      document.getElementById('bgrThreshold1Blink').checked = Boolean(thresholds[0]?.blink);
+      document.getElementById('bgrThreshold2Value').value = thresholds[1]?.value ?? 75;
+      bgrSetColor('bgrThreshold2FillColor', thresholds[1]?.fillColor || '#ff0000');
+      document.getElementById('bgrThreshold2Blink').checked = Boolean(thresholds[1]?.blink);
+      document.getElementById('bgrTag').value = formatTagForDisplay(comp.tag || '');
+      document.getElementById('bgrHeight').value = comp.height ?? 120;
+      document.getElementById('bgrWidth').value = comp.width ?? 80;
+      document.getElementById('bgrTop').value = comp.top ?? 16;
+      document.getElementById('bgrLeft').value = comp.left ?? 16;
+      document.getElementById('bgrName').value = comp.name || 'BarGraph1';
+      document.getElementById('bgrVisible').checked = comp.visible !== false;
+      syncBarGraphFields();
+    } finally {
+      if (window.state) window.state.propsFormFill = false;
+    }
   }
 
   function readBarGraphForm() {
@@ -121,16 +230,16 @@
       height: Number(document.getElementById('bgrHeight').value) || 120,
       visible: document.getElementById('bgrVisible').checked,
       borderStyle: document.getElementById('bgrBorderStyle').value,
-      borderWidth: Number(document.getElementById('bgrBorderWidth').value) || 4,
+      borderWidth: Number(document.getElementById('bgrBorderWidth').value ?? 4),
       borderUsesBackColor: document.getElementById('bgrBorderUsesBackColor').checked,
       backStyle: document.getElementById('bgrBackStyle').value,
       fillStyle: document.getElementById('bgrFillStyle').value,
-      backColor: document.getElementById('bgrBackColor').value,
-      useBackColor: document.getElementById('bgrUseBackColor').checked,
-      useBorderColor: document.getElementById('bgrUseBorderColor').checked,
-      borderColor: document.getElementById('bgrBorderColor').value,
-      fillColor: document.getElementById('bgrFillColor').value,
-      useFillColor: document.getElementById('bgrUseFillColor').checked,
+      backColor: bgrGetColor('bgrBackColor', '#001C38'),
+      useBackColor: true,
+      useBorderColor: true,
+      borderColor: bgrGetColor('bgrBorderColor', '#001C38'),
+      fillColor: bgrGetColor('bgrFillColor', '#99CCFF'),
+      useFillColor: true,
       minValue: Number(document.getElementById('bgrMinValue').value) || 0,
       maxValue: Number(document.getElementById('bgrMaxValue').value) || 100,
       fillDirection: document.getElementById('bgrFillDirection').value,
@@ -139,109 +248,127 @@
       thresholds: [
         {
           value: Number(document.getElementById('bgrThreshold1Value').value) || 50,
-          useFillColor: document.getElementById('bgrThreshold1UseFillColor').checked,
-          fillColor: document.getElementById('bgrThreshold1FillColor').value,
+          fillColor: bgrGetColor('bgrThreshold1FillColor', '#ffff00'),
           blink: document.getElementById('bgrThreshold1Blink').checked
         },
         {
           value: Number(document.getElementById('bgrThreshold2Value').value) || 75,
-          useFillColor: document.getElementById('bgrThreshold2UseFillColor').checked,
-          fillColor: document.getElementById('bgrThreshold2FillColor').value,
+          fillColor: bgrGetColor('bgrThreshold2FillColor', '#ff0000'),
           blink: document.getElementById('bgrThreshold2Blink').checked
         }
       ]
     };
   }
 
-  function validateBarGraph(comp) {
-    if (!comp.tag) {
-      window.setStatus('Connect a Value tag on the Connections tab');
-      switchTab('connections');
-      return false;
-    }
-    if (comp.maxValue <= comp.minValue) {
-      window.setStatus('Maximum value must be greater than minimum value');
-      switchTab('general');
-      return false;
-    }
-    return true;
-  }
-
   async function showBarGraphDialog(overrides = {}) {
     if (!window.displayIsOpen?.()) {
-      window.setStatus('Open a display first, then choose Bar Graph');
+      window.setStatus('Open a display first, then drag on the canvas to place the Bar Graph');
       return;
     }
-    const canvas = await window.fetchOpenCanvas();
-    const comp = defaultBarGraphComponent({
-      name: nextBarGraphName(canvas?.components),
-      ...overrides
-    });
-    fillBarGraphForm(comp);
-    window.resetPropsDialogState('bar-graph', readBarGraphForm, 'applyBarGraph');
-    switchTab('general');
-    wireTools();
-    document.getElementById('barGraphDialog')?.showModal();
+    try {
+      window.flushDeferredDialogInits?.();
+      initBarGraphDialog();
+      const canvas = await window.fetchOpenCanvas();
+      const comp = defaultBarGraphComponent({
+        name: nextBarGraphName(canvas?.components),
+        ...overrides
+      });
+      fillBarGraphForm(comp);
+      window.resetPropsDialogState('bar-graph', readBarGraphForm, 'applyBarGraph');
+      switchTab('general');
+      wireTools();
+      presentBarGraphDialog();
+      const previewComp = readBarGraphForm();
+      if (window.patchShapeLivePreview) window.patchShapeLivePreview(previewComp);
+      else if (previewComp?.name) window.previewPatchByName?.(previewComp.name, previewComp);
+      window.flushPropsApplyButton?.(readBarGraphForm, 'applyBarGraph');
+    } catch (err) {
+      window.setStatus(`Bar Graph properties error: ${err.message}`);
+    }
   }
 
   async function applyBarGraph() {
     const comp = readBarGraphForm();
-    if (!validateBarGraph(comp)) return;
-    await window.upsertCanvasComponent(comp);
+    const ok = await window.upsertCanvasComponent(comp);
+    if (!ok) {
+      window.setStatus('Could not apply — open a display or global object first');
+      return;
+    }
     window.commitPropsSnapshot(readBarGraphForm, 'applyBarGraph');
-    window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
+    window.afterCanvasComponentSaved?.(comp);
+    window.setStatus(`Applied ${comp.name}`);
   }
 
   async function saveBarGraph(e) {
     e.preventDefault();
     const comp = readBarGraphForm();
-    if (!validateBarGraph(comp)) return;
-    await window.upsertCanvasComponent(comp);
+    const ok = await window.upsertCanvasComponent(comp);
+    if (!ok) {
+      window.setStatus('Could not save — open a display or global object first');
+      return;
+    }
+    bgrDialogCommitted = true;
+    const editIdx = window.state?.propsDialog?.editIndex;
     document.getElementById('barGraphDialog').close();
-    window.clearPropsDialogState();
-    window.activateSelectTool(`Added ${comp.name} to ${window.state.selectedScreenId}`);
+    if (editIdx != null) window.state.canvasSelection.indices = [editIdx];
+    window.setStatus(`Saved ${comp.name}`);
   }
 
   function initBarGraphDialog() {
     const form = document.getElementById('barGraphForm');
-    if (!form) return;
+    if (!form || form.dataset.bgrWired === '1') return;
     form.addEventListener('submit', (e) => saveBarGraph(e).catch((err) => window.setStatus(`Error: ${err.message}`)));
     document.getElementById('applyBarGraph')?.addEventListener('click', () => {
       applyBarGraph().catch((err) => window.setStatus(`Error: ${err.message}`));
     });
-    form.addEventListener('input', () => window.updatePropsApplyButton(readBarGraphForm, 'applyBarGraph'));
-    form.addEventListener('change', () => window.updatePropsApplyButton(readBarGraphForm, 'applyBarGraph'));
+    form.addEventListener('input', () => {
+      scheduleBarGraphLivePreview();
+      window.flushPropsApplyButton?.(readBarGraphForm, 'applyBarGraph');
+    });
+    form.addEventListener('change', () => {
+      syncBarGraphFields();
+      scheduleBarGraphLivePreview();
+      window.flushPropsApplyButton?.(readBarGraphForm, 'applyBarGraph');
+    });
     document.getElementById('cancelBarGraph')?.addEventListener('click', () => {
+      if (!bgrDialogCommitted) window.revertPropsDialogPreview?.();
+      bgrDialogCommitted = true;
       document.getElementById('barGraphDialog')?.close();
-      window.clearPropsDialogState();
-      window.activateSelectTool('Placement cancelled');
     });
     document.getElementById('barGraphDialog')?.addEventListener('close', () => {
-      if (window.state.placement) window.activateSelectTool();
+      if (bgrPreviewTimer) {
+        clearTimeout(bgrPreviewTimer);
+        bgrPreviewTimer = null;
+      }
+      if (!bgrDialogCommitted) window.revertPropsDialogPreview?.();
+      bgrDialogCommitted = false;
+      window.clearPropsDialogState?.();
+      window.activateSelectTool?.();
     });
     document.getElementById('helpBarGraph')?.addEventListener('click', () => {
-      alert('Bar Graph displays a tag value as a filled bar between minimum and maximum values.');
+      alert('Bar Graph displays a Value tag as a filled bar between minimum and maximum values. A Value tag is optional until runtime.');
     });
     document.querySelectorAll('#barGraphDialog .dialog-tab').forEach((tab) => {
       tab.addEventListener('click', () => switchTab(tab.dataset.bgrTab));
     });
-    for (const id of [
-      'bgrUseBackColor', 'bgrUseBorderColor', 'bgrUseFillColor',
-      'bgrThreshold1UseFillColor', 'bgrThreshold2UseFillColor', 'bgrNumberOfThresholds'
-    ]) {
-      document.getElementById(id)?.addEventListener('change', () => {
-        syncBarGraphFields();
-        window.updatePropsApplyButton(readBarGraphForm, 'applyBarGraph');
-      });
-    }
+    document.getElementById('bgrNumberOfThresholds')?.addEventListener('change', () => {
+      syncBarGraphFields();
+      scheduleBarGraphLivePreview();
+    });
+    form.dataset.bgrWired = '1';
   }
 
   window.StudioBarGraph = {
     initBarGraphDialog,
+    presentBarGraphDialog,
+    scheduleBarGraphLivePreview,
     showBarGraphDialog,
     fillBarGraphForm,
     readBarGraphForm,
     switchBarGraphTab: switchTab,
-    wireBarGraphTools: wireTools
+    wireBarGraphTools: wireTools,
+    nextBarGraphName,
+    defaultBarGraphComponent,
+    applyBarGraph
   };
 })();

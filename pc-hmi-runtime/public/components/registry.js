@@ -132,6 +132,7 @@ const ComponentRegistry = {
       if (!stateDef) return;
       const merged = ComponentRegistry.mergeMomentaryState(comp, stateDef);
       ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit });
+      ComponentRegistry.applyShapePattern(btn, merged);
       caption.textContent = stateDef.caption ?? comp.caption ?? comp.label ?? '';
       const alignId = stateDef.alignment || comp.alignment || 'middleCenter';
       const align = ComponentRegistry.textAlignment(alignId);
@@ -148,7 +149,35 @@ const ComponentRegistry = {
         wordWrap: stateDef.wordWrap !== undefined ? stateDef.wordWrap : comp.wordWrap,
         alignment: alignId
       });
+      if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid') {
+        caption.style.backgroundColor = stateDef.captionBackColor || '#001C38';
+      } else {
+        caption.style.backgroundColor = 'transparent';
+      }
+      caption.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
       btn.classList.toggle('ft-blink', Boolean(stateDef.blink));
+
+      let imgEl = btn.querySelector('.ft-btn-image');
+      if (stateDef.image) {
+        if (!imgEl) {
+          imgEl = document.createElement('img');
+          imgEl.className = 'ft-btn-image ft-goto-btn-icon';
+          imgEl.alt = '';
+          imgEl.draggable = false;
+          imgEl.style.pointerEvents = 'none';
+          btn.insertBefore(imgEl, caption);
+        }
+        imgEl.src = ComponentRegistry.imageUrl(stateDef.image, ctx);
+        imgEl.classList.toggle('ft-goto-btn-icon-scaled', Boolean(stateDef.imageScaled));
+        imgEl.classList.toggle('ft-blink', Boolean(stateDef.imageBlink));
+        if (stateDef.useImageBackColor && stateDef.imageBackStyle === 'solid') {
+          imgEl.style.backgroundColor = stateDef.imageBackColor || '#001C38';
+        } else {
+          imgEl.style.backgroundColor = 'transparent';
+        }
+      } else if (imgEl) {
+        imgEl.remove();
+      }
     };
 
     const showTagState = (val) => {
@@ -275,7 +304,15 @@ const ComponentRegistry = {
         imgEl = null;
       }
       const merged = ComponentRegistry.mergeMomentaryState(comp, stateDef);
-      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit });
+      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit, useHighlightColor: false });
+      ComponentRegistry.applyShapePattern(btn, merged);
+      if (comp.useHighlightColor && comp.highlightColor) {
+        btn.classList.add('ft-highlight-on-focus');
+        btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+      } else {
+        btn.classList.remove('ft-highlight-on-focus');
+        btn.style.removeProperty('--ft-highlight-color');
+      }
       if (stateDef.image) {
         imgEl = document.createElement('img');
         imgEl.className = 'ft-maintained-btn-icon';
@@ -283,9 +320,13 @@ const ComponentRegistry = {
         imgEl.alt = '';
         imgEl.draggable = false;
         imgEl.style.pointerEvents = 'none';
-        imgEl.style.maxWidth = '88%';
-        imgEl.style.maxHeight = '88%';
-        imgEl.style.objectFit = 'contain';
+        const scaled = Boolean(stateDef.imageScaled);
+        imgEl.style.maxWidth = scaled ? '100%' : '88%';
+        imgEl.style.maxHeight = scaled ? '100%' : '88%';
+        imgEl.style.objectFit = scaled ? 'fill' : 'contain';
+        imgEl.style.width = scaled ? '100%' : '';
+        imgEl.style.height = scaled ? '100%' : '';
+        imgEl.classList.toggle('ft-blink', Boolean(stateDef.imageBlink));
         btn.insertBefore(imgEl, caption);
       }
       caption.textContent = stateDef.caption ?? comp.caption ?? comp.label ?? '';
@@ -305,6 +346,12 @@ const ComponentRegistry = {
         wordWrap: stateDef.wordWrap !== undefined ? stateDef.wordWrap : comp.wordWrap,
         alignment: alignId
       });
+      if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid') {
+        caption.style.backgroundColor = stateDef.captionBackColor || '#001C38';
+      } else {
+        caption.style.backgroundColor = 'transparent';
+      }
+      caption.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
       btn.classList.toggle('ft-blink', Boolean(stateDef.blink));
     };
 
@@ -313,11 +360,14 @@ const ComponentRegistry = {
     };
 
     const defaultState = ComponentRegistry.resolveMultistateState(states, state0Val);
+    const previewState = (studioEdit && comp.previewStateId)
+      ? (states.find((s) => s.id === comp.previewStateId) || defaultState)
+      : defaultState;
 
     if (indicatorTag && !studioEdit) {
       ComponentRegistry.bindIndicatorRef(indicatorTag, showTagState, ctx);
     } else {
-      renderState(defaultState);
+      renderState(previewState);
     }
 
     if (studioEdit) {
@@ -351,9 +401,12 @@ const ComponentRegistry = {
     const toggle = () => {
       const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
       if (!writeTag) return;
-      const current = indicatorTag
-        ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
-        : ctx.getTagValue(comp.tag);
+      const basedOnValue = (comp.nextStateBasedOn || 'currentState') === 'valueControl';
+      const current = basedOnValue
+        ? ctx.getTagValue(comp.tag)
+        : (indicatorTag
+          ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
+          : ctx.getTagValue(comp.tag));
       const nextVal = isState1(current) ? state0Val : state1Val;
       ctx.writeTag(writeTag, nextVal);
     };
@@ -380,16 +433,21 @@ const ComponentRegistry = {
     const studioEdit = Boolean(ctx.studioEdit);
     const states = comp.states?.length
       ? comp.states
-      : ComponentRegistry.defaultMaintainedButtonStates(comp.caption ?? comp.label);
+      : ComponentRegistry.defaultLatchedButtonStates(comp.caption ?? comp.label);
     const caption = document.createElement('span');
     caption.className = 'ft-btn-caption';
     caption.style.pointerEvents = 'none';
     btn.style.display = 'flex';
+    btn.style.flexDirection = 'column';
+    btn.style.alignItems = 'center';
+    btn.style.justifyContent = 'center';
     btn.style.padding = '0 4px';
     btn.style.overflow = 'hidden';
     btn.appendChild(caption);
+    let imgEl = null;
 
     const indicatorTag = comp.indicatorTag || comp.tag;
+    const handshakeTag = comp.handshakeTag || '';
     const state0 = states.find((s) => s.id === 'State0') || states[0];
     const state1 = states.find((s) => s.id === 'State1') || states[1];
     const state0Val = state0?.value ?? 0;
@@ -397,9 +455,38 @@ const ComponentRegistry = {
 
     const renderState = (stateDef) => {
       if (!stateDef) return;
+      if (imgEl) {
+        imgEl.remove();
+        imgEl = null;
+      }
       const merged = ComponentRegistry.mergeMomentaryState(comp, stateDef);
-      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit });
+      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit, useHighlightColor: false });
+      ComponentRegistry.applyShapePattern(btn, merged);
+      if (comp.useHighlightColor && comp.highlightColor) {
+        btn.classList.add('ft-highlight-on-focus');
+        btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+      } else {
+        btn.classList.remove('ft-highlight-on-focus');
+        btn.style.removeProperty('--ft-highlight-color');
+      }
+      if (stateDef.image) {
+        imgEl = document.createElement('img');
+        imgEl.className = 'ft-latched-btn-icon';
+        imgEl.src = ComponentRegistry.imageUrl(stateDef.image, ctx);
+        imgEl.alt = '';
+        imgEl.draggable = false;
+        imgEl.style.pointerEvents = 'none';
+        const scaled = Boolean(stateDef.imageScaled);
+        imgEl.style.maxWidth = scaled ? '100%' : '88%';
+        imgEl.style.maxHeight = scaled ? '100%' : '88%';
+        imgEl.style.objectFit = scaled ? 'fill' : 'contain';
+        imgEl.style.width = scaled ? '100%' : '';
+        imgEl.style.height = scaled ? '100%' : '';
+        imgEl.classList.toggle('ft-blink', Boolean(stateDef.imageBlink));
+        btn.insertBefore(imgEl, caption);
+      }
       caption.textContent = stateDef.caption ?? comp.caption ?? comp.label ?? '';
+      caption.style.display = caption.textContent ? '' : 'none';
       const alignId = stateDef.alignment || comp.alignment || 'middleCenter';
       const align = ComponentRegistry.textAlignment(alignId);
       btn.style.justifyContent = align.justify;
@@ -415,6 +502,12 @@ const ComponentRegistry = {
         wordWrap: stateDef.wordWrap !== undefined ? stateDef.wordWrap : comp.wordWrap,
         alignment: alignId
       });
+      if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid') {
+        caption.style.backgroundColor = stateDef.captionBackColor || '#001C38';
+      } else {
+        caption.style.backgroundColor = 'transparent';
+      }
+      caption.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
       btn.classList.toggle('ft-blink', Boolean(stateDef.blink));
     };
 
@@ -422,10 +515,15 @@ const ComponentRegistry = {
       renderState(ComponentRegistry.resolveMultistateState(states, val));
     };
 
+    const defaultState = ComponentRegistry.resolveMultistateState(states, state0Val);
+    const previewState = (studioEdit && comp.previewStateId)
+      ? (states.find((s) => s.id === comp.previewStateId) || defaultState)
+      : defaultState;
+
     if (indicatorTag && !studioEdit) {
       ComponentRegistry.bindIndicatorRef(indicatorTag, showTagState, ctx);
     } else {
-      renderState(ComponentRegistry.resolveMultistateState(states, state0Val));
+      renderState(previewState);
     }
 
     if (studioEdit) {
@@ -461,10 +559,12 @@ const ComponentRegistry = {
       e.preventDefault();
       const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
       if (!writeTag) return;
-      const current = indicatorTag
-        ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
-        : ctx.getTagValue(comp.tag);
-      if (!isLatched(current)) {
+      const resetVal = handshakeTag
+        ? ComponentRegistry.readIndicatorRef(handshakeTag, ctx)
+        : (indicatorTag
+          ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
+          : ctx.getTagValue(comp.tag));
+      if (!isLatched(resetVal)) {
         ctx.writeTag(writeTag, latchVal);
       }
     });
@@ -492,18 +592,51 @@ const ComponentRegistry = {
     caption.className = 'ft-btn-caption';
     caption.style.pointerEvents = 'none';
     btn.style.display = 'flex';
+    btn.style.flexDirection = 'column';
+    btn.style.alignItems = 'center';
+    btn.style.justifyContent = 'center';
     btn.style.padding = '0 4px';
     btn.style.overflow = 'hidden';
     btn.appendChild(caption);
+    let imgEl = null;
 
     const indicatorTag = comp.indicatorTag || comp.tag;
     const userStates = states.filter((s) => s.id !== 'Error');
 
     const renderState = (stateDef) => {
       if (!stateDef) return;
+      if (imgEl) {
+        imgEl.remove();
+        imgEl = null;
+      }
       const merged = ComponentRegistry.mergeMomentaryState(comp, stateDef);
-      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit });
+      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit, useHighlightColor: false });
+      ComponentRegistry.applyShapePattern(btn, merged);
+      if (comp.useHighlightColor && comp.highlightColor) {
+        btn.classList.add('ft-highlight-on-focus');
+        btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+      } else {
+        btn.classList.remove('ft-highlight-on-focus');
+        btn.style.removeProperty('--ft-highlight-color');
+      }
+      if (stateDef.image) {
+        imgEl = document.createElement('img');
+        imgEl.className = 'ft-multistate-btn-icon';
+        imgEl.src = ComponentRegistry.imageUrl(stateDef.image, ctx);
+        imgEl.alt = '';
+        imgEl.draggable = false;
+        imgEl.style.pointerEvents = 'none';
+        const scaled = Boolean(stateDef.imageScaled);
+        imgEl.style.maxWidth = scaled ? '100%' : '88%';
+        imgEl.style.maxHeight = scaled ? '100%' : '88%';
+        imgEl.style.objectFit = scaled ? 'fill' : 'contain';
+        imgEl.style.width = scaled ? '100%' : '';
+        imgEl.style.height = scaled ? '100%' : '';
+        imgEl.classList.toggle('ft-blink', Boolean(stateDef.imageBlink));
+        btn.insertBefore(imgEl, caption);
+      }
       caption.textContent = stateDef.caption ?? comp.caption ?? comp.label ?? '';
+      caption.style.display = caption.textContent ? '' : 'none';
       const alignId = stateDef.alignment || comp.alignment || 'middleCenter';
       const align = ComponentRegistry.textAlignment(alignId);
       btn.style.justifyContent = align.justify;
@@ -519,6 +652,12 @@ const ComponentRegistry = {
         wordWrap: stateDef.wordWrap !== undefined ? stateDef.wordWrap : comp.wordWrap,
         alignment: alignId
       });
+      if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid') {
+        caption.style.backgroundColor = stateDef.captionBackColor || '#001C38';
+      } else {
+        caption.style.backgroundColor = 'transparent';
+      }
+      caption.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
       btn.classList.toggle('ft-blink', Boolean(stateDef.blink));
     };
 
@@ -526,10 +665,15 @@ const ComponentRegistry = {
       renderState(ComponentRegistry.resolveMultistateState(states, val));
     };
 
+    const defaultState = ComponentRegistry.resolveMultistateState(states, userStates[0]?.value ?? 0);
+    const previewState = (studioEdit && comp.previewStateId)
+      ? (states.find((s) => s.id === comp.previewStateId) || defaultState)
+      : defaultState;
+
     if (indicatorTag && !studioEdit) {
       ComponentRegistry.bindIndicatorRef(indicatorTag, showTagState, ctx);
     } else {
-      renderState(ComponentRegistry.resolveMultistateState(states, userStates[0]?.value ?? 0));
+      renderState(previewState);
     }
 
     if (studioEdit) {
@@ -558,9 +702,12 @@ const ComponentRegistry = {
     const advance = () => {
       const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
       if (!writeTag) return;
-      const current = indicatorTag
-        ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
-        : ctx.getTagValue(comp.tag);
+      const basedOnValue = (comp.nextStateBasedOn || 'currentState') === 'valueControl';
+      const current = basedOnValue
+        ? ctx.getTagValue(comp.tag)
+        : (indicatorTag
+          ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
+          : ctx.getTagValue(comp.tag));
       const resolved = ComponentRegistry.resolveMultistateState(states, current);
       const idx = userStates.findIndex((s) => s.id === resolved?.id);
       const nextIdx = idx < 0 ? 0 : (idx + 1) % userStates.length;
@@ -569,8 +716,9 @@ const ComponentRegistry = {
 
     let repeatTimer = null;
     let repeatDelayTimer = null;
-    const rate = comp.autoRepeatRate ?? 0;
+    const rate = Number(comp.autoRepeatRate ?? 0);
     const delay = comp.autoRepeatDelay ?? 400;
+    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
 
     const stopRepeat = () => {
       if (repeatDelayTimer) clearTimeout(repeatDelayTimer);
@@ -581,9 +729,9 @@ const ComponentRegistry = {
 
     const startRepeat = () => {
       advance();
-      if (rate <= 0) return;
+      if (intervalMs <= 0) return;
       repeatDelayTimer = setTimeout(() => {
-        repeatTimer = setInterval(advance, rate);
+        repeatTimer = setInterval(advance, intervalMs);
       }, delay);
     };
 
@@ -601,21 +749,42 @@ const ComponentRegistry = {
   },
 
   defaultMultistateButtonStates(count = 2, caption = '') {
-    const states = [];
-    for (let i = 0; i < count; i++) {
-      states.push({
-        id: `State${i}`, value: i, backColor: '#001C38', borderColor: '#001C38',
-        useBackColor: true, useBorderColor: true, caption: i === 0 ? caption : '',
-        captionColor: '#ffffff', useCaptionColor: true,
-        wordWrap: true, alignment: 'middleCenter', blink: false
-      });
-    }
-    states.push({
-      id: 'Error', backColor: '#001C38', borderColor: '#001C38',
-      useBackColor: true, useBorderColor: true, caption: 'Error',
-      captionColor: '#ffffff', useCaptionColor: true,
-      wordWrap: true, alignment: 'middleCenter', blink: false
+    const n = Math.max(2, Number(count) || 2);
+    const state = (id, extra = {}) => ({
+      id,
+      backColor: '#001C38',
+      borderColor: '#001C38',
+      useBackColor: true,
+      useBorderColor: true,
+      caption: '',
+      captionColor: '#ffffff',
+      useCaptionColor: false,
+      captionBackColor: '#001C38',
+      useCaptionBackColor: true,
+      captionBlink: false,
+      captionBackStyle: 'transparent',
+      patternStyle: 'none',
+      usePatternColor: false,
+      patternColor: '#ffffff',
+      wordWrap: true,
+      alignment: 'middleCenter',
+      blink: false,
+      image: '',
+      imageBackStyle: 'transparent',
+      imageAlignment: 'middleCenter',
+      useImageColor: false,
+      imageColor: '#001C38',
+      useImageBackColor: false,
+      imageBackColor: '#001C38',
+      imageBlink: false,
+      imageScaled: false,
+      ...extra
     });
+    const states = [];
+    for (let i = 0; i < n; i++) {
+      states.push(state(`State${i}`, { value: i, caption: i === 0 ? caption : '' }));
+    }
+    states.push(state('Error', { caption: 'Error', blink: true, useCaptionColor: true, backColor: 'navy', borderColor: 'navy' }));
     return states;
   },
 
@@ -638,21 +807,54 @@ const ComponentRegistry = {
     caption.className = 'ft-btn-caption';
     caption.style.pointerEvents = 'none';
     btn.style.display = 'flex';
+    btn.style.flexDirection = 'column';
+    btn.style.alignItems = 'center';
+    btn.style.justifyContent = 'center';
     btn.style.padding = '0 4px';
     btn.style.overflow = 'hidden';
     btn.appendChild(caption);
+    let imgEl = null;
 
-    let pressed = false;
-    const buttonValue = comp.buttonValue ?? 1;
-    const releaseValue = 0;
+    const rawBv = Number(comp.buttonValue);
+    const buttonValue = Number.isFinite(rawBv) ? rawBv : 0;
+    const state0 = states.find((s) => s.id === 'State0') || states[0];
     const state1 = states.find((s) => s.id === 'State1') || states[1];
 
     const renderState = (stateDef) => {
       if (!stateDef) return;
+      if (imgEl) {
+        imgEl.remove();
+        imgEl = null;
+      }
       const merged = ComponentRegistry.mergeMomentaryState(comp, stateDef);
-      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit });
+      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit, useHighlightColor: false });
+      ComponentRegistry.applyShapePattern(btn, merged);
+      if (comp.useHighlightColor && comp.highlightColor) {
+        btn.classList.add('ft-highlight-on-focus');
+        btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+      } else {
+        btn.classList.remove('ft-highlight-on-focus');
+        btn.style.removeProperty('--ft-highlight-color');
+      }
+      if (stateDef.image) {
+        imgEl = document.createElement('img');
+        imgEl.className = 'ft-interlocked-btn-icon';
+        imgEl.src = ComponentRegistry.imageUrl(stateDef.image, ctx);
+        imgEl.alt = '';
+        imgEl.draggable = false;
+        imgEl.style.pointerEvents = 'none';
+        const scaled = Boolean(stateDef.imageScaled);
+        imgEl.style.maxWidth = scaled ? '100%' : '88%';
+        imgEl.style.maxHeight = scaled ? '100%' : '88%';
+        imgEl.style.objectFit = scaled ? 'fill' : 'contain';
+        imgEl.style.width = scaled ? '100%' : '';
+        imgEl.style.height = scaled ? '100%' : '';
+        imgEl.classList.toggle('ft-blink', Boolean(stateDef.imageBlink));
+        btn.insertBefore(imgEl, caption);
+      }
       caption.textContent = stateDef.caption ?? comp.caption ?? comp.label ?? '';
-      const alignId = stateDef.alignment || comp.alignment || 'middleLeft';
+      caption.style.display = caption.textContent ? '' : 'none';
+      const alignId = stateDef.alignment || comp.alignment || 'middleCenter';
       const align = ComponentRegistry.textAlignment(alignId);
       btn.style.justifyContent = align.justify;
       btn.style.alignItems = align.align;
@@ -667,18 +869,32 @@ const ComponentRegistry = {
         wordWrap: stateDef.wordWrap !== undefined ? stateDef.wordWrap : comp.wordWrap,
         alignment: alignId
       });
+      if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid') {
+        caption.style.backgroundColor = stateDef.captionBackColor || '#001C38';
+      } else {
+        caption.style.backgroundColor = 'transparent';
+      }
+      caption.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
       btn.classList.toggle('ft-blink', Boolean(stateDef.blink));
     };
 
-    const showTagState = (val) => {
-      if (pressed) return;
-      renderState(ComponentRegistry.resolveMultistateState(states, val));
+    const stateForValue = (val) => {
+      const n = Number(val);
+      return (Number.isFinite(n) && n === buttonValue) ? (state1 || state0) : state0;
     };
+
+    const showTagState = (val) => {
+      renderState(stateForValue(val));
+    };
+
+    const previewState = (studioEdit && comp.previewStateId)
+      ? (states.find((s) => s.id === comp.previewStateId) || state0)
+      : state0;
 
     if (comp.tag && !studioEdit) {
       ComponentRegistry.bindIndicatorRef(comp.tag, showTagState, ctx);
     } else {
-      renderState(ComponentRegistry.resolveMultistateState(states, releaseValue));
+      renderState(previewState);
     }
 
     if (studioEdit) {
@@ -705,28 +921,14 @@ const ComponentRegistry = {
     }
 
     const press = () => {
-      pressed = true;
-      if (state1) renderState(state1);
+      renderState(state1 || state0);
       const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
       if (writeTag) ctx.writeTag(writeTag, buttonValue);
     };
 
-    const release = () => {
-      if (!pressed) return;
-      pressed = false;
-      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
-      if (writeTag) ctx.writeTag(writeTag, releaseValue);
-      const val = comp.tag ? ctx.getTagValue(comp.tag) : releaseValue;
-      showTagState(val !== undefined ? val : releaseValue);
-    };
-
     btn.addEventListener('mousedown', (e) => { e.preventDefault(); press(); });
-    btn.addEventListener('mouseup', release);
-    btn.addEventListener('mouseleave', release);
     if (comp.touch !== false) {
       btn.addEventListener('touchstart', (e) => { e.preventDefault(); press(); }, { passive: false });
-      btn.addEventListener('touchend', release);
-      btn.addEventListener('touchcancel', release);
     }
 
     return btn;
@@ -748,13 +950,49 @@ const ComponentRegistry = {
     caption.className = 'ft-btn-caption';
     caption.style.pointerEvents = 'none';
     btn.style.display = 'flex';
+    btn.style.flexDirection = 'column';
+    btn.style.alignItems = 'center';
+    btn.style.justifyContent = 'center';
     btn.style.padding = '0 4px';
     btn.style.overflow = 'hidden';
     btn.appendChild(caption);
+    let imgEl = null;
 
     const renderAppearance = () => {
-      ComponentRegistry.applyButtonAppearance(btn, { ...comp, studioEdit });
+      if (imgEl) {
+        imgEl.remove();
+        imgEl = null;
+      }
+      ComponentRegistry.applyButtonAppearance(btn, { ...comp, studioEdit, useHighlightColor: false });
+      ComponentRegistry.applyShapePattern(btn, comp);
+      if (comp.useHighlightColor && comp.highlightColor) {
+        btn.classList.add('ft-highlight-on-focus');
+        btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+      } else {
+        btn.classList.remove('ft-highlight-on-focus');
+        btn.style.removeProperty('--ft-highlight-color');
+      }
+      if (comp.image) {
+        imgEl = document.createElement('img');
+        imgEl.className = 'ft-ramp-btn-icon';
+        imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+        imgEl.alt = '';
+        imgEl.draggable = false;
+        imgEl.style.pointerEvents = 'none';
+        const scaled = Boolean(comp.imageScaled);
+        imgEl.style.maxWidth = scaled ? '100%' : '88%';
+        imgEl.style.maxHeight = scaled ? '100%' : '88%';
+        imgEl.style.objectFit = scaled ? 'fill' : 'contain';
+        imgEl.style.width = scaled ? '100%' : '';
+        imgEl.style.height = scaled ? '100%' : '';
+        if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+          imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+        }
+        imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+        btn.insertBefore(imgEl, caption);
+      }
       caption.textContent = comp.caption ?? comp.label ?? '';
+      caption.style.display = caption.textContent ? '' : 'none';
       const alignId = comp.alignment || 'middleCenter';
       const align = ComponentRegistry.textAlignment(alignId);
       btn.style.justifyContent = align.justify;
@@ -770,6 +1008,13 @@ const ComponentRegistry = {
         wordWrap: comp.wordWrap !== false,
         alignment: alignId
       });
+      if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+        caption.style.backgroundColor = comp.captionBackColor || '#001C38';
+      } else {
+        caption.style.backgroundColor = 'transparent';
+      }
+      caption.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+      btn.classList.toggle('ft-blink', Boolean(comp.blink));
     };
     renderAppearance();
 
@@ -800,8 +1045,9 @@ const ComponentRegistry = {
     if (!writeTag) return btn;
 
     const rampUp = (comp.operationDirection || 'rampUp') === 'rampUp';
-    const rate = comp.autoRepeatRate ?? 0;
+    const rate = Number(comp.autoRepeatRate) || 0;
     const delay = comp.autoRepeatDelay ?? 400;
+    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
     let repeatTimer = null;
     let delayTimer = null;
 
@@ -842,9 +1088,9 @@ const ComponentRegistry = {
 
     const start = () => {
       step();
-      if (rate <= 0) return;
+      if (intervalMs <= 0) return;
       delayTimer = setTimeout(() => {
-        repeatTimer = setInterval(step, rate);
+        repeatTimer = setInterval(step, intervalMs);
       }, delay);
     };
 
@@ -862,24 +1108,116 @@ const ComponentRegistry = {
   },
 
   defaultInterlockedButtonStates(caption = '') {
+    const state = (id, extra = {}) => ({
+      id,
+      backColor: '#001C38',
+      borderColor: '#001C38',
+      useBackColor: true,
+      useBorderColor: true,
+      caption,
+      captionColor: '#ffffff',
+      useCaptionColor: false,
+      captionBackColor: '#001C38',
+      useCaptionBackColor: false,
+      captionBlink: false,
+      captionBackStyle: 'transparent',
+      patternStyle: 'none',
+      usePatternColor: false,
+      patternColor: '#ffffff',
+      wordWrap: true,
+      alignment: 'middleCenter',
+      blink: false,
+      image: '',
+      imageBackStyle: 'transparent',
+      imageAlignment: 'middleCenter',
+      useImageColor: false,
+      imageColor: '#ffffff',
+      useImageBackColor: false,
+      imageBackColor: '#001C38',
+      imageBlink: false,
+      imageScaled: false,
+      ...extra
+    });
     return [
-      {
-        id: 'State0', value: 0, backColor: '#001C38', borderColor: '#001C38',
-        useBackColor: true, useBorderColor: true, caption,
-        captionColor: '#ffffff', useCaptionColor: true,
-        wordWrap: true, alignment: 'middleLeft', blink: false
-      },
-      {
-        id: 'State1', value: 1, backColor: '#001C38', borderColor: '#001C38',
-        useBackColor: true, useBorderColor: true, caption,
-        captionColor: '#ffffff', useCaptionColor: true,
-        wordWrap: true, alignment: 'middleLeft', blink: false
-      }
+      state('State0'),
+      state('State1')
     ];
   },
 
-  defaultMaintainedButtonStates(caption = 'Pump Run') {
-    return ComponentRegistry.defaultMomentaryButtonStates(caption);
+  defaultMaintainedButtonStates(caption = '') {
+    const state = (id, extra = {}) => ({
+      id,
+      backColor: '#001C38',
+      borderColor: '#001C38',
+      useBackColor: true,
+      useBorderColor: true,
+      caption,
+      captionColor: '#ffffff',
+      useCaptionColor: false,
+      captionBackColor: '#001C38',
+      useCaptionBackColor: false,
+      captionBlink: false,
+      captionBackStyle: 'transparent',
+      patternStyle: 'none',
+      usePatternColor: false,
+      patternColor: '#ffffff',
+      wordWrap: true,
+      alignment: 'middleRight',
+      blink: false,
+      image: '',
+      imageBackStyle: 'transparent',
+      imageAlignment: 'middleCenter',
+      useImageColor: false,
+      imageColor: '#001C38',
+      useImageBackColor: false,
+      imageBackColor: '#001C38',
+      imageBlink: false,
+      imageScaled: false,
+      ...extra
+    });
+    return [
+      state('State0', { value: 0 }),
+      state('State1', { value: 1 }),
+      state('Error', { caption: 'Error', blink: true, useCaptionColor: true, backColor: 'navy', borderColor: 'navy' })
+    ];
+  },
+
+  defaultLatchedButtonStates(caption = '') {
+    const state = (id, extra = {}) => ({
+      id,
+      backColor: '#001C38',
+      borderColor: '#001C38',
+      useBackColor: true,
+      useBorderColor: true,
+      caption,
+      captionColor: '#ffffff',
+      useCaptionColor: false,
+      captionBackColor: '#001C38',
+      useCaptionBackColor: true,
+      captionBlink: false,
+      captionBackStyle: 'transparent',
+      patternStyle: 'none',
+      usePatternColor: false,
+      patternColor: '#ffffff',
+      wordWrap: true,
+      alignment: 'middleCenter',
+      blink: false,
+      image: '',
+      imageBackStyle: 'transparent',
+      imageAlignment: 'middleCenter',
+      useImageColor: false,
+      imageColor: '#001C38',
+      useImageBackColor: true,
+      imageBackColor: '#001C38',
+      imageBlink: false,
+      imageScaled: false,
+      ...extra
+    });
+    return [
+      state('State0', { value: 0 }),
+      state('State1', { value: 1 }),
+      state('Error', { caption: 'Error', blink: true, useCaptionColor: true, backColor: 'navy', borderColor: 'navy' })
+    ];
   },
 
   defaultMomentaryButtonStates(caption = 'Conveyor Run') {
@@ -910,10 +1248,13 @@ const ComponentRegistry = {
       ...comp,
       useBackColor: stateDef.useBackColor !== false,
       backColor: stateDef.backColor || comp.backColor,
-      useBorderColor: Boolean(stateDef.useBorderColor),
+      useBorderColor: stateDef.useBorderColor !== false,
       borderColor: stateDef.borderColor || comp.borderColor,
       backStyle: stateDef.backStyle || comp.backStyle || 'solid',
-      blink: stateDef.blink
+      blink: stateDef.blink,
+      patternStyle: stateDef.patternStyle || 'none',
+      usePatternColor: Boolean(stateDef.patternStyle && stateDef.patternStyle !== 'none' && stateDef.usePatternColor !== false),
+      patternColor: stateDef.patternColor || '#ffffff'
     };
   },
 
@@ -948,16 +1289,26 @@ const ComponentRegistry = {
       } else {
         el.style.borderColor = '#ffffff #808080 #808080 #ffffff';
       }
+    } else if (borderStyle === 'inset') {
+      el.style.borderStyle = 'solid';
+      el.style.borderWidth = `${borderWidth}px`;
+      el.style.borderColor = '#808080 #ffffff #ffffff #808080';
     } else if (borderStyle === 'none') {
       el.style.border = 'none';
     } else {
       el.style.border = `${borderWidth}px solid ${borderColor}`;
     }
 
-    if (comp.backStyle === 'solid') {
+    if (comp.backStyle === 'gradient') {
+      const end = comp.endColor || '#e8e8e8';
+      el.style.background = `linear-gradient(to left, ${faceColor}, ${end})`;
+      el.style.backgroundColor = '';
+    } else if (comp.backStyle === 'solid') {
+      el.style.background = 'none';
       el.style.backgroundColor = faceColor;
     } else {
       el.style.backgroundColor = 'transparent';
+      el.style.background = 'none';
     }
 
     if (comp.useHighlightColor && comp.highlightColor) {
@@ -967,7 +1318,15 @@ const ComponentRegistry = {
     }
 
     el.classList.toggle('ft-blink', Boolean(comp.blink));
-    el.style.borderRadius = comp.shape === 'roundedRectangle' ? '4px' : '0';
+    if (comp.shape === 'circle') {
+      el.style.borderRadius = '50%';
+    } else if (comp.shape === 'ellipse') {
+      el.style.borderRadius = '50%';
+    } else if (comp.shape === 'roundedRectangle') {
+      el.style.borderRadius = '4px';
+    } else {
+      el.style.borderRadius = '0';
+    }
     el.style.cursor = comp.studioEdit ? 'default' : 'pointer';
     el.style.padding = (comp.width != null && comp.width <= 36) ? '0' : '0 4px';
     el.style.overflow = 'hidden';
@@ -1089,6 +1448,7 @@ const ComponentRegistry = {
       useBackColor: comp.useBackColor !== false,
       studioEdit
     });
+    ComponentRegistry.applyShapePattern(el, comp);
 
     el.style.display = 'flex';
     el.style.overflow = 'hidden';
@@ -1114,7 +1474,7 @@ const ComponentRegistry = {
         italic: comp.italic,
         underline: comp.underline,
         foreColor: comp.foreColor || '#ffffff',
-        useForeColor: comp.useForeColor !== false,
+        useForeColor: true,
         wordWrap: false,
         alignment: alignId
       });
@@ -1122,18 +1482,36 @@ const ComponentRegistry = {
     };
     applyTextStyle();
 
+    const applyPolarity = (val) => {
+      if (!comp.polarityTag) return val;
+      const p = ComponentRegistry.readIndicatorRef(comp.polarityTag, ctx);
+      const flag = Number(p);
+      if (!flag) return val;
+      const n = Number(val);
+      return Number.isNaN(n) ? val : -n;
+    };
+
     const showValue = (val) => {
       valueEl.textContent = ComponentRegistry.formatNumericDisplayValue(val, comp);
     };
 
-    if (comp.tag && !studioEdit) {
-      ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
-      const current = ctx.getTagValue?.(comp.tag);
-      if (current !== undefined && current !== null) {
-        showValue(current);
-      } else {
+    const refresh = () => {
+      if (!comp.tag) {
         valueEl.textContent = placeholder;
+        return;
       }
+      const current = ctx.getTagValue?.(comp.tag);
+      if (current === undefined || current === null) {
+        valueEl.textContent = placeholder;
+        return;
+      }
+      showValue(applyPolarity(current));
+    };
+
+    if (comp.tag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(comp.tag, () => refresh(), ctx);
+      if (comp.polarityTag) ComponentRegistry.bindIndicatorRef(comp.polarityTag, () => refresh(), ctx);
+      refresh();
     } else {
       valueEl.textContent = placeholder;
     }
@@ -1175,58 +1553,103 @@ const ComponentRegistry = {
 
     ComponentRegistry.applyGraphicsObject(el, comp);
     const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(el, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 4,
-      borderUsesBackColor: comp.borderUsesBackColor !== false,
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      studioEdit
-    });
-
+    const caption = document.createElement('span');
+    caption.className = 'ft-btn-caption';
+    caption.style.pointerEvents = 'none';
     el.style.display = 'flex';
-    el.style.overflow = 'hidden';
+    el.style.flexDirection = 'column';
+    el.style.alignItems = 'center';
+    el.style.justifyContent = 'center';
     el.style.padding = '0 4px';
+    el.style.overflow = 'hidden';
     el.style.cursor = studioEdit ? 'default' : 'pointer';
+    el.appendChild(caption);
+    let imgEl = null;
 
-    const valueEl = document.createElement('span');
-    valueEl.className = 'ft-numeric-display-value';
-    valueEl.style.pointerEvents = 'none';
-    valueEl.style.width = '100%';
-    el.appendChild(valueEl);
-
-    const alignId = comp.alignment || 'middleCenter';
-    const align = ComponentRegistry.textAlignment(alignId);
-    el.style.justifyContent = align.justify;
-    el.style.alignItems = align.align;
-
-    const showValue = (val) => {
-      valueEl.textContent = ComponentRegistry.formatNumericDisplayValue(val, comp);
-    };
-
-    if (comp.tag && !studioEdit) {
-      ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
-    } else {
-      valueEl.textContent = ComponentRegistry.numericDisplayPlaceholder(comp);
-    }
-
-    if (comp.caption) {
-      ComponentRegistry.applyCaptionStyle(valueEl, {
+    const applyCaptionLook = (alignId) => {
+      ComponentRegistry.applyCaptionStyle(caption, {
         fontFamily: comp.fontFamily,
         fontSize: comp.fontSize,
         bold: comp.bold,
         italic: comp.italic,
         underline: comp.underline,
         foreColor: comp.captionColor || comp.foreColor || '#ffffff',
-        useForeColor: comp.useCaptionColor !== false && comp.useForeColor !== false,
+        useForeColor: Boolean(comp.useCaptionColor),
         wordWrap: comp.wordWrap !== false,
         alignment: alignId
       });
-    }
+      if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+        caption.style.backgroundColor = comp.captionBackColor || '#001C38';
+      } else {
+        caption.style.backgroundColor = 'transparent';
+      }
+      caption.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    };
+
+    const renderAppearance = (displayText) => {
+      if (imgEl) {
+        imgEl.remove();
+        imgEl = null;
+      }
+      ComponentRegistry.applyButtonAppearance(el, {
+        ...comp,
+        borderStyle: comp.borderStyle || 'line',
+        borderWidth: comp.borderWidth ?? 4,
+        borderUsesBackColor: comp.borderUsesBackColor !== false,
+        backStyle: comp.backStyle || 'solid',
+        backColor: comp.backColor || '#001C38',
+        useBackColor: comp.useBackColor !== false,
+        studioEdit,
+        useHighlightColor: false
+      });
+      ComponentRegistry.applyShapePattern(el, comp);
+      if (comp.useHighlightColor && comp.highlightColor) {
+        el.classList.add('ft-highlight-on-focus');
+        el.style.setProperty('--ft-highlight-color', comp.highlightColor);
+      } else {
+        el.classList.remove('ft-highlight-on-focus');
+        el.style.removeProperty('--ft-highlight-color');
+      }
+      if (comp.image) {
+        imgEl = document.createElement('img');
+        imgEl.className = 'ft-numeric-input-icon';
+        imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+        imgEl.alt = '';
+        imgEl.draggable = false;
+        imgEl.style.pointerEvents = 'none';
+        const scaled = Boolean(comp.imageScaled);
+        imgEl.style.maxWidth = scaled ? '100%' : '88%';
+        imgEl.style.maxHeight = scaled ? '100%' : '88%';
+        imgEl.style.objectFit = scaled ? 'fill' : 'contain';
+        imgEl.style.width = scaled ? '100%' : '';
+        imgEl.style.height = scaled ? '100%' : '';
+        if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+          imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+        }
+        imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+        el.insertBefore(imgEl, caption);
+      }
+      const text = displayText ?? (comp.caption ?? comp.label ?? '');
+      caption.textContent = text;
+      caption.style.display = text ? '' : 'none';
+      const alignId = comp.alignment || 'middleCenter';
+      const align = ComponentRegistry.textAlignment(alignId);
+      el.style.justifyContent = align.justify;
+      el.style.alignItems = align.align;
+      applyCaptionLook(alignId);
+      el.classList.toggle('ft-blink', Boolean(comp.blink));
+    };
+
+    const showValue = (val) => {
+      renderAppearance(ComponentRegistry.formatNumericDisplayValue(val, {
+        ...comp,
+        numberOfDigits: comp.numberOfDigits ?? 5,
+        decimalPlaces: comp.digitsAfterDecimal ?? comp.decimalPlaces ?? 0
+      }));
+    };
 
     if (studioEdit) {
+      renderAppearance(comp.caption ?? comp.label ?? '');
       el.addEventListener('dblclick', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -1247,6 +1670,12 @@ const ComponentRegistry = {
         }, '*');
       });
       return el;
+    }
+
+    if (comp.tag) {
+      ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
+    } else {
+      renderAppearance(comp.caption ?? comp.label ?? '');
     }
 
     const getMin = () => {
@@ -1315,13 +1744,23 @@ const ComponentRegistry = {
       backStyle: comp.backStyle || 'solid',
       backColor: comp.backColor || '#001C38',
       useBackColor: comp.useBackColor !== false,
-      studioEdit
+      studioEdit,
+      useHighlightColor: false
     });
+    ComponentRegistry.applyShapePattern(el, comp);
+    if (comp.useHighlightColor && comp.highlightColor) {
+      el.classList.add('ft-highlight-on-focus');
+      el.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      el.classList.remove('ft-highlight-on-focus');
+      el.style.removeProperty('--ft-highlight-color');
+    }
 
     el.style.display = 'flex';
     el.style.overflow = 'hidden';
     el.style.padding = '0 4px';
     el.style.cursor = studioEdit ? 'default' : 'pointer';
+    el.classList.toggle('ft-blink', Boolean(comp.blink));
 
     const valueEl = document.createElement('span');
     valueEl.className = 'ft-numeric-display-value';
@@ -1342,7 +1781,7 @@ const ComponentRegistry = {
       italic: comp.italic,
       underline: comp.underline,
       foreColor: comp.foreColor || '#ffffff',
-      useForeColor: comp.useForeColor !== false,
+      useForeColor: true,
       wordWrap: false,
       alignment: alignId
     });
@@ -1444,8 +1883,8 @@ const ComponentRegistry = {
     if (Number.isNaN(n)) return String(val);
     let text = decimalPlaces > 0 ? n.toFixed(decimalPlaces) : String(Math.round(n));
     const fill = (comp.fillLeftWith || 'none').toLowerCase();
-    if (fill === 'zero') text = text.padStart(digits, '0');
-    else if (fill === 'space') text = text.padStart(digits, ' ');
+    if (fill === 'zero' || fill === 'zeroes') text = text.padStart(digits, '0');
+    else if (fill === 'space' || fill === 'spaces') text = text.padStart(digits, ' ');
     return text;
   },
 
@@ -1498,6 +1937,8 @@ const ComponentRegistry = {
     if (comp.shape === 'circle') {
       el.classList.add('ft-multistate-circle', 'ft-status-led');
       el.style.borderRadius = '50%';
+    } else if (comp.shape === 'ellipse') {
+      el.style.borderRadius = '50%';
     } else if (comp.borderStyle === 'none' && (comp.width == null || comp.width <= 36)) {
       el.classList.add('ft-multistate-flat');
     }
@@ -1540,17 +1981,20 @@ const ComponentRegistry = {
         useBorderColor: stateDef.useBorderColor !== false,
         borderStyle: comp.borderStyle || 'line',
         borderWidth: comp.borderWidth ?? 4,
-        borderUsesBackColor: stateDef.useBorderColor === false && comp.borderUsesBackColor !== false,
+        borderUsesBackColor: comp.borderUsesBackColor !== false,
         backStyle: comp.backStyle || 'solid',
+        shape: comp.shape || 'rectangle',
+        patternStyle: stateDef.patternStyle || 'none',
+        patternColor: stateDef.patternColor || '#ffffff',
+        usePatternColor: Boolean(stateDef.usePatternColor),
         blink: stateDef.blink,
-        studioEdit
+        studioEdit,
+        useHighlightColor: false
       };
 
-      if (comp.shape === 'circle') {
-        applyLedClass(stateDef);
-      } else {
-        ComponentRegistry.applyButtonAppearance(el, merged);
-      }
+      ComponentRegistry.applyButtonAppearance(el, merged);
+      ComponentRegistry.applyShapePattern(el, merged);
+      if (comp.shape === 'circle') applyLedClass(stateDef);
 
       if (stateDef.image) {
         imgEl = document.createElement('img');
@@ -1573,20 +2017,19 @@ const ComponentRegistry = {
 
       const label = stateDef.caption || stateDef.text || '';
       caption.textContent = label;
-      caption.style.display = label ? '' : 'none';
 
       const alignId = stateDef.alignment || 'middleCenter';
       const hasImage = Boolean(stateDef.image);
       if (hasImage) {
-        const align = ComponentRegistry.textAlignment(alignId, 'column');
+        const imgAlign = ComponentRegistry.textAlignment(stateDef.imageAlignment || 'middleCenter', 'column');
         el.style.flexDirection = 'column';
-        el.style.justifyContent = align.justify;
-        el.style.alignItems = align.align;
+        el.style.justifyContent = imgAlign.justify;
+        el.style.alignItems = imgAlign.align;
         caption.style.width = '100%';
         caption.style.height = '';
         caption.style.flex = '0 0 auto';
-        caption.style.display = '';
-      } else {
+        caption.style.display = label ? '' : 'none';
+      } else if (label) {
         const align = ComponentRegistry.textAlignment(alignId, 'row');
         el.style.flexDirection = 'row';
         el.style.justifyContent = align.justify;
@@ -1597,16 +2040,18 @@ const ComponentRegistry = {
         caption.style.display = 'flex';
         caption.style.alignItems = align.align;
         caption.style.justifyContent = align.justify;
+      } else {
+        caption.style.display = 'none';
       }
 
       ComponentRegistry.applyCaptionStyle(caption, {
-        fontFamily: comp.fontFamily || 'Arial Unicode MS',
-        fontSize: comp.fontSize ?? 10,
-        bold: comp.bold,
-        italic: comp.italic,
-        underline: comp.underline,
+        fontFamily: stateDef.fontFamily || comp.fontFamily || 'Arial Unicode MS',
+        fontSize: stateDef.fontSize ?? comp.fontSize ?? 10,
+        bold: stateDef.bold ?? comp.bold,
+        italic: stateDef.italic ?? comp.italic,
+        underline: stateDef.underline ?? comp.underline,
         foreColor: stateDef.captionColor || stateDef.textColor || '#ffffff',
-        useForeColor: stateDef.useCaptionColor !== false,
+        useForeColor: stateDef.useCaptionColor !== undefined ? Boolean(stateDef.useCaptionColor) : Boolean(label),
         wordWrap: stateDef.wordWrap !== false,
         alignment: alignId
       });
@@ -1621,20 +2066,24 @@ const ComponentRegistry = {
     };
 
     const showTagState = (val) => {
-      applyState(ComponentRegistry.resolveMultistateState(states, val));
+      applyState(ComponentRegistry.resolveMultistateState(states, val, comp.triggerType));
     };
 
-    const tag = comp.tag || comp.indicatorTag;
-    if (tag && !studioEdit) {
-      ComponentRegistry.bindIndicatorRef(tag, showTagState, ctx);
-      const current = ctx.getTagValue(tag);
-      if (current !== undefined && current !== null) {
-        showTagState(current);
+    if (studioEdit && comp.previewStateId) {
+      applyState(states.find((s) => s.id === comp.previewStateId) || states[0]);
+    } else {
+      const tag = comp.tag || comp.indicatorTag;
+      if (tag && !studioEdit) {
+        ComponentRegistry.bindIndicatorRef(tag, showTagState, ctx);
+        const current = ctx.getTagValue(tag);
+        if (current !== undefined && current !== null) {
+          showTagState(current);
+        } else {
+          showTagState(comp.defaultValue ?? comp.previewValue ?? 0);
+        }
       } else {
         showTagState(comp.defaultValue ?? comp.previewValue ?? 0);
       }
-    } else {
-      showTagState(comp.defaultValue ?? comp.previewValue ?? 0);
     }
 
     if (studioEdit) {
@@ -1675,67 +2124,86 @@ const ComponentRegistry = {
     const studioEdit = Boolean(ctx.studioEdit);
     const states = comp.states?.length
       ? comp.states
-      : ComponentRegistry.defaultSymbolIndicatorStates(comp.numberOfStates ?? 2);
+      : ComponentRegistry.defaultSymbolIndicatorStates(comp.numberOfStates ?? 4);
 
     el.style.display = 'flex';
     el.style.overflow = 'hidden';
-    el.style.backgroundColor = 'transparent';
+    el.style.position = 'absolute';
+
+    const placeholder = document.createElement('span');
+    placeholder.className = 'ft-symbol-placeholder';
+    placeholder.setAttribute('aria-hidden', 'true');
+    el.appendChild(placeholder);
 
     const img = document.createElement('img');
     img.className = 'ft-symbol-indicator-image';
-    img.alt = comp.name || '';
+    img.alt = '';
     img.draggable = false;
     img.style.pointerEvents = 'none';
     el.appendChild(img);
 
     const applyState = (stateDef) => {
       if (!stateDef) return;
+      const hasImage = Boolean(stateDef.image);
+      const merged = {
+        ...comp,
+        borderStyle: comp.borderStyle || 'none',
+        borderWidth: comp.borderWidth ?? 4,
+        borderUsesBackColor: false,
+        useBorderColor: Boolean(stateDef.useBorderColor),
+        borderColor: stateDef.borderColor || '#808080',
+        backStyle: hasImage && stateDef.imageBackStyle === 'solid' ? 'solid' : 'transparent',
+        useBackColor: hasImage && stateDef.imageBackStyle === 'solid',
+        backColor: stateDef.imageBackColor || '#808080',
+        shape: comp.shape || 'rectangle',
+        blink: stateDef.imageBlink,
+        studioEdit,
+        useHighlightColor: false
+      };
+      ComponentRegistry.applyButtonAppearance(el, merged);
+
       const alignId = stateDef.imageAlignment || 'middleCenter';
       const align = ComponentRegistry.textAlignment(alignId);
       el.style.justifyContent = align.justify;
       el.style.alignItems = align.align;
 
-      if (stateDef.image) {
+      if (hasImage) {
+        placeholder.style.display = 'none';
         img.src = ComponentRegistry.imageUrl(stateDef.image, ctx);
         img.style.display = '';
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '100%';
+        img.style.objectFit = 'contain';
+        if (stateDef.imageBackStyle === 'solid') {
+          img.style.backgroundColor = stateDef.imageBackColor || '#808080';
+        } else {
+          img.style.backgroundColor = 'transparent';
+        }
       } else {
+        placeholder.style.display = '';
         img.removeAttribute('src');
         img.style.display = 'none';
       }
-
-      if (stateDef.imageScaled !== false) {
-        img.style.maxWidth = '100%';
-        img.style.maxHeight = '100%';
-        img.style.width = 'auto';
-        img.style.height = 'auto';
-        img.style.objectFit = 'contain';
-      } else {
-        img.style.maxWidth = '';
-        img.style.maxHeight = '';
-        img.style.width = '';
-        img.style.height = '';
-        img.style.objectFit = '';
-      }
-
-      if (stateDef.useImageBackColor && stateDef.imageBackStyle === 'solid') {
-        el.style.backgroundColor = stateDef.imageBackColor || '#001C38';
-      } else {
-        el.style.backgroundColor = 'transparent';
-      }
-
       img.classList.toggle('ft-blink', Boolean(stateDef.imageBlink));
       el.classList.toggle('ft-blink', Boolean(stateDef.imageBlink));
     };
 
     const showTagState = (val) => {
-      applyState(ComponentRegistry.resolveMultistateState(states, val));
+      applyState(ComponentRegistry.resolveMultistateState(states, val, comp.triggerType));
     };
 
-    const tag = comp.tag || comp.indicatorTag;
-    if (tag && !studioEdit) {
-      ComponentRegistry.bindIndicatorRef(tag, showTagState, ctx);
+    if (studioEdit && comp.previewStateId) {
+      applyState(states.find((s) => s.id === comp.previewStateId) || states[0]);
     } else {
-      showTagState(studioEdit ? 0 : (comp.defaultValue ?? 0));
+      const tag = comp.tag || comp.indicatorTag;
+      if (tag && !studioEdit) {
+        ComponentRegistry.bindIndicatorRef(tag, showTagState, ctx);
+        const current = ctx.getTagValue(tag);
+        if (current !== undefined && current !== null) showTagState(current);
+        else showTagState(comp.defaultValue ?? 0);
+      } else {
+        showTagState(comp.defaultValue ?? 0);
+      }
     }
 
     if (studioEdit) {
@@ -1778,16 +2246,20 @@ const ComponentRegistry = {
       ? comp.states.filter((s) => s.id !== 'Error')
       : ComponentRegistry.defaultListIndicatorStates(comp.numberOfStates ?? 5);
 
+    const patternStyle = comp.patternStyle || 'none';
     ComponentRegistry.applyButtonAppearance(el, {
       ...comp,
       borderStyle: comp.borderStyle || 'line',
       borderWidth: comp.borderWidth ?? 4,
-      borderUsesBackColor: comp.borderUsesBackColor,
-      backStyle: comp.backStyle || 'solid',
+      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
+      backStyle: comp.backStyle === 'gradient' ? 'gradient' : 'solid',
       backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      useBorderColor: comp.useBorderColor !== false,
+      useBackColor: true,
+      useBorderColor: true,
       borderColor: comp.borderColor || '#001C38',
+      patternStyle,
+      usePatternColor: patternStyle !== 'none',
+      patternColor: comp.patternColor || '#ffffff',
       blink: comp.blink,
       studioEdit
     });
@@ -1811,6 +2283,13 @@ const ComponentRegistry = {
       cap.style.pointerEvents = 'none';
       cap.style.width = '100%';
       cap.style.padding = '0 4px';
+      if (comp.captionTruncate === 'character') {
+        cap.style.whiteSpace = 'nowrap';
+        cap.style.textOverflow = 'ellipsis';
+      } else {
+        cap.style.whiteSpace = 'normal';
+        cap.style.textOverflow = 'clip';
+      }
       row.appendChild(cap);
       el.appendChild(row);
       return { row, cap, stateDef };
@@ -1824,16 +2303,14 @@ const ComponentRegistry = {
       row.style.alignItems = align.align;
 
       if (isActive) {
-        row.style.backgroundColor = comp.useSelectionBackColor !== false
-          ? (comp.selectionBackColor || '#0066cc')
-          : 'transparent';
+        row.style.backgroundColor = comp.selectionBackColor || '#99CCFF';
         ComponentRegistry.applyCaptionStyle(cap, {
           fontFamily: comp.fontFamily || 'Arial Unicode MS',
           fontSize: comp.fontSize ?? 10,
           bold: comp.bold,
           italic: comp.italic,
           underline: comp.underline,
-          foreColor: comp.useSelectionForeColor !== false ? (comp.selectionForeColor || '#000000') : '#ffffff',
+          foreColor: comp.selectionForeColor || '#000000',
           useForeColor: true,
           wordWrap: comp.captionTruncate !== 'character',
           alignment: alignId
@@ -1863,16 +2340,25 @@ const ComponentRegistry = {
     };
 
     const renderList = (val) => {
-      const active = ComponentRegistry.resolveMultistateState(states, val);
+      const active = ComponentRegistry.resolveMultistateState(states, val, comp.triggerType);
       rows.forEach((entry) => applyRowStyle(entry, entry.stateDef.id === active?.id));
       el.classList.toggle('ft-blink', Boolean(comp.blink));
     };
 
-    const tag = comp.tag || comp.indicatorTag;
-    if (tag && !studioEdit) {
-      ComponentRegistry.bindIndicatorRef(tag, renderList, ctx);
+    if (studioEdit && comp.previewStateId) {
+      const preview = states.find((s) => s.id === comp.previewStateId) || states[0];
+      rows.forEach((entry) => applyRowStyle(entry, entry.stateDef.id === preview?.id));
+      el.classList.toggle('ft-blink', Boolean(comp.blink));
     } else {
-      renderList(studioEdit ? 0 : (comp.defaultValue ?? 0));
+      const tag = comp.tag || comp.indicatorTag;
+      if (tag && !studioEdit) {
+        ComponentRegistry.bindIndicatorRef(tag, renderList, ctx);
+        const current = ctx.getTagValue?.(tag);
+        if (current !== undefined && current !== null) renderList(current);
+        else renderList(comp.defaultValue ?? 0);
+      } else {
+        renderList(comp.defaultValue ?? 0);
+      }
     }
 
     if (studioEdit) {
@@ -1919,8 +2405,8 @@ const ComponentRegistry = {
       borderUsesBackColor: comp.borderUsesBackColor !== false,
       backStyle: comp.backStyle || 'solid',
       backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      useBorderColor: comp.useBorderColor !== false,
+      useBackColor: true,
+      useBorderColor: true,
       borderColor: comp.borderColor || '#001C38',
       studioEdit
     });
@@ -1936,24 +2422,49 @@ const ComponentRegistry = {
     track.appendChild(fill);
     el.appendChild(track);
 
+    const thresholdCompare = (num, thresholdValue) => {
+      const type = String(comp.thresholdType || 'value').toLowerCase();
+      if (type === 'percentage') {
+        const min = comp.minValue ?? 0;
+        const max = comp.maxValue ?? 100;
+        const pct = ((num - min) / ((max - min) || 1)) * 100;
+        return pct >= thresholdValue;
+      }
+      return num >= thresholdValue;
+    };
+
     const resolveFillColor = (num) => {
       const count = comp.numberOfThresholds ?? 0;
       const thresholds = comp.thresholds || [];
-      if (count >= 2 && num >= (thresholds[1]?.value ?? 75) && thresholds[1]?.useFillColor) {
-        return thresholds[1].fillColor || '#ffb6c1';
+      if (count >= 2 && thresholdCompare(num, thresholds[1]?.value ?? 75)) {
+        return thresholds[1]?.fillColor || '#ff0000';
       }
-      if (count >= 1 && num >= (thresholds[0]?.value ?? 50) && thresholds[0]?.useFillColor) {
-        return thresholds[0].fillColor || '#ffff00';
+      if (count >= 1 && thresholdCompare(num, thresholds[0]?.value ?? 50)) {
+        return thresholds[0]?.fillColor || '#ffff00';
       }
-      return comp.useFillColor !== false ? (comp.fillColor || '#0066cc') : 'transparent';
+      return comp.fillColor || '#99CCFF';
     };
 
     const resolveBlink = (num) => {
       const count = comp.numberOfThresholds ?? 0;
       const thresholds = comp.thresholds || [];
-      if (count >= 2 && num >= (thresholds[1]?.value ?? 75) && thresholds[1]?.blink) return true;
-      if (count >= 1 && num >= (thresholds[0]?.value ?? 50) && thresholds[0]?.blink) return true;
+      if (count >= 2 && thresholdCompare(num, thresholds[1]?.value ?? 75) && thresholds[1]?.blink) return true;
+      if (count >= 1 && thresholdCompare(num, thresholds[0]?.value ?? 50) && thresholds[0]?.blink) return true;
       return false;
+    };
+
+    const applyFillPaint = (fillEl, color, dir) => {
+      if (comp.fillStyle === 'gradient') {
+        const angle = dir === 'leftToRight' ? '90deg'
+          : dir === 'rightToLeft' ? '270deg'
+          : dir === 'topToBottom' ? '180deg'
+          : '0deg';
+        fillEl.style.background = `linear-gradient(${angle}, ${color}, #ffffff)`;
+        fillEl.style.backgroundColor = '';
+      } else {
+        fillEl.style.background = '';
+        fillEl.style.backgroundColor = color;
+      }
     };
 
     const applyValue = (val) => {
@@ -1965,7 +2476,7 @@ const ComponentRegistry = {
       const pct = Math.max(0, Math.min(1, (num - min) / ((max - min) || 1)));
       const dir = comp.fillDirection || 'bottomToTop';
 
-      fill.style.backgroundColor = resolveFillColor(num);
+      applyFillPaint(fill, resolveFillColor(num), dir);
       fill.classList.toggle('ft-blink', resolveBlink(num));
 
       fill.style.top = '';
@@ -2002,7 +2513,7 @@ const ComponentRegistry = {
     if (tag && !studioEdit) {
       ComponentRegistry.bindIndicatorRef(tag, applyValue, ctx);
     } else {
-      applyValue(studioEdit ? (comp.minValue ?? 0) + ((comp.maxValue ?? 100) - (comp.minValue ?? 0)) * 0.2 : (comp.defaultValue ?? 20));
+      applyValue(studioEdit ? (comp.minValue ?? 0) + ((comp.maxValue ?? 100) - (comp.minValue ?? 0)) * 0.25 : (comp.defaultValue ?? 25));
     }
 
     if (studioEdit) {
@@ -2030,6 +2541,397 @@ const ComponentRegistry = {
     return el;
   },
 
+  Gauge(comp, ctx) {
+    const el = document.createElement('div');
+    el.className = 'ft-gauge ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: 'none',
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: true,
+      studioEdit
+    });
+    el.style.overflow = 'hidden';
+    el.style.padding = '0';
+    el.style.boxSizing = 'border-box';
+    el.style.cursor = studioEdit ? 'default' : 'default';
+
+    const w = Math.max(1, Number(comp.width) || 191);
+    const h = Math.max(1, Number(comp.height) || 140);
+    const fontSize = Number(comp.fontSize) || 10;
+    const fontFamily = comp.fontFamily || 'Arial Unicode MS';
+    const majorTicks = Math.max(2, Number(comp.majorTicks) || 5);
+    const minorTicks = Math.max(0, Number(comp.minorTicks) || 0);
+    const lineWidth = Number(comp.lineWidth) || 1;
+    const needleWidth = Math.max(1, Number(comp.needleWidth) || 2);
+    const lineStyle = comp.lineStyle || 'solid';
+    const sweepStyle = comp.sweepStyle || 'solidFill';
+    const min = comp.minValue ?? 0;
+    const max = comp.maxValue ?? 100;
+    const decimals = Math.max(0, Number(comp.decimalDigits) || 0);
+    const showLegend = comp.showLegend !== false;
+    const foreColor = comp.foreColor || '#FFFFFF';
+    const needleColor = comp.needleColor || '#FFFFFF';
+    const legendColor = comp.legendColor || '#FFFFFF';
+    const fillColor = comp.fillColor || '#99CCFF';
+    const ns = 'http://www.w3.org/2000/svg';
+    const safeName = String(comp.name || 'gauge').replace(/[^A-Za-z0-9_-]/g, '');
+    const gradId = `gg-fill-${safeName}`;
+
+    const padL = fontSize * 1.8;
+    const padR = fontSize * 2.4;
+    const padT = fontSize * 1.5;
+    const padB = Math.max(6, needleWidth + 2);
+    const cx = w / 2;
+    const cy = h - padB;
+    const radius = Math.max(12, Math.min(cx - padL, cx - padR, cy - padT) - 2);
+
+    const polar = (r, angle) => ({
+      x: cx + r * Math.cos(angle),
+      y: cy - r * Math.sin(angle)
+    });
+    const valueToAngle = (num) => {
+      const t = Math.max(0, Math.min(1, (num - min) / ((max - min) || 1)));
+      return Math.PI - t * Math.PI;
+    };
+    const formatLegend = (v) => {
+      if (decimals <= 0) return String(Math.round(v));
+      return Number(v).toFixed(decimals);
+    };
+
+    const thresholdCompare = (num, thresholdValue) => {
+      const type = String(comp.thresholdType || 'value').toLowerCase();
+      if (type === 'percentage') {
+        const pct = ((num - min) / ((max - min) || 1)) * 100;
+        return pct >= thresholdValue;
+      }
+      return num >= thresholdValue;
+    };
+    const resolveFillColor = (num) => {
+      const count = comp.numberOfThresholds ?? 0;
+      const thresholds = comp.thresholds || [];
+      if (count >= 2 && thresholdCompare(num, thresholds[1]?.value ?? 75)) {
+        return thresholds[1]?.fillColor || '#ff0000';
+      }
+      if (count >= 1 && thresholdCompare(num, thresholds[0]?.value ?? 50)) {
+        return thresholds[0]?.fillColor || '#ffff00';
+      }
+      return fillColor;
+    };
+    const resolveBlink = (num) => {
+      const count = comp.numberOfThresholds ?? 0;
+      const thresholds = comp.thresholds || [];
+      if (count >= 2 && thresholdCompare(num, thresholds[1]?.value ?? 75) && thresholds[1]?.blink) return true;
+      if (count >= 1 && thresholdCompare(num, thresholds[0]?.value ?? 50) && thresholds[0]?.blink) return true;
+      return false;
+    };
+
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.setAttribute('aria-hidden', 'true');
+
+    const defs = document.createElementNS(ns, 'defs');
+    const grad = document.createElementNS(ns, 'linearGradient');
+    grad.setAttribute('id', gradId);
+    grad.setAttribute('x1', '0%');
+    grad.setAttribute('y1', '100%');
+    grad.setAttribute('x2', '100%');
+    grad.setAttribute('y2', '0%');
+    const stopA = document.createElementNS(ns, 'stop');
+    stopA.setAttribute('offset', '0%');
+    const stopB = document.createElementNS(ns, 'stop');
+    stopB.setAttribute('offset', '100%');
+    stopB.setAttribute('stop-color', '#ffffff');
+    grad.appendChild(stopA);
+    grad.appendChild(stopB);
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
+    const fillPath = document.createElementNS(ns, 'path');
+    fillPath.setAttribute('stroke', 'none');
+    svg.appendChild(fillPath);
+
+    if (lineStyle !== 'none' && lineWidth > 0) {
+      const left = polar(radius, Math.PI);
+      const right = polar(radius, 0);
+      const arc = document.createElementNS(ns, 'path');
+      arc.setAttribute('d', `M ${left.x} ${left.y} A ${radius} ${radius} 0 0 1 ${right.x} ${right.y}`);
+      arc.setAttribute('fill', 'none');
+      arc.setAttribute('stroke', foreColor);
+      arc.setAttribute('stroke-width', String(lineWidth));
+      arc.setAttribute('stroke-linecap', 'butt');
+      const dash = ComponentRegistry.lineStyleToDashArray(lineStyle, lineWidth);
+      if (dash) arc.setAttribute('stroke-dasharray', dash);
+      svg.appendChild(arc);
+    }
+
+    const tickGroup = document.createElementNS(ns, 'g');
+    const majorLen = Math.max(6, radius * 0.12);
+    const minorLen = Math.max(4, radius * 0.07);
+    for (let i = 0; i < majorTicks; i++) {
+      const t = i / (majorTicks - 1);
+      const val = min + t * (max - min);
+      const ang = valueToAngle(val);
+      const outer = polar(radius, ang);
+      const inner = polar(radius - majorLen, ang);
+      const tick = document.createElementNS(ns, 'line');
+      tick.setAttribute('x1', String(outer.x));
+      tick.setAttribute('y1', String(outer.y));
+      tick.setAttribute('x2', String(inner.x));
+      tick.setAttribute('y2', String(inner.y));
+      tick.setAttribute('stroke', foreColor);
+      tick.setAttribute('stroke-width', String(Math.max(1, lineWidth)));
+      tickGroup.appendChild(tick);
+
+      if (showLegend) {
+        const lp = polar(radius + fontSize * 0.85, ang);
+        const label = document.createElementNS(ns, 'text');
+        label.setAttribute('x', String(lp.x));
+        label.setAttribute('y', String(lp.y));
+        label.setAttribute('fill', legendColor);
+        label.setAttribute('font-family', fontFamily);
+        label.setAttribute('font-size', String(fontSize));
+        label.setAttribute('font-weight', comp.bold ? '700' : '400');
+        label.setAttribute('font-style', comp.italic ? 'italic' : 'normal');
+        label.setAttribute('text-decoration', comp.underline ? 'underline' : 'none');
+        label.setAttribute('dominant-baseline', 'middle');
+        if (t <= 0.02) label.setAttribute('text-anchor', 'end');
+        else if (t >= 0.98) label.setAttribute('text-anchor', 'start');
+        else label.setAttribute('text-anchor', 'middle');
+        label.textContent = formatLegend(val);
+        tickGroup.appendChild(label);
+      }
+
+      if (minorTicks > 1 && i < majorTicks - 1) {
+        for (let m = 1; m < minorTicks; m++) {
+          const mt = (i + m / minorTicks) / (majorTicks - 1);
+          const mang = valueToAngle(min + mt * (max - min));
+          const mOuter = polar(radius, mang);
+          const mInner = polar(radius - minorLen, mang);
+          const mTick = document.createElementNS(ns, 'line');
+          mTick.setAttribute('x1', String(mOuter.x));
+          mTick.setAttribute('y1', String(mOuter.y));
+          mTick.setAttribute('x2', String(mInner.x));
+          mTick.setAttribute('y2', String(mInner.y));
+          mTick.setAttribute('stroke', foreColor);
+          mTick.setAttribute('stroke-width', String(Math.max(1, lineWidth)));
+          tickGroup.appendChild(mTick);
+        }
+      }
+    }
+    svg.appendChild(tickGroup);
+
+    const needle = document.createElementNS(ns, 'line');
+    needle.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(needle);
+    el.appendChild(svg);
+
+    const applyValue = (val) => {
+      let num = val;
+      if (typeof num === 'string' && num.trim() !== '' && !Number.isNaN(Number(num))) num = Number(num);
+      if (typeof num !== 'number' || Number.isNaN(num)) num = min;
+      const ang = valueToAngle(num);
+      const tip = polar(radius * 0.92, ang);
+      needle.setAttribute('x1', String(cx));
+      needle.setAttribute('y1', String(cy));
+      needle.setAttribute('x2', String(tip.x));
+      needle.setAttribute('y2', String(tip.y));
+      needle.setAttribute('stroke', needleColor);
+      needle.setAttribute('stroke-width', String(needleWidth));
+
+      const color = resolveFillColor(num);
+      stopA.setAttribute('stop-color', color);
+      fillPath.classList.toggle('ft-blink', resolveBlink(num));
+
+      const span = Math.abs(num - min);
+      if (sweepStyle === 'point' || span < ((max - min) || 1) * 0.002) {
+        fillPath.setAttribute('d', '');
+        fillPath.setAttribute('fill', 'none');
+        return;
+      }
+      const start = polar(radius, Math.PI);
+      const end = polar(radius, ang);
+      const large = 0;
+      fillPath.setAttribute('d', `M ${cx} ${cy} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${large} 1 ${end.x} ${end.y} Z`);
+      if (sweepStyle === 'gradientFill') {
+        fillPath.setAttribute('fill', `url(#${gradId})`);
+      } else {
+        fillPath.setAttribute('fill', color);
+      }
+      fillPath.setAttribute('fill-opacity', '0.9');
+    };
+
+    const tag = comp.tag;
+    if (tag && !studioEdit) {
+      ComponentRegistry.bindIndicatorRef(tag, applyValue, ctx);
+      const current = ctx.getTagValue?.(tag);
+      if (current !== undefined && current !== null) applyValue(current);
+      else applyValue(comp.defaultValue ?? min);
+    } else {
+      applyValue(studioEdit ? min : (comp.defaultValue ?? min));
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'Gauge',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'Gauge',
+          source: comp._source || ''
+        }, '*');
+      });
+    }
+
+    return el;
+  },
+
+  Scale(comp, ctx) {
+    const el = document.createElement('div');
+    el.className = 'ft-scale ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    const backStyle = comp.backStyle || 'transparent';
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'none',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle,
+      backColor: comp.backColor || '#001C38',
+      useBackColor: backStyle !== 'transparent',
+      useBorderColor: true,
+      borderColor: comp.borderColor || '#001C38',
+      blink: Boolean(comp.blink),
+      studioEdit
+    });
+    el.style.overflow = 'hidden';
+    el.style.padding = '0';
+    el.style.boxSizing = 'border-box';
+    el.style.cursor = 'default';
+
+    const w = Math.max(1, Number(comp.width) || 184);
+    const h = Math.max(1, Number(comp.height) || 101);
+    const lineStyle = comp.lineStyle || 'solid';
+    const lineWidth = Number(comp.lineWidth) || 1;
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.setAttribute('aria-hidden', 'true');
+
+    if (lineStyle !== 'none' && lineWidth > 0) {
+      const color = comp.foreColor || '#001C38';
+      const dash = ComponentRegistry.lineStyleToDashArray(lineStyle, lineWidth);
+      const addLine = (x1, y1, x2, y2) => {
+        const line = document.createElementNS(ns, 'line');
+        line.setAttribute('x1', String(x1));
+        line.setAttribute('y1', String(y1));
+        line.setAttribute('x2', String(x2));
+        line.setAttribute('y2', String(y2));
+        line.setAttribute('stroke', color);
+        line.setAttribute('stroke-width', String(lineWidth));
+        line.setAttribute('stroke-linecap', 'butt');
+        if (dash) line.setAttribute('stroke-dasharray', dash);
+        svg.appendChild(line);
+      };
+      const dir = comp.tickDirection || 'right';
+      const majors = Math.max(2, Number(comp.majorTicks) || 3);
+      const minors = Math.max(0, Number(comp.minorTicks) || 0);
+      const pad = Math.max(1, lineWidth / 2);
+      if (dir === 'right' || dir === 'left') {
+        const xBase = dir === 'right' ? pad : w - pad;
+        const sign = dir === 'right' ? 1 : -1;
+        const inner = Math.max(1, h - 2 * pad);
+        const majorLen = Math.max(4, (w - 2 * pad) * 0.5);
+        const minorLen = majorLen * 0.45;
+        addLine(xBase, pad, xBase, h - pad);
+        for (let i = 0; i < majors; i++) {
+          const y = pad + (i / (majors - 1)) * inner;
+          addLine(xBase, y, xBase + sign * majorLen, y);
+          if (i < majors - 1 && minors > 0) {
+            for (let m = 1; m <= minors; m++) {
+              const yt = pad + ((i + m / (minors + 1)) / (majors - 1)) * inner;
+              addLine(xBase, yt, xBase + sign * minorLen, yt);
+            }
+          }
+        }
+      } else {
+        const yBase = dir === 'down' ? pad : h - pad;
+        const sign = dir === 'down' ? 1 : -1;
+        const inner = Math.max(1, w - 2 * pad);
+        const majorLen = Math.max(4, (h - 2 * pad) * 0.5);
+        const minorLen = majorLen * 0.45;
+        addLine(pad, yBase, w - pad, yBase);
+        for (let i = 0; i < majors; i++) {
+          const x = pad + (i / (majors - 1)) * inner;
+          addLine(x, yBase, x, yBase + sign * majorLen);
+          if (i < majors - 1 && minors > 0) {
+            for (let m = 1; m <= minors; m++) {
+              const xt = pad + ((i + m / (minors + 1)) / (majors - 1)) * inner;
+              addLine(xt, yBase, xt, yBase + sign * minorLen);
+            }
+          }
+        }
+      }
+    }
+
+    el.appendChild(svg);
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'Scale',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'Scale',
+          source: comp._source || ''
+        }, '*');
+      });
+    }
+
+    return el;
+  },
+
   defaultListIndicatorStates(count = 5) {
     const states = [];
     for (let i = 0; i < count; i++) {
@@ -2037,19 +2939,30 @@ const ComponentRegistry = {
         id: `State${i}`,
         value: i,
         caption: '',
+        useCaptionColor: false,
+        captionColor: '#ffffff',
+        useCaptionBackColor: false,
+        captionBackColor: '#001C38',
+        captionBlink: false,
+        captionBackStyle: 'transparent',
         alignment: 'middleLeft'
       });
     }
     return states;
   },
 
-  defaultSymbolIndicatorStates(count = 2) {
+  defaultSymbolIndicatorStates(count = 4) {
     const states = [];
     for (let i = 0; i < count; i++) {
       states.push({
         id: `State${i}`,
         value: i,
         image: '',
+        useBorderColor: false,
+        borderColor: '#808080',
+        imageColor: '#001C38',
+        imageBackColor: '#808080',
+        imageBlink: false,
         imageScaled: true,
         imageBackStyle: 'transparent',
         imageAlignment: 'middleCenter'
@@ -2058,6 +2971,11 @@ const ComponentRegistry = {
     states.push({
       id: 'Error',
       image: '',
+      useBorderColor: false,
+      borderColor: '#808080',
+      imageColor: '#001C38',
+      imageBackColor: '#808080',
+      imageBlink: false,
       imageScaled: true,
       imageBackStyle: 'transparent',
       imageAlignment: 'middleCenter'
@@ -2065,7 +2983,7 @@ const ComponentRegistry = {
     return states;
   },
 
-  resolveMultistateState(states, value) {
+  resolveMultistateState(states, value, triggerType) {
     const errorState = states.find((s) => s.id === 'Error' || s.stateId === 'Error');
     if (value === null || value === undefined) return errorState || states[0];
 
@@ -2076,33 +2994,31 @@ const ComponentRegistry = {
       num = Number(num);
     }
 
+    if (String(triggerType || '').toLowerCase() === 'lsb') {
+      const bits = Number(num);
+      if (!Number.isFinite(bits) || bits === 0) return errorState || states[0];
+      const lowest = bits & -bits;
+      const bitIndex = Math.round(Math.log2(lowest >>> 0));
+      const match = states.find((s) => s.value === bitIndex) || states.find((s) => s.id === `State${bitIndex}`);
+      return match || errorState || states[0];
+    }
+
     const match = states.find((s) => s.value !== undefined && s.value === num);
     return match || errorState || states.find((s) => s.value === 0) || states[0];
   },
 
-  defaultMultistateIndicatorStates(count = 2) {
-    const palette = [
-      { backColor: '#F83D3D', borderColor: '#C00000' },
-      { backColor: '#10EB10', borderColor: '#10EB10' },
-      { backColor: '#001C38', borderColor: '#001C38' },
-      { backColor: '#F79646', borderColor: '#E36C09' },
-      { backColor: '#4F81BD', borderColor: '#1F497D' },
-      { backColor: '#8064A2', borderColor: '#5F497A' },
-      { backColor: '#C0504D', borderColor: '#953734' },
-      { backColor: '#9BBB59', borderColor: '#76923C' }
-    ];
+  defaultMultistateIndicatorStates(count = 4) {
     const states = [];
     for (let i = 0; i < count; i++) {
-      const colors = palette[i] || palette[palette.length - 1];
       states.push({
         id: `State${i}`,
         value: i,
         useBackColor: true,
-        backColor: colors.backColor,
+        backColor: '#001C38',
         useBorderColor: true,
-        borderColor: colors.borderColor,
+        borderColor: '#001C38',
         caption: '',
-        useCaptionColor: true,
+        useCaptionColor: false,
         captionColor: '#ffffff',
         wordWrap: true,
         alignment: 'middleCenter'
@@ -2730,7 +3646,13 @@ const ComponentRegistry = {
   },
 
   applyShapePattern(el, comp) {
-    if (!comp.usePatternColor || !comp.patternStyle || comp.patternStyle === 'none') return;
+    if (!comp.patternStyle || comp.patternStyle === 'none' || comp.usePatternColor === false) {
+      if (el.dataset.ftPattern) {
+        el.style.backgroundImage = '';
+        delete el.dataset.ftPattern;
+      }
+      return;
+    }
     const color = comp.patternColor || '#808080';
     const style = comp.patternStyle;
     let pattern = '';
@@ -2813,6 +3735,7 @@ const ComponentRegistry = {
     } else {
       el.style.background = pattern;
     }
+    el.dataset.ftPattern = '1';
   },
 
   applyPanelAppearance(el, comp) {
@@ -2879,6 +3802,21 @@ const ComponentRegistry = {
     el.style.border = `${borderW}px ${lineStyle} ${borderColor}`;
   },
 
+  ellipticalArcPoint(cx, cy, rx, ry, deg) {
+    const r = (Number(deg) * Math.PI) / 180;
+    return { x: cx + rx * Math.cos(r), y: cy - ry * Math.sin(r) };
+  },
+
+  arcPathData(cx, cy, rx, ry, startAngle, sweepAngle, pie = false) {
+    const start = ComponentRegistry.ellipticalArcPoint(cx, cy, rx, ry, startAngle);
+    const end = ComponentRegistry.ellipticalArcPoint(cx, cy, rx, ry, startAngle + sweepAngle);
+    const large = Math.abs(sweepAngle) > 180 ? 1 : 0;
+    const sweepFlag = sweepAngle >= 0 ? 0 : 1;
+    const arc = `A ${rx} ${ry} 0 ${large} ${sweepFlag} ${end.x} ${end.y}`;
+    if (pie) return `M ${cx} ${cy} L ${start.x} ${start.y} ${arc} Z`;
+    return `M ${start.x} ${start.y} ${arc}`;
+  },
+
   applyArcAppearance(el, comp) {
     if (comp.visible === false) {
       el.style.display = 'none';
@@ -2886,12 +3824,23 @@ const ComponentRegistry = {
     }
     el.style.display = '';
     ComponentRegistry.applyGraphicsObject(el, comp);
-    el.style.borderRadius = '50%';
+    const sweep = Number(comp.sweepAngle);
+    const startAngle = Number(comp.startAngle) || 0;
+    const isWedge = comp.type === 'Wedge' || el.classList.contains('ft-wedge');
+    const isPartial = (comp.type === 'Arc' || isWedge || el.classList.contains('ft-arc'))
+      && Number.isFinite(sweep)
+      && Math.abs(sweep) < 359.5;
+    el.style.borderRadius = isPartial ? '0' : '50%';
     el.style.border = 'none';
     el.style.boxSizing = 'border-box';
     el.style.overflow = 'hidden';
-    ComponentRegistry.applyShapeFill(el, comp);
-    ComponentRegistry.applyShapePattern(el, comp);
+    if (!isPartial) {
+      ComponentRegistry.applyShapeFill(el, comp);
+      ComponentRegistry.applyShapePattern(el, comp);
+    } else {
+      el.style.background = 'none';
+      el.style.backgroundColor = 'transparent';
+    }
 
     el.querySelector('svg')?.remove();
 
@@ -2900,7 +3849,10 @@ const ComponentRegistry = {
     const lineW = comp.lineWidth ?? 1;
     const lineStyle = comp.lineStyle || 'solid';
     const useFore = comp.useForeColor !== false && lineStyle !== 'none';
-    if (!useFore || lineW <= 0) return;
+    const useBack = comp.useBackColor !== false && comp.backStyle !== 'transparent';
+    const usePattern = Boolean(comp.patternStyle && comp.patternStyle !== 'none' && comp.usePatternColor !== false);
+    const needsSvg = (useFore && lineW > 0) || (isPartial && useBack) || (isPartial && usePattern);
+    if (!needsSvg) return;
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
@@ -2912,18 +3864,84 @@ const ComponentRegistry = {
     const cy = h / 2;
     const rx = Math.max(0, w / 2 - lineW / 2);
     const ry = Math.max(0, h / 2 - lineW / 2);
-    const ell = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
-    ell.setAttribute('cx', String(cx));
-    ell.setAttribute('cy', String(cy));
-    ell.setAttribute('rx', String(rx));
-    ell.setAttribute('ry', String(ry));
-    ell.setAttribute('fill', 'none');
-    ell.setAttribute('stroke', comp.foreColor || '#000000');
-    ell.setAttribute('stroke-width', String(lineW));
-    const dash = ComponentRegistry.lineStyleToDashArray(lineStyle, lineW);
-    if (dash) ell.setAttribute('stroke-dasharray', dash);
-    svg.appendChild(ell);
+
+    if (isPartial && useBack && Math.abs(sweep) > 0.01) {
+      if (comp.backStyle === 'gradient') {
+        const gradId = `arc-grad-${(comp.name || 'shape').replace(/[^A-Za-z0-9_-]/g, '')}`;
+        const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+        grad.setAttribute('id', gradId);
+        const shading = comp.gradientShadingStyle || comp.gradientDirection || '';
+        if (shading === 'gradientHorizontalFromRight') {
+          grad.setAttribute('x1', '100%'); grad.setAttribute('y1', '0%');
+          grad.setAttribute('x2', '0%'); grad.setAttribute('y2', '0%');
+        } else if (shading === 'gradientHorizontalFromLeft') {
+          grad.setAttribute('x1', '0%'); grad.setAttribute('y1', '0%');
+          grad.setAttribute('x2', '100%'); grad.setAttribute('y2', '0%');
+        } else {
+          grad.setAttribute('x1', '0%'); grad.setAttribute('y1', '0%');
+          grad.setAttribute('x2', '0%'); grad.setAttribute('y2', '100%');
+        }
+        const s0 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+        s0.setAttribute('offset', '0%');
+        s0.setAttribute('stop-color', comp.backColor || '#c0c0c0');
+        const s1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+        s1.setAttribute('offset', `${comp.gradientStop ?? 95}%`);
+        s1.setAttribute('stop-color', comp.endColor || '#e8e8e8');
+        grad.appendChild(s0);
+        grad.appendChild(s1);
+        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        defs.appendChild(grad);
+        svg.appendChild(defs);
+        const fillPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        fillPath.setAttribute('d', ComponentRegistry.arcPathData(cx, cy, w / 2, h / 2, startAngle, sweep, true));
+        fillPath.setAttribute('fill', `url(#${gradId})`);
+        fillPath.setAttribute('stroke', 'none');
+        svg.appendChild(fillPath);
+      } else {
+        const fillPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        fillPath.setAttribute('d', ComponentRegistry.arcPathData(cx, cy, w / 2, h / 2, startAngle, sweep, true));
+        fillPath.setAttribute('fill', comp.backColor || '#c0c0c0');
+        fillPath.setAttribute('stroke', 'none');
+        svg.appendChild(fillPath);
+      }
+    }
+
+    if (useFore && lineW > 0) {
+      if (isPartial && Math.abs(sweep) > 0.01) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', ComponentRegistry.arcPathData(cx, cy, rx, ry, startAngle, sweep, isWedge));
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', comp.foreColor || '#000000');
+        path.setAttribute('stroke-width', String(lineW));
+        path.setAttribute('stroke-linecap', 'round');
+        const dash = ComponentRegistry.lineStyleToDashArray(lineStyle, lineW);
+        if (dash) path.setAttribute('stroke-dasharray', dash);
+        svg.appendChild(path);
+      } else if (!isPartial) {
+        const ell = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+        ell.setAttribute('cx', String(cx));
+        ell.setAttribute('cy', String(cy));
+        ell.setAttribute('rx', String(rx));
+        ell.setAttribute('ry', String(ry));
+        ell.setAttribute('fill', 'none');
+        ell.setAttribute('stroke', comp.foreColor || '#000000');
+        ell.setAttribute('stroke-width', String(lineW));
+        const dash = ComponentRegistry.lineStyleToDashArray(lineStyle, lineW);
+        if (dash) ell.setAttribute('stroke-dasharray', dash);
+        svg.appendChild(ell);
+      }
+    }
     el.appendChild(svg);
+
+    if (isPartial && usePattern && Number.isFinite(sweep) && Math.abs(sweep) > 0.01) {
+      const d = ComponentRegistry.arcPathData(cx, cy, w / 2, h / 2, startAngle, sweep, true);
+      const overlay = document.createElement('div');
+      overlay.className = 'ft-arc-pattern';
+      overlay.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;background:none;background-color:transparent;'
+        + `clip-path:path('${d}');-webkit-clip-path:path('${d}')`;
+      ComponentRegistry.applyShapePattern(overlay, { ...comp, usePatternColor: true });
+      el.appendChild(overlay);
+    }
   },
 
   Arc(comp) {
@@ -2945,6 +3963,7 @@ const ComponentRegistry = {
   },
 
   freehandShouldClosePath(comp) {
+    if (comp.type === 'Polygon') return true;
     const useBack = comp.useBackColor !== false;
     return useBack && (comp.backStyle === 'solid' || comp.backStyle === 'gradient');
   },
@@ -2982,7 +4001,7 @@ const ComponentRegistry = {
     svg.setAttribute('aria-hidden', 'true');
     svg.style.cssText = 'position:absolute;left:0;top:0;display:block;pointer-events:none;overflow:visible';
 
-    const gradId = `fh-grad-${comp.name || 'shape'}`;
+    const gradId = `fh-grad-${String(comp.name || 'shape').replace(/[^A-Za-z0-9_-]/g, '')}`;
     if (comp.backStyle === 'gradient' && comp.useBackColor !== false) {
       const start = comp.backColor || '#808080';
       const end = comp.endColor || '#e8e8e8';
@@ -3034,6 +4053,17 @@ const ComponentRegistry = {
 
     svg.appendChild(path);
     el.appendChild(svg);
+
+    const usePattern = Boolean(comp.patternStyle && comp.patternStyle !== 'none');
+    if (usePattern && points.length >= 2) {
+      const clip = `polygon(${points.map((p) => `${Number(p.x) || 0}px ${Number(p.y) || 0}px`).join(',')})`;
+      const overlay = document.createElement('div');
+      overlay.className = 'ft-freehand-pattern';
+      overlay.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;background:none;background-color:transparent;'
+        + `-webkit-clip-path:${clip};clip-path:${clip}`;
+      ComponentRegistry.applyShapePattern(overlay, { ...comp, usePatternColor: true });
+      el.appendChild(overlay);
+    }
   },
 
   Freehand(comp) {
@@ -3045,6 +4075,208 @@ const ComponentRegistry = {
       return el;
     }
     ComponentRegistry.applyFreehandAppearance(el, comp);
+    return el;
+  },
+
+  applyLineAppearance(el, comp) {
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.display = '';
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    el.style.border = 'none';
+    el.style.boxSizing = 'border-box';
+    el.style.overflow = 'visible';
+    el.style.position = 'absolute';
+
+    const useBack = comp.useBackColor !== false && comp.backStyle === 'solid';
+    if (useBack) {
+      el.style.backgroundColor = comp.backColor || '#c0c0c0';
+      el.style.background = '';
+    } else {
+      el.style.backgroundColor = 'transparent';
+      el.style.background = 'none';
+    }
+
+    el.querySelector('svg')?.remove();
+
+    const w = Math.max(1, Number(comp.width) || 1);
+    const h = Math.max(1, Number(comp.height) || 1);
+    const x1 = Number.isFinite(Number(comp.x1)) ? Number(comp.x1) : 0;
+    const y1 = Number.isFinite(Number(comp.y1)) ? Number(comp.y1) : 0;
+    const x2 = Number.isFinite(Number(comp.x2)) ? Number(comp.x2) : w;
+    const y2 = Number.isFinite(Number(comp.y2)) ? Number(comp.y2) : h;
+
+    const lineW = comp.lineWidth ?? 1;
+    const lineStyle = comp.lineStyle || 'solid';
+    const useFore = comp.useForeColor !== false && lineStyle !== 'none' && lineW > 0;
+    if (!useFore) return;
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.style.cssText = 'position:absolute;left:0;top:0;display:block;pointer-events:none;overflow:visible';
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', String(x1));
+    line.setAttribute('y1', String(y1));
+    line.setAttribute('x2', String(x2));
+    line.setAttribute('y2', String(y2));
+    line.setAttribute('stroke', comp.foreColor || '#808080');
+    line.setAttribute('stroke-width', String(lineW));
+    line.setAttribute('stroke-linecap', 'round');
+    const dash = ComponentRegistry.lineStyleToDashArray(lineStyle, lineW);
+    if (dash) line.setAttribute('stroke-dasharray', dash);
+    svg.appendChild(line);
+    el.appendChild(svg);
+  },
+
+  Line(comp) {
+    const el = document.createElement('div');
+    el.className = 'ft-line ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+    ComponentRegistry.applyLineAppearance(el, comp);
+    return el;
+  },
+
+  applyPolygonAppearance(el, comp) {
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.display = '';
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    el.style.border = 'none';
+    el.style.background = 'none';
+    el.style.backgroundColor = 'transparent';
+    el.style.boxSizing = 'border-box';
+    el.style.overflow = 'visible';
+    el.style.position = 'absolute';
+
+    el.querySelectorAll('svg, .ft-polygon-fill, .ft-polygon-pattern').forEach((node) => node.remove());
+
+    const w = Math.max(1, Number(comp.width) || 1);
+    const h = Math.max(1, Number(comp.height) || 1);
+    const points = comp.points || [];
+    if (points.length < 2) return;
+
+    const closeStroke = comp.type !== 'Polyline';
+    const fillPathD = ComponentRegistry.freehandPathData(points, true);
+    const strokePathD = ComponentRegistry.freehandPathData(points, closeStroke);
+    const useBack = comp.useBackColor !== false && (comp.backStyle === 'solid' || comp.backStyle === 'gradient');
+    const usePattern = Boolean(comp.patternStyle && comp.patternStyle !== 'none');
+    const lineW = comp.lineWidth ?? 1;
+    const lineStyle = comp.lineStyle || 'solid';
+    const useFore = comp.useForeColor !== false && lineStyle !== 'none' && lineW > 0;
+
+    const makeSvg = () => {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', '100%');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.style.cssText = 'position:absolute;left:0;top:0;display:block;pointer-events:none;overflow:visible';
+      return svg;
+    };
+
+    if (useBack) {
+      const fillSvg = makeSvg();
+      let fill = comp.backColor || '#c0c0c0';
+      if (comp.backStyle === 'gradient') {
+        const safeName = String(comp.name || 'shape').replace(/[^A-Za-z0-9_-]/g, '');
+        const gradId = `${comp.type === 'Polyline' ? 'pl' : 'pg'}-grad-${safeName}`;
+        const start = comp.backColor || '#c0c0c0';
+        const end = comp.endColor || '#e8e8e8';
+        const stop = comp.gradientStop ?? 95;
+        const shading = comp.gradientShadingStyle || comp.gradientDirection || '';
+        const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+        grad.setAttribute('id', gradId);
+        if (shading === 'gradientHorizontalFromRight') {
+          grad.setAttribute('x1', '100%'); grad.setAttribute('y1', '0%');
+          grad.setAttribute('x2', '0%'); grad.setAttribute('y2', '0%');
+        } else if (shading === 'gradientHorizontalFromLeft') {
+          grad.setAttribute('x1', '0%'); grad.setAttribute('y1', '0%');
+          grad.setAttribute('x2', '100%'); grad.setAttribute('y2', '0%');
+        } else {
+          grad.setAttribute('x1', '0%'); grad.setAttribute('y1', '0%');
+          grad.setAttribute('x2', '0%'); grad.setAttribute('y2', '100%');
+        }
+        const s0 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+        s0.setAttribute('offset', '0%');
+        s0.setAttribute('stop-color', start);
+        const s1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+        s1.setAttribute('offset', `${stop}%`);
+        s1.setAttribute('stop-color', end);
+        grad.appendChild(s0);
+        grad.appendChild(s1);
+        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        defs.appendChild(grad);
+        fillSvg.appendChild(defs);
+        fill = `url(#${gradId})`;
+      }
+      const fillPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      fillPath.setAttribute('d', fillPathD);
+      fillPath.setAttribute('fill', fill);
+      fillPath.setAttribute('fill-rule', 'evenodd');
+      fillPath.setAttribute('stroke', 'none');
+      fillSvg.appendChild(fillPath);
+      el.appendChild(fillSvg);
+    }
+
+    if (usePattern) {
+      const clip = `polygon(${points.map((p) => `${Number(p.x) || 0}px ${Number(p.y) || 0}px`).join(',')})`;
+      const overlay = document.createElement('div');
+      overlay.className = 'ft-polygon-pattern';
+      overlay.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;background:none;background-color:transparent;'
+        + `-webkit-clip-path:${clip};clip-path:${clip}`;
+      ComponentRegistry.applyShapePattern(overlay, { ...comp, usePatternColor: true });
+      el.appendChild(overlay);
+    }
+
+    if (!useFore) return;
+
+    const strokeSvg = makeSvg();
+    const strokePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    strokePath.setAttribute('d', strokePathD);
+    strokePath.setAttribute('fill', 'none');
+    strokePath.setAttribute('stroke', comp.foreColor || '#000000');
+    strokePath.setAttribute('stroke-width', String(lineW));
+    strokePath.setAttribute('stroke-linejoin', 'miter');
+    strokePath.setAttribute('stroke-linecap', closeStroke ? 'butt' : 'round');
+    const dash = ComponentRegistry.lineStyleToDashArray(lineStyle, lineW);
+    if (dash) strokePath.setAttribute('stroke-dasharray', dash);
+    strokeSvg.appendChild(strokePath);
+    el.appendChild(strokeSvg);
+  },
+
+  Polygon(comp) {
+    const el = document.createElement('div');
+    el.className = 'ft-polygon ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+    ComponentRegistry.applyPolygonAppearance(el, comp);
+    return el;
+  },
+
+  Polyline(comp) {
+    const el = document.createElement('div');
+    el.className = 'ft-polyline ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+    ComponentRegistry.applyPolygonAppearance(el, comp);
     return el;
   },
 
@@ -3070,9 +4302,57 @@ const ComponentRegistry = {
     return el;
   },
 
+  roundedRectCornerRadius(comp) {
+    const w = Math.max(1, Number(comp.width) || 1);
+    const h = Math.max(1, Number(comp.height) || 1);
+    if (comp.cornerRadius != null && Number.isFinite(Number(comp.cornerRadius))) {
+      return Math.max(0, Number(comp.cornerRadius));
+    }
+    return Math.round(Math.min(w, h) * 0.28);
+  },
+
+  applyRoundedRectangleAppearance(el, comp) {
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.display = '';
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    ComponentRegistry.applyShapeFill(el, comp);
+    ComponentRegistry.applyShapePattern(el, comp);
+    ComponentRegistry.applyShapeBorder(el, comp, { borderMode: comp.borderMode });
+    el.style.borderRadius = `${ComponentRegistry.roundedRectCornerRadius(comp)}px`;
+    el.style.overflow = 'hidden';
+    el.style.boxSizing = 'border-box';
+  },
+
+  RoundedRectangle(comp) {
+    const el = document.createElement('div');
+    el.className = 'ft-rounded-rectangle ft-rectangle ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+    ComponentRegistry.applyRoundedRectangleAppearance(el, comp);
+    return el;
+  },
+
   Ellipse(comp) {
     const el = document.createElement('div');
     el.className = 'ft-ellipse ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+    ComponentRegistry.applyArcAppearance(el, comp);
+    return el;
+  },
+
+  Wedge(comp) {
+    const el = document.createElement('div');
+    el.className = 'ft-wedge ft-ellipse ft-graphic';
     if (comp.name) el.dataset.name = comp.name;
     if (comp.visible === false) {
       el.style.display = 'none';
@@ -3237,13 +4517,27 @@ const ComponentRegistry = {
       ...comp,
       borderStyle: comp.borderStyle || 'line',
       borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: comp.borderUsesBackColor ?? true,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
       backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#dcdcdc',
+      backColor: comp.backColor || '#001C38',
       useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
       navSideAccent: comp.navSideAccent,
-      studioEdit
+      studioEdit,
+      useHighlightColor: false
     });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
     let imgEl = null;
     if (comp.image) {
       imgEl = document.createElement('img');
@@ -3251,6 +4545,7 @@ const ComponentRegistry = {
       imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
       imgEl.alt = '';
       imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
       if (comp.imageScaled) {
         imgEl.classList.add('ft-goto-btn-icon-scaled');
       }
@@ -3262,15 +4557,17 @@ const ComponentRegistry = {
 
     const cap = document.createElement('span');
     cap.className = 'ft-goto-btn-caption';
-    cap.textContent = comp.label || comp.caption || '';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : comp.useForeColor !== false;
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
     ComponentRegistry.applyCaptionStyle(cap, {
       fontFamily: comp.fontFamily || 'Arial Unicode MS',
       fontSize: comp.fontSize ?? 10,
       bold: comp.bold ?? false,
       italic: comp.italic,
       underline: comp.underline,
-      foreColor: comp.foreColor || '#000000',
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
       useForeColor: useCaptionColor,
       wordWrap: comp.wordWrap !== false,
       alignment: comp.alignment || 'middleCenter'
@@ -3361,24 +4658,30 @@ const ComponentRegistry = {
       backStyle: comp.backStyle || 'solid',
       backColor: comp.backColor || '#001C38',
       useBackColor: comp.useBackColor !== false,
-      studioEdit
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
     });
-    btn.style.display = 'flex';
-    btn.style.flexDirection = 'column';
-    const alignId = comp.alignment || 'middleCenter';
-    const align = ComponentRegistry.textAlignment(alignId, 'column');
-    btn.style.justifyContent = align.justify;
-    btn.style.alignItems = align.align;
-    btn.style.padding = '2px 3px 3px';
-    btn.style.gap = '0';
-    btn.style.overflow = 'hidden';
-
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
     if (comp.image) {
-      const imgEl = document.createElement('img');
+      imgEl = document.createElement('img');
       imgEl.className = 'ft-goto-btn-icon';
       imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
       imgEl.alt = '';
       imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
       if (comp.imageScaled) {
         imgEl.classList.add('ft-goto-btn-icon-scaled');
       }
@@ -3386,23 +4689,24 @@ const ComponentRegistry = {
         imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
       }
       imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      btn.appendChild(imgEl);
     }
 
     const cap = document.createElement('span');
     cap.className = 'ft-goto-btn-caption';
-    cap.textContent = comp.label || comp.caption || '';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : comp.useForeColor !== false;
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
     ComponentRegistry.applyCaptionStyle(cap, {
       fontFamily: comp.fontFamily || 'Arial Unicode MS',
       fontSize: comp.fontSize ?? 10,
       bold: comp.bold ?? false,
       italic: comp.italic,
       underline: comp.underline,
-      foreColor: comp.foreColor || '#000000',
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
       useForeColor: useCaptionColor,
       wordWrap: comp.wordWrap !== false,
-      alignment: alignId
+      alignment: comp.alignment || 'middleCenter'
     });
     if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
       cap.style.backgroundColor = comp.captionBackColor || '#001C38';
@@ -3411,6 +4715,9 @@ const ComponentRegistry = {
     cap.style.width = '100%';
     cap.style.lineHeight = '1.15';
     cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
     btn.appendChild(cap);
     btn.classList.toggle('ft-blink', Boolean(comp.blink));
 
@@ -3462,24 +4769,30 @@ const ComponentRegistry = {
       backStyle: comp.backStyle || 'solid',
       backColor: comp.backColor || '#001C38',
       useBackColor: comp.useBackColor !== false,
-      studioEdit
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
     });
-    btn.style.display = 'flex';
-    btn.style.flexDirection = 'column';
-    const alignId = comp.alignment || 'middleCenter';
-    const align = ComponentRegistry.textAlignment(alignId, 'column');
-    btn.style.justifyContent = align.justify;
-    btn.style.alignItems = align.align;
-    btn.style.padding = '2px 3px 3px';
-    btn.style.gap = '0';
-    btn.style.overflow = 'hidden';
-
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
     if (comp.image) {
-      const imgEl = document.createElement('img');
+      imgEl = document.createElement('img');
       imgEl.className = 'ft-goto-btn-icon';
       imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
       imgEl.alt = '';
       imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
       if (comp.imageScaled) {
         imgEl.classList.add('ft-goto-btn-icon-scaled');
       }
@@ -3487,23 +4800,24 @@ const ComponentRegistry = {
         imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
       }
       imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      btn.appendChild(imgEl);
     }
 
     const cap = document.createElement('span');
     cap.className = 'ft-goto-btn-caption';
-    cap.textContent = comp.label || comp.caption || '';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : comp.useForeColor !== false;
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
     ComponentRegistry.applyCaptionStyle(cap, {
       fontFamily: comp.fontFamily || 'Arial Unicode MS',
       fontSize: comp.fontSize ?? 10,
       bold: comp.bold ?? false,
       italic: comp.italic,
       underline: comp.underline,
-      foreColor: comp.foreColor || '#000000',
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
       useForeColor: useCaptionColor,
       wordWrap: comp.wordWrap !== false,
-      alignment: alignId
+      alignment: comp.alignment || 'middleCenter'
     });
     if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
       cap.style.backgroundColor = comp.captionBackColor || '#001C38';
@@ -3512,11 +4826,18 @@ const ComponentRegistry = {
     cap.style.width = '100%';
     cap.style.lineHeight = '1.15';
     cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
     btn.appendChild(cap);
     btn.classList.toggle('ft-blink', Boolean(comp.blink));
 
     const runRecipeAction = () => {
-      ctx.navigate('500_Recipe');
+      if (typeof ctx.runRecipePlusAction === 'function') {
+        ctx.runRecipePlusAction(comp.action || 'download', comp);
+        return;
+      }
+      ctx.navigate?.('500_Recipe');
     };
 
     if (studioEdit) {
@@ -3559,7 +4880,8 @@ const ComponentRegistry = {
     const columns = comp.columns?.length
       ? comp.columns
       : ComponentRegistry.defaultRecipePlusColumns();
-    const activeCol = columns.find((c) => c.id === (comp.activeColumnId || 'recipe')) || columns[0];
+    const recipeCol = columns.find((c) => c.id === 'recipe') || columns[0];
+    const unitCol = columns.find((c) => c.id === 'unit') || columns[1];
 
     ComponentRegistry.applyButtonAppearance(el, {
       ...comp,
@@ -3570,12 +4892,15 @@ const ComponentRegistry = {
       backColor: comp.backColor || '#001C38',
       useBackColor: comp.useBackColor !== false,
       useBorderColor: comp.useBorderColor !== false,
-      borderColor: comp.borderColor || '#000000',
+      borderColor: comp.borderColor || '#001C38',
       studioEdit
     });
 
     el.style.padding = '0';
     el.style.overflow = 'hidden';
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.tabIndex = comp.keyNavigation === false ? -1 : 0;
 
     const fontBase = {
       fontFamily: comp.fontFamily || 'Arial Unicode MS',
@@ -3584,22 +4909,46 @@ const ComponentRegistry = {
       italic: comp.italic,
       underline: comp.underline
     };
+    const wrap = comp.wordWrap !== false;
+    const linesPerItem = Math.max(1, Math.min(10, Number(comp.linesPerItem) || 1));
+    const recipeWidth = Math.max(20, Number(recipeCol?.width) || 150);
+    const unitWidth = Math.max(20, Number(unitCol?.width) || 100);
 
-    let headerEl = null;
-    if (comp.displayHeader !== false) {
-      headerEl = document.createElement('div');
-      headerEl.className = 'ft-recipeplus-selector-header';
-      headerEl.textContent = activeCol?.headerText || activeCol?.label || 'Recipe';
-      if (comp.useHeaderBackColor !== false) {
-        headerEl.style.backgroundColor = comp.headerBackColor || '#001C38';
-      }
-      ComponentRegistry.applyCaptionStyle(headerEl, {
+    const applyColStyle = (node, kind) => {
+      node.style.flex = kind === 'recipe' ? `1 1 ${recipeWidth}px` : `0 0 ${unitWidth}px`;
+      node.style.minWidth = '0';
+      node.style.textAlign = kind === 'unit' ? 'right' : 'left';
+      node.style.overflow = 'hidden';
+      node.style.whiteSpace = wrap && linesPerItem > 1 ? 'normal' : 'nowrap';
+      node.style.textOverflow = 'ellipsis';
+    };
+
+    const paintText = (node, color) => {
+      ComponentRegistry.applyCaptionStyle(node, {
         ...fontBase,
-        foreColor: comp.useHeaderForeColor !== false ? (comp.headerForeColor || '#ffffff') : '#ffffff',
+        foreColor: color,
         useForeColor: true,
-        wordWrap: false,
-        alignment: 'middleLeft'
+        wordWrap: wrap,
+        alignment: node.style.textAlign === 'right' ? 'middleRight' : 'middleLeft'
       });
+    };
+
+    if (comp.displayHeader !== false) {
+      const headerEl = document.createElement('div');
+      headerEl.className = 'ft-recipeplus-selector-header';
+      headerEl.style.backgroundColor = comp.headerBackColor || '#001C38';
+      const recipeHead = document.createElement('span');
+      recipeHead.className = 'ft-recipeplus-selector-col recipe';
+      recipeHead.textContent = recipeCol?.headerText || recipeCol?.label || 'Recipe';
+      applyColStyle(recipeHead, 'recipe');
+      paintText(recipeHead, comp.headerForeColor || '#ffffff');
+      const unitHead = document.createElement('span');
+      unitHead.className = 'ft-recipeplus-selector-col unit';
+      unitHead.textContent = unitCol?.headerText || unitCol?.label || 'Unit';
+      applyColStyle(unitHead, 'unit');
+      paintText(unitHead, comp.headerForeColor || '#ffffff');
+      headerEl.appendChild(recipeHead);
+      headerEl.appendChild(unitHead);
       el.appendChild(headerEl);
     }
 
@@ -3608,50 +4957,40 @@ const ComponentRegistry = {
     el.appendChild(body);
 
     const demoRows = ComponentRegistry.defaultRecipePlusSelectorRows();
-    let selectedIndex = studioEdit ? 1 : (comp.selectedIndex ?? 1);
+    let selectedIndex = studioEdit ? 0 : (comp.selectedIndex ?? 0);
 
-    const rows = demoRows.map((text, index) => {
+    const rowEls = demoRows.map((item, index) => {
       const row = document.createElement('div');
       row.className = 'ft-recipeplus-selector-row';
       row.dataset.index = String(index);
-
-      const cell = document.createElement('span');
-      cell.className = 'ft-recipeplus-selector-cell';
-      cell.textContent = text;
-      row.appendChild(cell);
+      row.style.flex = `${linesPerItem} 1 0`;
+      const recipeCell = document.createElement('span');
+      recipeCell.className = 'ft-recipeplus-selector-col recipe';
+      recipeCell.textContent = typeof item === 'string' ? item : (item.recipe || '');
+      applyColStyle(recipeCell, 'recipe');
+      const unitCell = document.createElement('span');
+      unitCell.className = 'ft-recipeplus-selector-col unit';
+      unitCell.textContent = typeof item === 'string' ? '' : (item.unit || '');
+      applyColStyle(unitCell, 'unit');
+      row.appendChild(recipeCell);
+      row.appendChild(unitCell);
       body.appendChild(row);
-      return { row, cell };
+      return { row, recipeCell, unitCell };
     });
 
     const applySelection = (index) => {
       selectedIndex = index;
-      rows.forEach(({ row, cell }, i) => {
+      rowEls.forEach(({ row, recipeCell, unitCell }, i) => {
         const isActive = i === selectedIndex;
-        if (isActive) {
-          row.style.backgroundColor = comp.useSelectionBackColor !== false
-            ? (comp.selectionBackColor || '#0066cc')
-            : 'transparent';
-          ComponentRegistry.applyCaptionStyle(cell, {
-            ...fontBase,
-            foreColor: comp.useSelectionForeColor !== false ? (comp.selectionForeColor || '#000000') : '#ffffff',
-            useForeColor: true,
-            wordWrap: comp.wordWrap !== false,
-            alignment: 'middleLeft'
-          });
-          if (comp.wordWrap === false) cell.style.whiteSpace = 'nowrap';
-          else cell.style.whiteSpace = 'normal';
-        } else {
-          row.style.backgroundColor = 'transparent';
-          ComponentRegistry.applyCaptionStyle(cell, {
-            ...fontBase,
-            foreColor: comp.useForeColor !== false ? (comp.foreColor || '#ffffff') : '#ffffff',
-            useForeColor: true,
-            wordWrap: comp.wordWrap !== false,
-            alignment: 'middleLeft'
-          });
-          if (comp.wordWrap === false) cell.style.whiteSpace = 'nowrap';
-          else cell.style.whiteSpace = 'normal';
-        }
+        const back = isActive
+          ? (comp.selectionBackColor || '#99CCFF')
+          : 'transparent';
+        const fore = isActive
+          ? (comp.selectionForeColor || '#000000')
+          : (comp.foreColor || '#ffffff');
+        row.style.backgroundColor = back;
+        paintText(recipeCell, fore);
+        paintText(unitCell, fore);
         row.classList.toggle('ft-recipeplus-selector-row--active', isActive);
       });
     };
@@ -3659,10 +4998,24 @@ const ComponentRegistry = {
     applySelection(selectedIndex);
 
     if (!studioEdit) {
-      rows.forEach(({ row }, index) => {
+      rowEls.forEach(({ row }, index) => {
         row.style.cursor = 'pointer';
         row.addEventListener('click', () => applySelection(index));
       });
+      if (comp.keyNavigation !== false) {
+        el.addEventListener('keydown', (e) => {
+          const last = rowEls.length - 1;
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const next = selectedIndex >= last ? (comp.wrapAround ? 0 : last) : selectedIndex + 1;
+            applySelection(next);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const next = selectedIndex <= 0 ? (comp.wrapAround ? last : 0) : selectedIndex - 1;
+            applySelection(next);
+          }
+        });
+      }
     }
 
     if (studioEdit) {
@@ -3698,8 +5051,211 @@ const ComponentRegistry = {
   },
 
   defaultRecipePlusSelectorRows() {
-    const sample = 'recipe recipe recipe rec';
-    return Array.from({ length: 6 }, () => sample);
+    return Array.from({ length: 8 }, () => ({
+      recipe: 'recipe recipe recipe reci*',
+      unit: 'unit*'
+    }));
+  },
+
+  defaultRecipePlusTableColumns() {
+    return [
+      { id: 'ingredientName', label: 'Ingredient name', headerText: 'Ingredient', width: 100, display: true },
+      { id: 'currentValue', label: 'Current value', headerText: 'Current', width: 55, display: true },
+      { id: 'recipeValue', label: 'Recipe value', headerText: 'Recipe', width: 55, display: true },
+      { id: 'compareStatus', label: 'Compare status', headerText: 'Compare', width: 55, display: true },
+      { id: 'tagName', label: 'Tag name', headerText: 'Tag Name', width: 100, display: true }
+    ];
+  },
+
+  defaultRecipePlusTableRows() {
+    return [
+      { ingredientName: 'ingredient', currentValue: '', recipeValue: '', compareStatus: '', tagName: '' },
+      { ingredientName: 'ingredient', currentValue: '', recipeValue: '', compareStatus: '', tagName: '' },
+      { ingredientName: '', currentValue: '', recipeValue: '', compareStatus: '', tagName: '' }
+    ];
+  },
+
+  RecipePlusTable(comp, ctx) {
+    const el = document.createElement('div');
+    el.className = 'ft-recipeplus-table ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    const columns = (comp.columns?.length
+      ? comp.columns
+      : ComponentRegistry.defaultRecipePlusTableColumns()
+    ).filter((c) => c.display !== false);
+    const gridColor = comp.gridColor || '#A0A8B0';
+
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      useBorderColor: comp.useBorderColor !== false,
+      borderColor: comp.borderColor || '#001C38',
+      studioEdit
+    });
+
+    el.style.padding = '0';
+    el.style.overflow = 'hidden';
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.tabIndex = comp.keyNavigation === false ? -1 : 0;
+
+    const fontBase = {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold,
+      italic: comp.italic,
+      underline: comp.underline
+    };
+    const wrap = comp.wordWrap !== false;
+    const linesPerItem = Math.max(1, Math.min(10, Number(comp.linesPerItem) || 1));
+
+    const applyColStyle = (node, col, isLast) => {
+      const width = Math.max(20, Number(col.width) || 100);
+      node.style.flex = `0 0 ${width}px`;
+      node.style.width = `${width}px`;
+      node.style.minWidth = '0';
+      node.style.textAlign = 'left';
+      node.style.overflow = 'hidden';
+      node.style.whiteSpace = wrap && linesPerItem > 1 ? 'normal' : 'nowrap';
+      node.style.textOverflow = 'ellipsis';
+      node.style.padding = '0 4px';
+      node.style.boxSizing = 'border-box';
+      if (!isLast) node.style.borderRight = `1px solid ${gridColor}`;
+    };
+
+    const paintText = (node, color) => {
+      ComponentRegistry.applyCaptionStyle(node, {
+        ...fontBase,
+        foreColor: color,
+        useForeColor: true,
+        wordWrap: wrap,
+        alignment: 'middleLeft'
+      });
+    };
+
+    const fillCells = (rowEl, getText, color) => {
+      columns.forEach((col, i) => {
+        const cell = document.createElement('span');
+        cell.className = 'ft-recipeplus-table-col';
+        cell.textContent = getText(col) || '';
+        applyColStyle(cell, col, i === columns.length - 1);
+        paintText(cell, color);
+        rowEl.appendChild(cell);
+      });
+    };
+
+    if (comp.displayHeader !== false) {
+      const headerEl = document.createElement('div');
+      headerEl.className = 'ft-recipeplus-table-header';
+      headerEl.style.backgroundColor = comp.headerBackColor || '#001C38';
+      headerEl.style.borderBottom = `1px solid ${gridColor}`;
+      fillCells(headerEl, (col) => col.headerText || col.label || '', comp.headerForeColor || '#ffffff');
+      el.appendChild(headerEl);
+    }
+
+    const body = document.createElement('div');
+    body.className = 'ft-recipeplus-table-body';
+    el.appendChild(body);
+
+    const demoRows = ComponentRegistry.defaultRecipePlusTableRows();
+    let selectedIndex = studioEdit ? 0 : (comp.selectedIndex ?? 0);
+
+    const rowEls = demoRows.map((item, index) => {
+      const row = document.createElement('div');
+      row.className = 'ft-recipeplus-table-row';
+      row.dataset.index = String(index);
+      row.style.flex = `${linesPerItem} 1 0`;
+      row.style.borderBottom = `1px solid ${gridColor}`;
+      fillCells(row, (col) => (typeof item === 'string' ? item : (item[col.id] || '')), comp.foreColor || '#ffffff');
+      body.appendChild(row);
+      return row;
+    });
+
+    const applySelection = (index) => {
+      selectedIndex = index;
+      rowEls.forEach((row, i) => {
+        const isActive = i === selectedIndex;
+        const back = isActive ? (comp.selectionBackColor || '#99CCFF') : 'transparent';
+        const fore = isActive
+          ? (comp.selectionForeColor || '#000000')
+          : (comp.foreColor || '#ffffff');
+        row.style.backgroundColor = back;
+        row.querySelectorAll('.ft-recipeplus-table-col').forEach((cell) => paintText(cell, fore));
+        row.classList.toggle('ft-recipeplus-table-row--active', isActive);
+      });
+    };
+
+    applySelection(selectedIndex);
+
+    if (comp.displayFooter !== false) {
+      const footerEl = document.createElement('div');
+      footerEl.className = 'ft-recipeplus-table-footer';
+      footerEl.style.backgroundColor = comp.footerBackColor || '#001C38';
+      footerEl.style.borderTop = `1px solid ${gridColor}`;
+      const footerText = document.createElement('span');
+      footerText.className = 'ft-recipeplus-table-footer-text';
+      footerText.textContent = 'recipe : unit :';
+      paintText(footerText, comp.footerForeColor || '#ffffff');
+      footerEl.appendChild(footerText);
+      el.appendChild(footerEl);
+    }
+
+    if (!studioEdit && !comp.viewOnly) {
+      rowEls.forEach((row, index) => {
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', () => applySelection(index));
+      });
+      if (comp.keyNavigation !== false) {
+        el.addEventListener('keydown', (e) => {
+          const last = rowEls.length - 1;
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const next = selectedIndex >= last ? (comp.wrapAround ? 0 : last) : selectedIndex + 1;
+            applySelection(next);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const next = selectedIndex <= 0 ? (comp.wrapAround ? last : 0) : selectedIndex - 1;
+            applySelection(next);
+          }
+        });
+      }
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'RecipePlusTable',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'RecipePlusTable',
+          source: comp._source || ''
+        }, '*');
+      });
+    }
+
+    return el;
   },
 
   CloseDisplayButton(comp, ctx) {
@@ -3721,24 +5277,30 @@ const ComponentRegistry = {
       backStyle: comp.backStyle || 'solid',
       backColor: comp.backColor || '#001C38',
       useBackColor: comp.useBackColor !== false,
-      studioEdit
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
     });
-    btn.style.display = 'flex';
-    btn.style.flexDirection = 'column';
-    const alignId = comp.alignment || 'middleCenter';
-    const align = ComponentRegistry.textAlignment(alignId, 'column');
-    btn.style.justifyContent = align.justify;
-    btn.style.alignItems = align.align;
-    btn.style.padding = '2px 3px 3px';
-    btn.style.gap = '0';
-    btn.style.overflow = 'hidden';
-
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
     if (comp.image) {
-      const imgEl = document.createElement('img');
+      imgEl = document.createElement('img');
       imgEl.className = 'ft-goto-btn-icon';
       imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
       imgEl.alt = '';
       imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
       if (comp.imageScaled) {
         imgEl.classList.add('ft-goto-btn-icon-scaled');
       }
@@ -3746,23 +5308,24 @@ const ComponentRegistry = {
         imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
       }
       imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      btn.appendChild(imgEl);
     }
 
     const cap = document.createElement('span');
     cap.className = 'ft-goto-btn-caption';
-    cap.textContent = comp.label || comp.caption || '';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : comp.useForeColor !== false;
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
     ComponentRegistry.applyCaptionStyle(cap, {
       fontFamily: comp.fontFamily || 'Arial Unicode MS',
       fontSize: comp.fontSize ?? 10,
       bold: comp.bold ?? false,
       italic: comp.italic,
       underline: comp.underline,
-      foreColor: comp.foreColor || '#000000',
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
       useForeColor: useCaptionColor,
       wordWrap: comp.wordWrap !== false,
-      alignment: alignId
+      alignment: comp.alignment || 'middleCenter'
     });
     if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
       cap.style.backgroundColor = comp.captionBackColor || '#001C38';
@@ -3771,6 +5334,9 @@ const ComponentRegistry = {
     cap.style.width = '100%';
     cap.style.lineHeight = '1.15';
     cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
     btn.appendChild(cap);
     btn.classList.toggle('ft-blink', Boolean(comp.blink));
 
@@ -3807,84 +5373,933 @@ const ComponentRegistry = {
     return btn;
   },
 
-  DisplayListSelector(comp, ctx) {
+  PausePenButton(comp, ctx) {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'ft-display-list-btn ft-multistate-btn ft-graphic';
+    btn.className = 'ft-pause-pen-btn ft-goto-btn ft-graphic';
     if (comp.name) btn.dataset.name = comp.name;
     if (comp.visible === false) {
       btn.style.display = 'none';
       return btn;
     }
-
     ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    if (comp.image) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'PausePenButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'PausePenButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', () => {
+        const sendPressTo = comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus';
+        const linkedObject = (comp.linkedObject || '').trim();
+        const target = sendPressTo === 'linkedObject'
+          ? linkedObject
+          : (ctx.focusedObjectName || ctx.focusObject || '');
+        if (typeof ctx.pauseTrendPen === 'function') {
+          ctx.pauseTrendPen({ sendPressTo, linkedObject, target, audio: comp.audio !== false });
+        } else {
+          btn.dispatchEvent(new CustomEvent('planthmi-pause-pen', {
+            bubbles: true,
+            detail: { sendPressTo, linkedObject, target, audio: comp.audio !== false }
+          }));
+        }
+      });
+    }
+    return btn;
+  },
+
+  NextPenButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-next-pen-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    if (comp.image) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'NextPenButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'NextPenButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', () => {
+        const sendPressTo = comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus';
+        const linkedObject = (comp.linkedObject || '').trim();
+        const target = sendPressTo === 'linkedObject'
+          ? linkedObject
+          : (ctx.focusedObjectName || ctx.focusObject || '');
+        if (typeof ctx.nextTrendPen === 'function') {
+          ctx.nextTrendPen({ sendPressTo, linkedObject, target, audio: comp.audio !== false });
+        } else {
+          btn.dispatchEvent(new CustomEvent('planthmi-next-pen', {
+            bubbles: true,
+            detail: { sendPressTo, linkedObject, target, audio: comp.audio !== false }
+          }));
+        }
+      });
+    }
+    return btn;
+  },
+
+  resolveGraphicImageFile(fileName) {
+    const name = String(fileName || '').trim();
+    if (!name) return '';
+    if (/\.[a-z0-9]+$/i.test(name)) return name;
+    return `${name}.bmp`;
+  },
+
+  sendKeyToInputTarget(ctx, comp, key) {
+    const sendPressTo = comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus';
+    const linkedObject = (comp.linkedObject || '').trim();
+    const root = ctx.root || document;
+    const escapeName = (name) => {
+      try { return CSS.escape(name); } catch (_) { return String(name).replace(/"/g, '\\"'); }
+    };
+    const findInHost = (host) => {
+      if (!host) return null;
+      if (host.matches?.('input, textarea')) return host;
+      return host.querySelector?.('input, textarea') || null;
+    };
+    let input = null;
+    if (sendPressTo === 'linkedObject' && linkedObject) {
+      input = findInHost(root.querySelector(`[data-name="${escapeName(linkedObject)}"]`));
+    }
+    if (!input) {
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) input = active;
+    }
+    if (!input && (ctx.focusedObjectName || ctx.focusObject)) {
+      input = findInHost(root.querySelector(`[data-name="${escapeName(ctx.focusedObjectName || ctx.focusObject)}"]`));
+    }
+    if (!input || input.disabled || input.readOnly) return;
+    input.focus();
+    if (key === 'Backspace') {
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? start;
+      if (typeof start === 'number' && typeof end === 'number') {
+        if (start !== end) {
+          input.value = input.value.slice(0, start) + input.value.slice(end);
+          input.setSelectionRange(start, start);
+        } else if (start > 0) {
+          input.value = input.value.slice(0, start - 1) + input.value.slice(start);
+          input.setSelectionRange(start - 1, start - 1);
+        }
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+    if (key === 'End') {
+      const len = input.value.length;
+      try { input.setSelectionRange(len, len); } catch (_) { /* ignore */ }
+    }
+    input.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true }));
+  },
+
+  BackspaceButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-backspace-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Backspace');
+    if (imageName) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      const missing = document.createElement('span');
+      missing.className = 'ft-goto-btn-missing hidden';
+      missing.setAttribute('aria-hidden', 'true');
+      imgEl.addEventListener('error', () => {
+        imgEl.style.display = 'none';
+        missing.classList.remove('hidden');
+      });
+      btn.appendChild(missing);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'BackspaceButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'BackspaceButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', () => {
+        if (typeof ctx.sendKeyPress === 'function') {
+          ctx.sendKeyPress({
+            key: 'Backspace',
+            sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
+            linkedObject: (comp.linkedObject || '').trim(),
+            audio: comp.audio !== false
+          });
+        } else {
+          ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'Backspace');
+        }
+      });
+    }
+    return btn;
+  },
+
+  EndButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-end-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'End');
+    if (imageName) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      const missing = document.createElement('span');
+      missing.className = 'ft-goto-btn-missing hidden';
+      missing.setAttribute('aria-hidden', 'true');
+      imgEl.addEventListener('error', () => {
+        imgEl.style.display = 'none';
+        missing.classList.remove('hidden');
+      });
+      btn.appendChild(missing);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'EndButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'EndButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', () => {
+        if (typeof ctx.sendKeyPress === 'function') {
+          ctx.sendKeyPress({
+            key: 'End',
+            sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
+            linkedObject: (comp.linkedObject || '').trim(),
+            audio: comp.audio !== false
+          });
+        } else {
+          ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'End');
+        }
+      });
+    }
+    return btn;
+  },
+
+  Trend(comp, ctx) {
+    const el = document.createElement('div');
+    el.className = 'ft-trend ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    const fontFamily = comp.fontFamily || 'Arial Unicode MS';
+    const fontSize = Math.max(6, Number(comp.fontSize) || 8);
+    const textColor = comp.textColor || '#000000';
+    const backColor = comp.backColor || '#000000';
+    const gridColor = comp.xGridColor || comp.yGridColor || '#808080';
+    const xGridLines = Math.max(0, Number(comp.xGridLines ?? 4));
+    const yGridLines = Math.max(0, Number(comp.yGridLines ?? 4));
+    const xMinor = Math.max(0, Number(comp.xMinorGridLines) || 0);
+    const yMinor = Math.max(0, Number(comp.yMinorGridLines) || 0);
+    const connectPoints = (comp.dataPointConnection || 'connect') !== 'none'
+      && (comp.dataPointConnection || 'connect') !== 'noconnect';
+    const pens = Array.isArray(comp.pens) && comp.pens.length ? comp.pens : [];
+    const buffer = Math.max(8, Number(comp.bufferRecords) || 200);
+    const spanMs = (() => {
+      const n = Number(comp.timeSpan) || 2;
+      const u = comp.timeSpanUnit || 'min';
+      if (u === 'ms') return n;
+      if (u === 's') return n * 1000;
+      if (u === 'h') return n * 3600000;
+      return n * 60000;
+    })();
+
+    el.style.fontFamily = fontFamily;
+    el.style.fontSize = `${fontSize}px`;
+    el.style.color = textColor;
+    el.style.fontStyle = (comp.fontStyle === 'oblique' || comp.fontStyle === 'boldOblique') ? 'italic' : 'normal';
+    el.style.fontWeight = (comp.fontStyle === 'bold' || comp.fontStyle === 'boldOblique') ? '700' : '400';
+    el.style.textDecoration = [comp.underline ? 'underline' : '', comp.strikeout ? 'line-through' : ''].filter(Boolean).join(' ') || 'none';
+    if (comp.focusHighlight !== false) el.classList.add('ft-highlight-on-focus');
+
+    const dateEl = document.createElement('div');
+    dateEl.className = 'ft-trend-date';
+    const plot = document.createElement('div');
+    plot.className = 'ft-trend-plot';
+    plot.style.background = backColor;
+    if (comp.useGradientStyle) {
+      plot.style.background = `linear-gradient(#404040, ${backColor})`;
+    }
+    const timesEl = document.createElement('div');
+    timesEl.className = 'ft-trend-times';
+    const timeLeft = document.createElement('span');
+    const timeRight = document.createElement('span');
+    timesEl.appendChild(timeLeft);
+    timesEl.appendChild(timeRight);
+    el.appendChild(dateEl);
+    el.appendChild(plot);
+    el.appendChild(timesEl);
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    plot.appendChild(svg);
+
+    const formatTrendTime = (d) => {
+      const fmt = comp.timeFormat || 'system';
+      const opts = { hour: 'numeric', minute: '2-digit', second: '2-digit' };
+      if (fmt === '24' || fmt === '24h') {
+        opts.hour12 = false;
+        opts.hour = '2-digit';
+      } else if (fmt === '12' || fmt === '12h') {
+        opts.hour12 = true;
+      }
+      let s = d.toLocaleTimeString(undefined, opts);
+      if (comp.displayMilliseconds) s += `.${String(d.getMilliseconds()).padStart(3, '0')}`;
+      return s;
+    };
+    const dashFor = (style) => {
+      if (style === 'dash') return '2 1.5';
+      if (style === 'dot') return '0.6 1.2';
+      if (style === 'dashDot') return '2.4 1.2 0.6 1.2';
+      if (style === 'dashDotDot') return '2.4 1.2 0.6 1.2 0.6 1.2';
+      return '';
+    };
+    const histories = pens.map(() => []);
+    let paused = false;
+
+    const drawGrid = () => {
+      const parts = [];
+      if (comp.xDisplayGrid !== false) {
+        for (let i = 1; i <= xGridLines; i++) {
+          const x = (i / (xGridLines + 1)) * 100;
+          parts.push(`<line x1="${x}" y1="0" x2="${x}" y2="100" stroke="${gridColor}" stroke-width="0.35" vector-effect="non-scaling-stroke" />`);
+        }
+        if (xMinor > 0) {
+          const cells = xGridLines + 1;
+          for (let c = 0; c < cells; c++) {
+            for (let m = 1; m <= xMinor; m++) {
+              const x = ((c + m / (xMinor + 1)) / cells) * 100;
+              parts.push(`<line x1="${x}" y1="0" x2="${x}" y2="100" stroke="${gridColor}" stroke-width="0.15" opacity="0.55" vector-effect="non-scaling-stroke" />`);
+            }
+          }
+        }
+      }
+      if (comp.yDisplayGrid !== false) {
+        for (let i = 1; i <= yGridLines; i++) {
+          const y = (i / (yGridLines + 1)) * 100;
+          parts.push(`<line x1="0" y1="${y}" x2="100" y2="${y}" stroke="${gridColor}" stroke-width="0.35" vector-effect="non-scaling-stroke" />`);
+        }
+        if (yMinor > 0) {
+          const cells = yGridLines + 1;
+          for (let c = 0; c < cells; c++) {
+            for (let m = 1; m <= yMinor; m++) {
+              const y = ((c + m / (yMinor + 1)) / cells) * 100;
+              parts.push(`<line x1="0" y1="${y}" x2="100" y2="${y}" stroke="${gridColor}" stroke-width="0.15" opacity="0.55" vector-effect="non-scaling-stroke" />`);
+            }
+          }
+        }
+      }
+      return parts.join('');
+    };
+
+    const redraw = (now = Date.now()) => {
+      const start = now - spanMs;
+      dateEl.textContent = new Date(now).toLocaleDateString(undefined, {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
+      dateEl.style.display = comp.xDisplayScale === false ? 'none' : '';
+      timesEl.style.display = comp.xDisplayScale === false ? 'none' : '';
+      timeLeft.textContent = formatTrendTime(new Date(start));
+      timeRight.textContent = formatTrendTime(new Date(now));
+
+      const traces = [];
+      pens.forEach((pen, i) => {
+        if (!pen || pen.visible === false || !pen.tag) return;
+        const pts = histories[i].filter((p) => p.t >= start);
+        if (!pts.length) return;
+        let min = Number(pen.min);
+        let max = Number(pen.max);
+        if (!Number.isFinite(min)) min = 0;
+        if (!Number.isFinite(max)) max = 100;
+        if (comp.yMode === 'automatic' && pts.length) {
+          min = Math.min(...pts.map((p) => p.v));
+          max = Math.max(...pts.map((p) => p.v));
+          if (min === max) { min -= 1; max += 1; }
+        } else if (comp.yMode === 'custom') {
+          min = Number(comp.yMinValue) || 0;
+          max = Number(comp.yMaxValue) || 100;
+        }
+        const range = (max - min) || 1;
+        const coords = pts.map((p) => {
+          const x = Math.max(0, Math.min(100, ((p.t - start) / spanMs) * 100));
+          const y = Math.max(0, Math.min(100, 100 - ((p.v - min) / range) * 100));
+          return { x, y };
+        });
+        const color = pen.color || '#00ff00';
+        const width = Math.max(0.4, Number(pen.width) || 1);
+        const dash = dashFor(pen.style);
+        if (connectPoints && coords.length > 1) {
+          const d = coords.map((c, idx) => `${idx ? 'L' : 'M'}${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ');
+          traces.push(`<path d="${d}" fill="none" stroke="${color}" stroke-width="${width * 0.35}" ${dash ? `stroke-dasharray="${dash}"` : ''} vector-effect="non-scaling-stroke" />`);
+        }
+        if (pen.marker && pen.marker !== 'none') {
+          coords.forEach((c) => {
+            if (pen.marker === 'square') traces.push(`<rect x="${c.x - 0.8}" y="${c.y - 0.8}" width="1.6" height="1.6" fill="${color}" />`);
+            else if (pen.marker === 'diamond') traces.push(`<polygon points="${c.x},${c.y - 1} ${c.x + 1},${c.y} ${c.x},${c.y + 1} ${c.x - 1},${c.y}" fill="${color}" />`);
+            else if (pen.marker === 'triangle') traces.push(`<polygon points="${c.x},${c.y - 1.1} ${c.x + 1},${c.y + 0.8} ${c.x - 1},${c.y + 0.8}" fill="${color}" />`);
+            else traces.push(`<circle cx="${c.x}" cy="${c.y}" r="0.9" fill="${color}" />`);
+          });
+        }
+      });
+      svg.innerHTML = drawGrid() + traces.join('');
+    };
+
+    const sample = () => {
+      if (paused || studioEdit) return;
+      const now = Date.now();
+      pens.forEach((pen, i) => {
+        if (!pen?.tag) return;
+        const raw = ctx.getTagValue?.(pen.tag);
+        const v = typeof raw === 'number' ? raw : Number(raw);
+        histories[i].push({ t: now, v: Number.isFinite(v) ? v : 0 });
+        if (histories[i].length > buffer) histories[i].splice(0, histories[i].length - buffer);
+      });
+      redraw(now);
+    };
+
+    redraw();
+
+    if (!studioEdit) {
+      const unitMs = (n, u) => {
+        const v = Number(n) || 1;
+        if (u === 'ms') return v;
+        if (u === 'min') return v * 60000;
+        if (u === 'h') return v * 3600000;
+        return v * 1000;
+      };
+      const interval = comp.updateMode === 'onChange'
+        ? unitMs(comp.heartbeat, comp.heartbeatUnit || 'min')
+        : unitMs(comp.refreshRate, comp.refreshUnit || 's');
+      const timer = setInterval(sample, Math.max(200, interval));
+      el.addEventListener('DOMNodeRemoved', () => clearInterval(timer), { once: true });
+      pens.forEach((pen) => {
+        if (pen?.tag) ComponentRegistry.bindIndicatorRef(pen.tag, sample, ctx);
+      });
+      el.pauseTrendPen = () => { paused = !paused; };
+      el.nextTrendPen = () => {
+        const vis = pens.map((p, i) => (p.visible !== false && p.tag ? i : -1)).filter((i) => i >= 0);
+        if (!vis.length) return;
+        const cur = vis.findIndex((i) => pens[i].active) || 0;
+        vis.forEach((i) => { pens[i].active = false; });
+        pens[vis[(cur + 1) % vis.length]].active = true;
+      };
+    }
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'Trend',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'Trend',
+          source: comp._source || ''
+        }, '*');
+      });
+    }
+
+    return el;
+  },
+
+  DisplayListSelector(comp, ctx) {
+    const el = document.createElement('div');
+    el.className = 'ft-display-list-selector ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
     const studioEdit = Boolean(ctx.studioEdit);
     const states = comp.states?.length
       ? comp.states
       : ComponentRegistry.defaultDisplayListSelectorStates(comp.numberOfStates ?? 5);
 
-    const caption = document.createElement('span');
-    caption.className = 'ft-btn-caption';
-    caption.style.pointerEvents = 'none';
-    btn.style.display = 'flex';
-    btn.style.padding = '0 4px';
-    btn.style.overflow = 'hidden';
-    btn.appendChild(caption);
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 4,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(el, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.padding = '0';
+    el.style.overflow = 'hidden';
+    el.style.boxSizing = 'border-box';
+    el.tabIndex = studioEdit ? -1 : (comp.keyNavigation !== false ? 0 : -1);
+    el.classList.toggle('ft-blink', Boolean(comp.blink));
 
-    const renderState = (stateDef) => {
-      if (!stateDef) return;
-      ComponentRegistry.applyButtonAppearance(btn, {
-        ...comp,
-        borderStyle: comp.borderStyle || 'line',
-        borderWidth: comp.borderWidth ?? 1,
-        borderUsesBackColor: comp.borderUsesBackColor !== false,
-        backStyle: comp.backStyle || 'solid',
-        backColor: comp.backColor || '#001C38',
-        useBackColor: comp.useBackColor !== false,
-        useHighlightColor: comp.useHighlightColor,
-        highlightColor: comp.highlightColor,
-        studioEdit
+    const fontBase = {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: Boolean(comp.bold),
+      italic: Boolean(comp.italic),
+      underline: Boolean(comp.underline)
+    };
+    const truncate = comp.captionTruncate === 'character' ? 'character' : 'word';
+    let selectedIndex = 0;
+
+    const rowEls = states.map((stateDef, index) => {
+      const row = document.createElement('div');
+      row.className = 'ft-display-list-row';
+      row.dataset.index = String(index);
+      const arrow = document.createElement('span');
+      arrow.className = 'ft-display-list-arrow';
+      arrow.setAttribute('aria-hidden', 'true');
+      const cap = document.createElement('span');
+      cap.className = 'ft-display-list-caption';
+      cap.classList.add(truncate === 'character' ? 'truncate-character' : 'truncate-word');
+      row.appendChild(arrow);
+      row.appendChild(cap);
+      el.appendChild(row);
+      return { row, arrow, cap, stateDef };
+    });
+
+    const paint = (index) => {
+      selectedIndex = Math.max(0, Math.min(rowEls.length - 1, Number(index) || 0));
+      rowEls.forEach(({ row, arrow, cap, stateDef }, i) => {
+        const isSelected = i === selectedIndex;
+        row.classList.toggle('is-selected', isSelected);
+        arrow.textContent = '';
+        let capText = stateDef.caption ?? '';
+        if (stateDef.useDisplayName && stateDef.target) capText = stateDef.target;
+        cap.textContent = capText;
+        const alignId = stateDef.alignment || 'middleLeft';
+        const align = ComponentRegistry.textAlignment(alignId);
+        cap.style.textAlign = align.align === 'flex-end' ? 'right' : align.align === 'center' ? 'center' : 'left';
+        if (isSelected) {
+          row.style.backgroundColor = comp.selectionBackColor || '#d0e7ff';
+          ComponentRegistry.applyCaptionStyle(cap, {
+            ...fontBase,
+            foreColor: stateDef.useCaptionColor ? (stateDef.captionColor || '#000000') : (comp.selectionForeColor || '#000000'),
+            useForeColor: true,
+            wordWrap: false,
+            alignment: alignId
+          });
+        } else {
+          row.style.backgroundColor = 'transparent';
+          ComponentRegistry.applyCaptionStyle(cap, {
+            ...fontBase,
+            foreColor: stateDef.captionColor || '#ffffff',
+            useForeColor: Boolean(stateDef.useCaptionColor),
+            wordWrap: false,
+            alignment: alignId
+          });
+        }
+        if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid' && !isSelected) {
+          cap.style.backgroundColor = stateDef.captionBackColor || '#001C38';
+        } else {
+          cap.style.backgroundColor = '';
+        }
+        cap.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
       });
-
-      let capText = stateDef.caption ?? '';
-      if (stateDef.useDisplayName && stateDef.target) capText = stateDef.target;
-      caption.textContent = capText;
-
-      const alignId = stateDef.alignment || 'middleLeft';
-      const align = ComponentRegistry.textAlignment(alignId);
-      btn.style.justifyContent = align.justify;
-      btn.style.alignItems = align.align;
-
-      ComponentRegistry.applyCaptionStyle(caption, {
-        fontFamily: comp.fontFamily || 'Arial Unicode MS',
-        fontSize: comp.fontSize ?? 10,
-        bold: comp.bold,
-        italic: comp.italic,
-        underline: comp.underline,
-        foreColor: stateDef.captionColor || '#ffffff',
-        useForeColor: Boolean(stateDef.useCaptionColor),
-        alignment: alignId
-      });
-      if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid') {
-        caption.style.backgroundColor = stateDef.captionBackColor || '#001C38';
-      } else {
-        caption.style.backgroundColor = '';
-      }
-      caption.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
     };
 
-    const showTagState = (val) => {
-      renderState(ComponentRegistry.resolveMultistateState(states, val));
+    const indexFromValue = (val) => {
+      const resolved = ComponentRegistry.resolveMultistateState(states, val);
+      const idx = states.findIndex((s) => s.id === resolved?.id);
+      return idx < 0 ? 0 : idx;
     };
+
+    paint(studioEdit ? 0 : (comp.tag ? indexFromValue(ctx.getTagValue?.(comp.tag)) : 0));
 
     if (comp.tag && !studioEdit) {
-      ComponentRegistry.bindIndicatorRef(comp.tag, showTagState, ctx);
-    } else {
-      renderState(states[0]);
+      ComponentRegistry.bindIndicatorRef(comp.tag, (val) => paint(indexFromValue(val)), ctx);
     }
 
+    const goToIndex = (index) => {
+      if (!rowEls.length) return;
+      let next = index;
+      if (comp.wrapAround !== false) {
+        next = ((index % rowEls.length) + rowEls.length) % rowEls.length;
+      } else {
+        next = Math.max(0, Math.min(rowEls.length - 1, index));
+      }
+      paint(next);
+      const stateDef = states[next];
+      if (comp.tag) {
+        const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+        if (writeTag) ctx.writeTag(writeTag, stateDef?.value ?? next);
+      }
+      if (stateDef?.target && typeof ctx.navigate === 'function') ctx.navigate(stateDef.target);
+    };
+
     if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
+      el.addEventListener('dblclick', (e) => {
         e.preventDefault();
         e.stopPropagation();
         window.parent.postMessage({
@@ -3894,7 +6309,7 @@ const ComponentRegistry = {
           source: comp._source || ''
         }, '*');
       });
-      btn.addEventListener('click', (e) => {
+      el.addEventListener('click', (e) => {
         e.preventDefault();
         window.parent.postMessage({
           type: 'planthmi-embed-graphic-click',
@@ -3903,27 +6318,30 @@ const ComponentRegistry = {
           source: comp._source || ''
         }, '*');
       });
-      return btn;
+    } else {
+      rowEls.forEach(({ row }, index) => {
+        row.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          goToIndex(index);
+        });
+      });
+      if (comp.keyNavigation !== false) {
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            goToIndex(selectedIndex + 1);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            goToIndex(selectedIndex - 1);
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            goToIndex(selectedIndex);
+          }
+        });
+      }
     }
-
-    const advance = () => {
-      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
-      if (!writeTag) return;
-      const current = ctx.getTagValue(comp.tag);
-      const resolved = ComponentRegistry.resolveMultistateState(states, current);
-      const idx = states.findIndex((s) => s.id === resolved?.id);
-      const nextIdx = idx < 0 ? 0 : (idx + 1) % states.length;
-      const nextState = states[nextIdx];
-      const nextValue = nextState?.value ?? nextIdx;
-      ctx.writeTag(writeTag, nextValue);
-      if (nextState?.target) ctx.navigate(nextState.target);
-    };
-
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      advance();
-    });
-    return btn;
+    return el;
   },
 
   defaultDisplayListSelectorStates(count = 5) {
@@ -4090,6 +6508,7 @@ const ComponentRegistry = {
       useBackColor: comp.useBackColor !== false,
       studioEdit
     });
+    ComponentRegistry.applyShapePattern(el, comp);
 
     el.style.display = 'flex';
     el.style.overflow = 'hidden';
@@ -4101,7 +6520,7 @@ const ComponentRegistry = {
     valueEl.style.width = '100%';
     el.appendChild(valueEl);
 
-    const alignId = comp.alignment || 'middleLeft';
+    const alignId = comp.alignment || 'middleCenter';
     const align = ComponentRegistry.textAlignment(alignId);
     el.style.justifyContent = align.justify;
     el.style.alignItems = align.align;
@@ -4114,7 +6533,7 @@ const ComponentRegistry = {
         italic: comp.italic,
         underline: comp.underline,
         foreColor: comp.foreColor || '#ffffff',
-        useForeColor: comp.useForeColor !== false,
+        useForeColor: true,
         wordWrap: comp.wordWrap !== false,
         alignment: alignId
       });
@@ -4124,22 +6543,22 @@ const ComponentRegistry = {
 
     const placeholder = ComponentRegistry.stringDisplayPlaceholder(comp);
     const showValue = (val) => {
-      valueEl.textContent = val != null && val !== '' ? String(val) : (comp.caption || '');
+      valueEl.textContent = val != null && val !== '' ? String(val) : '';
     };
 
     if (comp.useCurrentUser && !studioEdit) {
       const renderUser = (user) => showValue(user?.username || comp.caption || 'Guest');
       renderUser(ctx.getCurrentUser?.());
       ctx.onUserChange?.(renderUser);
-    } else if (comp.tag) {
+    } else if (comp.tag && !studioEdit) {
       ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
       const current = ctx.getTagValue?.(comp.tag);
       if (current !== undefined && current !== null) showValue(current);
-      else valueEl.textContent = comp.caption || placeholder;
+      else valueEl.textContent = placeholder;
     } else if (studioEdit) {
       valueEl.textContent = comp.useCurrentUser
         ? (comp.caption || 'Guest')
-        : (comp.caption || placeholder);
+        : placeholder;
     } else {
       showValue(comp.caption);
     }
@@ -4181,70 +6600,108 @@ const ComponentRegistry = {
 
     ComponentRegistry.applyGraphicsObject(el, comp);
     const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(el, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 4,
-      borderUsesBackColor: comp.borderUsesBackColor !== false,
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      studioEdit
-    });
-
+    const caption = document.createElement('span');
+    caption.className = 'ft-btn-caption ft-string-input-value';
+    caption.style.pointerEvents = 'none';
     el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.alignItems = 'center';
+    el.style.justifyContent = 'center';
+    el.style.padding = '0 4px';
     el.style.overflow = 'hidden';
-    el.style.padding = '2px 4px';
     el.style.cursor = studioEdit ? 'default' : 'pointer';
+    el.appendChild(caption);
+    let imgEl = null;
 
-    const valueEl = document.createElement('span');
-    valueEl.className = 'ft-string-input-value';
-    valueEl.style.pointerEvents = 'none';
-    valueEl.style.width = '100%';
-    el.appendChild(valueEl);
-
-    const alignId = comp.alignment || 'middleCenter';
-    const align = ComponentRegistry.textAlignment(alignId);
-    el.style.justifyContent = align.justify;
-    el.style.alignItems = align.align;
-
-    const applyTextStyle = () => {
-      ComponentRegistry.applyCaptionStyle(valueEl, {
+    const applyCaptionLook = (alignId) => {
+      ComponentRegistry.applyCaptionStyle(caption, {
         fontFamily: comp.fontFamily,
         fontSize: comp.fontSize,
         bold: comp.bold,
         italic: comp.italic,
         underline: comp.underline,
         foreColor: comp.captionColor || comp.foreColor || '#ffffff',
-        useForeColor: comp.useCaptionColor || comp.useForeColor !== false,
+        useForeColor: Boolean(comp.useCaptionColor),
         wordWrap: comp.wordWrap !== false,
         alignment: alignId
       });
       if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-        valueEl.style.backgroundColor = comp.captionBackColor || '#001C38';
+        caption.style.backgroundColor = comp.captionBackColor || '#001C38';
       } else {
-        valueEl.style.backgroundColor = 'transparent';
+        caption.style.backgroundColor = 'transparent';
       }
-      el.classList.toggle('ft-blink', Boolean(comp.blink));
-      valueEl.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+      caption.classList.toggle('ft-blink', Boolean(comp.captionBlink));
     };
-    applyTextStyle();
+
+    const renderAppearance = (displayText) => {
+      if (imgEl) {
+        imgEl.remove();
+        imgEl = null;
+      }
+      ComponentRegistry.applyButtonAppearance(el, {
+        ...comp,
+        borderStyle: comp.borderStyle || 'line',
+        borderWidth: comp.borderWidth ?? 4,
+        borderUsesBackColor: comp.borderUsesBackColor !== false,
+        backStyle: comp.backStyle || 'solid',
+        backColor: comp.backColor || '#001C38',
+        useBackColor: comp.useBackColor !== false,
+        studioEdit,
+        useHighlightColor: false
+      });
+      ComponentRegistry.applyShapePattern(el, {
+        ...comp,
+        usePatternColor: comp.usePatternColor !== false,
+        patternColor: comp.patternColor || '#ffffff'
+      });
+      if (comp.useHighlightColor !== false && comp.highlightColor) {
+        el.classList.add('ft-highlight-on-focus');
+        el.style.setProperty('--ft-highlight-color', comp.highlightColor);
+      } else {
+        el.classList.remove('ft-highlight-on-focus');
+        el.style.removeProperty('--ft-highlight-color');
+      }
+      if (comp.image) {
+        imgEl = document.createElement('img');
+        imgEl.className = 'ft-string-input-icon';
+        imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+        imgEl.alt = '';
+        imgEl.draggable = false;
+        imgEl.style.pointerEvents = 'none';
+        const scaled = Boolean(comp.imageScaled);
+        imgEl.style.maxWidth = scaled ? '100%' : '88%';
+        imgEl.style.maxHeight = scaled ? '100%' : '88%';
+        imgEl.style.objectFit = scaled ? 'fill' : 'contain';
+        imgEl.style.width = scaled ? '100%' : '';
+        imgEl.style.height = scaled ? '100%' : '';
+        if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+          imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+        }
+        imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+        el.insertBefore(imgEl, caption);
+      }
+      const text = displayText ?? (comp.caption ?? comp.label ?? '');
+      caption.textContent = text;
+      caption.style.display = text ? '' : 'none';
+      const alignId = comp.alignment || 'middleCenter';
+      const align = ComponentRegistry.textAlignment(alignId);
+      el.style.justifyContent = align.justify;
+      el.style.alignItems = align.align;
+      applyCaptionLook(alignId);
+      el.classList.toggle('ft-blink', Boolean(comp.blink));
+    };
 
     const showValue = (val) => {
-      if (studioEdit) return;
-      const text = ComponentRegistry.formatStringInputValue(val, comp);
-      valueEl.textContent = text || comp.caption || '';
+      if (studioEdit) {
+        renderAppearance(comp.caption ?? comp.label ?? '');
+        return;
+      }
+      const formatted = ComponentRegistry.formatStringInputValue(val, comp);
+      renderAppearance(formatted || comp.caption || '');
     };
 
-    if (comp.tag && !studioEdit) {
-      ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
-    } else if (!studioEdit) {
-      showValue(comp.caption);
-    } else {
-      valueEl.textContent = '';
-    }
-
     if (studioEdit) {
+      renderAppearance(comp.caption ?? comp.label ?? '');
       el.addEventListener('dblclick', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -4267,14 +6724,19 @@ const ComponentRegistry = {
       return el;
     }
 
+    if (comp.tag) {
+      ComponentRegistry.bindIndicatorRef(comp.tag, showValue, ctx);
+      const current = ctx.getTagValue?.(comp.tag);
+      if (current !== undefined && current !== null) showValue(current);
+      else renderAppearance(comp.caption ?? '');
+    } else {
+      renderAppearance(comp.caption ?? '');
+    }
+
     const commitValue = (raw) => {
       const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
       if (!writeTag) return;
-      const maxLen = comp.numberOfInputCharacters ?? 8;
-      let text = String(raw ?? '').slice(0, maxLen);
-      if (comp.fillCharacter === 'space' && text.length < maxLen) {
-        text = text.padEnd(maxLen, ' ');
-      }
+      const text = ComponentRegistry.formatStringInputValue(raw, { ...comp, maskScratchpad: false });
       ctx.writeTag(writeTag, text);
       if (comp.enterTag) {
         const enterWrite = ComponentRegistry.resolveWriteTagName(comp.enterTag);
@@ -4301,8 +6763,11 @@ const ComponentRegistry = {
     let text = val != null && val !== '' ? String(val) : '';
     const maxLen = comp.numberOfInputCharacters ?? 8;
     text = text.slice(0, maxLen);
-    if (comp.fillCharacter === 'space' && text.length < maxLen) {
-      text = text.padEnd(maxLen, ' ');
+    const fill = String(comp.fillCharacter || 'null').toLowerCase();
+    if (text.length < maxLen) {
+      if (fill === 'space' || fill === 'spaces') text = text.padEnd(maxLen, ' ');
+      else if (fill === 'zero' || fill === 'zeros') text = text.padEnd(maxLen, '0');
+      else if (fill === 'ff') text = text.padEnd(maxLen, String.fromCharCode(0xFF));
     }
     if (comp.maskScratchpad && text) {
       return '*'.repeat(text.length);
@@ -4311,9 +6776,13 @@ const ComponentRegistry = {
   },
 
   stringDisplayPlaceholder(comp) {
-    const line = 's'.repeat(14);
-    const lines = Math.max(2, Math.min(8, Math.round((comp?.height || 80) / 18)));
-    return Array(lines).fill(line).join('\n');
+    const fontSize = Number(comp?.fontSize) || 10;
+    const width = Number(comp?.width) || 168;
+    const height = Number(comp?.height) || 91;
+    const cols = Math.max(4, Math.min(40, Math.round((width - 8) / Math.max(6, fontSize * 0.8))));
+    const rows = Math.max(1, Math.min(12, Math.round((height - 8) / Math.max(16, fontSize * 2.05))));
+    const line = 'S'.repeat(cols);
+    return Array(rows).fill(line).join('\n');
   },
 
   AlarmTicker(comp, ctx) {
@@ -4521,6 +6990,10 @@ const ComponentRegistry = {
     if (comp.width != null) el.style.width = `${comp.width}px`;
     if (comp.height != null) el.style.height = `${comp.height}px`;
     el.classList.add('ft-graphic');
+    if (comp.type === 'RoundedRectangle') {
+      el.style.borderRadius = `${ComponentRegistry.roundedRectCornerRadius(comp)}px`;
+      el.style.overflow = 'hidden';
+    }
   },
 
   isPlacedGraphic(comp) {
@@ -4722,6 +7195,7 @@ const ComponentRegistry = {
   render(comp, ctx) {
     let type = comp.type;
     if (type === 'ChecklistGrid') type = 'ChecklistTable';
+    if (type === 'TrendChart') type = 'Trend';
     const renderer = ComponentRegistry[type];
     if (!renderer) {
       const fallback = document.createElement('div');

@@ -126,8 +126,8 @@ const freehandStrokePreview = document.getElementById('freehandStrokePreview');
 
 const CANVAS_GRAPHIC_TYPES = new Set([
   'Text', 'Image', 'NumericDisplay', 'NumericInputEnable', 'NumericInputCursorPoint', 'StringDisplay', 'StringInputEnable', 'MomentaryButton', 'MaintainedButton', 'LatchedButton', 'MultistateButton', 'InterlockedButton', 'RampButton',
-  'MultistateIndicator', 'SymbolIndicator', 'ListIndicator', 'BarGraph', 'RecipePlusButton', 'RecipePlusSelector',
-  'GotoButton', 'ReturnToButton', 'CloseDisplayButton', 'DisplayListSelector', 'TimeDateDisplay', 'StringDisplay', 'AlarmTicker', 'Rectangle', 'Ellipse', 'Arc', 'Freehand', 'Panel',
+  'MultistateIndicator', 'SymbolIndicator', 'ListIndicator', 'BarGraph', 'Gauge', 'Scale', 'PausePenButton', 'NextPenButton', 'BackspaceButton', 'EndButton', 'Trend', 'RecipePlusButton', 'RecipePlusSelector', 'RecipePlusTable',
+  'GotoButton', 'ReturnToButton', 'CloseDisplayButton', 'DisplayListSelector', 'TimeDateDisplay', 'StringDisplay', 'AlarmTicker', 'Rectangle', 'RoundedRectangle', 'Ellipse', 'Wedge', 'Arc', 'Freehand', 'Line', 'Polygon', 'Polyline', 'Panel',
   'SafetyLadderDiagram'
 ]);
 const displayGrid = document.getElementById('displayGrid');
@@ -160,11 +160,17 @@ function exposeStudioGlobals() {
   window.clearPropsDialogState = clearPropsDialogState;
   window.previewPatchByName = previewPatchByName;
   window.updateFreehandStudioPreview = updateFreehandStudioPreview;
+  window.updateLineStudioPreview = updateLineStudioPreview;
+  window.updatePolygonStudioPreview = updatePolygonStudioPreview;
   window.hideFreehandStudioPreview = hideFreehandStrokePreview;
   window.showCanvasPropsDialog = showCanvasPropsDialog;
   window.resolveEditComponentIndex = resolveEditComponentIndex;
+  window.updateCanvasEditHitBounds = updateCanvasEditHitBounds;
+  window.patchShapeLivePreview = patchShapeLivePreview;
+  window.afterCanvasComponentSaved = afterCanvasComponentSaved;
   window.refreshCanvasEditOverlaySelection = refreshCanvasEditOverlaySelection;
   window.activateSelectTool = activateSelectTool;
+  window.flushDeferredDialogInits = flushDeferredDialogInits;
   window.setTemplateEditStatus = setTemplateEditStatus;
   window.isEditingGlobalObject = isEditingGlobalObject;
   window.showImageBrowserDialog = showImageBrowserDialog;
@@ -264,46 +270,55 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
     ({ comp, ref } = await mergeTemplateOverrideComponent(comp, ref));
 
     if (comp.type === 'GotoButton') {
-      fillGotoButtonForm(comp);
-      resetPropsDialogState('goto', readGotoButtonForm, 'applyGotoButton', null, ref);
-      switchGotoButtonTab('general');
-      wireGotoButtonDialogTools();
-      document.getElementById('gotoButtonDialog')?.showModal();
+      flushDeferredDialogInits();
+      window.StudioGotoButton?.initGotoButtonDialog();
+      window.StudioGotoButton?.fillGotoButtonForm(comp);
+      resetPropsDialogState('goto', window.StudioGotoButton.readGotoButtonForm, 'applyGotoButton', null, ref);
+      window.StudioGotoButton?.switchGotoButtonTab('general');
+      window.StudioGotoButton?.wireGotoButtonTools();
+      window.StudioGotoButton?.presentGotoButtonDialog();
+      window.StudioGotoButton?.scheduleGotoLivePreview();
       setTemplateEditStatus(name, ref);
     } else if (comp.type === 'ReturnToButton') {
+      flushDeferredDialogInits();
+      window.StudioReturnToButton?.initReturnToButtonDialog();
       window.StudioReturnToButton?.fillReturnToButtonForm(comp);
       resetPropsDialogState('return-to', window.StudioReturnToButton.readReturnToButtonForm, 'applyReturnToButton', null, ref);
       window.StudioReturnToButton?.switchReturnToButtonTab('general');
       window.StudioReturnToButton?.wireReturnToButtonTools();
-      document.getElementById('returnToButtonDialog')?.showModal();
+      window.StudioReturnToButton?.presentReturnToButtonDialog();
+      window.StudioReturnToButton?.scheduleReturnToLivePreview();
+      setTemplateEditStatus(name, ref);
     } else if (comp.type === 'CloseDisplayButton') {
+      flushDeferredDialogInits();
+      window.StudioCloseDisplayButton?.initCloseDisplayButtonDialog();
       window.StudioCloseDisplayButton?.fillCloseDisplayButtonForm(comp);
       resetPropsDialogState('close-display', window.StudioCloseDisplayButton.readCloseDisplayButtonForm, 'applyCloseDisplayButton', null, ref);
       window.StudioCloseDisplayButton?.switchCloseDisplayButtonTab('general');
       window.StudioCloseDisplayButton?.wireCloseDisplayButtonTools();
-      document.getElementById('closeDisplayButtonDialog')?.showModal();
-      if (ref.type === 'template-override') {
-        setStatus(`Editing ${name} — screen override (change Global Objects/Template to affect all displays)`);
-      } else if (ref.type === 'shell') {
-        setStatus(`Editing ${name} — ${navShellStatusLabel(state.canvasEditCache?.raw)} override for this display`);
-      } else {
-        setStatus(`Editing ${name}`);
-      }
+      window.StudioCloseDisplayButton?.presentCloseDisplayButtonDialog();
+      window.StudioCloseDisplayButton?.scheduleCloseDisplayLivePreview();
+      setTemplateEditStatus(name, ref);
     } else if (comp.type === 'DisplayListSelector') {
+      flushDeferredDialogInits();
+      window.StudioDisplayListSelector?.initDisplayListSelectorDialog();
       window.StudioDisplayListSelector?.fillDisplayListSelectorForm(comp);
       resetPropsDialogState('display-list', window.StudioDisplayListSelector.readDisplayListSelectorForm, 'applyDisplayListSelector', null, ref);
       window.StudioDisplayListSelector?.switchDisplayListSelectorTab('general');
       window.StudioDisplayListSelector?.wireDisplayListSelectorTools();
-      document.getElementById('displayListSelectorDialog')?.showModal();
+      window.StudioDisplayListSelector?.presentDisplayListSelectorDialog();
+      window.StudioDisplayListSelector?.scheduleDisplayListLivePreview();
+      setTemplateEditStatus(name, ref);
     } else if (comp.type === 'MultistateIndicator') {
+      flushDeferredDialogInits();
+      window.StudioMultistateIndicator?.initMultistateIndicatorDialog();
       window.StudioMultistateIndicator?.fillMultistateIndicatorForm(comp);
       resetPropsDialogState('multistate-indicator', window.StudioMultistateIndicator.readMultistateIndicatorForm, 'applyMultistateIndicator', null, ref);
       window.StudioMultistateIndicator?.switchMultistateIndicatorTab('general');
       window.StudioMultistateIndicator?.wireMultistateIndicatorTools();
-      document.getElementById('multistateIndicatorDialog')?.showModal();
-      if (ref.type === 'template-global') {
-        setStatus(`Editing Template → ${comp.name} (applies to all displays)`);
-      }
+      window.StudioMultistateIndicator?.presentMultistateIndicatorDialog();
+      window.StudioMultistateIndicator?.scheduleMultistateLivePreview();
+      setTemplateEditStatus(name, ref);
     } else if (comp.type === 'TimeDateDisplay') {
       window.StudioTimeDateDisplay?.fillTimeDateDisplayForm(comp);
       resetPropsDialogState('time-date', window.StudioTimeDateDisplay.readTimeDateDisplayForm, 'applyTimeDateDisplay', null, ref);
@@ -314,35 +329,135 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
         setStatus(`Editing Template → ${comp.name} (applies to all displays)`);
       }
     } else if (comp.type === 'SymbolIndicator') {
+      flushDeferredDialogInits();
+      window.StudioSymbolIndicator?.initSymbolIndicatorDialog();
       window.StudioSymbolIndicator?.fillSymbolIndicatorForm(comp);
       resetPropsDialogState('symbol-indicator', window.StudioSymbolIndicator.readSymbolIndicatorForm, 'applySymbolIndicator', null, ref);
       window.StudioSymbolIndicator?.switchSymbolIndicatorTab('general');
       window.StudioSymbolIndicator?.wireSymbolIndicatorTools();
-      document.getElementById('symbolIndicatorDialog')?.showModal();
+      window.StudioSymbolIndicator?.presentSymbolIndicatorDialog();
+      window.StudioSymbolIndicator?.scheduleSymbolLivePreview();
+      setTemplateEditStatus(name, ref);
     } else if (comp.type === 'ListIndicator') {
+      flushDeferredDialogInits();
+      window.StudioListIndicator?.initListIndicatorDialog();
       window.StudioListIndicator?.fillListIndicatorForm(comp);
       resetPropsDialogState('list-indicator', window.StudioListIndicator.readListIndicatorForm, 'applyListIndicator', null, ref);
       window.StudioListIndicator?.switchListIndicatorTab('general');
       window.StudioListIndicator?.wireListIndicatorTools();
-      document.getElementById('listIndicatorDialog')?.showModal();
+      window.StudioListIndicator?.presentListIndicatorDialog();
+      window.StudioListIndicator?.scheduleListLivePreview();
+      setTemplateEditStatus(name, ref);
     } else if (comp.type === 'BarGraph') {
+      flushDeferredDialogInits();
+      window.StudioBarGraph?.initBarGraphDialog();
       window.StudioBarGraph?.fillBarGraphForm(comp);
       resetPropsDialogState('bar-graph', window.StudioBarGraph.readBarGraphForm, 'applyBarGraph', null, ref);
       window.StudioBarGraph?.switchBarGraphTab('general');
       window.StudioBarGraph?.wireBarGraphTools();
-      document.getElementById('barGraphDialog')?.showModal();
+      window.StudioBarGraph?.presentBarGraphDialog();
+      window.StudioBarGraph?.scheduleBarGraphLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'Gauge') {
+      flushDeferredDialogInits();
+      window.StudioGauge?.initGaugeDialog();
+      window.StudioGauge?.fillGaugeForm(comp);
+      resetPropsDialogState('gauge', window.StudioGauge.readGaugeForm, 'applyGauge', null, ref);
+      window.StudioGauge?.switchGaugeTab('general');
+      window.StudioGauge?.wireGaugeTools();
+      window.StudioGauge?.presentGaugeDialog();
+      window.StudioGauge?.scheduleGaugeLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'Scale') {
+      flushDeferredDialogInits();
+      window.StudioScale?.initScaleDialog();
+      window.StudioScale?.fillScaleForm(comp);
+      resetPropsDialogState('scale', window.StudioScale.readScaleForm, 'applyScale', null, ref);
+      window.StudioScale?.switchScaleTab('general');
+      window.StudioScale?.wireScaleTools();
+      window.StudioScale?.presentScaleDialog();
+      window.StudioScale?.scheduleScaleLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'PausePenButton') {
+      flushDeferredDialogInits();
+      window.StudioPausePenButton?.initPausePenButtonDialog();
+      window.StudioPausePenButton?.fillPausePenButtonForm(comp);
+      resetPropsDialogState('pause-pen', window.StudioPausePenButton.readPausePenButtonForm, 'applyPausePenButton', null, ref);
+      window.StudioPausePenButton?.switchPausePenButtonTab('general');
+      window.StudioPausePenButton?.wirePausePenButtonTools();
+      window.StudioPausePenButton?.presentPausePenButtonDialog();
+      window.StudioPausePenButton?.schedulePausePenLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'NextPenButton') {
+      flushDeferredDialogInits();
+      window.StudioNextPenButton?.initNextPenButtonDialog();
+      window.StudioNextPenButton?.fillNextPenButtonForm(comp);
+      resetPropsDialogState('next-pen', window.StudioNextPenButton.readNextPenButtonForm, 'applyNextPenButton', null, ref);
+      window.StudioNextPenButton?.switchNextPenButtonTab('general');
+      window.StudioNextPenButton?.wireNextPenButtonTools();
+      window.StudioNextPenButton?.presentNextPenButtonDialog();
+      window.StudioNextPenButton?.scheduleNextPenLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'BackspaceButton') {
+      flushDeferredDialogInits();
+      window.StudioBackspaceButton?.initBackspaceButtonDialog();
+      window.StudioBackspaceButton?.fillBackspaceButtonForm(comp);
+      resetPropsDialogState('backspace', window.StudioBackspaceButton.readBackspaceButtonForm, 'applyBackspaceButton', null, ref);
+      window.StudioBackspaceButton?.switchBackspaceButtonTab('general');
+      window.StudioBackspaceButton?.wireBackspaceButtonTools();
+      window.StudioBackspaceButton?.presentBackspaceButtonDialog();
+      window.StudioBackspaceButton?.scheduleBackspaceLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'EndButton') {
+      flushDeferredDialogInits();
+      window.StudioEndButton?.initEndButtonDialog();
+      window.StudioEndButton?.fillEndButtonForm(comp);
+      resetPropsDialogState('end', window.StudioEndButton.readEndButtonForm, 'applyEndButton', null, ref);
+      window.StudioEndButton?.switchEndButtonTab('general');
+      window.StudioEndButton?.wireEndButtonTools();
+      window.StudioEndButton?.presentEndButtonDialog();
+      window.StudioEndButton?.scheduleEndLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'Trend') {
+      flushDeferredDialogInits();
+      window.StudioTrend?.initTrendDialog();
+      window.StudioTrend?.fillTrendForm(comp);
+      resetPropsDialogState('trend', window.StudioTrend.readTrendForm, 'applyTrend', null, ref);
+      window.StudioTrend?.switchTrendTab('general');
+      window.StudioTrend?.wireTrendTools();
+      window.StudioTrend?.presentTrendDialog();
+      window.StudioTrend?.scheduleTrendLivePreview();
+      setTemplateEditStatus(name, ref);
     } else if (comp.type === 'RecipePlusButton') {
+      flushDeferredDialogInits();
+      window.StudioRecipePlusButton?.initRecipePlusButtonDialog();
       window.StudioRecipePlusButton?.fillRecipePlusButtonForm(comp);
       resetPropsDialogState('recipeplus-button', window.StudioRecipePlusButton.readRecipePlusButtonForm, 'applyRecipePlusButton', null, ref);
       window.StudioRecipePlusButton?.switchRecipePlusButtonTab('general');
       window.StudioRecipePlusButton?.wireRecipePlusButtonTools();
-      document.getElementById('recipePlusButtonDialog')?.showModal();
+      window.StudioRecipePlusButton?.presentRecipePlusButtonDialog();
+      window.StudioRecipePlusButton?.scheduleRecipePlusLivePreview();
+      setTemplateEditStatus(name, ref);
     } else if (comp.type === 'RecipePlusSelector') {
+      flushDeferredDialogInits();
+      window.StudioRecipePlusSelector?.initRecipePlusSelectorDialog();
       window.StudioRecipePlusSelector?.fillRecipePlusSelectorForm(comp);
       resetPropsDialogState('recipeplus-selector', window.StudioRecipePlusSelector.readRecipePlusSelectorForm, 'applyRecipePlusSelector', null, ref);
       window.StudioRecipePlusSelector?.switchRecipePlusSelectorTab('general');
       window.StudioRecipePlusSelector?.wireRecipePlusSelectorTools();
-      document.getElementById('recipePlusSelectorDialog')?.showModal();
+      window.StudioRecipePlusSelector?.presentRecipePlusSelectorDialog();
+      window.StudioRecipePlusSelector?.scheduleRecipePlusSelectorLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'RecipePlusTable') {
+      flushDeferredDialogInits();
+      window.StudioRecipePlusTable?.initRecipePlusTableDialog();
+      window.StudioRecipePlusTable?.fillRecipePlusTableForm(comp);
+      resetPropsDialogState('recipeplus-table', window.StudioRecipePlusTable.readRecipePlusTableForm, 'applyRecipePlusTable', null, ref);
+      window.StudioRecipePlusTable?.switchRecipePlusTableTab('general');
+      window.StudioRecipePlusTable?.wireRecipePlusTableTools();
+      window.StudioRecipePlusTable?.presentRecipePlusTableDialog();
+      window.StudioRecipePlusTable?.scheduleRecipePlusTableLivePreview();
+      setTemplateEditStatus(name, ref);
     } else if (comp.type === 'Text') {
       fillTextPropertiesForm(comp);
       resetPropsDialogState('text', readTextPropertiesForm, 'applyTextProperties', null, ref);
@@ -356,77 +471,111 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
         setStatus(`Editing ${name}`);
       }
     } else if (comp.type === 'NumericDisplay') {
+      flushDeferredDialogInits();
+      window.StudioNumericDisplay?.initNumericDisplayDialog();
       window.StudioNumericDisplay?.fillNumericDisplayForm(comp);
       resetPropsDialogState('numeric', window.StudioNumericDisplay.readNumericDisplayForm, 'applyNumericDisplay', null, ref);
       window.StudioNumericDisplay?.switchNumericDisplayTab('general');
       window.StudioNumericDisplay?.wireNumericDisplayTools();
-      document.getElementById('numericDisplayDialog')?.showModal();
+      window.StudioNumericDisplay?.presentNumericDisplayDialog();
+      window.StudioNumericDisplay?.scheduleNumericLivePreview();
     } else if (comp.type === 'StringDisplay') {
+      flushDeferredDialogInits();
+      window.StudioStringDisplay?.initStringDisplayDialog();
       window.StudioStringDisplay?.fillStringDisplayForm(comp);
       resetPropsDialogState('string-display', window.StudioStringDisplay.readStringDisplayForm, 'applyStringDisplay', null, ref);
       window.StudioStringDisplay?.switchStringDisplayTab('general');
       window.StudioStringDisplay?.wireStringDisplayTools();
-      document.getElementById('stringDisplayDialog')?.showModal();
+      window.StudioStringDisplay?.presentStringDisplayDialog();
+      window.StudioStringDisplay?.scheduleStringDisplayLivePreview();
     } else if (comp.type === 'StringInputEnable') {
+      flushDeferredDialogInits();
+      window.StudioStringInput?.initStringInputDialog();
       window.StudioStringInput?.fillStringInputForm(comp);
       resetPropsDialogState('string-input', window.StudioStringInput.readStringInputForm, 'applyStringInput', null, ref);
       window.StudioStringInput?.switchStringInputTab('general');
       window.StudioStringInput?.wireStringInputTools();
-      document.getElementById('stringInputDialog')?.showModal();
+      window.StudioStringInput?.presentStringInputDialog();
+      window.StudioStringInput?.scheduleStringInputLivePreview();
     } else if (comp.type === 'NumericInputEnable') {
+      flushDeferredDialogInits();
+      window.StudioNumericInput?.initNumericInputDialog();
       window.StudioNumericInput?.fillNumericInputForm(comp);
       resetPropsDialogState('numeric-input', window.StudioNumericInput.readNumericInputForm, 'applyNumericInput', null, ref);
       window.StudioNumericInput?.switchNumericInputTab('general');
       window.StudioNumericInput?.wireNumericInputTools();
-      document.getElementById('numericInputDialog')?.showModal();
+      window.StudioNumericInput?.presentNumericInputDialog();
+      window.StudioNumericInput?.scheduleNumericInputLivePreview();
     } else if (comp.type === 'NumericInputCursorPoint') {
+      flushDeferredDialogInits();
+      window.StudioNumericInput?.initNumericInputCursorDialog();
       window.StudioNumericInput?.fillNumericInputCursorForm(comp);
       resetPropsDialogState('numeric-input-cursor', window.StudioNumericInput.readNumericInputCursorForm, 'applyNumericInputCursor', null, ref);
       window.StudioNumericInput?.switchNumericInputCursorTab('general');
       window.StudioNumericInput?.wireNumericInputCursorTools();
-      document.getElementById('numericInputCursorDialog')?.showModal();
+      window.StudioNumericInput?.presentNumericInputCursorDialog();
+      window.StudioNumericInput?.scheduleNumericInputCursorLivePreview();
     } else if (comp.type === 'MomentaryButton') {
+      flushDeferredDialogInits();
+      initMomentaryButtonDialog();
       fillMomentaryButtonForm(comp);
+      wireMomentaryButtonDialogTools();
       resetPropsDialogState('momentary', readMomentaryButtonForm, 'applyMomentaryButton', null, ref);
       switchMomentaryButtonTab('general');
-      document.getElementById('momentaryButtonDialog')?.showModal();
+      presentMomentaryButtonDialog();
+      scheduleMomentaryLivePreview();
     } else if (comp.type === 'MaintainedButton') {
+      flushDeferredDialogInits();
+      initMaintainedButtonDialog();
       fillMaintainedButtonForm(comp);
       resetPropsDialogState('maintained', readMaintainedButtonForm, 'applyMaintainedButton', null, ref);
       switchMaintainedButtonTab('general');
       wireMaintainedButtonDialogTools();
-      document.getElementById('maintainedButtonDialog')?.showModal();
+      presentMaintainedButtonDialog();
+      scheduleMaintainedLivePreview();
     } else if (comp.type === 'LatchedButton') {
+      flushDeferredDialogInits();
+      window.StudioLatchedMultistate?.initLatchedButtonDialog();
       window.StudioLatchedMultistate?.fillLatchedButtonForm(comp);
       resetPropsDialogState('latched', window.StudioLatchedMultistate.readLatchedButtonForm, 'applyLatchedButton', null, ref);
       window.StudioLatchedMultistate?.switchLatchedButtonTab('general');
       window.StudioLatchedMultistate?.wireLatchedButtonDialogTools();
-      document.getElementById('latchedButtonDialog')?.showModal();
+      window.StudioLatchedMultistate?.presentLatchedButtonDialog();
+      window.StudioLatchedMultistate?.scheduleLatchedLivePreview();
     } else if (comp.type === 'MultistateButton') {
+      flushDeferredDialogInits();
+      window.StudioLatchedMultistate?.initMultistateButtonDialog();
       window.StudioLatchedMultistate?.fillMultistateButtonForm(comp);
       resetPropsDialogState('multistate', window.StudioLatchedMultistate.readMultistateButtonForm, 'applyMultistateButton', null, ref);
       window.StudioLatchedMultistate?.switchMultistateButtonTab('general');
       window.StudioLatchedMultistate?.wireMultistateButtonDialogTools();
-      document.getElementById('multistateButtonDialog')?.showModal();
+      window.StudioLatchedMultistate?.presentMultistateButtonDialog();
+      window.StudioLatchedMultistate?.scheduleMultistateLivePreview();
     } else if (comp.type === 'InterlockedButton') {
+      flushDeferredDialogInits();
+      window.StudioLatchedMultistate?.initInterlockedButtonDialog();
       window.StudioLatchedMultistate?.fillInterlockedButtonForm(comp);
       resetPropsDialogState('interlocked', window.StudioLatchedMultistate.readInterlockedButtonForm, 'applyInterlockedButton', null, ref);
       window.StudioLatchedMultistate?.switchInterlockedButtonTab('general');
       window.StudioLatchedMultistate?.wireInterlockedButtonDialogTools();
-      document.getElementById('interlockedButtonDialog')?.showModal();
+      window.StudioLatchedMultistate?.presentInterlockedButtonDialog();
+      window.StudioLatchedMultistate?.scheduleInterlockedLivePreview();
     } else if (comp.type === 'RampButton') {
+      flushDeferredDialogInits();
+      window.StudioLatchedMultistate?.initRampButtonDialog();
       window.StudioLatchedMultistate?.fillRampButtonForm(comp);
       resetPropsDialogState('ramp', window.StudioLatchedMultistate.readRampButtonForm, 'applyRampButton', null, ref);
       window.StudioLatchedMultistate?.switchRampButtonTab('general');
       window.StudioLatchedMultistate?.wireRampButtonDialogTools();
-      document.getElementById('rampButtonDialog')?.showModal();
+      window.StudioLatchedMultistate?.presentRampButtonDialog();
+      window.StudioLatchedMultistate?.scheduleRampLivePreview();
     } else if (comp.type === 'Image') {
       fillCanvasImagePropertiesForm(comp);
       resetPropsDialogState('image', readCanvasImagePropertiesForm, 'applyCanvasImageProperties', null, ref);
       switchCanvasImagePropertiesTab('general');
       document.getElementById('canvasImagePropertiesDialog')?.showModal();
       setTemplateEditStatus(name, ref);
-    } else if (comp.type === 'Rectangle') {
+    } else if (comp.type === 'Rectangle' || comp.type === 'RoundedRectangle' || comp.type === 'Wedge') {
       window.StudioShapeProperties?.openShapePropertiesDialog(comp, ref, null);
       setTemplateEditStatus(name, ref);
     } else if (comp.type === 'Ellipse') {
@@ -437,6 +586,15 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       setTemplateEditStatus(name, ref);
     } else if (comp.type === 'Freehand') {
       window.StudioFreehandProperties?.openFreehandPropertiesDialog(comp, ref, null);
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'Line') {
+      window.StudioLineProperties?.openLinePropertiesDialog(comp, ref, null);
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'Polygon') {
+      window.StudioPolygonProperties?.openPolygonPropertiesDialog(comp, ref, null);
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'Polyline') {
+      window.StudioPolylineProperties?.openPolylinePropertiesDialog(comp, ref, null);
       setTemplateEditStatus(name, ref);
     } else if (comp.type === 'Panel') {
       window.StudioPanelProperties?.openPanelPropertiesDialog(comp, ref, null);
@@ -545,7 +703,7 @@ async function fetchComposedCanvasCached() {
 function stripComponentMeta(comp) {
   if (!comp || typeof comp !== 'object') return comp;
   const {
-    _source, _templateIndex, _displayIndex, _replacesTemplate, _composed, ...clean
+    _source, _templateIndex, _displayIndex, _replacesTemplate, _composed, previewStateId, ...clean
   } = comp;
   return clean;
 }
@@ -821,7 +979,8 @@ function buildGotoOverrideStore(comp, base = {}) {
     'endColor', 'gradientStop', 'gradientShadingStyle', 'gradientDirection',
     'useVariableDisplay', 'parameterType', 'parameterFile', 'parameterList',
     'displayPosition', 'displayTop', 'displayLeft', 'useVariableDisplayPosition',
-    'horizontalMargin', 'verticalMargin', 'numberOfStates', 'triggerType', 'tag', 'states'
+    'horizontalMargin', 'verticalMargin', 'numberOfStates', 'triggerType', 'tag', 'states',
+    'points', 'children', 'startAngle', 'sweepAngle', 'x1', 'y1', 'x2', 'y2'
   ].forEach((key) => setOverrideIfDiff(patch, key, comp[key], baseComp));
 
   if (Boolean(comp.borderUsesBackColor) !== Boolean(baseComp.borderUsesBackColor !== false)) {
@@ -1211,10 +1370,11 @@ async function upsertCanvasComponent(component) {
   }
 
   if (ref?.type === 'template-override') {
-    const useFullMerge = clean.type === 'Rectangle' || clean.type === 'Ellipse' || clean.type === 'Arc' || clean.type === 'Freehand' || clean.type === 'Panel'
+    const useFullMerge = clean.type === 'Rectangle' || clean.type === 'RoundedRectangle' || clean.type === 'Ellipse' || clean.type === 'Wedge' || clean.type === 'Arc' || clean.type === 'Freehand' || clean.type === 'Line' || clean.type === 'Polygon' || clean.type === 'Polyline' || clean.type === 'Panel'
       || clean.type === 'MultistateIndicator' || clean.type === 'Text';
     await patchTemplateOverride(ref.name, clean, useFullMerge ? { mergeOnly: true } : undefined);
     await syncEditComponentAfterSave(clean, ref);
+    afterCanvasComponentSaved(clean);
     setStatus(`Saved ${clean.name}`);
     return true;
   }
@@ -1324,13 +1484,10 @@ async function upsertCanvasComponent(component) {
     if (isNew) {
       await refreshCanvasEditOverlay().catch(() => {});
       state.propsDialog.ref = { type: 'display', index };
-      const editIdx = resolveEditComponentIndex(savedComp || clean, state.propsDialog.ref);
-      if (editIdx >= 0) {
-        state.propsDialog.editIndex = editIdx;
-        state.canvasSelection.indices = [editIdx];
-        refreshCanvasEditOverlaySelection();
-      }
+      afterCanvasComponentSaved(savedComp || clean);
     }
+  } else {
+    afterCanvasComponentSaved(savedComp || clean);
   }
   if (isEditingGlobalObject()) {
     setStatus(`Saved ${clean.name} on Template (applies to all displays)`);
@@ -1358,8 +1515,15 @@ function isCanvasOverlayRefreshBlocked() {
 }
 
 function syncOpenPropsDialogBounds(comp) {
-  const { kind, editIndex } = state.propsDialog || {};
-  if (editIndex == null || !comp?.name) return;
+  const { kind } = state.propsDialog || {};
+  if (!comp?.name || !kind) return;
+  let { editIndex } = state.propsDialog || {};
+  const cached = editIndex != null ? state.canvasEditCache?.editComponents?.[editIndex] : null;
+  if (!cached || cached.comp?.name !== comp.name) {
+    editIndex = resolveEditComponentIndex(comp, state.propsDialog.ref);
+    if (editIndex >= 0) state.propsDialog.editIndex = editIndex;
+  }
+  if (editIndex == null || editIndex < 0) return;
   const entry = state.canvasEditCache?.editComponents?.[editIndex];
   if (!entry || entry.comp?.name !== comp.name) return;
 
@@ -1413,6 +1577,67 @@ function syncOpenPropsDialogBounds(comp) {
       }
       window.updateFreehandStudioPreview?.(window.StudioFreehandProperties.readFreehandPropertiesForm());
       window.flushPropsApplyButton?.(window.StudioFreehandProperties.readFreehandPropertiesForm, 'applyFreehandProperties');
+    } else if (kind === 'line') {
+      const lnHeight = document.getElementById('lnHeight');
+      const lnWidth = document.getElementById('lnWidth');
+      const lnTop = document.getElementById('lnTop');
+      const lnLeft = document.getElementById('lnLeft');
+      if (!lnHeight) return;
+      lnHeight.value = comp.height ?? lnHeight.value;
+      lnWidth.value = comp.width ?? lnWidth.value;
+      lnTop.value = comp.top ?? lnTop.value;
+      lnLeft.value = comp.left ?? lnLeft.value;
+      if (comp.x1 != null) document.getElementById('lnX1').value = String(comp.x1);
+      if (comp.y1 != null) document.getElementById('lnY1').value = String(comp.y1);
+      if (comp.x2 != null) document.getElementById('lnX2').value = String(comp.x2);
+      if (comp.y2 != null) document.getElementById('lnY2').value = String(comp.y2);
+      document.getElementById('lnOrigWidth').value = String(comp.width ?? lnWidth.value);
+      document.getElementById('lnOrigHeight').value = String(comp.height ?? lnHeight.value);
+      const previewComp = window.StudioLineProperties.readLinePropertiesForm();
+      if (state.propsDialog?.editIndex == null) {
+        window.updateLineStudioPreview?.(previewComp);
+      }
+      window.flushPropsApplyButton?.(window.StudioLineProperties.readLinePropertiesForm, 'applyLineProperties');
+    } else if (kind === 'polygon') {
+      const pgHeight = document.getElementById('pgHeight');
+      const pgWidth = document.getElementById('pgWidth');
+      const pgTop = document.getElementById('pgTop');
+      const pgLeft = document.getElementById('pgLeft');
+      if (!pgHeight) return;
+      pgHeight.value = comp.height ?? pgHeight.value;
+      pgWidth.value = comp.width ?? pgWidth.value;
+      pgTop.value = comp.top ?? pgTop.value;
+      pgLeft.value = comp.left ?? pgLeft.value;
+      document.getElementById('pgOrigWidth').value = String(comp.width ?? pgWidth.value);
+      document.getElementById('pgOrigHeight').value = String(comp.height ?? pgHeight.value);
+      if (Array.isArray(comp.points)) {
+        document.getElementById('pgPointsData').value = JSON.stringify(comp.points);
+      }
+      const previewComp = window.StudioPolygonProperties.readPolygonPropertiesForm();
+      if (state.propsDialog?.editIndex == null) {
+        window.updatePolygonStudioPreview?.(previewComp);
+      }
+      window.flushPropsApplyButton?.(window.StudioPolygonProperties.readPolygonPropertiesForm, 'applyPolygonProperties');
+    } else if (kind === 'polyline') {
+      const plHeight = document.getElementById('plHeight');
+      const plWidth = document.getElementById('plWidth');
+      const plTop = document.getElementById('plTop');
+      const plLeft = document.getElementById('plLeft');
+      if (!plHeight) return;
+      plHeight.value = comp.height ?? plHeight.value;
+      plWidth.value = comp.width ?? plWidth.value;
+      plTop.value = comp.top ?? plTop.value;
+      plLeft.value = comp.left ?? plLeft.value;
+      document.getElementById('plOrigWidth').value = String(comp.width ?? plWidth.value);
+      document.getElementById('plOrigHeight').value = String(comp.height ?? plHeight.value);
+      if (Array.isArray(comp.points)) {
+        document.getElementById('plPointsData').value = JSON.stringify(comp.points);
+      }
+      const previewComp = window.StudioPolylineProperties.readPolylinePropertiesForm();
+      if (state.propsDialog?.editIndex == null) {
+        window.updatePolygonStudioPreview?.(previewComp);
+      }
+      window.flushPropsApplyButton?.(window.StudioPolylineProperties.readPolylinePropertiesForm, 'applyPolylineProperties');
     } else if (kind === 'panel') {
       const ppHeight = document.getElementById('ppHeight');
       const ppWidth = document.getElementById('ppWidth');
@@ -1424,6 +1649,314 @@ function syncOpenPropsDialogBounds(comp) {
       ppTop.value = comp.top ?? ppTop.value;
       ppLeft.value = comp.left ?? ppLeft.value;
       window.flushPropsApplyButton?.(window.StudioPanelProperties.readPanelPropertiesForm, 'applyPanelProperties');
+    } else if (kind === 'maintained') {
+      const mtnHeight = document.getElementById('mtnHeight');
+      const mtnWidth = document.getElementById('mtnWidth');
+      const mtnTop = document.getElementById('mtnTop');
+      const mtnLeft = document.getElementById('mtnLeft');
+      if (!mtnHeight) return;
+      mtnHeight.value = comp.height ?? mtnHeight.value;
+      mtnWidth.value = comp.width ?? mtnWidth.value;
+      mtnTop.value = comp.top ?? mtnTop.value;
+      mtnLeft.value = comp.left ?? mtnLeft.value;
+      flushPropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
+    } else if (kind === 'latched') {
+      const latHeight = document.getElementById('latHeight');
+      const latWidth = document.getElementById('latWidth');
+      const latTop = document.getElementById('latTop');
+      const latLeft = document.getElementById('latLeft');
+      if (!latHeight) return;
+      latHeight.value = comp.height ?? latHeight.value;
+      latWidth.value = comp.width ?? latWidth.value;
+      latTop.value = comp.top ?? latTop.value;
+      latLeft.value = comp.left ?? latLeft.value;
+      flushPropsApplyButton(window.StudioLatchedMultistate.readLatchedButtonForm, 'applyLatchedButton');
+    } else if (kind === 'multistate') {
+      const msHeight = document.getElementById('msHeight');
+      const msWidth = document.getElementById('msWidth');
+      const msTop = document.getElementById('msTop');
+      const msLeft = document.getElementById('msLeft');
+      if (!msHeight) return;
+      msHeight.value = comp.height ?? msHeight.value;
+      msWidth.value = comp.width ?? msWidth.value;
+      msTop.value = comp.top ?? msTop.value;
+      msLeft.value = comp.left ?? msLeft.value;
+      flushPropsApplyButton(window.StudioLatchedMultistate.readMultistateButtonForm, 'applyMultistateButton');
+    } else if (kind === 'interlocked') {
+      const ilkHeight = document.getElementById('ilkHeight');
+      const ilkWidth = document.getElementById('ilkWidth');
+      const ilkTop = document.getElementById('ilkTop');
+      const ilkLeft = document.getElementById('ilkLeft');
+      if (!ilkHeight) return;
+      ilkHeight.value = comp.height ?? ilkHeight.value;
+      ilkWidth.value = comp.width ?? ilkWidth.value;
+      ilkTop.value = comp.top ?? ilkTop.value;
+      ilkLeft.value = comp.left ?? ilkLeft.value;
+      flushPropsApplyButton(window.StudioLatchedMultistate.readInterlockedButtonForm, 'applyInterlockedButton');
+    } else if (kind === 'ramp') {
+      const rmpHeight = document.getElementById('rmpHeight');
+      const rmpWidth = document.getElementById('rmpWidth');
+      const rmpTop = document.getElementById('rmpTop');
+      const rmpLeft = document.getElementById('rmpLeft');
+      if (!rmpHeight) return;
+      rmpHeight.value = comp.height ?? rmpHeight.value;
+      rmpWidth.value = comp.width ?? rmpWidth.value;
+      rmpTop.value = comp.top ?? rmpTop.value;
+      rmpLeft.value = comp.left ?? rmpLeft.value;
+      flushPropsApplyButton(window.StudioLatchedMultistate.readRampButtonForm, 'applyRampButton');
+    } else if (kind === 'numeric') {
+      const ndHeight = document.getElementById('ndHeight');
+      const ndWidth = document.getElementById('ndWidth');
+      const ndTop = document.getElementById('ndTop');
+      const ndLeft = document.getElementById('ndLeft');
+      if (!ndHeight) return;
+      ndHeight.value = comp.height ?? ndHeight.value;
+      ndWidth.value = comp.width ?? ndWidth.value;
+      ndTop.value = comp.top ?? ndTop.value;
+      ndLeft.value = comp.left ?? ndLeft.value;
+      flushPropsApplyButton(window.StudioNumericDisplay.readNumericDisplayForm, 'applyNumericDisplay');
+    } else if (kind === 'string-display') {
+      const sdHeight = document.getElementById('sdHeight');
+      const sdWidth = document.getElementById('sdWidth');
+      const sdTop = document.getElementById('sdTop');
+      const sdLeft = document.getElementById('sdLeft');
+      if (!sdHeight) return;
+      sdHeight.value = comp.height ?? sdHeight.value;
+      sdWidth.value = comp.width ?? sdWidth.value;
+      sdTop.value = comp.top ?? sdTop.value;
+      sdLeft.value = comp.left ?? sdLeft.value;
+      flushPropsApplyButton(window.StudioStringDisplay.readStringDisplayForm, 'applyStringDisplay');
+    } else if (kind === 'numeric-input') {
+      const nieHeight = document.getElementById('nieHeight');
+      const nieWidth = document.getElementById('nieWidth');
+      const nieTop = document.getElementById('nieTop');
+      const nieLeft = document.getElementById('nieLeft');
+      if (!nieHeight) return;
+      nieHeight.value = comp.height ?? nieHeight.value;
+      nieWidth.value = comp.width ?? nieWidth.value;
+      nieTop.value = comp.top ?? nieTop.value;
+      nieLeft.value = comp.left ?? nieLeft.value;
+      flushPropsApplyButton(window.StudioNumericInput.readNumericInputForm, 'applyNumericInput');
+    } else if (kind === 'string-input') {
+      const sieHeight = document.getElementById('sieHeight');
+      const sieWidth = document.getElementById('sieWidth');
+      const sieTop = document.getElementById('sieTop');
+      const sieLeft = document.getElementById('sieLeft');
+      if (!sieHeight) return;
+      sieHeight.value = comp.height ?? sieHeight.value;
+      sieWidth.value = comp.width ?? sieWidth.value;
+      sieTop.value = comp.top ?? sieTop.value;
+      sieLeft.value = comp.left ?? sieLeft.value;
+      flushPropsApplyButton(window.StudioStringInput.readStringInputForm, 'applyStringInput');
+    } else if (kind === 'numeric-input-cursor') {
+      const nicHeight = document.getElementById('nicHeight');
+      const nicWidth = document.getElementById('nicWidth');
+      const nicTop = document.getElementById('nicTop');
+      const nicLeft = document.getElementById('nicLeft');
+      if (!nicHeight) return;
+      nicHeight.value = comp.height ?? nicHeight.value;
+      nicWidth.value = comp.width ?? nicWidth.value;
+      nicTop.value = comp.top ?? nicTop.value;
+      nicLeft.value = comp.left ?? nicLeft.value;
+      flushPropsApplyButton(window.StudioNumericInput.readNumericInputCursorForm, 'applyNumericInputCursor');
+    } else if (kind === 'goto') {
+      const gbHeight = document.getElementById('gbHeight');
+      const gbWidth = document.getElementById('gbWidth');
+      const gbTop = document.getElementById('gbTop');
+      const gbLeft = document.getElementById('gbLeft');
+      if (!gbHeight) return;
+      gbHeight.value = comp.height ?? gbHeight.value;
+      gbWidth.value = comp.width ?? gbWidth.value;
+      gbTop.value = comp.top ?? gbTop.value;
+      gbLeft.value = comp.left ?? gbLeft.value;
+      flushPropsApplyButton(window.StudioGotoButton.readGotoButtonForm, 'applyGotoButton');
+    } else if (kind === 'return-to') {
+      const rtbHeight = document.getElementById('rtbHeight');
+      const rtbWidth = document.getElementById('rtbWidth');
+      const rtbTop = document.getElementById('rtbTop');
+      const rtbLeft = document.getElementById('rtbLeft');
+      if (!rtbHeight) return;
+      rtbHeight.value = comp.height ?? rtbHeight.value;
+      rtbWidth.value = comp.width ?? rtbWidth.value;
+      rtbTop.value = comp.top ?? rtbTop.value;
+      rtbLeft.value = comp.left ?? rtbLeft.value;
+      flushPropsApplyButton(window.StudioReturnToButton.readReturnToButtonForm, 'applyReturnToButton');
+    } else if (kind === 'close-display') {
+      const cdbHeight = document.getElementById('cdbHeight');
+      const cdbWidth = document.getElementById('cdbWidth');
+      const cdbTop = document.getElementById('cdbTop');
+      const cdbLeft = document.getElementById('cdbLeft');
+      if (!cdbHeight) return;
+      cdbHeight.value = comp.height ?? cdbHeight.value;
+      cdbWidth.value = comp.width ?? cdbWidth.value;
+      cdbTop.value = comp.top ?? cdbTop.value;
+      cdbLeft.value = comp.left ?? cdbLeft.value;
+      flushPropsApplyButton(window.StudioCloseDisplayButton.readCloseDisplayButtonForm, 'applyCloseDisplayButton');
+    } else if (kind === 'display-list') {
+      const dlsHeight = document.getElementById('dlsHeight');
+      const dlsWidth = document.getElementById('dlsWidth');
+      const dlsTop = document.getElementById('dlsTop');
+      const dlsLeft = document.getElementById('dlsLeft');
+      if (!dlsHeight) return;
+      dlsHeight.value = comp.height ?? dlsHeight.value;
+      dlsWidth.value = comp.width ?? dlsWidth.value;
+      dlsTop.value = comp.top ?? dlsTop.value;
+      dlsLeft.value = comp.left ?? dlsLeft.value;
+      flushPropsApplyButton(window.StudioDisplayListSelector.readDisplayListSelectorForm, 'applyDisplayListSelector');
+    } else if (kind === 'multistate-indicator') {
+      const miHeight = document.getElementById('miHeight');
+      const miWidth = document.getElementById('miWidth');
+      const miTop = document.getElementById('miTop');
+      const miLeft = document.getElementById('miLeft');
+      if (!miHeight) return;
+      miHeight.value = comp.height ?? miHeight.value;
+      miWidth.value = comp.width ?? miWidth.value;
+      miTop.value = comp.top ?? miTop.value;
+      miLeft.value = comp.left ?? miLeft.value;
+      flushPropsApplyButton(window.StudioMultistateIndicator.readMultistateIndicatorForm, 'applyMultistateIndicator');
+    } else if (kind === 'symbol-indicator') {
+      const siHeight = document.getElementById('siHeight');
+      const siWidth = document.getElementById('siWidth');
+      const siTop = document.getElementById('siTop');
+      const siLeft = document.getElementById('siLeft');
+      if (!siHeight) return;
+      siHeight.value = comp.height ?? siHeight.value;
+      siWidth.value = comp.width ?? siWidth.value;
+      siTop.value = comp.top ?? siTop.value;
+      siLeft.value = comp.left ?? siLeft.value;
+      flushPropsApplyButton(window.StudioSymbolIndicator.readSymbolIndicatorForm, 'applySymbolIndicator');
+    } else if (kind === 'list-indicator') {
+      const liHeight = document.getElementById('liHeight');
+      const liWidth = document.getElementById('liWidth');
+      const liTop = document.getElementById('liTop');
+      const liLeft = document.getElementById('liLeft');
+      if (!liHeight) return;
+      liHeight.value = comp.height ?? liHeight.value;
+      liWidth.value = comp.width ?? liWidth.value;
+      liTop.value = comp.top ?? liTop.value;
+      liLeft.value = comp.left ?? liLeft.value;
+      flushPropsApplyButton(window.StudioListIndicator.readListIndicatorForm, 'applyListIndicator');
+    } else if (kind === 'bar-graph') {
+      const bgrHeight = document.getElementById('bgrHeight');
+      const bgrWidth = document.getElementById('bgrWidth');
+      const bgrTop = document.getElementById('bgrTop');
+      const bgrLeft = document.getElementById('bgrLeft');
+      if (!bgrHeight) return;
+      bgrHeight.value = comp.height ?? bgrHeight.value;
+      bgrWidth.value = comp.width ?? bgrWidth.value;
+      bgrTop.value = comp.top ?? bgrTop.value;
+      bgrLeft.value = comp.left ?? bgrLeft.value;
+      flushPropsApplyButton(window.StudioBarGraph.readBarGraphForm, 'applyBarGraph');
+    } else if (kind === 'gauge') {
+      const ggHeight = document.getElementById('ggHeight');
+      const ggWidth = document.getElementById('ggWidth');
+      const ggTop = document.getElementById('ggTop');
+      const ggLeft = document.getElementById('ggLeft');
+      if (!ggHeight) return;
+      ggHeight.value = comp.height ?? ggHeight.value;
+      ggWidth.value = comp.width ?? ggWidth.value;
+      ggTop.value = comp.top ?? ggTop.value;
+      ggLeft.value = comp.left ?? ggLeft.value;
+      flushPropsApplyButton(window.StudioGauge.readGaugeForm, 'applyGauge');
+    } else if (kind === 'scale') {
+      const scHeight = document.getElementById('scHeight');
+      const scWidth = document.getElementById('scWidth');
+      const scTop = document.getElementById('scTop');
+      const scLeft = document.getElementById('scLeft');
+      if (!scHeight) return;
+      scHeight.value = comp.height ?? scHeight.value;
+      scWidth.value = comp.width ?? scWidth.value;
+      scTop.value = comp.top ?? scTop.value;
+      scLeft.value = comp.left ?? scLeft.value;
+      flushPropsApplyButton(window.StudioScale.readScaleForm, 'applyScale');
+    } else if (kind === 'pause-pen') {
+      const ppbHeight = document.getElementById('ppbHeight');
+      const ppbWidth = document.getElementById('ppbWidth');
+      const ppbTop = document.getElementById('ppbTop');
+      const ppbLeft = document.getElementById('ppbLeft');
+      if (!ppbHeight) return;
+      ppbHeight.value = comp.height ?? ppbHeight.value;
+      ppbWidth.value = comp.width ?? ppbWidth.value;
+      ppbTop.value = comp.top ?? ppbTop.value;
+      ppbLeft.value = comp.left ?? ppbLeft.value;
+      flushPropsApplyButton(window.StudioPausePenButton.readPausePenButtonForm, 'applyPausePenButton');
+    } else if (kind === 'next-pen') {
+      const npbHeight = document.getElementById('npbHeight');
+      const npbWidth = document.getElementById('npbWidth');
+      const npbTop = document.getElementById('npbTop');
+      const npbLeft = document.getElementById('npbLeft');
+      if (!npbHeight) return;
+      npbHeight.value = comp.height ?? npbHeight.value;
+      npbWidth.value = comp.width ?? npbWidth.value;
+      npbTop.value = comp.top ?? npbTop.value;
+      npbLeft.value = comp.left ?? npbLeft.value;
+      flushPropsApplyButton(window.StudioNextPenButton.readNextPenButtonForm, 'applyNextPenButton');
+    } else if (kind === 'backspace') {
+      const bsbHeight = document.getElementById('bsbHeight');
+      const bsbWidth = document.getElementById('bsbWidth');
+      const bsbTop = document.getElementById('bsbTop');
+      const bsbLeft = document.getElementById('bsbLeft');
+      if (!bsbHeight) return;
+      bsbHeight.value = comp.height ?? bsbHeight.value;
+      bsbWidth.value = comp.width ?? bsbWidth.value;
+      bsbTop.value = comp.top ?? bsbTop.value;
+      bsbLeft.value = comp.left ?? bsbLeft.value;
+      flushPropsApplyButton(window.StudioBackspaceButton.readBackspaceButtonForm, 'applyBackspaceButton');
+    } else if (kind === 'end') {
+      const enbHeight = document.getElementById('enbHeight');
+      const enbWidth = document.getElementById('enbWidth');
+      const enbTop = document.getElementById('enbTop');
+      const enbLeft = document.getElementById('enbLeft');
+      if (!enbHeight) return;
+      enbHeight.value = comp.height ?? enbHeight.value;
+      enbWidth.value = comp.width ?? enbWidth.value;
+      enbTop.value = comp.top ?? enbTop.value;
+      enbLeft.value = comp.left ?? enbLeft.value;
+      flushPropsApplyButton(window.StudioEndButton.readEndButtonForm, 'applyEndButton');
+    } else if (kind === 'trend') {
+      const trHeight = document.getElementById('trHeight');
+      const trWidth = document.getElementById('trWidth');
+      const trTop = document.getElementById('trTop');
+      const trLeft = document.getElementById('trLeft');
+      if (!trHeight) return;
+      trHeight.value = comp.height ?? trHeight.value;
+      trWidth.value = comp.width ?? trWidth.value;
+      trTop.value = comp.top ?? trTop.value;
+      trLeft.value = comp.left ?? trLeft.value;
+      flushPropsApplyButton(window.StudioTrend.readTrendForm, 'applyTrend');
+    } else if (kind === 'recipeplus-button') {
+      const rpbHeight = document.getElementById('rpbHeight');
+      const rpbWidth = document.getElementById('rpbWidth');
+      const rpbTop = document.getElementById('rpbTop');
+      const rpbLeft = document.getElementById('rpbLeft');
+      if (!rpbHeight) return;
+      rpbHeight.value = comp.height ?? rpbHeight.value;
+      rpbWidth.value = comp.width ?? rpbWidth.value;
+      rpbTop.value = comp.top ?? rpbTop.value;
+      rpbLeft.value = comp.left ?? rpbLeft.value;
+      flushPropsApplyButton(window.StudioRecipePlusButton.readRecipePlusButtonForm, 'applyRecipePlusButton');
+    } else if (kind === 'recipeplus-selector') {
+      const rpsHeight = document.getElementById('rpsHeight');
+      const rpsWidth = document.getElementById('rpsWidth');
+      const rpsTop = document.getElementById('rpsTop');
+      const rpsLeft = document.getElementById('rpsLeft');
+      if (!rpsHeight) return;
+      rpsHeight.value = comp.height ?? rpsHeight.value;
+      rpsWidth.value = comp.width ?? rpsWidth.value;
+      rpsTop.value = comp.top ?? rpsTop.value;
+      rpsLeft.value = comp.left ?? rpsLeft.value;
+      flushPropsApplyButton(window.StudioRecipePlusSelector.readRecipePlusSelectorForm, 'applyRecipePlusSelector');
+    } else if (kind === 'recipeplus-table') {
+      const rptHeight = document.getElementById('rptHeight');
+      const rptWidth = document.getElementById('rptWidth');
+      const rptTop = document.getElementById('rptTop');
+      const rptLeft = document.getElementById('rptLeft');
+      if (!rptHeight) return;
+      rptHeight.value = comp.height ?? rptHeight.value;
+      rptWidth.value = comp.width ?? rptWidth.value;
+      rptTop.value = comp.top ?? rptTop.value;
+      rptLeft.value = comp.left ?? rptLeft.value;
+      flushPropsApplyButton(window.StudioRecipePlusTable.readRecipePlusTableForm, 'applyRecipePlusTable');
     }
   } finally {
     state.propsFormFill = false;
@@ -1568,10 +2101,24 @@ function nextShapeObjectName(components, type, prefix) {
   return `${prefix}${n}`;
 }
 
+function nextPrefixedObjectName(components, prefix) {
+  const used = new Set();
+  const collect = (list) => {
+    for (const c of list || []) {
+      if (c.name) used.add(c.name);
+      if (c.children?.length) collect(c.children);
+    }
+  };
+  collect(components);
+  let n = 1;
+  while (used.has(`${prefix}${n}`)) n += 1;
+  return `${prefix}${n}`;
+}
+
 function defaultRectangleComponent(overrides = {}) {
   return {
     type: 'Rectangle',
-    name: 'Polygon1',
+    name: 'Rectangle1',
     left: 0,
     top: 0,
     width: 100,
@@ -1581,7 +2128,30 @@ function defaultRectangleComponent(overrides = {}) {
     backStyle: 'solid',
     patternStyle: 'none',
     useForeColor: true,
-    foreColor: '#c6c6c6',
+    foreColor: '#000000',
+    useBackColor: true,
+    backColor: '#c0c0c0',
+    usePatternColor: false,
+    patternColor: '#ffffff',
+    lineWidth: 1,
+    ...overrides
+  };
+}
+
+function defaultRoundedRectangleComponent(overrides = {}) {
+  return {
+    type: 'RoundedRectangle',
+    name: 'RoundedRectangle1',
+    left: 0,
+    top: 0,
+    width: 248,
+    height: 154,
+    visible: true,
+    lineStyle: 'solid',
+    backStyle: 'solid',
+    patternStyle: 'none',
+    useForeColor: true,
+    foreColor: '#000000',
     useBackColor: true,
     backColor: '#ffffff',
     usePatternColor: false,
@@ -1614,6 +2184,31 @@ function defaultEllipseComponent(overrides = {}) {
   };
 }
 
+function defaultWedgeComponent(overrides = {}) {
+  return {
+    type: 'Wedge',
+    name: 'Wedge1',
+    left: 0,
+    top: 0,
+    width: 208,
+    height: 131,
+    visible: true,
+    lineStyle: 'solid',
+    backStyle: 'solid',
+    patternStyle: 'none',
+    useForeColor: true,
+    foreColor: '#808080',
+    useBackColor: true,
+    backColor: '#c0c0c0',
+    usePatternColor: false,
+    patternColor: '#ffffff',
+    lineWidth: 1,
+    startAngle: 0,
+    sweepAngle: 360,
+    ...overrides
+  };
+}
+
 function defaultFreehandComponent(overrides = {}) {
   return {
     type: 'Freehand',
@@ -1632,6 +2227,78 @@ function defaultFreehandComponent(overrides = {}) {
     backColor: '#808080',
     usePatternColor: false,
     patternColor: '#808080',
+    lineWidth: 1,
+    points: [],
+    ...overrides
+  };
+}
+
+function defaultLineComponent(overrides = {}) {
+  return {
+    type: 'Line',
+    name: 'Line1',
+    left: 0,
+    top: 0,
+    width: 156,
+    height: 12,
+    visible: true,
+    lineStyle: 'solid',
+    backStyle: 'transparent',
+    useForeColor: true,
+    foreColor: '#808080',
+    useBackColor: false,
+    backColor: '#c0c0c0',
+    lineWidth: 1,
+    x1: 0,
+    y1: 0,
+    x2: 156,
+    y2: 12,
+    ...overrides
+  };
+}
+
+function defaultPolygonComponent(overrides = {}) {
+  return {
+    type: 'Polygon',
+    name: 'Polygon1',
+    left: 0,
+    top: 0,
+    width: 100,
+    height: 80,
+    visible: true,
+    lineStyle: 'solid',
+    backStyle: 'transparent',
+    patternStyle: 'none',
+    useForeColor: true,
+    foreColor: '#000000',
+    useBackColor: false,
+    backColor: '#c0c0c0',
+    usePatternColor: false,
+    patternColor: '#000000',
+    lineWidth: 1,
+    points: [],
+    ...overrides
+  };
+}
+
+function defaultPolylineComponent(overrides = {}) {
+  return {
+    type: 'Polyline',
+    name: 'Polyline1',
+    left: 0,
+    top: 0,
+    width: 231,
+    height: 116,
+    visible: true,
+    lineStyle: 'solid',
+    backStyle: 'transparent',
+    patternStyle: 'none',
+    useForeColor: true,
+    foreColor: '#808080',
+    useBackColor: false,
+    backColor: '#c0c0c0',
+    usePatternColor: false,
+    patternColor: '#ffffff',
     lineWidth: 1,
     points: [],
     ...overrides
@@ -1838,37 +2505,105 @@ function initTextPropertiesDialog() {
 
 function nextMomentaryButtonName(components) {
   const n = countComponentsByType(components, 'MomentaryButton') + 1;
-  return `MomentaryButton${n}`;
+  return `MomentaryPushButton${n}`;
 }
 
-function defaultMomentaryButtonStates(caption = 'Conveyor Run') {
+const MB_NAVY = '#001C38';
+
+function defaultMomentaryState(id, extras = {}) {
+  const isError = id === 'Error';
+  const isState1 = id === 'State1';
+  return {
+    id,
+    value: isState1 ? 1 : 0,
+    backColor: isError ? 'navy' : MB_NAVY,
+    borderColor: isError ? 'navy' : MB_NAVY,
+    useBackColor: true,
+    useBorderColor: true,
+    blink: isError,
+    patternStyle: 'none',
+    usePatternColor: false,
+    patternColor: '#ffffff',
+    caption: isError ? 'Error' : '',
+    captionColor: isState1 || isError ? '#ffffff' : MB_NAVY,
+    useCaptionColor: isError,
+    captionBackColor: MB_NAVY,
+    useCaptionBackColor: false,
+    captionBlink: false,
+    wordWrap: true,
+    alignment: isState1 ? 'middleLeft' : 'middleCenter',
+    captionBackStyle: 'transparent',
+    image: '',
+    imageBackStyle: 'transparent',
+    useImageColor: false,
+    imageColor: isState1 ? '#ffffff' : MB_NAVY,
+    useImageBackColor: false,
+    imageBackColor: MB_NAVY,
+    imageBlink: false,
+    imageScaled: false,
+    imageAlignment: 'middleCenter',
+    ...extras
+  };
+}
+
+function defaultMomentaryButtonStates(caption = '') {
   return [
-    {
-      id: 'State0', value: 0, backColor: '#dcdcdc', borderColor: '#c0c0c0',
-      useBackColor: true, useBorderColor: false, caption,
-      captionColor: '#000000', useCaptionColor: true,
-      wordWrap: true, alignment: 'middleCenter', blink: false
-    },
-    {
-      id: 'State1', value: 1, backColor: '#00c000', borderColor: '#40ff10',
-      useBackColor: true, useBorderColor: true, caption,
-      captionColor: '#ffffff', useCaptionColor: true,
-      wordWrap: true, alignment: 'middleCenter', blink: false
-    },
-    {
-      id: 'Error', backColor: 'navy', borderColor: 'navy',
-      useBackColor: true, useBorderColor: true, caption: 'Error',
-      captionColor: '#ffffff', useCaptionColor: true,
-      wordWrap: true, alignment: 'middleCenter', blink: true
-    }
+    defaultMomentaryState('State0', { caption }),
+    defaultMomentaryState('State1', { caption, alignment: 'middleLeft' }),
+    defaultMomentaryState('Error', { caption: 'Error' })
   ];
 }
 
 let mbStatesDraft = null;
 let mbActiveStateId = 'State0';
+let mbStateClipboard = null;
+let mbPreviewTimer = null;
+let mbDialogCommitted = false;
 
 function cloneMomentaryStates(states) {
   return (states || []).map((s) => ({ ...s }));
+}
+
+function mbSetColor(id, raw) {
+  const S = window.StudioPropsShared;
+  if (S?.setColorFieldValue) S.setColorFieldValue(id, raw);
+  else {
+    const el = document.getElementById(id);
+    if (el) el.value = raw;
+  }
+}
+
+function mbGetColor(id) {
+  const S = window.StudioPropsShared;
+  const norm = window.FtColorPicker?.normalizeColor || ((v) => v);
+  if (S?.getColorFieldValue) return norm(S.getColorFieldValue(id));
+  return norm(document.getElementById(id)?.value || '#000000');
+}
+
+function setMbHoldTime(ms) {
+  const el = document.getElementById('mbHoldTime');
+  if (!el) return;
+  const value = String(Number(ms) || 0);
+  if (el.tagName === 'SELECT' && el.options) {
+    if (![...el.options].some((o) => o.value === value)) {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = `${value} msec`;
+      el.appendChild(opt);
+    }
+  }
+  el.value = value;
+}
+
+function scheduleMomentaryLivePreview() {
+  if (state.propsFormFill) return;
+  if (mbPreviewTimer) clearTimeout(mbPreviewTimer);
+  mbPreviewTimer = setTimeout(() => {
+    mbPreviewTimer = null;
+    const comp = readMomentaryButtonForm();
+    if (window.patchShapeLivePreview) window.patchShapeLivePreview(comp);
+    updatePropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
+  }, 100);
 }
 
 function inferMomentaryButtonMode(comp) {
@@ -1881,11 +2616,11 @@ function inferMomentaryButtonMode(comp) {
 }
 
 function defaultMomentaryButtonComponent(overrides = {}) {
-  const caption = overrides.caption || overrides.label || 'Conveyor Run';
+  const caption = overrides.caption ?? overrides.label ?? '';
   return {
     type: 'MomentaryButton',
-    name: 'MomentaryButton1',
-    tag: 'Manual.ConveyorRun',
+    name: 'MomentaryPushButton1',
+    tag: '',
     indicatorTag: '',
     value: 1,
     releaseValue: 0,
@@ -1893,18 +2628,18 @@ function defaultMomentaryButtonComponent(overrides = {}) {
     holdTime: 250,
     caption,
     label: caption,
-    left: 16,
-    top: 79,
-    width: 147,
-    height: 38,
+    left: 0,
+    top: 0,
+    width: 202,
+    height: 74,
     visible: true,
-    borderStyle: 'raisedInset',
+    borderStyle: 'line',
     borderWidth: 1,
     borderUsesBackColor: true,
     backStyle: 'solid',
     shape: 'rectangle',
-    useHighlightColor: false,
-    highlightColor: '#00ff00',
+    useHighlightColor: true,
+    highlightColor: '#0066cc',
     buttonType: 'momentary',
     touch: true,
     audio: true,
@@ -1921,21 +2656,80 @@ function defaultMomentaryButtonComponent(overrides = {}) {
   };
 }
 
+function wireMomentaryButtonDialogTools() {
+  window.StudioTagTools?.wirePickButtons();
+  window.StudioPropsShared?.fillPatternSelect('mbStatePatternStyle', 'mbFilled');
+  const dialog = document.getElementById('momentaryButtonDialog');
+  if (dialog && window.FtColorPicker) {
+    window.FtColorPicker.initAll(dialog);
+    window.FtColorPicker.refreshAll?.(dialog);
+  }
+  syncMomentaryButtonGeneralFields();
+}
+
 async function showMomentaryButtonDialog(overrides = {}) {
   if (!displayIsOpen()) {
     setStatus('Open a display or global object first, then choose Momentary from Push Button');
     return;
   }
-  const canvas = await fetchOpenCanvas();
-  const comp = defaultMomentaryButtonComponent({
-    name: nextMomentaryButtonName(canvas.components || []),
-    label: overrides.caption || 'Conveyor Run',
-    ...overrides
-  });
-  fillMomentaryButtonForm(comp);
-  resetPropsDialogState('momentary', readMomentaryButtonForm, 'applyMomentaryButton');
-  switchMomentaryButtonTab('general');
-  document.getElementById('momentaryButtonDialog')?.showModal();
+  try {
+    flushDeferredDialogInits();
+    initMomentaryButtonDialog();
+    const canvas = await fetchOpenCanvas();
+    const comp = defaultMomentaryButtonComponent({
+      name: nextMomentaryButtonName(canvas.components || []),
+      ...overrides
+    });
+    fillMomentaryButtonForm(comp);
+    wireMomentaryButtonDialogTools();
+    resetPropsDialogState('momentary', readMomentaryButtonForm, 'applyMomentaryButton');
+    switchMomentaryButtonTab('general');
+    presentMomentaryButtonDialog();
+    const previewComp = readMomentaryButtonForm();
+    if (window.patchShapeLivePreview) window.patchShapeLivePreview(previewComp);
+    else if (previewComp?.name) previewPatchByName(previewComp.name, previewComp);
+    flushPropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
+    scheduleMomentaryLivePreview();
+  } catch (err) {
+    setStatus(`Momentary properties error: ${err.message}`);
+  }
+}
+
+function presentMomentaryButtonDialog() {
+  const dialog = document.getElementById('momentaryButtonDialog');
+  if (!dialog) {
+    setStatus('Momentary Push Button Properties dialog is missing from Studio');
+    return;
+  }
+  if (dialog.open) return;
+  mbDialogCommitted = false;
+  dialog.classList.add('is-positioned');
+  dialog.style.position = 'fixed';
+  dialog.style.margin = '0';
+  dialog.style.left = '24px';
+  dialog.style.top = '36px';
+  dialog.style.right = 'auto';
+  dialog.style.bottom = 'auto';
+  dialog.style.transform = 'none';
+  dialog.style.zIndex = '30000';
+  dialog.style.maxHeight = 'calc(100vh - 48px)';
+  dialog.style.overflow = 'auto';
+  try {
+    dialog.showModal();
+  } catch (err) {
+    document.querySelectorAll('dialog[open]').forEach((other) => {
+      if (other !== dialog) {
+        try { other.close(); } catch (_) { /* ignore */ }
+      }
+    });
+    try {
+      dialog.showModal();
+    } catch (err2) {
+      dialog.setAttribute('open', '');
+      dialog.style.display = 'block';
+      setStatus(`Opened Momentary properties without modal: ${err2.message}`);
+    }
+  }
 }
 
 function switchMomentaryButtonTab(tabId) {
@@ -1949,14 +2743,30 @@ function switchMomentaryButtonTab(tabId) {
 
 function syncMomentaryButtonGeneralFields() {
   const useHighlight = document.getElementById('mbUseHighlightColor')?.checked;
-  document.getElementById('mbHighlightColor').disabled = !useHighlight;
+  const hl = document.getElementById('mbHighlightColor');
+  if (hl) hl.disabled = !useHighlight;
   const mode = document.querySelector('#momentaryButtonForm input[name="mbButtonMode"]:checked')?.value || 'normallyOpen';
-  const valueLocked = mode !== 'value';
-  document.getElementById('mbValue').disabled = valueLocked;
-  document.getElementById('mbReleaseValue').disabled = valueLocked;
-  document.getElementById('mbStateBackColor').disabled = !document.getElementById('mbStateUseBackColor')?.checked;
-  document.getElementById('mbStateBorderColor').disabled = !document.getElementById('mbStateUseBorderColor')?.checked;
-  document.getElementById('mbStateCaptionColor').disabled = !document.getElementById('mbStateUseCaptionColor')?.checked;
+  const valueLocked = mode !== 'value' || mbActiveStateId === 'Error';
+  const valueEl = document.getElementById('mbStateValue');
+  if (valueEl) valueEl.readOnly = valueLocked;
+  document.getElementById('mbStateValueRow')?.classList.toggle('hidden', mbActiveStateId === 'Error');
+  const patOn = document.getElementById('mbStateUsePatternColor')?.checked;
+  const pat = document.getElementById('mbStatePatternColor');
+  if (pat) pat.disabled = !patOn;
+  const capOn = document.getElementById('mbStateUseCaptionColor')?.checked;
+  const cap = document.getElementById('mbStateCaptionColor');
+  if (cap) cap.disabled = !capOn;
+  const capBackOn = document.getElementById('mbStateUseCaptionBackColor')?.checked
+    && document.getElementById('mbCaptionBackStyle')?.value === 'solid';
+  const capBack = document.getElementById('mbStateCaptionBackColor');
+  if (capBack) capBack.disabled = !capBackOn;
+  const imgOn = document.getElementById('mbStateUseImageColor')?.checked;
+  const img = document.getElementById('mbStateImageColor');
+  if (img) img.disabled = !imgOn;
+  const imgBackOn = document.getElementById('mbStateUseImageBackColor')?.checked
+    && document.getElementById('mbImageBackStyle')?.value === 'solid';
+  const imgBack = document.getElementById('mbStateImageBackColor');
+  if (imgBack) imgBack.disabled = !imgBackOn;
 }
 
 function applyMomentaryButtonModeToFields(mode) {
@@ -1975,35 +2785,93 @@ function saveMbStateFieldsToDraft() {
   const idx = mbStatesDraft.findIndex((s) => s.id === id);
   if (idx < 0) return;
   const alignment = document.querySelector('#momentaryButtonForm input[name="mbStateAlign"]:checked')?.value || 'middleCenter';
-  mbStatesDraft[idx] = {
+  const imageAlignment = document.querySelector('#momentaryButtonForm input[name="mbImageAlign"]:checked')?.value || 'middleCenter';
+  const next = {
     ...mbStatesDraft[idx],
-    backColor: document.getElementById('mbStateBackColor').value,
-    borderColor: document.getElementById('mbStateBorderColor').value,
-    useBackColor: document.getElementById('mbStateUseBackColor').checked,
-    useBorderColor: document.getElementById('mbStateUseBorderColor').checked,
-    blink: document.getElementById('mbStateBlink').checked,
-    caption: document.getElementById('mbStateCaption').value,
-    captionColor: document.getElementById('mbStateCaptionColor').value,
-    useCaptionColor: document.getElementById('mbStateUseCaptionColor').checked,
-    wordWrap: document.getElementById('mbStateWordWrap').checked,
-    alignment
+    backColor: mbGetColor('mbStateBackColor'),
+    borderColor: mbGetColor('mbStateBorderColor'),
+    useBackColor: true,
+    useBorderColor: true,
+    blink: Boolean(document.getElementById('mbStateBlink')?.checked),
+    patternStyle: document.getElementById('mbStatePatternStyle')?.value || 'none',
+    usePatternColor: document.getElementById('mbStateUsePatternColor')?.checked,
+    patternColor: mbGetColor('mbStatePatternColor'),
+    caption: document.getElementById('mbStateCaption')?.value ?? '',
+    captionColor: mbGetColor('mbStateCaptionColor'),
+    useCaptionColor: Boolean(document.getElementById('mbStateUseCaptionColor')?.checked),
+    captionBackColor: mbGetColor('mbStateCaptionBackColor'),
+    useCaptionBackColor: document.getElementById('mbStateUseCaptionBackColor')?.checked,
+    captionBlink: document.getElementById('mbStateCaptionBlink')?.checked,
+    wordWrap: document.getElementById('mbStateWordWrap')?.checked !== false,
+    alignment,
+    captionBackStyle: document.getElementById('mbCaptionBackStyle')?.value || 'transparent',
+    image: document.getElementById('mbStateImage')?.value.trim() || '',
+    imageBackStyle: document.getElementById('mbImageBackStyle')?.value || 'transparent',
+    useImageColor: document.getElementById('mbStateUseImageColor')?.checked,
+    imageColor: mbGetColor('mbStateImageColor'),
+    useImageBackColor: document.getElementById('mbStateUseImageBackColor')?.checked,
+    imageBackColor: mbGetColor('mbStateImageBackColor'),
+    imageBlink: document.getElementById('mbStateImageBlink')?.checked,
+    imageScaled: document.getElementById('mbStateImageScaled')?.checked,
+    imageAlignment
   };
+  if (id === 'State0' || id === 'State1') {
+    next.value = Number(document.getElementById('mbStateValue').value);
+  }
+  mbStatesDraft[idx] = next;
 }
 
 function loadMbStateFieldsFromDraft(stateId) {
   mbActiveStateId = stateId;
-  const state = mbStatesDraft?.find((s) => s.id === stateId) || {};
-  document.getElementById('mbStateSelect').value = stateId;
-  document.getElementById('mbStateUseBackColor').checked = state.useBackColor !== false;
-  document.getElementById('mbStateBackColor').value = state.backColor || '#dcdcdc';
-  document.getElementById('mbStateUseBorderColor').checked = Boolean(state.useBorderColor);
-  document.getElementById('mbStateBorderColor').value = state.borderColor || '#c0c0c0';
-  document.getElementById('mbStateBlink').checked = Boolean(state.blink);
-  document.getElementById('mbStateCaption').value = state.caption ?? '';
-  document.getElementById('mbStateUseCaptionColor').checked = state.useCaptionColor !== false;
-  document.getElementById('mbStateCaptionColor').value = state.captionColor || '#000000';
-  document.getElementById('mbStateWordWrap').checked = state.wordWrap !== false;
-  document.querySelector(`#momentaryButtonForm input[name="mbStateAlign"][value="${state.alignment || 'middleCenter'}"]`)?.click();
+  const fallback = defaultMomentaryState(stateId);
+  const state = { ...fallback, ...(mbStatesDraft?.find((s) => s.id === stateId) || {}) };
+  const select = document.getElementById('mbStateSelect');
+  if (select) select.value = stateId;
+  const valueEl = document.getElementById('mbStateValue');
+  if (valueEl) valueEl.value = String(state.value ?? (stateId === 'State1' ? 1 : 0));
+  mbSetColor('mbStateBackColor', state.backColor || MB_NAVY);
+  mbSetColor('mbStateBorderColor', state.borderColor || MB_NAVY);
+  const blink = document.getElementById('mbStateBlink');
+  if (blink) blink.checked = Boolean(state.blink);
+  const pat = document.getElementById('mbStatePatternStyle');
+  if (pat) pat.value = state.patternStyle || 'none';
+  const usePat = document.getElementById('mbStateUsePatternColor');
+  if (usePat) usePat.checked = Boolean(state.usePatternColor);
+  mbSetColor('mbStatePatternColor', state.patternColor || '#ffffff');
+  const caption = document.getElementById('mbStateCaption');
+  if (caption) caption.value = state.caption ?? '';
+  const useCap = document.getElementById('mbStateUseCaptionColor');
+  if (useCap) useCap.checked = Boolean(state.useCaptionColor);
+  mbSetColor('mbStateCaptionColor', state.captionColor || MB_NAVY);
+  const useCapBack = document.getElementById('mbStateUseCaptionBackColor');
+  if (useCapBack) useCapBack.checked = Boolean(state.useCaptionBackColor);
+  mbSetColor('mbStateCaptionBackColor', state.captionBackColor || MB_NAVY);
+  const capBlink = document.getElementById('mbStateCaptionBlink');
+  if (capBlink) capBlink.checked = Boolean(state.captionBlink);
+  const wrap = document.getElementById('mbStateWordWrap');
+  if (wrap) wrap.checked = state.wordWrap !== false;
+  const capBackStyle = document.getElementById('mbCaptionBackStyle');
+  if (capBackStyle) capBackStyle.value = state.captionBackStyle || 'transparent';
+  document.querySelectorAll('#momentaryButtonForm input[name="mbStateAlign"]').forEach((el) => {
+    el.checked = el.value === (state.alignment || 'middleCenter');
+  });
+  const img = document.getElementById('mbStateImage');
+  if (img) img.value = state.image || '';
+  const imgBackStyle = document.getElementById('mbImageBackStyle');
+  if (imgBackStyle) imgBackStyle.value = state.imageBackStyle || 'transparent';
+  const useImgColor = document.getElementById('mbStateUseImageColor');
+  if (useImgColor) useImgColor.checked = Boolean(state.useImageColor);
+  mbSetColor('mbStateImageColor', state.imageColor || MB_NAVY);
+  const useImgBack = document.getElementById('mbStateUseImageBackColor');
+  if (useImgBack) useImgBack.checked = Boolean(state.useImageBackColor);
+  mbSetColor('mbStateImageBackColor', state.imageBackColor || MB_NAVY);
+  const imgBlink = document.getElementById('mbStateImageBlink');
+  if (imgBlink) imgBlink.checked = Boolean(state.imageBlink);
+  const imgScaled = document.getElementById('mbStateImageScaled');
+  if (imgScaled) imgScaled.checked = Boolean(state.imageScaled);
+  document.querySelectorAll('#momentaryButtonForm input[name="mbImageAlign"]').forEach((el) => {
+    el.checked = el.value === (state.imageAlignment || 'middleCenter');
+  });
   syncMomentaryButtonGeneralFields();
 }
 
@@ -2016,61 +2884,96 @@ function fillMomentaryButtonForm(comp) {
   const mode = inferMomentaryButtonMode(comp);
   mbStatesDraft = cloneMomentaryStates(comp.states?.length ? comp.states : defaultMomentaryButtonStates(comp.caption ?? comp.label));
   mbActiveStateId = 'State0';
+  mbStateClipboard = null;
+  const pasteBtn = document.getElementById('mbStatePaste');
+  if (pasteBtn) pasteBtn.disabled = true;
 
-  document.getElementById('mbBorderStyle').value = comp.borderStyle || 'raisedInset';
-  document.getElementById('mbBorderWidth').value = comp.borderWidth ?? 1;
-  document.getElementById('mbBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
-  document.getElementById('mbBackStyle').value = comp.backStyle || 'solid';
-  document.getElementById('mbShape').value = comp.shape || 'rectangle';
-  document.getElementById('mbUseHighlightColor').checked = Boolean(comp.useHighlightColor);
-  document.getElementById('mbHighlightColor').value = comp.highlightColor || '#00ff00';
-  document.getElementById('mbHoldTime').value = comp.holdTime ?? 250;
-  document.getElementById('mbHorizontalMargin').value = comp.horizontalMargin ?? 0;
-  document.getElementById('mbVerticalMargin').value = comp.verticalMargin ?? 0;
-  document.getElementById('mbTouch').checked = comp.touch !== false;
-  document.getElementById('mbAudio').checked = comp.audio !== false;
-  document.getElementById('mbFont').value = comp.fontFamily || 'Arial Unicode MS';
-  document.getElementById('mbFontSize').value = String(comp.fontSize ?? 10);
-  document.getElementById('mbBold').classList.toggle('active', Boolean(comp.bold));
-  document.getElementById('mbItalic').classList.toggle('active', Boolean(comp.italic));
-  document.getElementById('mbUnderline').classList.toggle('active', Boolean(comp.underline));
-  document.getElementById('mbKeyAssignment').value = comp.keyAssignment || 'None';
-  document.getElementById('mbHeight').value = comp.height ?? 38;
-  document.getElementById('mbWidth').value = comp.width ?? 147;
-  document.getElementById('mbTop').value = comp.top ?? 79;
-  document.getElementById('mbLeft').value = comp.left ?? 16;
-  document.getElementById('mbName').value = comp.name || 'MomentaryButton1';
-  document.getElementById('mbVisible').checked = comp.visible !== false;
-  document.getElementById('mbTag').value = comp.tag || '';
-  document.getElementById('mbIndicatorTag').value = comp.indicatorTag || '';
-  document.getElementById('mbValue').value = comp.value ?? 1;
-  document.getElementById('mbReleaseValue').value = comp.releaseValue ?? 0;
-  document.querySelector(`#momentaryButtonForm input[name="mbButtonMode"][value="${mode}"]`)?.click();
-  applyMomentaryButtonModeToFields(mode);
-  loadMbStateFieldsFromDraft('State0');
-  syncMomentaryButtonGeneralFields();
+  if (window.state) window.state.propsFormFill = true;
+  try {
+    window.StudioPropsShared?.fillPatternSelect('mbStatePatternStyle', 'mbFilled');
+    const borderStyle = comp.borderStyle || 'line';
+    const borderEl = document.getElementById('mbBorderStyle');
+    if (borderEl && ![...borderEl.options].some((o) => o.value === borderStyle)) {
+      const opt = document.createElement('option');
+      opt.value = borderStyle;
+      opt.textContent = borderStyle;
+      borderEl.appendChild(opt);
+    }
+    document.getElementById('mbBorderStyle').value = borderStyle;
+    document.getElementById('mbBorderWidth').value = comp.borderWidth ?? 1;
+    document.getElementById('mbBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
+    document.getElementById('mbBackStyle').value = comp.backStyle === 'transparent' || comp.backStyle === 'gradient'
+      ? comp.backStyle
+      : 'solid';
+    const shape = comp.shape === 'circle' || comp.shape === 'ellipse' ? comp.shape : 'rectangle';
+    document.getElementById('mbShape').value = shape;
+    document.getElementById('mbUseHighlightColor').checked = comp.useHighlightColor !== false;
+    mbSetColor('mbHighlightColor', comp.highlightColor || '#0066cc');
+    setMbHoldTime(comp.holdTime ?? 250);
+    document.getElementById('mbHorizontalMargin').value = comp.horizontalMargin ?? 0;
+    document.getElementById('mbVerticalMargin').value = comp.verticalMargin ?? 0;
+    document.getElementById('mbTouch').checked = comp.touch !== false;
+    document.getElementById('mbAudio').checked = comp.audio !== false;
+    document.getElementById('mbFont').value = comp.fontFamily || 'Arial Unicode MS';
+    document.getElementById('mbFontSize').value = String(comp.fontSize ?? 10);
+    document.getElementById('mbBold').classList.toggle('active', Boolean(comp.bold));
+    document.getElementById('mbItalic').classList.toggle('active', Boolean(comp.italic));
+    document.getElementById('mbUnderline').classList.toggle('active', Boolean(comp.underline));
+    document.getElementById('mbKeyAssignment').value = comp.keyAssignment || 'None';
+    document.getElementById('mbHeight').value = comp.height ?? 74;
+    document.getElementById('mbWidth').value = comp.width ?? 202;
+    document.getElementById('mbTop').value = comp.top ?? 0;
+    document.getElementById('mbLeft').value = comp.left ?? 0;
+    document.getElementById('mbName').value = comp.name || 'MomentaryPushButton1';
+    document.getElementById('mbVisible').checked = comp.visible !== false;
+    document.getElementById('mbTag').value = comp.tag || '';
+    document.getElementById('mbIndicatorTag').value = comp.indicatorTag || '';
+    document.getElementById('mbValue').value = String(comp.value ?? 1);
+    document.getElementById('mbReleaseValue').value = String(comp.releaseValue ?? 0);
+    document.querySelectorAll('#momentaryButtonForm input[name="mbButtonMode"]').forEach((el) => {
+      el.checked = el.value === mode;
+    });
+    applyMomentaryButtonModeToFields(mode);
+    loadMbStateFieldsFromDraft('State0');
+    syncMomentaryButtonGeneralFields();
+  } finally {
+    if (window.state) window.state.propsFormFill = false;
+  }
 }
 
 function readMomentaryButtonForm() {
   saveMbStateFieldsToDraft();
   const mode = document.querySelector('#momentaryButtonForm input[name="mbButtonMode"]:checked')?.value || 'normallyOpen';
   const state0 = mbStatesDraft?.find((s) => s.id === 'State0');
+  const state1 = mbStatesDraft?.find((s) => s.id === 'State1');
   const caption = state0?.caption ?? '';
+  let value = Number(document.getElementById('mbValue').value);
+  let releaseValue = Number(document.getElementById('mbReleaseValue').value);
+  if (mode === 'normallyOpen') {
+    value = 1;
+    releaseValue = 0;
+  } else if (mode === 'normallyClosed') {
+    value = 0;
+    releaseValue = 1;
+  } else {
+    value = state1?.value ?? 1;
+    releaseValue = state0?.value ?? 0;
+  }
   return {
     type: 'MomentaryButton',
-    name: document.getElementById('mbName').value.trim() || 'MomentaryButton1',
+    name: document.getElementById('mbName').value.trim() || 'MomentaryPushButton1',
     tag: document.getElementById('mbTag').value.trim(),
     indicatorTag: document.getElementById('mbIndicatorTag').value.trim(),
-    value: Number(document.getElementById('mbValue').value),
-    releaseValue: Number(document.getElementById('mbReleaseValue').value),
+    value,
+    releaseValue,
     buttonMode: mode,
     holdTime: Number(document.getElementById('mbHoldTime').value) || 0,
     caption,
     label: caption,
     left: Number(document.getElementById('mbLeft').value) || 0,
     top: Number(document.getElementById('mbTop').value) || 0,
-    width: Number(document.getElementById('mbWidth').value) || 147,
-    height: Number(document.getElementById('mbHeight').value) || 38,
+    width: Number(document.getElementById('mbWidth').value) || 202,
+    height: Number(document.getElementById('mbHeight').value) || 74,
     visible: document.getElementById('mbVisible').checked,
     borderStyle: document.getElementById('mbBorderStyle').value,
     borderWidth: Number(document.getElementById('mbBorderWidth').value) || 1,
@@ -2078,9 +2981,9 @@ function readMomentaryButtonForm() {
     backStyle: document.getElementById('mbBackStyle').value,
     shape: document.getElementById('mbShape').value,
     useHighlightColor: document.getElementById('mbUseHighlightColor').checked,
-    highlightColor: document.getElementById('mbHighlightColor').value,
+    highlightColor: mbGetColor('mbHighlightColor'),
     buttonType: 'momentary',
-    touch: document.getElementById('mbTouch').checked,
+    touch: document.getElementById('mbTouch')?.checked !== false,
     audio: document.getElementById('mbAudio').checked,
     horizontalMargin: Number(document.getElementById('mbHorizontalMargin').value) || 0,
     verticalMargin: Number(document.getElementById('mbVerticalMargin').value) || 0,
@@ -2096,109 +2999,163 @@ function readMomentaryButtonForm() {
 
 async function applyMomentaryButton() {
   const comp = readMomentaryButtonForm();
-  if (!comp.tag) {
-    setStatus('Enter a tag on the Connections tab');
-    switchMomentaryButtonTab('connections');
+  const ok = await upsertCanvasComponent(comp);
+  if (!ok) {
+    setStatus('Could not apply — open a display or global object first');
     return;
   }
-  await upsertCanvasComponent(comp);
   commitPropsSnapshot(readMomentaryButtonForm, 'applyMomentaryButton');
-  state.canvasSelection.indices = [state.propsDialog.editIndex];
-  setStatus(`Applied ${comp.name} on ${state.selectedScreenId}`);
+  afterCanvasComponentSaved?.(comp);
+  setStatus(`Applied ${comp.name}`);
 }
 
 async function saveMomentaryButton(e) {
   e.preventDefault();
   const comp = readMomentaryButtonForm();
-  if (!comp.tag) {
-    setStatus('Enter a tag on the Connections tab');
-    switchMomentaryButtonTab('connections');
+  const ok = await upsertCanvasComponent(comp);
+  if (!ok) {
+    setStatus('Could not save — open a display or global object first');
     return;
   }
-  await upsertCanvasComponent(comp);
+  mbDialogCommitted = true;
+  const editIdx = state.propsDialog.editIndex;
   document.getElementById('momentaryButtonDialog').close();
-  state.canvasSelection.indices = [state.propsDialog.editIndex];
-  clearPropsDialogState();
-  activateSelectTool(`Added ${comp.name} to ${state.selectedScreenId}`);
+  if (editIdx != null) state.canvasSelection.indices = [editIdx];
+  setStatus(`Saved ${comp.name}`);
 }
 
 function initMomentaryButtonDialog() {
-  document.getElementById('momentaryButtonForm')?.addEventListener('submit', (e) => {
+  const form = document.getElementById('momentaryButtonForm');
+  if (!form || form.dataset.mbWired === '1') return;
+  form.dataset.mbWired = '1';
+  window.StudioPropsShared?.fillPatternSelect('mbStatePatternStyle', 'mbFilled');
+  form.addEventListener('submit', (e) => {
     saveMomentaryButton(e).catch((err) => setStatus(`Error: ${err.message}`));
   });
   document.getElementById('applyMomentaryButton')?.addEventListener('click', () => {
     applyMomentaryButton().catch((err) => setStatus(`Error: ${err.message}`));
   });
-  document.getElementById('momentaryButtonForm')?.addEventListener('input', () => {
-    updatePropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
+  form.addEventListener('input', () => {
+    scheduleMomentaryLivePreview();
+    flushPropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
   });
-  document.getElementById('momentaryButtonForm')?.addEventListener('change', () => {
-    updatePropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
+  form.addEventListener('change', () => {
+    syncMomentaryButtonGeneralFields();
+    scheduleMomentaryLivePreview();
+    flushPropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
   });
   document.getElementById('cancelMomentaryButton')?.addEventListener('click', () => {
     document.getElementById('momentaryButtonDialog')?.close();
-    clearPropsDialogState();
-    activateSelectTool('Placement cancelled');
   });
   document.getElementById('momentaryButtonDialog')?.addEventListener('close', () => {
-    if (state.placement) activateSelectTool();
+    if (!mbDialogCommitted) revertPropsDialogPreview();
+    mbDialogCommitted = false;
+    clearPropsDialogState();
+    activateSelectTool();
   });
   document.getElementById('helpMomentaryButton')?.addEventListener('click', () => {
-    alert('Momentary Push Button writes Value while pressed and Release Value after Hold time when released. State0/State1/Error control appearance from the indicator tag.');
+    alert('Momentary Push Button Properties define appearance, states, size, and tag connections. The button writes Value while pressed and Release Value after Hold time.');
   });
   document.querySelectorAll('#momentaryButtonDialog .dialog-tab').forEach((tab) => {
     tab.addEventListener('click', () => switchMomentaryButtonTab(tab.dataset.mbTab));
   });
   document.getElementById('mbStateSelect')?.addEventListener('change', (e) => {
     switchMbState(e.target.value);
-    updatePropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
+    flushPropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
   });
-  for (const id of ['mbUseHighlightColor', 'mbStateUseBackColor', 'mbStateUseBorderColor', 'mbStateUseCaptionColor']) {
+  document.getElementById('mbStateCopy')?.addEventListener('click', () => {
+    saveMbStateFieldsToDraft();
+    const state = mbStatesDraft?.find((s) => s.id === mbActiveStateId);
+    if (state) {
+      mbStateClipboard = { ...state };
+      const pasteBtn = document.getElementById('mbStatePaste');
+      if (pasteBtn) pasteBtn.disabled = false;
+    }
+  });
+  document.getElementById('mbStatePaste')?.addEventListener('click', () => {
+    if (!mbStateClipboard || !mbStatesDraft) return;
+    saveMbStateFieldsToDraft();
+    const idx = mbStatesDraft.findIndex((s) => s.id === mbActiveStateId);
+    if (idx < 0) return;
+    const keep = { id: mbStatesDraft[idx].id, value: mbStatesDraft[idx].value };
+    mbStatesDraft[idx] = { ...mbStateClipboard, ...keep };
+    loadMbStateFieldsFromDraft(mbActiveStateId);
+    flushPropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
+    scheduleMomentaryLivePreview();
+  });
+  document.getElementById('mbBrowseImage')?.addEventListener('click', () => {
+    showImageBrowserDialog({ selectedFileName: document.getElementById('mbStateImage').value || null })
+      .then((fileName) => {
+        if (!fileName) return;
+        document.getElementById('mbStateImage').value = fileName;
+        flushPropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
+        scheduleMomentaryLivePreview();
+      })
+      .catch((err) => setStatus(`Error: ${err.message}`));
+  });
+  for (const id of ['mbUseHighlightColor', 'mbStateUsePatternColor', 'mbStateUseCaptionColor', 'mbStateUseCaptionBackColor', 'mbStateUseImageColor', 'mbStateUseImageBackColor', 'mbCaptionBackStyle', 'mbImageBackStyle']) {
     document.getElementById(id)?.addEventListener('change', () => {
       syncMomentaryButtonGeneralFields();
-      updatePropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
+      flushPropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
     });
   }
   document.querySelectorAll('#momentaryButtonForm input[name="mbButtonMode"]').forEach((el) => {
     el.addEventListener('change', () => {
       applyMomentaryButtonModeToFields(el.value);
       syncMomentaryButtonGeneralFields();
-      updatePropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
+      flushPropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
+      scheduleMomentaryLivePreview();
     });
   });
   for (const id of ['mbBold', 'mbItalic', 'mbUnderline']) {
     document.getElementById(id)?.addEventListener('click', (e) => {
       e.preventDefault();
       e.currentTarget.classList.toggle('active');
-      updatePropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
+      flushPropsApplyButton(readMomentaryButtonForm, 'applyMomentaryButton');
+      scheduleMomentaryLivePreview();
     });
   }
 }
 
 function nextMaintainedButtonName(components) {
   const n = countComponentsByType(components, 'MaintainedButton') + 1;
-  return `MaintainedButton${n}`;
+  return `MaintainedPushButton${n}`;
 }
 
-function defaultMaintainedButtonStates(caption = 'Pump Run') {
+function defaultMaintainedButtonStates(caption = '') {
   return [
     {
-      id: 'State0', value: 0, backColor: '#dcdcdc', borderColor: '#c0c0c0',
-      useBackColor: true, useBorderColor: false, caption,
-      captionColor: '#000000', useCaptionColor: true,
-      wordWrap: true, alignment: 'middleCenter', blink: false
+      id: 'State0', value: 0, backColor: '#001C38', borderColor: '#001C38',
+      useBackColor: true, useBorderColor: true, caption,
+      captionColor: '#ffffff', useCaptionColor: false,
+      captionBackColor: '#001C38', useCaptionBackColor: false, captionBlink: false,
+      captionBackStyle: 'transparent', patternStyle: 'none', usePatternColor: false, patternColor: '#ffffff',
+      wordWrap: true, alignment: 'middleRight', blink: false,
+      image: '', imageBackStyle: 'transparent', imageAlignment: 'middleCenter',
+      useImageColor: false, imageColor: '#001C38', useImageBackColor: false, imageBackColor: '#001C38',
+      imageBlink: false, imageScaled: false
     },
     {
-      id: 'State1', value: 1, backColor: '#00c000', borderColor: '#40ff10',
+      id: 'State1', value: 1, backColor: '#001C38', borderColor: '#001C38',
       useBackColor: true, useBorderColor: true, caption,
-      captionColor: '#ffffff', useCaptionColor: true,
-      wordWrap: true, alignment: 'middleCenter', blink: false
+      captionColor: '#ffffff', useCaptionColor: false,
+      captionBackColor: '#001C38', useCaptionBackColor: false, captionBlink: false,
+      captionBackStyle: 'transparent', patternStyle: 'none', usePatternColor: false, patternColor: '#ffffff',
+      wordWrap: true, alignment: 'middleRight', blink: false,
+      image: '', imageBackStyle: 'transparent', imageAlignment: 'middleCenter',
+      useImageColor: false, imageColor: '#001C38', useImageBackColor: false, imageBackColor: '#001C38',
+      imageBlink: false, imageScaled: false
     },
     {
       id: 'Error', backColor: 'navy', borderColor: 'navy',
       useBackColor: true, useBorderColor: true, caption: 'Error',
       captionColor: '#ffffff', useCaptionColor: true,
-      wordWrap: true, alignment: 'middleCenter', blink: true
+      captionBackColor: '#001C38', useCaptionBackColor: false, captionBlink: false,
+      captionBackStyle: 'transparent', patternStyle: 'none', usePatternColor: false, patternColor: '#ffffff',
+      wordWrap: true, alignment: 'middleRight', blink: true,
+      image: '', imageBackStyle: 'transparent', imageAlignment: 'middleCenter',
+      useImageColor: false, imageColor: '#001C38', useImageBackColor: false, imageBackColor: '#001C38',
+      imageBlink: false, imageScaled: false
     }
   ];
 }
@@ -2206,12 +3163,35 @@ function defaultMaintainedButtonStates(caption = 'Pump Run') {
 let mtnStatesDraft = null;
 let mtnActiveStateId = 'State0';
 let mtnStateClipboard = null;
+let mtnPreviewTimer = null;
+let mtnDialogCommitted = false;
+
+function scheduleMaintainedLivePreview() {
+  if (state.propsFormFill) return;
+  if (mtnPreviewTimer) clearTimeout(mtnPreviewTimer);
+  mtnPreviewTimer = setTimeout(() => {
+    mtnPreviewTimer = null;
+    const comp = readMaintainedButtonForm();
+    if (window.patchShapeLivePreview) window.patchShapeLivePreview(comp);
+    else if (comp?.name) previewPatchByName(comp.name, comp);
+    updatePropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
+  }, 80);
+}
 
 function wireMaintainedButtonDialogTools() {
   if (window.StudioTagTools) StudioTagTools.wirePickButtons();
   if (window.FtColorPicker) {
-    window.FtColorPicker.initAll(document.getElementById('maintainedButtonDialog'));
+    const dlg = document.getElementById('maintainedButtonDialog');
+    if (window.FtColorPicker.initAllSync) window.FtColorPicker.initAllSync(dlg);
+    else window.FtColorPicker.initAll(dlg);
+    window.FtColorPicker.refreshAll?.(dlg);
   }
+  document.querySelectorAll('#maintainedButtonForm .ft-color-input').forEach((input) => {
+    if (input.dataset.mtnPreviewWired === '1') return;
+    input.dataset.mtnPreviewWired = '1';
+    input.addEventListener('input', scheduleMaintainedLivePreview);
+    input.addEventListener('change', scheduleMaintainedLivePreview);
+  });
   syncMaintainedButtonGeneralFields();
 }
 
@@ -2220,11 +3200,11 @@ function cloneMaintainedStates(states) {
 }
 
 function defaultMaintainedButtonComponent(overrides = {}) {
-  const caption = overrides.caption || overrides.label || 'Pump Run';
+  const caption = overrides.caption || overrides.label || '';
   return {
     type: 'MaintainedButton',
-    name: 'MaintainedButton1',
-    tag: 'Manual.PumpRun',
+    name: 'MaintainedPushButton1',
+    tag: '',
     indicatorTag: '',
     nextStateBasedOn: 'currentState',
     caption,
@@ -2234,13 +3214,13 @@ function defaultMaintainedButtonComponent(overrides = {}) {
     width: 147,
     height: 38,
     visible: true,
-    borderStyle: 'line',
+    borderStyle: 'raised',
     borderWidth: 1,
     borderUsesBackColor: true,
     backStyle: 'solid',
     shape: 'rectangle',
-    useHighlightColor: false,
-    highlightColor: '#00ff00',
+    useHighlightColor: true,
+    highlightColor: '#0066cc',
     buttonType: 'maintained',
     touch: true,
     audio: true,
@@ -2252,6 +3232,16 @@ function defaultMaintainedButtonComponent(overrides = {}) {
     italic: false,
     underline: false,
     keyAssignment: 'None',
+    requireESignature: false,
+    allowBlankComment: false,
+    requireReauth: false,
+    requireCounterSig: false,
+    authorizedGroup: 'Administrators',
+    domainVisible: false,
+    domainMode: 'name',
+    domainName: '',
+    domainVariable: '',
+    domainDisable: false,
     states: defaultMaintainedButtonStates(caption),
     ...overrides
   };
@@ -2259,20 +3249,67 @@ function defaultMaintainedButtonComponent(overrides = {}) {
 
 async function showMaintainedButtonDialog(overrides = {}) {
   if (!displayIsOpen()) {
-    setStatus('Open a display or global object first, then choose Maintained from Push Button');
+    setStatus('Open a display first, then drag on the canvas to place the Maintained button');
     return;
   }
-  const canvas = await fetchOpenCanvas();
-  const comp = defaultMaintainedButtonComponent({
-    name: nextMaintainedButtonName(canvas.components || []),
-    label: overrides.caption || 'Pump Run',
-    ...overrides
-  });
-  fillMaintainedButtonForm(comp);
-  resetPropsDialogState('maintained', readMaintainedButtonForm, 'applyMaintainedButton');
-  switchMaintainedButtonTab('general');
-  wireMaintainedButtonDialogTools();
-  document.getElementById('maintainedButtonDialog')?.showModal();
+  try {
+    flushDeferredDialogInits();
+    initMaintainedButtonDialog();
+    const canvas = await fetchOpenCanvas();
+    const comp = defaultMaintainedButtonComponent({
+      name: nextMaintainedButtonName(canvas.components || []),
+      label: overrides.caption || '',
+      ...overrides
+    });
+    fillMaintainedButtonForm(comp);
+    resetPropsDialogState('maintained', readMaintainedButtonForm, 'applyMaintainedButton');
+    switchMaintainedButtonTab('general');
+    wireMaintainedButtonDialogTools();
+    presentMaintainedButtonDialog();
+    const previewComp = readMaintainedButtonForm();
+    if (window.patchShapeLivePreview) window.patchShapeLivePreview(previewComp);
+    else if (previewComp?.name) previewPatchByName(previewComp.name, previewComp);
+    flushPropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
+  } catch (err) {
+    setStatus(`Maintained properties error: ${err.message}`);
+  }
+}
+
+function presentMaintainedButtonDialog() {
+  const dialog = document.getElementById('maintainedButtonDialog');
+  if (!dialog) {
+    setStatus('Maintained Push Button Properties dialog is missing from Studio');
+    return;
+  }
+  if (dialog.open) return;
+  mtnDialogCommitted = false;
+  dialog.classList.add('is-positioned');
+  dialog.style.position = 'fixed';
+  dialog.style.margin = '0';
+  dialog.style.left = '24px';
+  dialog.style.top = '36px';
+  dialog.style.right = 'auto';
+  dialog.style.bottom = 'auto';
+  dialog.style.transform = 'none';
+  dialog.style.zIndex = '30000';
+  dialog.style.maxHeight = 'calc(100vh - 48px)';
+  dialog.style.overflow = 'auto';
+  try {
+    dialog.showModal();
+  } catch (err) {
+    document.querySelectorAll('dialog[open]').forEach((other) => {
+      if (other !== dialog) {
+        try { other.close(); } catch (_) { /* ignore */ }
+      }
+    });
+    try {
+      dialog.showModal();
+    } catch (err2) {
+      dialog.setAttribute('open', '');
+      dialog.style.display = 'block';
+      setStatus(`Opened Maintained properties without modal: ${err2.message}`);
+    }
+  }
 }
 
 function switchMaintainedButtonTab(tabId) {
@@ -2280,18 +3317,51 @@ function switchMaintainedButtonTab(tabId) {
     el.classList.toggle('active', el.dataset.mtnTab === tabId);
   });
   document.querySelectorAll('#maintainedButtonDialog .dialog-tab-panel').forEach((el) => {
-    el.classList.toggle('active', el.dataset.mtnTabPanel === tabId);
+    const on = el.dataset.mtnTabPanel === tabId;
+    el.classList.toggle('active', on);
+    el.style.display = on ? 'block' : 'none';
   });
 }
 
+function mtnGetColor(id) {
+  return window.StudioPropsShared?.getColorFieldValue?.(id)
+    || window.FtColorPicker?.getInputColor?.(document.getElementById(id))
+    || document.getElementById(id)?.value
+    || '#001C38';
+}
+
+function mtnSetColor(id, raw) {
+  if (window.StudioPropsShared?.setColorFieldValue) window.StudioPropsShared.setColorFieldValue(id, raw);
+  else if (window.FtColorPicker?.setValueSilent) window.FtColorPicker.setValueSilent(document.getElementById(id), raw);
+  else if (document.getElementById(id)) document.getElementById(id).value = raw;
+}
+
+function syncMaintainedESignatureFields() {
+  const on = Boolean(document.getElementById('mtnRequireESignature')?.checked);
+  for (const id of [
+    'mtnAllowBlankComment', 'mtnRequireReauth', 'mtnRequireCounterSig', 'mtnAuthorizedGroup',
+    'mtnDomainVisible', 'mtnDomainNameMode', 'mtnDomainVariableMode', 'mtnDomainName',
+    'mtnDomainVariable', 'mtnDomainBrowse', 'mtnDomainDisable'
+  ]) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !on;
+  }
+}
+
 function syncMaintainedButtonGeneralFields() {
-  const useHighlight = document.getElementById('mtnUseHighlightColor')?.checked;
-  document.getElementById('mtnHighlightColor').disabled = !useHighlight;
-  document.getElementById('mtnStateBackColor').disabled = !document.getElementById('mtnStateUseBackColor')?.checked;
-  document.getElementById('mtnStateBorderColor').disabled = !document.getElementById('mtnStateUseBorderColor')?.checked;
-  document.getElementById('mtnStateCaptionColor').disabled = !document.getElementById('mtnStateUseCaptionColor')?.checked;
+  const capColor = document.getElementById('mtnStateCaptionColor');
+  if (capColor) capColor.disabled = !document.getElementById('mtnStateUseCaptionColor')?.checked;
+  const capBack = document.getElementById('mtnStateCaptionBackColor');
+  if (capBack) capBack.disabled = !document.getElementById('mtnStateUseCaptionBackColor')?.checked;
+  const highlight = document.getElementById('mtnHighlightColor');
+  if (highlight) highlight.disabled = !document.getElementById('mtnUseHighlightColor')?.checked;
+  const imgColor = document.getElementById('mtnStateImageColor');
+  if (imgColor) imgColor.disabled = !document.getElementById('mtnStateUseImageColor')?.checked;
+  const imgBack = document.getElementById('mtnStateImageBackColor');
+  if (imgBack) imgBack.disabled = !document.getElementById('mtnStateUseImageBackColor')?.checked;
   const showValue = mtnActiveStateId === 'State0' || mtnActiveStateId === 'State1';
   document.getElementById('mtnStateValueRow')?.classList.toggle('hidden', !showValue);
+  syncMaintainedESignatureFields();
 }
 
 function saveMtnStateFieldsToDraft() {
@@ -2299,19 +3369,36 @@ function saveMtnStateFieldsToDraft() {
   const id = mtnActiveStateId;
   const idx = mtnStatesDraft.findIndex((s) => s.id === id);
   if (idx < 0) return;
-  const alignment = document.querySelector('#maintainedButtonForm input[name="mtnStateAlign"]:checked')?.value || 'middleCenter';
+  const alignment = document.querySelector('#maintainedButtonForm input[name="mtnStateAlign"]:checked')?.value || 'middleRight';
+  const imageAlignment = document.querySelector('#maintainedButtonForm input[name="mtnImageAlign"]:checked')?.value || 'middleCenter';
   const next = {
     ...mtnStatesDraft[idx],
-    backColor: document.getElementById('mtnStateBackColor').value,
-    borderColor: document.getElementById('mtnStateBorderColor').value,
-    useBackColor: document.getElementById('mtnStateUseBackColor').checked,
-    useBorderColor: document.getElementById('mtnStateUseBorderColor').checked,
+    backColor: mtnGetColor('mtnStateBackColor'),
+    borderColor: mtnGetColor('mtnStateBorderColor'),
+    useBackColor: true,
+    useBorderColor: true,
     blink: document.getElementById('mtnStateBlink').checked,
+    patternStyle: document.getElementById('mtnStatePatternStyle')?.value || 'none',
+    usePatternColor: (document.getElementById('mtnStatePatternStyle')?.value || 'none') !== 'none',
+    patternColor: mtnGetColor('mtnStatePatternColor'),
     caption: document.getElementById('mtnStateCaption').value,
-    captionColor: document.getElementById('mtnStateCaptionColor').value,
+    captionColor: mtnGetColor('mtnStateCaptionColor'),
     useCaptionColor: document.getElementById('mtnStateUseCaptionColor').checked,
+    captionBackColor: mtnGetColor('mtnStateCaptionBackColor'),
+    useCaptionBackColor: document.getElementById('mtnStateUseCaptionBackColor')?.checked,
+    captionBlink: document.getElementById('mtnStateCaptionBlink')?.checked,
     wordWrap: document.getElementById('mtnStateWordWrap').checked,
-    alignment
+    alignment,
+    captionBackStyle: document.getElementById('mtnCaptionBackStyle')?.value || 'transparent',
+    image: document.getElementById('mtnStateImage')?.value.trim() || '',
+    imageBackStyle: document.getElementById('mtnImageBackStyle')?.value || 'transparent',
+    useImageColor: document.getElementById('mtnStateUseImageColor')?.checked,
+    imageColor: mtnGetColor('mtnStateImageColor'),
+    useImageBackColor: document.getElementById('mtnStateUseImageBackColor')?.checked,
+    imageBackColor: mtnGetColor('mtnStateImageBackColor'),
+    imageBlink: document.getElementById('mtnStateImageBlink')?.checked,
+    imageScaled: document.getElementById('mtnStateImageScaled')?.checked,
+    imageAlignment
   };
   if (id === 'State0' || id === 'State1') {
     next.value = Number(document.getElementById('mtnStateValue').value);
@@ -2321,19 +3408,47 @@ function saveMtnStateFieldsToDraft() {
 
 function loadMtnStateFieldsFromDraft(stateId) {
   mtnActiveStateId = stateId;
-  const state = mtnStatesDraft?.find((s) => s.id === stateId) || {};
+  const fallback = defaultMaintainedButtonStates()[0];
+  const state = { ...fallback, ...(mtnStatesDraft?.find((s) => s.id === stateId) || {}) };
   document.getElementById('mtnStateSelect').value = stateId;
-  document.getElementById('mtnStateUseBackColor').checked = state.useBackColor !== false;
-  document.getElementById('mtnStateBackColor').value = state.backColor || '#dcdcdc';
-  document.getElementById('mtnStateUseBorderColor').checked = Boolean(state.useBorderColor);
-  document.getElementById('mtnStateBorderColor').value = state.borderColor || '#c0c0c0';
+  mtnSetColor('mtnStateBackColor', state.backColor || '#001C38');
+  mtnSetColor('mtnStateBorderColor', state.borderColor || '#001C38');
   document.getElementById('mtnStateBlink').checked = Boolean(state.blink);
+  window.StudioPropsShared?.fillPatternSelect('mtnStatePatternStyle', 'mtnFilled');
+  const pat = document.getElementById('mtnStatePatternStyle');
+  if (pat) pat.value = state.patternStyle || 'none';
+  mtnSetColor('mtnStatePatternColor', state.patternColor || '#ffffff');
   document.getElementById('mtnStateCaption').value = state.caption ?? '';
-  document.getElementById('mtnStateUseCaptionColor').checked = state.useCaptionColor !== false;
-  document.getElementById('mtnStateCaptionColor').value = state.captionColor || '#000000';
+  document.getElementById('mtnStateUseCaptionColor').checked = Boolean(state.useCaptionColor);
+  mtnSetColor('mtnStateCaptionColor', state.captionColor || '#ffffff');
+  const useCapBack = document.getElementById('mtnStateUseCaptionBackColor');
+  if (useCapBack) useCapBack.checked = Boolean(state.useCaptionBackColor);
+  mtnSetColor('mtnStateCaptionBackColor', state.captionBackColor || '#001C38');
+  const capBlink = document.getElementById('mtnStateCaptionBlink');
+  if (capBlink) capBlink.checked = Boolean(state.captionBlink);
   document.getElementById('mtnStateWordWrap').checked = state.wordWrap !== false;
   document.getElementById('mtnStateValue').value = state.value ?? (stateId === 'State1' ? 1 : 0);
-  document.querySelector(`#maintainedButtonForm input[name="mtnStateAlign"][value="${state.alignment || 'middleCenter'}"]`)?.click();
+  document.getElementById('mtnCaptionBackStyle').value = state.captionBackStyle || 'transparent';
+  document.querySelectorAll('#maintainedButtonForm input[name="mtnStateAlign"]').forEach((el) => {
+    el.checked = el.value === (state.alignment || 'middleRight');
+  });
+  const img = document.getElementById('mtnStateImage');
+  if (img) img.value = state.image || '';
+  const imgBackStyle = document.getElementById('mtnImageBackStyle');
+  if (imgBackStyle) imgBackStyle.value = state.imageBackStyle || 'transparent';
+  const useImgColor = document.getElementById('mtnStateUseImageColor');
+  if (useImgColor) useImgColor.checked = Boolean(state.useImageColor);
+  mtnSetColor('mtnStateImageColor', state.imageColor || '#001C38');
+  const useImgBack = document.getElementById('mtnStateUseImageBackColor');
+  if (useImgBack) useImgBack.checked = Boolean(state.useImageBackColor);
+  mtnSetColor('mtnStateImageBackColor', state.imageBackColor || '#001C38');
+  const imgBlink = document.getElementById('mtnStateImageBlink');
+  if (imgBlink) imgBlink.checked = Boolean(state.imageBlink);
+  const imgScaled = document.getElementById('mtnStateImageScaled');
+  if (imgScaled) imgScaled.checked = Boolean(state.imageScaled);
+  document.querySelectorAll('#maintainedButtonForm input[name="mtnImageAlign"]').forEach((el) => {
+    el.checked = el.value === (state.imageAlignment || 'middleCenter');
+  });
   syncMaintainedButtonGeneralFields();
 }
 
@@ -2343,40 +3458,68 @@ function switchMtnState(stateId) {
 }
 
 function fillMaintainedButtonForm(comp) {
-  mtnStatesDraft = cloneMaintainedStates(comp.states?.length ? comp.states : defaultMaintainedButtonStates(comp.caption ?? comp.label));
-  mtnActiveStateId = 'State0';
-  mtnStateClipboard = null;
-  const pasteBtn = document.getElementById('mtnStatePaste');
-  if (pasteBtn) pasteBtn.disabled = true;
+  state.propsFormFill = true;
+  try {
+    mtnStatesDraft = cloneMaintainedStates(comp.states?.length ? comp.states : defaultMaintainedButtonStates(comp.caption ?? comp.label));
+    mtnActiveStateId = 'State0';
+    mtnStateClipboard = null;
+    const pasteBtn = document.getElementById('mtnStatePaste');
+    if (pasteBtn) pasteBtn.disabled = true;
 
-  document.getElementById('mtnBorderStyle').value = comp.borderStyle || 'line';
-  document.getElementById('mtnBorderWidth').value = comp.borderWidth ?? 1;
-  document.getElementById('mtnBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
-  document.getElementById('mtnBackStyle').value = comp.backStyle || 'solid';
-  document.getElementById('mtnShape').value = comp.shape || 'rectangle';
-  document.getElementById('mtnUseHighlightColor').checked = Boolean(comp.useHighlightColor);
-  document.getElementById('mtnHighlightColor').value = comp.highlightColor || '#00ff00';
-  document.getElementById('mtnNextStateBasedOn').value = comp.nextStateBasedOn || 'currentState';
-  document.getElementById('mtnHorizontalMargin').value = comp.horizontalMargin ?? 0;
-  document.getElementById('mtnVerticalMargin').value = comp.verticalMargin ?? 0;
-  document.getElementById('mtnTouch').checked = comp.touch !== false;
-  document.getElementById('mtnAudio').checked = comp.audio !== false;
-  document.getElementById('mtnFont').value = comp.fontFamily || 'Arial Unicode MS';
-  document.getElementById('mtnFontSize').value = String(comp.fontSize ?? 10);
-  document.getElementById('mtnBold').classList.toggle('active', Boolean(comp.bold));
-  document.getElementById('mtnItalic').classList.toggle('active', Boolean(comp.italic));
-  document.getElementById('mtnUnderline').classList.toggle('active', Boolean(comp.underline));
-  document.getElementById('mtnKeyAssignment').value = comp.keyAssignment || 'None';
-  document.getElementById('mtnHeight').value = comp.height ?? 38;
-  document.getElementById('mtnWidth').value = comp.width ?? 147;
-  document.getElementById('mtnTop').value = comp.top ?? 79;
-  document.getElementById('mtnLeft').value = comp.left ?? 16;
-  document.getElementById('mtnName').value = comp.name || 'MaintainedButton1';
-  document.getElementById('mtnVisible').checked = comp.visible !== false;
-  document.getElementById('mtnTag').value = comp.tag || '';
-  document.getElementById('mtnIndicatorTag').value = comp.indicatorTag || '';
-  loadMtnStateFieldsFromDraft('State0');
-  syncMaintainedButtonGeneralFields();
+    document.getElementById('mtnBorderStyle').value = comp.borderStyle || 'raised';
+    document.getElementById('mtnBorderWidth').value = comp.borderWidth ?? 1;
+    document.getElementById('mtnBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
+    document.getElementById('mtnBackStyle').value = comp.backStyle || 'solid';
+    const shape = comp.shape === 'roundedRectangle' ? 'rectangle' : (comp.shape || 'rectangle');
+    document.getElementById('mtnShape').value = shape;
+    const useHighlight = document.getElementById('mtnUseHighlightColor');
+    if (useHighlight) useHighlight.checked = comp.useHighlightColor !== false;
+    mtnSetColor('mtnHighlightColor', comp.highlightColor || '#0066cc');
+    document.getElementById('mtnNextStateBasedOn').value = comp.nextStateBasedOn || 'currentState';
+    document.getElementById('mtnHorizontalMargin').value = comp.horizontalMargin ?? 0;
+    document.getElementById('mtnVerticalMargin').value = comp.verticalMargin ?? 0;
+    document.getElementById('mtnAudio').checked = comp.audio !== false;
+    document.getElementById('mtnFont').value = comp.fontFamily || 'Arial Unicode MS';
+    document.getElementById('mtnFontSize').value = String(comp.fontSize ?? 10);
+    document.getElementById('mtnBold').classList.toggle('active', Boolean(comp.bold));
+    document.getElementById('mtnItalic').classList.toggle('active', Boolean(comp.italic));
+    document.getElementById('mtnUnderline').classList.toggle('active', Boolean(comp.underline));
+    document.getElementById('mtnHeight').value = comp.height ?? 38;
+    document.getElementById('mtnWidth').value = comp.width ?? 147;
+    document.getElementById('mtnTop').value = comp.top ?? 79;
+    document.getElementById('mtnLeft').value = comp.left ?? 16;
+    document.getElementById('mtnName').value = comp.name || 'MaintainedPushButton1';
+    document.getElementById('mtnVisible').checked = comp.visible !== false;
+    document.getElementById('mtnTag').value = comp.tag || '';
+    document.getElementById('mtnIndicatorTag').value = comp.indicatorTag || '';
+    const reqSig = document.getElementById('mtnRequireESignature');
+    if (reqSig) reqSig.checked = Boolean(comp.requireESignature);
+    const allowBlank = document.getElementById('mtnAllowBlankComment');
+    if (allowBlank) allowBlank.checked = Boolean(comp.allowBlankComment);
+    const reauth = document.getElementById('mtnRequireReauth');
+    if (reauth) reauth.checked = Boolean(comp.requireReauth);
+    const counter = document.getElementById('mtnRequireCounterSig');
+    if (counter) counter.checked = Boolean(comp.requireCounterSig);
+    const group = document.getElementById('mtnAuthorizedGroup');
+    if (group) group.value = comp.authorizedGroup || 'Administrators';
+    const domainVisible = document.getElementById('mtnDomainVisible');
+    if (domainVisible) domainVisible.checked = Boolean(comp.domainVisible);
+    const domainNameMode = document.getElementById('mtnDomainNameMode');
+    const domainVarMode = document.getElementById('mtnDomainVariableMode');
+    if (domainNameMode) domainNameMode.checked = (comp.domainMode || 'name') !== 'variable';
+    if (domainVarMode) domainVarMode.checked = (comp.domainMode || 'name') === 'variable';
+    const domainName = document.getElementById('mtnDomainName');
+    if (domainName) domainName.value = comp.domainName || '';
+    const domainVar = document.getElementById('mtnDomainVariable');
+    if (domainVar) domainVar.value = comp.domainVariable || '';
+    const domainDisable = document.getElementById('mtnDomainDisable');
+    if (domainDisable) domainDisable.checked = Boolean(comp.domainDisable);
+    window.StudioPropsShared?.fillPatternSelect('mtnStatePatternStyle', 'mtnFilled');
+    loadMtnStateFieldsFromDraft('State0');
+    syncMaintainedButtonGeneralFields();
+  } finally {
+    state.propsFormFill = false;
+  }
 }
 
 function readMaintainedButtonForm() {
@@ -2385,7 +3528,7 @@ function readMaintainedButtonForm() {
   const caption = state0?.caption ?? '';
   return {
     type: 'MaintainedButton',
-    name: document.getElementById('mtnName').value.trim() || 'MaintainedButton1',
+    name: document.getElementById('mtnName').value.trim() || 'MaintainedPushButton1',
     tag: document.getElementById('mtnTag').value.trim(),
     indicatorTag: document.getElementById('mtnIndicatorTag').value.trim(),
     nextStateBasedOn: document.getElementById('mtnNextStateBasedOn').value || 'currentState',
@@ -2401,10 +3544,10 @@ function readMaintainedButtonForm() {
     borderUsesBackColor: document.getElementById('mtnBorderUsesBackColor').checked,
     backStyle: document.getElementById('mtnBackStyle').value,
     shape: document.getElementById('mtnShape').value,
-    useHighlightColor: document.getElementById('mtnUseHighlightColor').checked,
-    highlightColor: document.getElementById('mtnHighlightColor').value,
+    useHighlightColor: document.getElementById('mtnUseHighlightColor')?.checked !== false,
+    highlightColor: mtnGetColor('mtnHighlightColor'),
     buttonType: 'maintained',
-    touch: document.getElementById('mtnTouch').checked,
+    touch: true,
     audio: document.getElementById('mtnAudio').checked,
     horizontalMargin: Number(document.getElementById('mtnHorizontalMargin').value) || 0,
     verticalMargin: Number(document.getElementById('mtnVerticalMargin').value) || 0,
@@ -2413,69 +3556,90 @@ function readMaintainedButtonForm() {
     bold: document.getElementById('mtnBold').classList.contains('active'),
     italic: document.getElementById('mtnItalic').classList.contains('active'),
     underline: document.getElementById('mtnUnderline').classList.contains('active'),
-    keyAssignment: document.getElementById('mtnKeyAssignment').value,
+    keyAssignment: 'None',
+    requireESignature: Boolean(document.getElementById('mtnRequireESignature')?.checked),
+    allowBlankComment: Boolean(document.getElementById('mtnAllowBlankComment')?.checked),
+    requireReauth: Boolean(document.getElementById('mtnRequireReauth')?.checked),
+    requireCounterSig: Boolean(document.getElementById('mtnRequireCounterSig')?.checked),
+    authorizedGroup: document.getElementById('mtnAuthorizedGroup')?.value || 'Administrators',
+    domainVisible: Boolean(document.getElementById('mtnDomainVisible')?.checked),
+    domainMode: document.querySelector('#maintainedButtonForm input[name="mtnDomainMode"]:checked')?.value || 'name',
+    domainName: document.getElementById('mtnDomainName')?.value.trim() || '',
+    domainVariable: document.getElementById('mtnDomainVariable')?.value.trim() || '',
+    domainDisable: Boolean(document.getElementById('mtnDomainDisable')?.checked),
+    previewStateId: mtnActiveStateId,
     states: cloneMaintainedStates(mtnStatesDraft)
   };
 }
 
 async function applyMaintainedButton() {
   const comp = readMaintainedButtonForm();
-  if (!comp.tag) {
-    setStatus('Enter a tag on the Connections tab');
-    switchMaintainedButtonTab('connections');
+  const ok = await upsertCanvasComponent(comp);
+  if (!ok) {
+    setStatus('Could not apply — open a display or global object first');
     return;
   }
-  await upsertCanvasComponent(comp);
   commitPropsSnapshot(readMaintainedButtonForm, 'applyMaintainedButton');
-  state.canvasSelection.indices = [state.propsDialog.editIndex];
+  afterCanvasComponentSaved?.(comp);
+  if (state.propsDialog.editIndex != null) {
+    state.canvasSelection.indices = [state.propsDialog.editIndex];
+  }
   setStatus(`Applied ${comp.name} on ${state.selectedScreenId}`);
 }
 
 async function saveMaintainedButton(e) {
   e.preventDefault();
   const comp = readMaintainedButtonForm();
-  if (!comp.tag) {
-    setStatus('Enter a tag on the Connections tab');
-    switchMaintainedButtonTab('connections');
+  const ok = await upsertCanvasComponent(comp);
+  if (!ok) {
+    setStatus('Could not save — open a display or global object first');
     return;
   }
-  await upsertCanvasComponent(comp);
+  mtnDialogCommitted = true;
+  const editIdx = state.propsDialog.editIndex;
   document.getElementById('maintainedButtonDialog').close();
-  state.canvasSelection.indices = [state.propsDialog.editIndex];
-  clearPropsDialogState();
-  activateSelectTool(`Added ${comp.name} to ${state.selectedScreenId}`);
+  if (editIdx != null) state.canvasSelection.indices = [editIdx];
+  setStatus(`Saved ${comp.name}`);
 }
 
 function initMaintainedButtonDialog() {
-  document.getElementById('maintainedButtonForm')?.addEventListener('submit', (e) => {
+  const form = document.getElementById('maintainedButtonForm');
+  if (!form || form.dataset.mtnWired === '1') return;
+  form.dataset.mtnWired = '1';
+  window.StudioPropsShared?.fillPatternSelect('mtnStatePatternStyle', 'mtnFilled');
+  form.addEventListener('submit', (e) => {
     saveMaintainedButton(e).catch((err) => setStatus(`Error: ${err.message}`));
   });
   document.getElementById('applyMaintainedButton')?.addEventListener('click', () => {
     applyMaintainedButton().catch((err) => setStatus(`Error: ${err.message}`));
   });
-  document.getElementById('maintainedButtonForm')?.addEventListener('input', () => {
-    updatePropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
+  form.addEventListener('input', () => {
+    scheduleMaintainedLivePreview();
+    flushPropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
   });
-  document.getElementById('maintainedButtonForm')?.addEventListener('change', () => {
-    updatePropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
+  form.addEventListener('change', () => {
+    syncMaintainedButtonGeneralFields();
+    scheduleMaintainedLivePreview();
+    flushPropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
   });
   document.getElementById('cancelMaintainedButton')?.addEventListener('click', () => {
     document.getElementById('maintainedButtonDialog')?.close();
-    clearPropsDialogState();
-    activateSelectTool('Placement cancelled');
   });
   document.getElementById('maintainedButtonDialog')?.addEventListener('close', () => {
-    if (state.placement) activateSelectTool();
+    if (!mtnDialogCommitted) revertPropsDialogPreview();
+    mtnDialogCommitted = false;
+    clearPropsDialogState();
+    activateSelectTool();
   });
   document.getElementById('helpMaintainedButton')?.addEventListener('click', () => {
-    alert('Maintained Push Button toggles the value tag between State0 and State1 on each click. Appearance follows the indicator tag (or value tag if no indicator).');
+    alert('Maintained Push Button toggles the Value tag between State0 and State1. Next state can follow Current State or Value Control. Appearance follows the Indicator tag when set.');
   });
   document.querySelectorAll('#maintainedButtonDialog .dialog-tab').forEach((tab) => {
     tab.addEventListener('click', () => switchMaintainedButtonTab(tab.dataset.mtnTab));
   });
   document.getElementById('mtnStateSelect')?.addEventListener('change', (e) => {
     switchMtnState(e.target.value);
-    updatePropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
+    scheduleMaintainedLivePreview();
   });
   document.getElementById('mtnStateCopy')?.addEventListener('click', () => {
     saveMtnStateFieldsToDraft();
@@ -2494,467 +3658,190 @@ function initMaintainedButtonDialog() {
     const keep = { id: mtnStatesDraft[idx].id, value: mtnStatesDraft[idx].value };
     mtnStatesDraft[idx] = { ...mtnStateClipboard, ...keep };
     loadMtnStateFieldsFromDraft(mtnActiveStateId);
-    updatePropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
+    scheduleMaintainedLivePreview();
   });
-  for (const id of ['mtnUseHighlightColor', 'mtnStateUseBackColor', 'mtnStateUseBorderColor', 'mtnStateUseCaptionColor']) {
+  document.getElementById('mtnBrowseImage')?.addEventListener('click', () => {
+    showImageBrowserDialog({ selectedFileName: document.getElementById('mtnStateImage').value || null })
+      .then((fileName) => {
+        if (fileName) {
+          document.getElementById('mtnStateImage').value = fileName;
+          scheduleMaintainedLivePreview();
+        }
+      })
+      .catch((err) => setStatus(`Error: ${err.message}`));
+  });
+  document.getElementById('mtnShape')?.addEventListener('change', () => {
+    if (document.getElementById('mtnShape')?.value !== 'circle') return;
+    const w = Number(document.getElementById('mtnWidth')?.value) || 0;
+    const h = Number(document.getElementById('mtnHeight')?.value) || 0;
+    const size = Math.max(1, Math.min(w, h) || Math.max(w, h));
+    document.getElementById('mtnWidth').value = String(size);
+    document.getElementById('mtnHeight').value = String(size);
+  });
+  document.getElementById('mtnRequireESignature')?.addEventListener('change', syncMaintainedESignatureFields);
+  for (const id of [
+    'mtnUseHighlightColor', 'mtnStateUseCaptionColor', 'mtnStateUseCaptionBackColor',
+    'mtnStateUseImageColor', 'mtnStateUseImageBackColor'
+  ]) {
     document.getElementById(id)?.addEventListener('change', () => {
       syncMaintainedButtonGeneralFields();
-      updatePropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
+      scheduleMaintainedLivePreview();
     });
   }
   for (const id of ['mtnBold', 'mtnItalic', 'mtnUnderline']) {
     document.getElementById(id)?.addEventListener('click', (e) => {
       e.preventDefault();
       e.currentTarget.classList.toggle('active');
-      updatePropsApplyButton(readMaintainedButtonForm, 'applyMaintainedButton');
+      scheduleMaintainedLivePreview();
     });
   }
 }
 
 function nextGotoButtonName(components) {
-  const n = countComponentsByType(components, 'GotoButton') + 1;
-  return `GotoDisplayButton${n}`;
+  return window.StudioGotoButton?.nextGotoButtonName?.(components) || 'GotoDisplayButton1';
 }
 
 function defaultGotoButtonComponent(overrides = {}) {
-  return {
-    type: 'GotoButton',
-    name: 'GotoDisplayButton1',
-    label: '',
-    caption: '',
-    target: '',
-    displayNameTag: '',
-    displayTopTag: '',
-    displayLeftTag: '',
-    left: 8,
-    top: 75,
-    width: 66,
-    height: 35,
-    visible: true,
-    borderStyle: 'line',
-    borderWidth: 1,
-    borderUsesBackColor: true,
-    useBackColor: true,
-    useBorderColor: true,
-    usePatternColor: false,
-    useHighlightColor: false,
-    backStyle: 'solid',
-    backColor: '#001C38',
-    borderColor: '#000000',
-    patternColor: '#ffffff',
-    highlightColor: '#0066cc',
-    patternStyle: 'none',
-    shape: 'rectangle',
-    blink: false,
-    useVariableDisplay: false,
-    parameterType: 'file',
-    parameterFile: '',
-    parameterList: '',
-    displayPosition: false,
-    displayTop: 0,
-    displayLeft: 0,
-    useVariableDisplayPosition: false,
-    audio: true,
-    horizontalMargin: 0,
-    verticalMargin: 0,
-    fontFamily: 'Arial Unicode MS',
-    fontSize: 10,
-    bold: false,
-    italic: false,
-    underline: false,
-    foreColor: '#ffffff',
-    useForeColor: false,
-    useCaptionColor: false,
-    captionBackStyle: 'transparent',
-    wordWrap: true,
-    alignment: 'middleCenter',
-    imageBackStyle: 'transparent',
-    imageAlignment: 'middleCenter',
-    ...overrides
-  };
+  return window.StudioGotoButton?.defaultGotoButtonComponent?.(overrides) || { type: 'GotoButton', ...overrides };
 }
 
 function wireGotoButtonDialogTools() {
-  if (window.StudioTagTools) StudioTagTools.wirePickButtons();
-  if (window.FtColorPicker) window.FtColorPicker.initAll(document.getElementById('gotoButtonDialog'));
-  syncGotoButtonGeneralFields();
-  syncGotoButtonLabelFields();
+  window.StudioGotoButton?.wireGotoButtonTools();
 }
 
 function syncGotoButtonLabelFields() {
-  document.getElementById('gbCaptionColor').disabled = !document.getElementById('gbUseCaptionColor')?.checked;
-  document.getElementById('gbCaptionBackColor').disabled = !document.getElementById('gbUseCaptionBackColor')?.checked;
-  document.getElementById('gbImageColor').disabled = !document.getElementById('gbUseImageColor')?.checked;
-  document.getElementById('gbImageBackColor').disabled = !document.getElementById('gbUseImageBackColor')?.checked;
+  /* handled in studio-goto-button.js */
 }
 
 async function showGotoButtonDialog(overrides = {}) {
-  if (!displayIsOpen()) {
-    setStatus('Open a display or global object first, then choose Goto from Display Navigation');
-    return;
-  }
-  const canvas = await fetchOpenCanvas();
-  const comp = defaultGotoButtonComponent({
-    name: nextGotoButtonName(canvas.components || []),
-    ...overrides
-  });
-  fillGotoButtonForm(comp);
-  resetPropsDialogState('goto', readGotoButtonForm, 'applyGotoButton');
-  switchGotoButtonTab('general');
-  wireGotoButtonDialogTools();
-  document.getElementById('gotoButtonDialog')?.showModal();
+  return window.StudioGotoButton?.showGotoButtonDialog(overrides);
 }
 
 function switchGotoButtonTab(tabId) {
-  document.querySelectorAll('#gotoButtonDialog .dialog-tab').forEach((el) => {
-    el.classList.toggle('active', el.dataset.gbTab === tabId);
-  });
-  document.querySelectorAll('#gotoButtonDialog .dialog-tab-panel').forEach((el) => {
-    el.classList.toggle('active', el.dataset.gbTabPanel === tabId);
-  });
-}
-
-function normalizeGotoCaptionColor(useBorderColor, foreColor) {
-  const normalized = String(foreColor || '').trim().toLowerCase();
-  if (useBorderColor) return foreColor || '#000000';
-  if (!normalized || normalized === '#ffffff' || normalized === '#fff') return '#000000';
-  return foreColor || '#000000';
+  window.StudioGotoButton?.switchGotoButtonTab(tabId);
 }
 
 function syncGotoButtonGeneralFields() {
-  const borderUsesBack = document.getElementById('gbBorderUsesBackColor')?.checked;
-  const useBack = document.getElementById('gbUseBackColor')?.checked;
-  const useBorder = document.getElementById('gbUseBorderColor')?.checked;
-  const usePattern = document.getElementById('gbUsePatternColor')?.checked;
-  const useHighlight = document.getElementById('gbUseHighlightColor')?.checked;
-  const useVarDisplay = document.getElementById('gbUseVariableDisplay')?.checked;
-  const displayPos = document.getElementById('gbDisplayPosition')?.checked;
-  const paramType = document.querySelector('#gotoButtonForm input[name="gbParameterType"]:checked')?.value || 'file';
-
-  if (!useBorder) {
-    const captionEl = document.getElementById('gbCaptionColor');
-    if (captionEl) {
-      captionEl.value = normalizeGotoCaptionColor(false, captionEl.value);
-    }
-  }
-
-  document.getElementById('gbBackColor').disabled = !useBack;
-  document.getElementById('gbBorderColor').disabled = !useBorder || Boolean(borderUsesBack);
-  document.getElementById('gbUseBorderColor').disabled = Boolean(borderUsesBack);
-  document.getElementById('gbPatternColor').disabled = !usePattern;
-  document.getElementById('gbHighlightColor').disabled = !useHighlight;
-  document.getElementById('gbTarget').disabled = Boolean(useVarDisplay);
-  document.getElementById('gbBrowseDisplay').disabled = Boolean(useVarDisplay);
-  document.getElementById('gbDisplayTop').disabled = !displayPos;
-  document.getElementById('gbDisplayLeft').disabled = !displayPos;
-
-  const fileMode = paramType === 'file';
-  document.getElementById('gbParameterFile').disabled = !fileMode;
-  document.getElementById('gbBrowseParameterFile').disabled = !fileMode;
-  document.getElementById('gbParameterList').disabled = fileMode;
-  document.getElementById('gbBrowseParameterList').disabled = fileMode;
+  /* handled in studio-goto-button.js */
 }
 
 let displayPickerResolve = null;
+let displayPickerItems = [];
+let displayPickerSelected = '';
+let displayPickerKind = 'displays';
 
-async function showDisplayPickerDialog(selectedId = '') {
+function displayPickerMatches(item, query) {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  return String(item.id || '').toLowerCase().includes(q)
+    || String(item.title || '').toLowerCase().includes(q);
+}
+
+function renderDisplayPickerTree(selectedId, query) {
+  const tree = document.getElementById('displayPickerTree');
+  if (!tree) return;
+  const items = displayPickerItems.filter((item) => displayPickerMatches(item, query));
+  const rootLabel = displayPickerKind === 'parameter-files' ? 'Parameter Files' : 'Displays';
+  const rows = items.map((item) => {
+    const selected = item.id === selectedId ? ' is-selected' : '';
+    const label = item.title && item.title !== item.id ? `${item.title}` : item.id;
+    return `<button type="button" class="component-browser-item${selected}" data-id="${escapeHtml(item.id)}" role="treeitem">${escapeHtml(label)}</button>`;
+  }).join('');
+  tree.innerHTML = `
+    <div class="component-browser-root" role="group">
+      <div class="component-browser-folder">${escapeHtml(rootLabel)}</div>
+      <div class="component-browser-children">${rows || '<div class="component-browser-empty">No matches</div>'}</div>
+    </div>`;
+  displayPickerSelected = items.some((item) => item.id === selectedId) ? selectedId : (items[0]?.id || '');
+  tree.querySelectorAll('.component-browser-item').forEach((btn) => {
+    btn.classList.toggle('is-selected', btn.dataset.id === displayPickerSelected);
+    btn.addEventListener('click', () => {
+      displayPickerSelected = btn.dataset.id;
+      tree.querySelectorAll('.component-browser-item').forEach((el) => {
+        el.classList.toggle('is-selected', el === btn);
+      });
+    });
+    btn.addEventListener('dblclick', () => resolveDisplayPicker(btn.dataset.id));
+  });
+}
+
+async function showDisplayPickerDialog(selectedId = '', options = {}) {
   if (!state.activeProject) {
     setStatus('Open a project first');
     return null;
   }
-  const screens = await fetchJson(`/api/runtime/screens?project=${encodeURIComponent(state.activeProject)}`);
-  const list = document.getElementById('displayPickerList');
-  if (!list) return null;
-  list.innerHTML = screens.map((s) =>
-    `<option value="${escapeHtml(s.id)}"${s.id === selectedId ? ' selected' : ''}>${escapeHtml(s.title || s.id)} (${escapeHtml(s.id)})</option>`
-  ).join('');
+  displayPickerKind = options.kind === 'parameter-files' ? 'parameter-files' : 'displays';
+  const hint = document.getElementById('displayPickerHint');
+  if (hint) hint.textContent = 'Select a component';
+  const search = document.getElementById('displayPickerSearch');
+  if (search) search.value = '';
+  try {
+    if (displayPickerKind === 'parameter-files') {
+      const res = await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/parameter-files`);
+      const files = res.parameterFiles || state.projectConfig?.parameterFiles || {};
+      displayPickerItems = Object.keys(files).sort((a, b) => a.localeCompare(b)).map((id) => ({ id, title: id }));
+    } else {
+      const screens = await fetchJson(`/api/runtime/screens?project=${encodeURIComponent(state.activeProject)}`);
+      displayPickerItems = (screens || []).map((s) => ({ id: s.id, title: s.title || s.id }));
+    }
+  } catch (err) {
+    setStatus(`Could not load picker: ${err.message}`);
+    return null;
+  }
+  renderDisplayPickerTree(selectedId, '');
   return new Promise((resolve) => {
     displayPickerResolve = resolve;
     document.getElementById('displayPickerDialog')?.showModal();
+    search?.focus();
   });
 }
 
 function resolveDisplayPicker(value) {
+  const resolve = displayPickerResolve;
+  displayPickerResolve = null;
   document.getElementById('displayPickerDialog')?.close();
-  if (displayPickerResolve) {
-    displayPickerResolve(value);
-    displayPickerResolve = null;
-  }
+  if (resolve) resolve(value);
 }
 
 function initDisplayPickerDialog() {
+  const dlg = document.getElementById('displayPickerDialog');
+  if (!dlg || dlg.dataset.pickerWired === '1') return;
+  dlg.dataset.pickerWired = '1';
   document.getElementById('displayPickerOk')?.addEventListener('click', () => {
-    const list = document.getElementById('displayPickerList');
-    resolveDisplayPicker(list?.value || null);
+    resolveDisplayPicker(displayPickerSelected || null);
   });
   document.getElementById('displayPickerCancel')?.addEventListener('click', () => {
     resolveDisplayPicker(null);
   });
-  document.getElementById('displayPickerDialog')?.addEventListener('close', () => {
+  document.getElementById('displayPickerHelp')?.addEventListener('click', () => {
+    alert('Select a display or parameter file, then OK.');
+  });
+  dlg.addEventListener('close', () => {
     if (displayPickerResolve) resolveDisplayPicker(null);
   });
-  document.getElementById('displayPickerList')?.addEventListener('dblclick', () => {
-    const list = document.getElementById('displayPickerList');
-    resolveDisplayPicker(list?.value || null);
+  document.getElementById('displayPickerSearch')?.addEventListener('input', (e) => {
+    renderDisplayPickerTree(displayPickerSelected, e.target.value || '');
   });
 }
 
 function fillGotoButtonForm(comp) {
-  document.getElementById('gbBorderStyle').value = comp.borderStyle || 'raised';
-  document.getElementById('gbBackStyle').value = comp.backStyle || 'solid';
-  document.getElementById('gbShape').value = comp.shape || 'rectangle';
-  document.getElementById('gbBorderWidth').value = comp.borderWidth ?? 3;
-  document.getElementById('gbPatternStyle').value = comp.patternStyle || 'none';
-  document.getElementById('gbBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
-  document.getElementById('gbUseBackColor').checked = Boolean(comp.useBackColor);
-  document.getElementById('gbBackColor').value = comp.backColor || '#dcdcdc';
-  document.getElementById('gbUseBorderColor').checked = Boolean(comp.useBorderColor);
-  document.getElementById('gbBorderColor').value = comp.borderColor || '#e0e0e0';
-  document.getElementById('gbUsePatternColor').checked = Boolean(comp.usePatternColor);
-  document.getElementById('gbPatternColor').value = comp.patternColor || '#ffffff';
-  document.getElementById('gbUseHighlightColor').checked = Boolean(comp.useHighlightColor);
-  document.getElementById('gbHighlightColor').value = comp.highlightColor || '#00ff00';
-  document.getElementById('gbBlink').checked = Boolean(comp.blink);
-  document.getElementById('gbTarget').value = comp.target || '';
-  document.getElementById('gbUseVariableDisplay').checked = Boolean(comp.useVariableDisplay);
-  document.getElementById('gbParameterFileRadio').checked = (comp.parameterType || 'file') === 'file';
-  document.getElementById('gbParameterListRadio').checked = comp.parameterType === 'list';
-  document.getElementById('gbParameterFile').value = comp.parameterFile || '';
-  document.getElementById('gbParameterList').value = comp.parameterList || '';
-  document.getElementById('gbDisplayPosition').checked = Boolean(comp.displayPosition);
-  document.getElementById('gbDisplayTop').value = comp.displayTop ?? 0;
-  document.getElementById('gbDisplayLeft').value = comp.displayLeft ?? 0;
-  document.getElementById('gbUseVariableDisplayPosition').checked = Boolean(comp.useVariableDisplayPosition);
-  document.getElementById('gbHorizontalMargin').value = comp.horizontalMargin ?? 0;
-  document.getElementById('gbVerticalMargin').value = comp.verticalMargin ?? 0;
-  document.getElementById('gbAudio').checked = comp.audio !== false;
-  document.getElementById('gbCaption').value = comp.caption ?? comp.label ?? '';
-  document.getElementById('gbFont').value = comp.fontFamily || 'Arial';
-  document.getElementById('gbFontSize').value = String(comp.fontSize ?? 10);
-  document.getElementById('gbBold').classList.toggle('active', Boolean(comp.bold));
-  document.getElementById('gbItalic').classList.toggle('active', Boolean(comp.italic));
-  document.getElementById('gbUnderline').classList.toggle('active', Boolean(comp.underline));
-  document.getElementById('gbUseCaptionColor').checked = comp.useCaptionColor !== undefined
-    ? Boolean(comp.useCaptionColor)
-    : comp.useForeColor !== false;
-  document.getElementById('gbCaptionColor').value = comp.foreColor || '#000000';
-  document.getElementById('gbUseCaptionBackColor').checked = Boolean(comp.useCaptionBackColor);
-  document.getElementById('gbCaptionBackColor').value = comp.captionBackColor || '#001C38';
-  document.getElementById('gbCaptionBlink').checked = Boolean(comp.captionBlink);
-  document.getElementById('gbWordWrap').checked = comp.wordWrap !== false;
-  document.querySelector(`#gotoButtonForm input[name="gbAlign"][value="${comp.alignment || 'middleCenter'}"]`)?.click();
-  document.getElementById('gbCaptionBackStyle').value = comp.captionBackStyle || 'transparent';
-  document.getElementById('gbImage').value = comp.image || '';
-  document.getElementById('gbImageBackStyle').value = comp.imageBackStyle || 'transparent';
-  document.getElementById('gbUseImageColor').checked = Boolean(comp.useImageColor);
-  document.getElementById('gbImageColor').value = comp.imageColor || '#ffffff';
-  document.getElementById('gbUseImageBackColor').checked = Boolean(comp.useImageBackColor);
-  document.getElementById('gbImageBackColor').value = comp.imageBackColor || '#001C38';
-  document.getElementById('gbImageBlink').checked = Boolean(comp.imageBlink);
-  document.getElementById('gbImageScaled').checked = Boolean(comp.imageScaled);
-  document.querySelector(`#gotoButtonForm input[name="gbImageAlign"][value="${comp.imageAlignment || 'middleCenter'}"]`)?.click();
-  document.getElementById('gbDisplayNameTag').value = comp.displayNameTag || '';
-  document.getElementById('gbDisplayTopTag').value = comp.displayTopTag || '';
-  document.getElementById('gbDisplayLeftTag').value = comp.displayLeftTag || '';
-  document.getElementById('gbHeight').value = comp.height ?? 35;
-  document.getElementById('gbWidth').value = comp.width ?? 66;
-  document.getElementById('gbTop').value = comp.top ?? 75;
-  document.getElementById('gbLeft').value = comp.left ?? 8;
-  document.getElementById('gbName').value = comp.name || 'GotoDisplayButton1';
-  document.getElementById('gbVisible').checked = comp.visible !== false;
-  syncGotoButtonLabelFields();
-  syncGotoButtonGeneralFields();
-}
-
-function validateGotoButton(comp) {
-  if (comp.useVariableDisplay) {
-    if (!comp.displayNameTag) {
-      setStatus('Enter a Display Name tag on the Connections tab');
-      switchGotoButtonTab('connections');
-      return false;
-    }
-    return true;
-  }
-  if (!comp.target) {
-    setStatus('Enter a display name on the General tab');
-    switchGotoButtonTab('general');
-    return false;
-  }
-  return true;
+  window.StudioGotoButton?.fillGotoButtonForm(comp);
 }
 
 function readGotoButtonForm() {
-  const alignment = document.querySelector('#gotoButtonForm input[name="gbAlign"]:checked')?.value || 'middleCenter';
-  const caption = document.getElementById('gbCaption').value;
-  const useBorderColor = document.getElementById('gbUseBorderColor').checked;
-  const foreColor = normalizeGotoCaptionColor(useBorderColor, document.getElementById('gbCaptionColor').value);
-  return {
-    type: 'GotoButton',
-    name: document.getElementById('gbName').value.trim() || 'GotoDisplayButton1',
-    target: document.getElementById('gbTarget').value.trim(),
-    label: caption,
-    caption,
-    left: Number(document.getElementById('gbLeft').value) || 0,
-    top: Number(document.getElementById('gbTop').value) || 0,
-    width: Number(document.getElementById('gbWidth').value) || 66,
-    height: Number(document.getElementById('gbHeight').value) || 35,
-    visible: document.getElementById('gbVisible').checked,
-    borderStyle: document.getElementById('gbBorderStyle').value,
-    borderWidth: Number(document.getElementById('gbBorderWidth').value) || 3,
-    borderUsesBackColor: document.getElementById('gbBorderUsesBackColor').checked,
-    useBackColor: document.getElementById('gbUseBackColor').checked,
-    backColor: document.getElementById('gbBackColor').value,
-    useBorderColor,
-    borderColor: document.getElementById('gbBorderColor').value,
-    usePatternColor: document.getElementById('gbUsePatternColor').checked,
-    patternColor: document.getElementById('gbPatternColor').value,
-    useHighlightColor: document.getElementById('gbUseHighlightColor').checked,
-    highlightColor: document.getElementById('gbHighlightColor').value,
-    backStyle: document.getElementById('gbBackStyle').value,
-    patternStyle: document.getElementById('gbPatternStyle').value,
-    shape: document.getElementById('gbShape').value,
-    blink: document.getElementById('gbBlink').checked,
-    useVariableDisplay: document.getElementById('gbUseVariableDisplay').checked,
-    displayNameTag: document.getElementById('gbDisplayNameTag').value.trim(),
-    displayTopTag: document.getElementById('gbDisplayTopTag').value.trim(),
-    displayLeftTag: document.getElementById('gbDisplayLeftTag').value.trim(),
-    parameterType: document.querySelector('#gotoButtonForm input[name="gbParameterType"]:checked')?.value || 'file',
-    parameterFile: document.getElementById('gbParameterFile').value.trim(),
-    parameterList: document.getElementById('gbParameterList').value.trim(),
-    displayPosition: document.getElementById('gbDisplayPosition').checked,
-    displayTop: Number(document.getElementById('gbDisplayTop').value) || 0,
-    displayLeft: Number(document.getElementById('gbDisplayLeft').value) || 0,
-    useVariableDisplayPosition: document.getElementById('gbUseVariableDisplayPosition').checked,
-    horizontalMargin: Number(document.getElementById('gbHorizontalMargin').value) || 0,
-    verticalMargin: Number(document.getElementById('gbVerticalMargin').value) || 0,
-    audio: document.getElementById('gbAudio').checked,
-    fontFamily: document.getElementById('gbFont').value,
-    fontSize: Number(document.getElementById('gbFontSize').value) || 10,
-    bold: document.getElementById('gbBold').classList.contains('active'),
-    italic: document.getElementById('gbItalic').classList.contains('active'),
-    underline: document.getElementById('gbUnderline').classList.contains('active'),
-    foreColor,
-    useForeColor: document.getElementById('gbUseCaptionColor').checked,
-    useCaptionColor: document.getElementById('gbUseCaptionColor').checked,
-    useCaptionBackColor: document.getElementById('gbUseCaptionBackColor').checked,
-    captionBackColor: document.getElementById('gbCaptionBackColor').value,
-    captionBlink: document.getElementById('gbCaptionBlink').checked,
-    captionBackStyle: document.getElementById('gbCaptionBackStyle').value,
-    wordWrap: document.getElementById('gbWordWrap').checked,
-    alignment,
-    image: document.getElementById('gbImage').value.trim() || undefined,
-    imageBackStyle: document.getElementById('gbImageBackStyle').value,
-    useImageColor: document.getElementById('gbUseImageColor').checked,
-    imageColor: document.getElementById('gbImageColor').value,
-    useImageBackColor: document.getElementById('gbUseImageBackColor').checked,
-    imageBackColor: document.getElementById('gbImageBackColor').value,
-    imageBlink: document.getElementById('gbImageBlink').checked,
-    imageScaled: document.getElementById('gbImageScaled').checked,
-    imageAlignment: document.querySelector('#gotoButtonForm input[name="gbImageAlign"]:checked')?.value || 'middleCenter'
-  };
+  return window.StudioGotoButton?.readGotoButtonForm() || { type: 'GotoButton' };
 }
 
 async function applyGotoButton() {
-  const comp = readGotoButtonForm();
-  if (!validateGotoButton(comp)) return;
-  await upsertCanvasComponent(comp);
-  commitPropsSnapshot(readGotoButtonForm, 'applyGotoButton');
-  state.canvasSelection.indices = [state.propsDialog.editIndex];
-  setStatus(`Applied ${comp.name} on ${state.selectedScreenId}`);
+  return window.StudioGotoButton?.applyGotoButton?.();
 }
 
 async function saveGotoButton(e) {
-  e.preventDefault();
-  const comp = readGotoButtonForm();
-  if (!validateGotoButton(comp)) return;
-  await upsertCanvasComponent(comp);
-  document.getElementById('gotoButtonDialog').close();
-  state.canvasSelection.indices = [state.propsDialog.editIndex];
-  clearPropsDialogState();
-  activateSelectTool(`Added ${comp.name} to ${state.selectedScreenId}`);
+  e?.preventDefault?.();
 }
 
 function initGotoButtonDialog() {
-  document.getElementById('gotoButtonForm')?.addEventListener('submit', (e) => {
-    saveGotoButton(e).catch((err) => setStatus(`Error: ${err.message}`));
-  });
-  document.getElementById('applyGotoButton')?.addEventListener('click', () => {
-    applyGotoButton().catch((err) => setStatus(`Error: ${err.message}`));
-  });
-  document.getElementById('gotoButtonForm')?.addEventListener('input', () => {
-    updatePropsApplyButton(readGotoButtonForm, 'applyGotoButton');
-  });
-  document.getElementById('gotoButtonForm')?.addEventListener('change', () => {
-    updatePropsApplyButton(readGotoButtonForm, 'applyGotoButton');
-  });
-  document.getElementById('cancelGotoButton')?.addEventListener('click', () => {
-    document.getElementById('gotoButtonDialog')?.close();
-  });
-  document.getElementById('gotoButtonDialog')?.addEventListener('close', () => {
-    if (state.propsDialog.kind === 'goto') clearPropsDialogState();
-  });
-  document.getElementById('helpGotoButton')?.addEventListener('click', () => {
-    alert('Goto Display Button navigates to another display when pressed — matching FactoryTalk View goto buttons.');
-  });
-  document.querySelectorAll('#gotoButtonDialog .dialog-tab').forEach((tab) => {
-    tab.addEventListener('click', () => switchGotoButtonTab(tab.dataset.gbTab));
-  });
-  document.getElementById('gbUseCaptionColor')?.addEventListener('change', () => {
-    syncGotoButtonLabelFields();
-    updatePropsApplyButton(readGotoButtonForm, 'applyGotoButton');
-  });
-  document.getElementById('gbUseCaptionBackColor')?.addEventListener('change', () => {
-    syncGotoButtonLabelFields();
-    updatePropsApplyButton(readGotoButtonForm, 'applyGotoButton');
-  });
-  for (const id of ['gbUseImageColor', 'gbUseImageBackColor']) {
-    document.getElementById(id)?.addEventListener('change', () => {
-      syncGotoButtonLabelFields();
-      updatePropsApplyButton(readGotoButtonForm, 'applyGotoButton');
-    });
-  }
-  for (const id of ['gbBold', 'gbItalic', 'gbUnderline']) {
-    document.getElementById(id)?.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.currentTarget.classList.toggle('active');
-      updatePropsApplyButton(readGotoButtonForm, 'applyGotoButton');
-    });
-  }
-  document.getElementById('gbBrowseImage')?.addEventListener('click', () => {
-    showImageBrowserDialog({ selectedFileName: document.getElementById('gbImage').value || null })
-      .then((fileName) => {
-        if (fileName) {
-          document.getElementById('gbImage').value = fileName;
-          updatePropsApplyButton(readGotoButtonForm, 'applyGotoButton');
-        }
-      })
-      .catch((err) => setStatus(`Error: ${err.message}`));
-  });
-  document.getElementById('gbBrowseDisplay')?.addEventListener('click', () => {
-    showDisplayPickerDialog(document.getElementById('gbTarget').value || '')
-      .then((screenId) => {
-        if (screenId) {
-          document.getElementById('gbTarget').value = screenId;
-          updatePropsApplyButton(readGotoButtonForm, 'applyGotoButton');
-        }
-      })
-      .catch((err) => setStatus(`Error: ${err.message}`));
-  });
-  for (const id of [
-    'gbBorderUsesBackColor', 'gbUseBackColor', 'gbUseBorderColor', 'gbUsePatternColor',
-    'gbUseHighlightColor', 'gbUseVariableDisplay', 'gbDisplayPosition'
-  ]) {
-    document.getElementById(id)?.addEventListener('change', () => {
-      syncGotoButtonGeneralFields();
-      updatePropsApplyButton(readGotoButtonForm, 'applyGotoButton');
-    });
-  }
-  document.querySelectorAll('#gotoButtonForm input[name="gbParameterType"]').forEach((el) => {
-    el.addEventListener('change', () => {
-      syncGotoButtonGeneralFields();
-      updatePropsApplyButton(readGotoButtonForm, 'applyGotoButton');
-    });
-  });
+  window.StudioGotoButton?.initGotoButtonDialog();
 }
 
 function nextImageObjectName(components) {
@@ -3347,6 +4234,87 @@ function patchFreehandBounds(comp, bounds) {
   return patch;
 }
 
+function patchLineBounds(comp, bounds) {
+  if (bounds.x1 != null && bounds.y1 != null && bounds.x2 != null && bounds.y2 != null) {
+    return { ...bounds };
+  }
+  const oldW = comp.width || 1;
+  const oldH = comp.height || 1;
+  const newW = bounds.width ?? comp.width ?? oldW;
+  const newH = bounds.height ?? comp.height ?? oldH;
+  const patch = { ...bounds };
+  if (bounds.width != null || bounds.height != null) {
+    const sx = newW / oldW;
+    const sy = newH / oldH;
+    if (Math.abs(sx - 1) > 0.0001 || Math.abs(sy - 1) > 0.0001) {
+      patch.x1 = (Number(comp.x1) || 0) * sx;
+      patch.y1 = (Number(comp.y1) || 0) * sy;
+      patch.x2 = (comp.x2 != null ? Number(comp.x2) : oldW) * sx;
+      patch.y2 = (comp.y2 != null ? Number(comp.y2) : oldH) * sy;
+    }
+  }
+  return patch;
+}
+
+function lineLocalEndpoints(comp) {
+  const w = Number(comp.width) || 1;
+  const h = Number(comp.height) || 1;
+  return {
+    x1: Number.isFinite(Number(comp.x1)) ? Number(comp.x1) : 0,
+    y1: Number.isFinite(Number(comp.y1)) ? Number(comp.y1) : 0,
+    x2: Number.isFinite(Number(comp.x2)) ? Number(comp.x2) : w,
+    y2: Number.isFinite(Number(comp.y2)) ? Number(comp.y2) : h
+  };
+}
+
+function linePad(comp) {
+  return Math.max(2, Number(comp.lineWidth) || 1);
+}
+
+function positionLineEndpointHandles(hit, comp) {
+  if (!hit || !comp) return;
+  const pts = lineLocalEndpoints(comp);
+  const p1 = hit.querySelector('.line-endpoint[data-handle="p1"]');
+  const p2 = hit.querySelector('.line-endpoint[data-handle="p2"]');
+  if (p1) {
+    p1.style.left = `${pts.x1}px`;
+    p1.style.top = `${pts.y1}px`;
+  }
+  if (p2) {
+    p2.style.left = `${pts.x2}px`;
+    p2.style.top = `${pts.y2}px`;
+  }
+}
+
+function patchShapeGeometryBounds(comp, bounds) {
+  if (comp?.type === 'Freehand' || comp?.type === 'Polygon' || comp?.type === 'Polyline') return patchFreehandBounds(comp, bounds);
+  if (comp?.type === 'Line') return patchLineBounds(comp, bounds);
+  return { ...bounds };
+}
+
+function isPointGeometryType(type) {
+  return type === 'Freehand' || type === 'Line' || type === 'Polygon' || type === 'Polyline';
+}
+
+function isVertexShapeType(type) {
+  return type === 'Polygon' || type === 'Polyline';
+}
+
+function polygonPad(comp) {
+  return Math.max(2, Number(comp.lineWidth) || 1);
+}
+
+function positionPolygonVertexHandles(hit, comp) {
+  if (!hit || !comp?.points?.length) return;
+  hit.querySelectorAll('.polygon-vertex').forEach((el) => {
+    const i = Number(el.dataset.vertex);
+    const p = comp.points[i];
+    if (!p) return;
+    el.style.left = `${p.x}px`;
+    el.style.top = `${p.y}px`;
+  });
+}
+
 function updateFreehandStudioPreview(comp) {
   if (!freehandStrokePreview || !comp?.points?.length || comp.points.length < 2 || comp.visible === false) {
     hideFreehandStrokePreview();
@@ -3378,6 +4346,109 @@ function updateFreehandStudioPreview(comp) {
     ` stroke-linecap="round" stroke-linejoin="round" fill-rule="evenodd"${dash}/>`;
 }
 
+function updateLineStudioPreview(comp) {
+  if (!freehandStrokePreview || !comp || comp.visible === false) {
+    hideFreehandStrokePreview();
+    return;
+  }
+  const canvasW = state.previewCanvas.width || 800;
+  const canvasH = state.previewCanvas.height || 600;
+  const left = Number(comp.left) || 0;
+  const top = Number(comp.top) || 0;
+  const width = Math.max(1, Number(comp.width) || 1);
+  const height = Math.max(1, Number(comp.height) || 1);
+  const x1 = left + (Number.isFinite(Number(comp.x1)) ? Number(comp.x1) : 0);
+  const y1 = top + (Number.isFinite(Number(comp.y1)) ? Number(comp.y1) : 0);
+  const x2 = left + (Number.isFinite(Number(comp.x2)) ? Number(comp.x2) : width);
+  const y2 = top + (Number.isFinite(Number(comp.y2)) ? Number(comp.y2) : height);
+  const lineW = Math.max(0, Number(comp.lineWidth) || 0);
+  const lineStyle = comp.lineStyle || 'solid';
+  const useFore = comp.useForeColor !== false && lineStyle !== 'none' && lineW > 0;
+  const useBack = comp.useBackColor !== false && comp.backStyle === 'solid';
+  if (!useFore && !useBack) {
+    hideFreehandStrokePreview();
+    return;
+  }
+  freehandStrokePreview.classList.remove('hidden');
+  freehandStrokePreview.setAttribute('aria-hidden', 'false');
+  freehandStrokePreview.setAttribute('viewBox', `0 0 ${canvasW} ${canvasH}`);
+  freehandStrokePreview.setAttribute('width', '100%');
+  freehandStrokePreview.setAttribute('height', '100%');
+  const parts = [];
+  if (useBack) {
+    parts.push(`<rect x="${left}" y="${top}" width="${width}" height="${height}" fill="${comp.backColor || '#c0c0c0'}" stroke="none"/>`);
+  }
+  if (useFore) {
+    const dash = freehandPreviewDashAttr(lineStyle, lineW);
+    parts.push(
+      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" fill="none"` +
+      ` stroke="${comp.foreColor || '#808080'}" stroke-width="${lineW}" stroke-linecap="round"${dash}/>`
+    );
+  }
+  freehandStrokePreview.innerHTML = parts.join('');
+}
+
+function polygonPreviewPathAbsolute(comp) {
+  const points = comp?.points || [];
+  if (points.length < 2) return '';
+  const left = comp.left || 0;
+  const top = comp.top || 0;
+  const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${left + p.x} ${top + p.y}`).join(' ');
+  return comp.type === 'Polyline' ? d : `${d} Z`;
+}
+
+function updatePolygonStudioPreview(comp) {
+  if (!freehandStrokePreview || !comp?.points?.length || comp.points.length < 2 || comp.visible === false) {
+    hideFreehandStrokePreview();
+    return;
+  }
+  const w = state.previewCanvas.width || 800;
+  const h = state.previewCanvas.height || 600;
+  const d = polygonPreviewPathAbsolute(comp);
+  if (!d) {
+    hideFreehandStrokePreview();
+    return;
+  }
+  freehandStrokePreview.classList.remove('hidden');
+  freehandStrokePreview.setAttribute('aria-hidden', 'false');
+  freehandStrokePreview.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  freehandStrokePreview.setAttribute('width', '100%');
+  freehandStrokePreview.setAttribute('height', '100%');
+  const useBack = comp.useBackColor !== false && comp.backStyle !== 'transparent';
+  const fill = useBack && (comp.backStyle === 'solid' || comp.backStyle === 'gradient')
+    ? (comp.backColor || '#c0c0c0')
+    : 'none';
+  const lineStyle = comp.lineStyle || 'solid';
+  const lineW = comp.lineWidth ?? 1;
+  const useFore = comp.useForeColor !== false && lineStyle !== 'none' && lineW > 0;
+  const stroke = useFore ? (comp.foreColor || '#000000') : 'none';
+  const dash = useFore ? freehandPreviewDashAttr(lineStyle, lineW) : '';
+  freehandStrokePreview.innerHTML =
+    `<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${lineW}"` +
+    ` stroke-linejoin="miter" fill-rule="evenodd"${dash}/>`;
+}
+
+function boundsFromLineEndpoints(x1, y1, x2, y2, pad = 2) {
+  const minX = Math.min(x1, x2);
+  const maxX = Math.max(x1, x2);
+  const minY = Math.min(y1, y2);
+  const maxY = Math.max(y1, y2);
+  const left = Math.max(0, minX - pad);
+  const top = Math.max(0, minY - pad);
+  const width = Math.max(1, maxX - minX + pad * 2);
+  const height = Math.max(1, maxY - minY + pad * 2);
+  return {
+    left,
+    top,
+    width,
+    height,
+    x1: x1 - left,
+    y1: y1 - top,
+    x2: x2 - left,
+    y2: y2 - top
+  };
+}
+
 function updateFreehandStrokePreview(points) {
   if (!freehandStrokePreview || !points?.length) return;
   const w = state.previewCanvas.width || 800;
@@ -3389,6 +4460,23 @@ function updateFreehandStrokePreview(points) {
   freehandStrokePreview.setAttribute('height', '100%');
   const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
   freehandStrokePreview.innerHTML = `<path d="${d}" fill="none" stroke="#000" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+
+function updatePolygonStrokePreview(points, cursor, closeToFirst = true) {
+  if (!freehandStrokePreview || !points?.length) return;
+  const w = state.previewCanvas.width || 800;
+  const h = state.previewCanvas.height || 600;
+  const pts = cursor ? [...points, cursor] : points.slice();
+  let d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  if (closeToFirst && points.length >= 1 && pts.length >= 2) {
+    d += ` L ${points[0].x} ${points[0].y}`;
+  }
+  freehandStrokePreview.classList.remove('hidden');
+  freehandStrokePreview.setAttribute('aria-hidden', 'false');
+  freehandStrokePreview.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  freehandStrokePreview.setAttribute('width', '100%');
+  freehandStrokePreview.setAttribute('height', '100%');
+  freehandStrokePreview.innerHTML = `<path d="${d}" fill="none" stroke="#000" stroke-width="1" stroke-linejoin="miter"/>`;
 }
 
 function boundsFromFreehandPoints(points, pad = 2) {
@@ -3433,6 +4521,108 @@ async function completeFreehandDrawing(canvasPoints) {
   }
 }
 
+async function completeLinePlacement(start, current) {
+  const placement = state.placement;
+  if (!placement || placement.kind !== 'line') return;
+  hideFreehandStrokePreview();
+  hidePlacementRubberband();
+  objectPlacementOverlay?.classList.add('hidden');
+  previewCanvasWrap?.classList.remove('placement-active');
+  state.placement = null;
+
+  const dx = current.x - start.x;
+  const dy = current.y - start.y;
+  if (Math.hypot(dx, dy) < 4) {
+    activateSelectTool('Line cancelled — drag to draw a line');
+    return;
+  }
+
+  try {
+    const pad = Math.max(2, Number(placement.defaults?.lineWidth) || 1);
+    const bounds = boundsFromLineEndpoints(start.x, start.y, current.x, current.y, pad);
+    const canvas = await fetchOpenCanvas();
+    const comp = defaultLineComponent({
+      ...placement.defaults,
+      ...bounds,
+      name: nextShapeObjectName(canvas.components, 'Line', 'Line')
+    });
+    window.StudioLineProperties?.openLinePropertiesDialog(comp, null, null);
+  } catch (err) {
+    activateSelectTool(`Error: ${err.message}`);
+  }
+}
+
+function dedupePolygonClosePoints(points) {
+  const next = [...(points || [])];
+  while (next.length >= 2) {
+    const a = next[next.length - 1];
+    const b = next[next.length - 2];
+    if (Math.hypot(a.x - b.x, a.y - b.y) < 4) next.pop();
+    else break;
+  }
+  return next;
+}
+
+async function completePolygonDrawing(canvasPoints) {
+  const placement = state.placement;
+  if (!placement || placement.kind !== 'polygon') return;
+  hideFreehandStrokePreview();
+  hidePlacementRubberband();
+  objectPlacementOverlay?.classList.add('hidden');
+  previewCanvasWrap?.classList.remove('placement-active');
+  state.placement = null;
+
+  const points = dedupePolygonClosePoints(canvasPoints);
+  if (!points || points.length < 3) {
+    activateSelectTool('Polygon cancelled — click at least three vertices');
+    return;
+  }
+
+  try {
+    const pad = Math.max(2, Number(placement.defaults?.lineWidth) || 1);
+    const bounds = boundsFromFreehandPoints(points, pad);
+    const canvas = await fetchOpenCanvas();
+    const comp = defaultPolygonComponent({
+      ...placement.defaults,
+      ...bounds,
+      name: nextPrefixedObjectName(canvas.components, 'Polygon')
+    });
+    window.StudioPolygonProperties?.openPolygonPropertiesDialog(comp, null, null);
+  } catch (err) {
+    activateSelectTool(`Error: ${err.message}`);
+  }
+}
+
+async function completePolylineDrawing(canvasPoints) {
+  const placement = state.placement;
+  if (!placement || placement.kind !== 'polyline') return;
+  hideFreehandStrokePreview();
+  hidePlacementRubberband();
+  objectPlacementOverlay?.classList.add('hidden');
+  previewCanvasWrap?.classList.remove('placement-active');
+  state.placement = null;
+
+  const points = dedupePolygonClosePoints(canvasPoints);
+  if (!points || points.length < 2) {
+    activateSelectTool('Polyline cancelled — click at least two vertices');
+    return;
+  }
+
+  try {
+    const pad = Math.max(2, Number(placement.defaults?.lineWidth) || 1);
+    const bounds = boundsFromFreehandPoints(points, pad);
+    const canvas = await fetchOpenCanvas();
+    const comp = defaultPolylineComponent({
+      ...placement.defaults,
+      ...bounds,
+      name: nextPrefixedObjectName(canvas.components, 'Polyline')
+    });
+    window.StudioPolylineProperties?.openPolylinePropertiesDialog(comp, null, null);
+  } catch (err) {
+    activateSelectTool(`Error: ${err.message}`);
+  }
+}
+
 function hidePlacementRubberband() {
   placementRubberband?.classList.add('hidden');
   placementRubberband?.classList.remove('image-preview');
@@ -3448,7 +4638,7 @@ function startObjectPlacement(kind, defaults = {}) {
   if (kind === 'text') objectPlacementOverlay?.classList.add('tool-text');
   else if (kind === 'image') objectPlacementOverlay?.classList.add('tool-image');
   else if (kind === 'string-display') objectPlacementOverlay?.classList.add('tool-text');
-  else if (kind === 'freehand') objectPlacementOverlay?.classList.add('tool-freehand');
+  else if (kind === 'freehand' || kind === 'line' || kind === 'polygon' || kind === 'polyline') objectPlacementOverlay?.classList.add('tool-freehand');
   else objectPlacementOverlay?.classList.add('tool-momentary');
   objectPlacementOverlay?.setAttribute('aria-hidden', 'false');
   previewCanvasWrap?.classList.add('placement-active');
@@ -3458,17 +4648,81 @@ function startObjectPlacement(kind, defaults = {}) {
   } else if (kind === 'image') {
     setStatus('Drag on the display to draw an image box (Esc to cancel)');
   } else if (kind === 'string-display') {
-    setStatus('Drag on the display to draw a string display box (Esc to cancel)');
+    setStatus('Drag on the display to draw the String Display, then properties will open (Esc to cancel)');
   } else if (kind === 'rectangle') {
     setStatus('Drag on the display to draw a rectangle (Esc to cancel)');
+  } else if (kind === 'rounded-rectangle') {
+    setStatus('Drag on the display to draw a rounded rectangle (Esc to cancel)');
   } else if (kind === 'ellipse') {
     setStatus('Drag on the display to draw an ellipse (Esc to cancel)');
+  } else if (kind === 'wedge') {
+    setStatus('Drag on the display to draw a wedge (Esc to cancel)');
   } else if (kind === 'panel') {
     setStatus('Drag on the display to draw a panel (Esc to cancel)');
   } else if (kind === 'arc') {
     setStatus('Drag on the display to draw an arc (Esc to cancel)');
   } else if (kind === 'freehand') {
     setStatus('Draw on the display with the mouse (Esc to cancel)');
+  } else if (kind === 'line') {
+    setStatus('Drag on the display to draw a line (Esc to cancel)');
+  } else if (kind === 'polygon') {
+    setStatus('Click to add vertices, double-click or press Enter to close the polygon (Esc to cancel)');
+  } else if (kind === 'polyline') {
+    setStatus('Click to add vertices, double-click or press Enter to finish the polyline (Esc to cancel)');
+  } else if (kind === 'maintained') {
+    setStatus('Drag on the display to draw the Maintained button, then properties will open (Esc to cancel)');
+  } else if (kind === 'latched') {
+    setStatus('Drag on the display to draw the Latched button, then properties will open (Esc to cancel)');
+  } else if (kind === 'multistate') {
+    setStatus('Drag on the display to draw the Multistate button, then properties will open (Esc to cancel)');
+  } else if (kind === 'interlocked') {
+    setStatus('Drag on the display to draw the Interlocked button, then properties will open (Esc to cancel)');
+  } else if (kind === 'ramp') {
+    setStatus('Drag on the display to draw the Ramp button, then properties will open (Esc to cancel)');
+  } else if (kind === 'numeric') {
+    setStatus('Drag on the display to draw the Numeric Display, then properties will open (Esc to cancel)');
+  } else if (kind === 'numeric-input') {
+    setStatus('Drag on the display to draw the Numeric Input Enable, then properties will open (Esc to cancel)');
+  } else if (kind === 'numeric-input-cursor') {
+    setStatus('Drag on the display to draw the Numeric Input Cursor Point, then properties will open (Esc to cancel)');
+  } else if (kind === 'string-input') {
+    setStatus('Drag on the display to draw the String Input Enable, then properties will open (Esc to cancel)');
+  } else if (kind === 'goto') {
+    setStatus('Drag on the display to draw the Goto Display Button, then properties will open (Esc to cancel)');
+  } else if (kind === 'return-to') {
+    setStatus('Drag on the display to draw the Return to Display Button, then properties will open (Esc to cancel)');
+  } else if (kind === 'close-display') {
+    setStatus('Drag on the display to draw the Close Display Button, then properties will open (Esc to cancel)');
+  } else if (kind === 'display-list') {
+    setStatus('Drag on the display to draw the Display List Selector, then properties will open (Esc to cancel)');
+  } else if (kind === 'multistate-indicator') {
+    setStatus('Drag on the display to draw the Multistate Indicator, then properties will open (Esc to cancel)');
+  } else if (kind === 'symbol-indicator') {
+    setStatus('Drag on the display to draw the Symbol, then properties will open (Esc to cancel)');
+  } else if (kind === 'list-indicator') {
+    setStatus('Drag on the display to draw the List Indicator, then properties will open (Esc to cancel)');
+  } else if (kind === 'bar-graph') {
+    setStatus('Drag on the display to draw the Bar Graph, then properties will open (Esc to cancel)');
+  } else if (kind === 'gauge') {
+    setStatus('Drag on the display to draw the Gauge, then properties will open (Esc to cancel)');
+  } else if (kind === 'scale') {
+    setStatus('Drag on the display to draw the Scale, then properties will open (Esc to cancel)');
+  } else if (kind === 'pause-pen') {
+    setStatus('Drag on the display to draw the Pause Pen Button, then properties will open (Esc to cancel)');
+  } else if (kind === 'next-pen') {
+    setStatus('Drag on the display to draw the Next Pen Button, then properties will open (Esc to cancel)');
+  } else if (kind === 'backspace') {
+    setStatus('Drag on the display to draw the Backspace Button, then properties will open (Esc to cancel)');
+  } else if (kind === 'end') {
+    setStatus('Drag on the display to draw the End Button, then properties will open (Esc to cancel)');
+  } else if (kind === 'trend') {
+    setStatus('Drag on the display to draw the Trend, then properties will open (Esc to cancel)');
+  } else if (kind === 'recipeplus-button') {
+    setStatus('Drag on the display to draw the RecipePlus Button, then properties will open (Esc to cancel)');
+  } else if (kind === 'recipeplus-selector') {
+    setStatus('Drag on the display to draw the RecipePlus Selector, then properties will open (Esc to cancel)');
+  } else if (kind === 'recipeplus-table') {
+    setStatus('Drag on the display to draw the RecipePlus Table, then properties will open (Esc to cancel)');
   } else {
     setStatus('Drag on the display to draw a button (Esc to cancel)');
   }
@@ -3507,14 +4761,34 @@ async function completeObjectPlacement(rect) {
     if (kind === 'text') {
       await showTextPropertiesDialog(defaults);
     } else if (kind === 'numeric') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
       await window.StudioNumericDisplay?.showNumericDisplayDialog(defaults);
     } else if (kind === 'string-display') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
       await window.StudioStringDisplay?.showStringDisplayDialog(defaults);
     } else if (kind === 'string-input') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
       await window.StudioStringInput?.showStringInputDialog(defaults);
     } else if (kind === 'numeric-input') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
       await window.StudioNumericInput?.showNumericInputDialog(defaults);
     } else if (kind === 'numeric-input-cursor') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
       await window.StudioNumericInput?.showNumericInputCursorDialog(defaults);
     } else if (kind === 'momentary') {
       await showMomentaryButtonDialog(defaults);
@@ -3533,31 +4807,127 @@ async function completeObjectPlacement(rect) {
       }
       await window.StudioLatchedMultistate?.showMultistateButtonDialog(defaults);
     } else if (kind === 'interlocked') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
       await window.StudioLatchedMultistate?.showInterlockedButtonDialog(defaults);
     } else if (kind === 'ramp') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
       await window.StudioLatchedMultistate?.showRampButtonDialog(defaults);
+    } else if (kind === 'goto') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioGotoButton?.showGotoButtonDialog(defaults);
+    } else if (kind === 'return-to') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioReturnToButton?.showReturnToButtonDialog(defaults);
+    } else if (kind === 'close-display') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioCloseDisplayButton?.showCloseDisplayButtonDialog(defaults);
     } else if (kind === 'display-list') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
       await window.StudioDisplayListSelector?.showDisplayListSelectorDialog(defaults);
     } else if (kind === 'multistate-indicator') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
       await window.StudioMultistateIndicator?.showMultistateIndicatorDialog(defaults);
     } else if (kind === 'time-date') {
       await window.StudioTimeDateDisplay?.showTimeDateDisplayDialog(defaults);
     } else if (kind === 'symbol-indicator') {
-      const fileName = await showImageBrowserDialog();
-      if (!fileName) {
-        activateSelectTool('Symbol placement cancelled');
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
         return;
       }
-      const states = window.StudioSymbolIndicator?.defaultSymbolIndicatorStates(defaults.numberOfStates ?? 2, fileName);
-      await window.StudioSymbolIndicator?.showSymbolIndicatorDialog({ ...defaults, states, initialImage: fileName });
+      await window.StudioSymbolIndicator?.showSymbolIndicatorDialog(defaults);
     } else if (kind === 'list-indicator') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
       await window.StudioListIndicator?.showListIndicatorDialog(defaults);
     } else if (kind === 'bar-graph') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
       await window.StudioBarGraph?.showBarGraphDialog(defaults);
+    } else if (kind === 'gauge') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioGauge?.showGaugeDialog(defaults);
+    } else if (kind === 'scale') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioScale?.showScaleDialog(defaults);
+    } else if (kind === 'pause-pen') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioPausePenButton?.showPausePenButtonDialog(defaults);
+    } else if (kind === 'next-pen') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioNextPenButton?.showNextPenButtonDialog(defaults);
+    } else if (kind === 'backspace') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioBackspaceButton?.showBackspaceButtonDialog(defaults);
+    } else if (kind === 'end') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioEndButton?.showEndButtonDialog(defaults);
+    } else if (kind === 'trend') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioTrend?.showTrendDialog(defaults);
     } else if (kind === 'recipeplus-button') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
       await window.StudioRecipePlusButton?.showRecipePlusButtonDialog(defaults);
     } else if (kind === 'recipeplus-selector') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
       await window.StudioRecipePlusSelector?.showRecipePlusSelectorDialog(defaults);
+    } else if (kind === 'recipeplus-table') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioRecipePlusTable?.showRecipePlusTableDialog(defaults);
     } else if (kind === 'image') {
       const fileName = await showImageBrowserDialog();
       if (!fileName) {
@@ -3569,7 +4939,14 @@ async function completeObjectPlacement(rect) {
       const canvas = await fetchOpenCanvas();
       const comp = defaultRectangleComponent({
         ...defaults,
-        name: nextShapeObjectName(canvas.components, 'Rectangle', 'Polygon')
+        name: nextShapeObjectName(canvas.components, 'Rectangle', 'Rectangle')
+      });
+      window.StudioShapeProperties?.openShapePropertiesDialog(comp, null, null);
+    } else if (kind === 'rounded-rectangle') {
+      const canvas = await fetchOpenCanvas();
+      const comp = defaultRoundedRectangleComponent({
+        ...defaults,
+        name: nextShapeObjectName(canvas.components, 'RoundedRectangle', 'RoundedRectangle')
       });
       window.StudioShapeProperties?.openShapePropertiesDialog(comp, null, null);
     } else if (kind === 'ellipse') {
@@ -3579,6 +4956,13 @@ async function completeObjectPlacement(rect) {
         name: nextShapeObjectName(canvas.components, 'Ellipse', 'Ellipse')
       });
       window.StudioEllipseProperties?.openEllipsePropertiesDialog(comp, null, null);
+    } else if (kind === 'wedge') {
+      const canvas = await fetchOpenCanvas();
+      const comp = defaultWedgeComponent({
+        ...defaults,
+        name: nextShapeObjectName(canvas.components, 'Wedge', 'Wedge')
+      });
+      window.StudioShapeProperties?.openShapePropertiesDialog(comp, null, null);
     } else if (kind === 'panel') {
       const canvas = await fetchOpenCanvas();
       const comp = defaultPanelComponent({
@@ -3593,10 +4977,22 @@ async function completeObjectPlacement(rect) {
         name: nextShapeObjectName(canvas.components, 'Arc', 'Arc')
       });
       window.StudioArcProperties?.openArcPropertiesDialog(comp, null, null);
+    } else if (kind === 'line') {
+      const canvas = await fetchOpenCanvas();
+      const comp = defaultLineComponent({
+        ...defaults,
+        x1: 0,
+        y1: 0,
+        x2: defaults.width || 156,
+        y2: defaults.height || 12,
+        name: nextShapeObjectName(canvas.components, 'Line', 'Line')
+      });
+      window.StudioLineProperties?.openLinePropertiesDialog(comp, null, null);
     }
   } catch (err) {
-    cancelObjectPlacement();
     setStatus(`Error: ${err.message}`);
+  } finally {
+    activateSelectTool();
   }
 }
 
@@ -3613,13 +5009,69 @@ function initObjectPlacement() {
       updateFreehandStrokePreview([pt]);
       return;
     }
+    if (state.placement.kind === 'polygon' || state.placement.kind === 'polyline') {
+      const pt = getCanvasPoint(e.clientX, e.clientY);
+      const points = state.placement.points || [];
+      if (state.placement.kind === 'polygon' && points.length >= 3) {
+        const first = points[0];
+        if (Math.hypot(pt.x - first.x, pt.y - first.y) <= 10) {
+          completePolygonDrawing(points).catch((err) => setStatus(`Error: ${err.message}`));
+          return;
+        }
+      }
+      points.push(pt);
+      state.placement.points = points;
+      updatePolygonStrokePreview(points, pt, state.placement.kind === 'polygon');
+      return;
+    }
     const start = getCanvasPoint(e.clientX, e.clientY);
     state.placement.dragging = true;
     state.placement.start = start;
+    if (state.placement.kind === 'line') {
+      hidePlacementRubberband();
+      updateFreehandStrokePreview([start, start]);
+      return;
+    }
     updatePlacementRubberband(normalizePlacementRect(start.x, start.y, start.x, start.y));
   });
 
+  objectPlacementOverlay.addEventListener('dblclick', (e) => {
+    if (state.placement?.kind !== 'polygon' && state.placement?.kind !== 'polyline') return;
+    e.preventDefault();
+    const points = state.placement.points || [];
+    if (state.placement.kind === 'polyline') {
+      completePolylineDrawing(points).catch((err) => setStatus(`Error: ${err.message}`));
+    } else {
+      completePolygonDrawing(points).catch((err) => setStatus(`Error: ${err.message}`));
+    }
+  });
+
+  objectPlacementOverlay.addEventListener('contextmenu', (e) => {
+    if (state.placement?.kind !== 'polygon' && state.placement?.kind !== 'polyline') return;
+    e.preventDefault();
+    const points = state.placement.points || [];
+    if (state.placement.kind === 'polyline') {
+      if (points.length >= 2) {
+        completePolylineDrawing(points).catch((err) => setStatus(`Error: ${err.message}`));
+      } else {
+        activateSelectTool('Polyline cancelled');
+      }
+    } else if (points.length >= 3) {
+      completePolygonDrawing(points).catch((err) => setStatus(`Error: ${err.message}`));
+    } else {
+      activateSelectTool('Polygon cancelled');
+    }
+  });
+
   document.addEventListener('mousemove', (e) => {
+    if ((state.placement?.kind === 'polygon' || state.placement?.kind === 'polyline') && state.placement.points?.length) {
+      updatePolygonStrokePreview(
+        state.placement.points,
+        getCanvasPoint(e.clientX, e.clientY),
+        state.placement.kind === 'polygon'
+      );
+      return;
+    }
     if (state.placement?.kind === 'freehand' && state.placement.drawing) {
       const pt = getCanvasPoint(e.clientX, e.clientY);
       const points = state.placement.points || [];
@@ -3634,12 +5086,17 @@ function initObjectPlacement() {
     if (!state.placement?.dragging || !state.placement.start) return;
     const current = getCanvasPoint(e.clientX, e.clientY);
     const start = state.placement.start;
-    const minW = state.placement.kind === 'momentary' ? 40 : state.placement.kind === 'image' ? 32 : 24;
-    const minH = state.placement.kind === 'momentary' ? 24 : state.placement.kind === 'image' ? 32 : 16;
+    if (state.placement.kind === 'line') {
+      updateFreehandStrokePreview([start, current]);
+      return;
+    }
+    const minW = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'numeric') ? 40 : state.placement.kind === 'image' ? 32 : 24;
+    const minH = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'numeric') ? 24 : state.placement.kind === 'image' ? 32 : 16;
     updatePlacementRubberband(normalizePlacementRect(start.x, start.y, current.x, current.y, minW, minH));
   });
 
   document.addEventListener('mouseup', (e) => {
+    if (state.placement?.kind === 'polygon' || state.placement?.kind === 'polyline') return;
     if (state.placement?.kind === 'freehand' && state.placement.drawing) {
       state.placement.drawing = false;
       const points = [...(state.placement.points || [])];
@@ -3651,13 +5108,27 @@ function initObjectPlacement() {
     const start = state.placement.start;
     state.placement.dragging = false;
     state.placement.start = null;
-    const minW = state.placement.kind === 'momentary' ? 40 : state.placement.kind === 'image' ? 32 : 24;
-    const minH = state.placement.kind === 'momentary' ? 24 : state.placement.kind === 'image' ? 32 : 16;
+    if (state.placement.kind === 'line') {
+      completeLinePlacement(start, current).catch((err) => setStatus(`Error: ${err.message}`));
+      return;
+    }
+    const minW = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'numeric') ? 40 : state.placement.kind === 'image' ? 32 : 24;
+    const minH = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'numeric') ? 24 : state.placement.kind === 'image' ? 32 : 16;
     const rect = normalizePlacementRect(start.x, start.y, current.x, current.y, minW, minH);
     completeObjectPlacement(rect).catch((err) => setStatus(`Error: ${err.message}`));
   });
 
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (state.placement?.kind === 'polygon' || state.placement?.kind === 'polyline') && !objectPlacementOverlay?.classList.contains('hidden')) {
+      e.preventDefault();
+      const points = state.placement.points || [];
+      if (state.placement.kind === 'polyline') {
+        completePolylineDrawing(points).catch((err) => setStatus(`Error: ${err.message}`));
+      } else {
+        completePolygonDrawing(points).catch((err) => setStatus(`Error: ${err.message}`));
+      }
+      return;
+    }
     if (e.key === 'Escape' && state.placement && !objectPlacementOverlay?.classList.contains('hidden')) {
       activateSelectTool('Placement cancelled');
     }
@@ -3719,7 +5190,13 @@ function setCanvasSelection(index, options = {}) {
   const comp = entry?.comp;
   previewSetSelection(comp?.name || null);
   const count = indices.length;
-  setStatus(count > 1 ? `Selected ${count} objects` : `Selected ${comp?.name || comp?.type || 'object'}`);
+  setStatus(count > 1
+    ? `Selected ${count} objects`
+    : (comp?.type === 'Line'
+      ? `Selected ${comp.name || 'Line'} — drag an endpoint to change the angle`
+      : (isVertexShapeType(comp?.type)
+        ? `Selected ${comp.name || comp.type} — drag a vertex to change the shape`
+        : `Selected ${comp?.name || comp?.type || 'object'}`)));
   updateEditClipboardUI();
 }
 
@@ -3745,7 +5222,33 @@ function updateCanvasEditHitBounds(name, bounds) {
   if (index < 0) return;
   Object.assign(editComponents[index].comp, bounds);
   const hit = canvasEditOverlay?.querySelector(`.canvas-graphic-hit[data-index="${index}"]`);
-  if (hit) applyGraphicBoundsStyle(hit, editComponents[index].comp);
+  if (hit) {
+    applyGraphicBoundsStyle(hit, editComponents[index].comp);
+    const updated = editComponents[index].comp;
+    if (updated?.type === 'Line') positionLineEndpointHandles(hit, updated);
+    if (isVertexShapeType(updated?.type)) positionPolygonVertexHandles(hit, updated);
+  }
+}
+
+function patchShapeLivePreview(comp) {
+  if (!comp?.name) return;
+  previewPatchByName(comp.name, comp);
+  updateCanvasEditHitBounds(comp.name, {
+    left: comp.left,
+    top: comp.top,
+    width: comp.width,
+    height: comp.height
+  });
+}
+
+function afterCanvasComponentSaved(comp) {
+  scheduleRefreshCanvasEditOverlay();
+  const editIdx = resolveEditComponentIndex(comp, state.propsDialog?.ref);
+  if (editIdx >= 0) {
+    state.propsDialog.editIndex = editIdx;
+    state.canvasSelection.indices = [editIdx];
+    refreshCanvasEditOverlaySelection();
+  }
 }
 
 function attachPreviewLoadHandler() {
@@ -3809,11 +5312,32 @@ async function renderCanvasEditHits(editComponents) {
       applyGraphicBoundsStyle(hit, comp);
       if (canvasSelectionIncludes(index)) hit.classList.add('selected');
 
-      for (const corner of ['nw', 'ne', 'sw', 'se']) {
-        const handle = document.createElement('span');
-        handle.className = `resize-handle ${corner}`;
-        handle.dataset.handle = corner;
-        hit.appendChild(handle);
+      if (comp.type === 'Line') {
+        hit.classList.add('line-hit');
+        for (const which of ['p1', 'p2']) {
+          const handle = document.createElement('span');
+          handle.className = 'line-endpoint';
+          handle.dataset.handle = which;
+          hit.appendChild(handle);
+        }
+        positionLineEndpointHandles(hit, comp);
+      } else if (isVertexShapeType(comp.type) && Array.isArray(comp.points)) {
+        hit.classList.add(comp.type === 'Polyline' ? 'polyline-hit' : 'polygon-hit');
+        comp.points.forEach((_, i) => {
+          const handle = document.createElement('span');
+          handle.className = 'line-endpoint polygon-vertex';
+          handle.dataset.handle = `v${i}`;
+          handle.dataset.vertex = String(i);
+          hit.appendChild(handle);
+        });
+        positionPolygonVertexHandles(hit, comp);
+      } else {
+        for (const corner of ['nw', 'ne', 'sw', 'se']) {
+          const handle = document.createElement('span');
+          handle.className = `resize-handle ${corner}`;
+          handle.dataset.handle = corner;
+          hit.appendChild(handle);
+        }
       }
       canvasEditOverlay.appendChild(hit);
     }
@@ -3890,7 +5414,7 @@ async function updateCanvasComponentBounds(index, bounds) {
     const shellKey = getNavShellKey(canvas);
     if (!shellKey) return;
     let patch = { ...bounds };
-    if (entry.comp?.type === 'Freehand') patch = patchFreehandBounds(entry.comp, bounds);
+    if (isPointGeometryType(entry.comp?.type)) patch = patchShapeGeometryBounds(entry.comp, bounds);
     const shellOverrides = {
       ...(canvas[shellKey] || {}),
       [entry.ref.name]: stripNavShellPersistFields({
@@ -3902,7 +5426,7 @@ async function updateCanvasComponentBounds(index, bounds) {
     state.canvasEditCache.raw = { ...canvas, [shellKey]: shellOverrides };
     if (entry.comp) Object.assign(entry.comp, patch);
     updateCanvasEditHitBounds(entry.comp?.name, patch);
-    if (entry.comp?.type === 'Freehand') {
+    if (isPointGeometryType(entry.comp?.type)) {
       await updateCanvasPreview({ name: entry.comp.name, component: { ...entry.comp }, mode: 'patch-by-name' });
     } else {
       await updateCanvasPreview({ name: entry.comp?.name, bounds: patch });
@@ -3915,11 +5439,11 @@ async function updateCanvasComponentBounds(index, bounds) {
 
   if (entry.ref?.type === 'template-override') {
     let patch = { ...bounds };
-    if (entry.comp?.type === 'Freehand') patch = patchFreehandBounds(entry.comp, bounds);
+    if (isPointGeometryType(entry.comp?.type)) patch = patchShapeGeometryBounds(entry.comp, bounds);
     await patchTemplateOverride(entry.ref.name, patch, { mergeOnly: true });
     if (entry.comp) Object.assign(entry.comp, patch);
     updateCanvasEditHitBounds(entry.comp?.name, patch);
-    if (entry.comp?.type === 'Freehand') {
+    if (isPointGeometryType(entry.comp?.type)) {
       await updateCanvasPreview({ name: entry.comp.name, component: { ...entry.comp }, mode: 'patch-by-name' });
     } else {
       await updateCanvasPreview({ name: entry.comp?.name, bounds: patch });
@@ -3934,15 +5458,15 @@ async function updateCanvasComponentBounds(index, bounds) {
   const compIndex = entry.ref?.index;
   if (compIndex == null || !components[compIndex]) return;
   let patch = { ...bounds };
-  if (entry.comp?.type === 'Freehand') {
-    patch = patchFreehandBounds(entry.comp, bounds);
+  if (isPointGeometryType(entry.comp?.type)) {
+    patch = patchShapeGeometryBounds(entry.comp, bounds);
   }
   components[compIndex] = { ...components[compIndex], ...patch };
   await patchOpenCanvas({ components });
   state.canvasEditCache.raw = { ...canvas, components };
   if (entry.comp) Object.assign(entry.comp, patch);
   updateCanvasEditHitBounds(entry.comp?.name, patch);
-  if (entry.comp?.type === 'Freehand') {
+  if (isPointGeometryType(entry.comp?.type)) {
     await updateCanvasPreview({ name: entry.comp.name, component: { ...entry.comp }, mode: 'patch-by-name' });
   } else {
     await updateCanvasPreview({ name: entry.comp?.name, bounds: patch });
@@ -3967,104 +5491,154 @@ async function openPropertiesForComponent(index) {
       switchTextPropertiesTab('general');
       document.getElementById('textPropertiesDialog')?.showModal();
     } else if (comp.type === 'NumericDisplay') {
+      flushDeferredDialogInits();
+      window.StudioNumericDisplay?.initNumericDisplayDialog();
       window.StudioNumericDisplay?.fillNumericDisplayForm(comp);
       resetPropsDialogState('numeric', window.StudioNumericDisplay.readNumericDisplayForm, 'applyNumericDisplay', index, entry.ref);
       window.StudioNumericDisplay?.switchNumericDisplayTab('general');
       window.StudioNumericDisplay?.wireNumericDisplayTools();
-      document.getElementById('numericDisplayDialog')?.showModal();
+      window.StudioNumericDisplay?.presentNumericDisplayDialog();
+      window.StudioNumericDisplay?.scheduleNumericLivePreview();
     } else if (comp.type === 'StringDisplay') {
+      flushDeferredDialogInits();
+      window.StudioStringDisplay?.initStringDisplayDialog();
       window.StudioStringDisplay?.fillStringDisplayForm(comp);
       resetPropsDialogState('string-display', window.StudioStringDisplay.readStringDisplayForm, 'applyStringDisplay', index, entry.ref);
       window.StudioStringDisplay?.switchStringDisplayTab('general');
       window.StudioStringDisplay?.wireStringDisplayTools();
-      document.getElementById('stringDisplayDialog')?.showModal();
+      window.StudioStringDisplay?.presentStringDisplayDialog();
+      window.StudioStringDisplay?.scheduleStringDisplayLivePreview();
     } else if (comp.type === 'StringInputEnable') {
+      flushDeferredDialogInits();
+      window.StudioStringInput?.initStringInputDialog();
       window.StudioStringInput?.fillStringInputForm(comp);
       resetPropsDialogState('string-input', window.StudioStringInput.readStringInputForm, 'applyStringInput', index, entry.ref);
       window.StudioStringInput?.switchStringInputTab('general');
       window.StudioStringInput?.wireStringInputTools();
-      document.getElementById('stringInputDialog')?.showModal();
+      window.StudioStringInput?.presentStringInputDialog();
+      window.StudioStringInput?.scheduleStringInputLivePreview();
     } else if (comp.type === 'NumericInputEnable') {
+      flushDeferredDialogInits();
+      window.StudioNumericInput?.initNumericInputDialog();
       window.StudioNumericInput?.fillNumericInputForm(comp);
       resetPropsDialogState('numeric-input', window.StudioNumericInput.readNumericInputForm, 'applyNumericInput', index, entry.ref);
       window.StudioNumericInput?.switchNumericInputTab('general');
       window.StudioNumericInput?.wireNumericInputTools();
-      document.getElementById('numericInputDialog')?.showModal();
+      window.StudioNumericInput?.presentNumericInputDialog();
+      window.StudioNumericInput?.scheduleNumericInputLivePreview();
     } else if (comp.type === 'NumericInputCursorPoint') {
+      flushDeferredDialogInits();
+      window.StudioNumericInput?.initNumericInputCursorDialog();
       window.StudioNumericInput?.fillNumericInputCursorForm(comp);
       resetPropsDialogState('numeric-input-cursor', window.StudioNumericInput.readNumericInputCursorForm, 'applyNumericInputCursor', index, entry.ref);
       window.StudioNumericInput?.switchNumericInputCursorTab('general');
       window.StudioNumericInput?.wireNumericInputCursorTools();
-      document.getElementById('numericInputCursorDialog')?.showModal();
+      window.StudioNumericInput?.presentNumericInputCursorDialog();
+      window.StudioNumericInput?.scheduleNumericInputCursorLivePreview();
     } else if (comp.type === 'MomentaryButton') {
+      flushDeferredDialogInits();
+      initMomentaryButtonDialog();
       fillMomentaryButtonForm(comp);
+      wireMomentaryButtonDialogTools();
       resetPropsDialogState('momentary', readMomentaryButtonForm, 'applyMomentaryButton', index, entry.ref);
       switchMomentaryButtonTab('general');
-      document.getElementById('momentaryButtonDialog')?.showModal();
+      presentMomentaryButtonDialog();
+      scheduleMomentaryLivePreview();
     } else if (comp.type === 'MaintainedButton') {
+      flushDeferredDialogInits();
+      initMaintainedButtonDialog();
       fillMaintainedButtonForm(comp);
       resetPropsDialogState('maintained', readMaintainedButtonForm, 'applyMaintainedButton', index, entry.ref);
       switchMaintainedButtonTab('general');
       wireMaintainedButtonDialogTools();
-      document.getElementById('maintainedButtonDialog')?.showModal();
+      presentMaintainedButtonDialog();
+      scheduleMaintainedLivePreview();
     } else if (comp.type === 'LatchedButton') {
+      flushDeferredDialogInits();
+      window.StudioLatchedMultistate?.initLatchedButtonDialog();
       window.StudioLatchedMultistate?.fillLatchedButtonForm(comp);
       resetPropsDialogState('latched', window.StudioLatchedMultistate.readLatchedButtonForm, 'applyLatchedButton', index, entry.ref);
       window.StudioLatchedMultistate?.switchLatchedButtonTab('general');
       window.StudioLatchedMultistate?.wireLatchedButtonDialogTools();
-      document.getElementById('latchedButtonDialog')?.showModal();
+      window.StudioLatchedMultistate?.presentLatchedButtonDialog();
+      window.StudioLatchedMultistate?.scheduleLatchedLivePreview();
     } else if (comp.type === 'MultistateButton') {
+      flushDeferredDialogInits();
+      window.StudioLatchedMultistate?.initMultistateButtonDialog();
       window.StudioLatchedMultistate?.fillMultistateButtonForm(comp);
       resetPropsDialogState('multistate', window.StudioLatchedMultistate.readMultistateButtonForm, 'applyMultistateButton', index, entry.ref);
       window.StudioLatchedMultistate?.switchMultistateButtonTab('general');
       window.StudioLatchedMultistate?.wireMultistateButtonDialogTools();
-      document.getElementById('multistateButtonDialog')?.showModal();
+      window.StudioLatchedMultistate?.presentMultistateButtonDialog();
+      window.StudioLatchedMultistate?.scheduleMultistateLivePreview();
     } else if (comp.type === 'InterlockedButton') {
+      flushDeferredDialogInits();
+      window.StudioLatchedMultistate?.initInterlockedButtonDialog();
       window.StudioLatchedMultistate?.fillInterlockedButtonForm(comp);
       resetPropsDialogState('interlocked', window.StudioLatchedMultistate.readInterlockedButtonForm, 'applyInterlockedButton', index, entry.ref);
       window.StudioLatchedMultistate?.switchInterlockedButtonTab('general');
       window.StudioLatchedMultistate?.wireInterlockedButtonDialogTools();
-      document.getElementById('interlockedButtonDialog')?.showModal();
+      window.StudioLatchedMultistate?.presentInterlockedButtonDialog();
+      window.StudioLatchedMultistate?.scheduleInterlockedLivePreview();
     } else if (comp.type === 'RampButton') {
+      flushDeferredDialogInits();
+      window.StudioLatchedMultistate?.initRampButtonDialog();
       window.StudioLatchedMultistate?.fillRampButtonForm(comp);
       resetPropsDialogState('ramp', window.StudioLatchedMultistate.readRampButtonForm, 'applyRampButton', index, entry.ref);
       window.StudioLatchedMultistate?.switchRampButtonTab('general');
       window.StudioLatchedMultistate?.wireRampButtonDialogTools();
-      document.getElementById('rampButtonDialog')?.showModal();
+      window.StudioLatchedMultistate?.presentRampButtonDialog();
+      window.StudioLatchedMultistate?.scheduleRampLivePreview();
     } else if (comp.type === 'GotoButton') {
-      fillGotoButtonForm(comp);
-      resetPropsDialogState('goto', readGotoButtonForm, 'applyGotoButton', index, entry.ref);
-      switchGotoButtonTab('general');
-      wireGotoButtonDialogTools();
-      document.getElementById('gotoButtonDialog')?.showModal();
+      flushDeferredDialogInits();
+      window.StudioGotoButton?.initGotoButtonDialog();
+      window.StudioGotoButton?.fillGotoButtonForm(comp);
+      resetPropsDialogState('goto', window.StudioGotoButton.readGotoButtonForm, 'applyGotoButton', index, entry.ref);
+      window.StudioGotoButton?.switchGotoButtonTab('general');
+      window.StudioGotoButton?.wireGotoButtonTools();
+      window.StudioGotoButton?.presentGotoButtonDialog();
+      window.StudioGotoButton?.scheduleGotoLivePreview();
       setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'ReturnToButton') {
+      flushDeferredDialogInits();
+      window.StudioReturnToButton?.initReturnToButtonDialog();
       window.StudioReturnToButton?.fillReturnToButtonForm(comp);
       resetPropsDialogState('return-to', window.StudioReturnToButton.readReturnToButtonForm, 'applyReturnToButton', index, entry.ref);
       window.StudioReturnToButton?.switchReturnToButtonTab('general');
       window.StudioReturnToButton?.wireReturnToButtonTools();
-      document.getElementById('returnToButtonDialog')?.showModal();
+      window.StudioReturnToButton?.presentReturnToButtonDialog();
+      window.StudioReturnToButton?.scheduleReturnToLivePreview();
+      setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'CloseDisplayButton') {
+      flushDeferredDialogInits();
+      window.StudioCloseDisplayButton?.initCloseDisplayButtonDialog();
       window.StudioCloseDisplayButton?.fillCloseDisplayButtonForm(comp);
       resetPropsDialogState('close-display', window.StudioCloseDisplayButton.readCloseDisplayButtonForm, 'applyCloseDisplayButton', index, entry.ref);
       window.StudioCloseDisplayButton?.switchCloseDisplayButtonTab('general');
       window.StudioCloseDisplayButton?.wireCloseDisplayButtonTools();
-      document.getElementById('closeDisplayButtonDialog')?.showModal();
+      window.StudioCloseDisplayButton?.presentCloseDisplayButtonDialog();
+      window.StudioCloseDisplayButton?.scheduleCloseDisplayLivePreview();
+      setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'DisplayListSelector') {
+      flushDeferredDialogInits();
+      window.StudioDisplayListSelector?.initDisplayListSelectorDialog();
       window.StudioDisplayListSelector?.fillDisplayListSelectorForm(comp);
       resetPropsDialogState('display-list', window.StudioDisplayListSelector.readDisplayListSelectorForm, 'applyDisplayListSelector', index, entry.ref);
       window.StudioDisplayListSelector?.switchDisplayListSelectorTab('general');
       window.StudioDisplayListSelector?.wireDisplayListSelectorTools();
-      document.getElementById('displayListSelectorDialog')?.showModal();
+      window.StudioDisplayListSelector?.presentDisplayListSelectorDialog();
+      window.StudioDisplayListSelector?.scheduleDisplayListLivePreview();
+      setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'MultistateIndicator') {
+      flushDeferredDialogInits();
+      window.StudioMultistateIndicator?.initMultistateIndicatorDialog();
       window.StudioMultistateIndicator?.fillMultistateIndicatorForm(comp);
       resetPropsDialogState('multistate-indicator', window.StudioMultistateIndicator.readMultistateIndicatorForm, 'applyMultistateIndicator', index, ref);
       window.StudioMultistateIndicator?.switchMultistateIndicatorTab('general');
       window.StudioMultistateIndicator?.wireMultistateIndicatorTools();
-      document.getElementById('multistateIndicatorDialog')?.showModal();
-      if (ref?.type === 'template-global') {
-        setStatus(`Editing Template → ${comp.name} (applies to all displays)`);
-      }
+      window.StudioMultistateIndicator?.presentMultistateIndicatorDialog();
+      window.StudioMultistateIndicator?.scheduleMultistateLivePreview();
+      setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'TimeDateDisplay') {
       window.StudioTimeDateDisplay?.fillTimeDateDisplayForm(comp);
       resetPropsDialogState('time-date', window.StudioTimeDateDisplay.readTimeDateDisplayForm, 'applyTimeDateDisplay', index, ref);
@@ -4075,42 +5649,142 @@ async function openPropertiesForComponent(index) {
         setStatus(`Editing Template → ${comp.name} (applies to all displays)`);
       }
     } else if (comp.type === 'SymbolIndicator') {
+      flushDeferredDialogInits();
+      window.StudioSymbolIndicator?.initSymbolIndicatorDialog();
       window.StudioSymbolIndicator?.fillSymbolIndicatorForm(comp);
       resetPropsDialogState('symbol-indicator', window.StudioSymbolIndicator.readSymbolIndicatorForm, 'applySymbolIndicator', index, entry.ref);
       window.StudioSymbolIndicator?.switchSymbolIndicatorTab('general');
       window.StudioSymbolIndicator?.wireSymbolIndicatorTools();
-      document.getElementById('symbolIndicatorDialog')?.showModal();
+      window.StudioSymbolIndicator?.presentSymbolIndicatorDialog();
+      window.StudioSymbolIndicator?.scheduleSymbolLivePreview();
+      setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'ListIndicator') {
+      flushDeferredDialogInits();
+      window.StudioListIndicator?.initListIndicatorDialog();
       window.StudioListIndicator?.fillListIndicatorForm(comp);
       resetPropsDialogState('list-indicator', window.StudioListIndicator.readListIndicatorForm, 'applyListIndicator', index, entry.ref);
       window.StudioListIndicator?.switchListIndicatorTab('general');
       window.StudioListIndicator?.wireListIndicatorTools();
-      document.getElementById('listIndicatorDialog')?.showModal();
+      window.StudioListIndicator?.presentListIndicatorDialog();
+      window.StudioListIndicator?.scheduleListLivePreview();
+      setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'BarGraph') {
+      flushDeferredDialogInits();
+      window.StudioBarGraph?.initBarGraphDialog();
       window.StudioBarGraph?.fillBarGraphForm(comp);
       resetPropsDialogState('bar-graph', window.StudioBarGraph.readBarGraphForm, 'applyBarGraph', index, entry.ref);
       window.StudioBarGraph?.switchBarGraphTab('general');
       window.StudioBarGraph?.wireBarGraphTools();
-      document.getElementById('barGraphDialog')?.showModal();
+      window.StudioBarGraph?.presentBarGraphDialog();
+      window.StudioBarGraph?.scheduleBarGraphLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'Gauge') {
+      flushDeferredDialogInits();
+      window.StudioGauge?.initGaugeDialog();
+      window.StudioGauge?.fillGaugeForm(comp);
+      resetPropsDialogState('gauge', window.StudioGauge.readGaugeForm, 'applyGauge', index, entry.ref);
+      window.StudioGauge?.switchGaugeTab('general');
+      window.StudioGauge?.wireGaugeTools();
+      window.StudioGauge?.presentGaugeDialog();
+      window.StudioGauge?.scheduleGaugeLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'Scale') {
+      flushDeferredDialogInits();
+      window.StudioScale?.initScaleDialog();
+      window.StudioScale?.fillScaleForm(comp);
+      resetPropsDialogState('scale', window.StudioScale.readScaleForm, 'applyScale', index, entry.ref);
+      window.StudioScale?.switchScaleTab('general');
+      window.StudioScale?.wireScaleTools();
+      window.StudioScale?.presentScaleDialog();
+      window.StudioScale?.scheduleScaleLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'PausePenButton') {
+      flushDeferredDialogInits();
+      window.StudioPausePenButton?.initPausePenButtonDialog();
+      window.StudioPausePenButton?.fillPausePenButtonForm(comp);
+      resetPropsDialogState('pause-pen', window.StudioPausePenButton.readPausePenButtonForm, 'applyPausePenButton', index, entry.ref);
+      window.StudioPausePenButton?.switchPausePenButtonTab('general');
+      window.StudioPausePenButton?.wirePausePenButtonTools();
+      window.StudioPausePenButton?.presentPausePenButtonDialog();
+      window.StudioPausePenButton?.schedulePausePenLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'NextPenButton') {
+      flushDeferredDialogInits();
+      window.StudioNextPenButton?.initNextPenButtonDialog();
+      window.StudioNextPenButton?.fillNextPenButtonForm(comp);
+      resetPropsDialogState('next-pen', window.StudioNextPenButton.readNextPenButtonForm, 'applyNextPenButton', index, entry.ref);
+      window.StudioNextPenButton?.switchNextPenButtonTab('general');
+      window.StudioNextPenButton?.wireNextPenButtonTools();
+      window.StudioNextPenButton?.presentNextPenButtonDialog();
+      window.StudioNextPenButton?.scheduleNextPenLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'BackspaceButton') {
+      flushDeferredDialogInits();
+      window.StudioBackspaceButton?.initBackspaceButtonDialog();
+      window.StudioBackspaceButton?.fillBackspaceButtonForm(comp);
+      resetPropsDialogState('backspace', window.StudioBackspaceButton.readBackspaceButtonForm, 'applyBackspaceButton', index, entry.ref);
+      window.StudioBackspaceButton?.switchBackspaceButtonTab('general');
+      window.StudioBackspaceButton?.wireBackspaceButtonTools();
+      window.StudioBackspaceButton?.presentBackspaceButtonDialog();
+      window.StudioBackspaceButton?.scheduleBackspaceLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'EndButton') {
+      flushDeferredDialogInits();
+      window.StudioEndButton?.initEndButtonDialog();
+      window.StudioEndButton?.fillEndButtonForm(comp);
+      resetPropsDialogState('end', window.StudioEndButton.readEndButtonForm, 'applyEndButton', index, entry.ref);
+      window.StudioEndButton?.switchEndButtonTab('general');
+      window.StudioEndButton?.wireEndButtonTools();
+      window.StudioEndButton?.presentEndButtonDialog();
+      window.StudioEndButton?.scheduleEndLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'Trend') {
+      flushDeferredDialogInits();
+      window.StudioTrend?.initTrendDialog();
+      window.StudioTrend?.fillTrendForm(comp);
+      resetPropsDialogState('trend', window.StudioTrend.readTrendForm, 'applyTrend', index, entry.ref);
+      window.StudioTrend?.switchTrendTab('general');
+      window.StudioTrend?.wireTrendTools();
+      window.StudioTrend?.presentTrendDialog();
+      window.StudioTrend?.scheduleTrendLivePreview();
+      setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'RecipePlusButton') {
+      flushDeferredDialogInits();
+      window.StudioRecipePlusButton?.initRecipePlusButtonDialog();
       window.StudioRecipePlusButton?.fillRecipePlusButtonForm(comp);
       resetPropsDialogState('recipeplus-button', window.StudioRecipePlusButton.readRecipePlusButtonForm, 'applyRecipePlusButton', index, entry.ref);
       window.StudioRecipePlusButton?.switchRecipePlusButtonTab('general');
       window.StudioRecipePlusButton?.wireRecipePlusButtonTools();
-      document.getElementById('recipePlusButtonDialog')?.showModal();
+      window.StudioRecipePlusButton?.presentRecipePlusButtonDialog();
+      window.StudioRecipePlusButton?.scheduleRecipePlusLivePreview();
+      setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'RecipePlusSelector') {
+      flushDeferredDialogInits();
+      window.StudioRecipePlusSelector?.initRecipePlusSelectorDialog();
       window.StudioRecipePlusSelector?.fillRecipePlusSelectorForm(comp);
       resetPropsDialogState('recipeplus-selector', window.StudioRecipePlusSelector.readRecipePlusSelectorForm, 'applyRecipePlusSelector', index, entry.ref);
       window.StudioRecipePlusSelector?.switchRecipePlusSelectorTab('general');
       window.StudioRecipePlusSelector?.wireRecipePlusSelectorTools();
-      document.getElementById('recipePlusSelectorDialog')?.showModal();
+      window.StudioRecipePlusSelector?.presentRecipePlusSelectorDialog();
+      window.StudioRecipePlusSelector?.scheduleRecipePlusSelectorLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'RecipePlusTable') {
+      flushDeferredDialogInits();
+      window.StudioRecipePlusTable?.initRecipePlusTableDialog();
+      window.StudioRecipePlusTable?.fillRecipePlusTableForm(comp);
+      resetPropsDialogState('recipeplus-table', window.StudioRecipePlusTable.readRecipePlusTableForm, 'applyRecipePlusTable', index, entry.ref);
+      window.StudioRecipePlusTable?.switchRecipePlusTableTab('general');
+      window.StudioRecipePlusTable?.wireRecipePlusTableTools();
+      window.StudioRecipePlusTable?.presentRecipePlusTableDialog();
+      window.StudioRecipePlusTable?.scheduleRecipePlusTableLivePreview();
+      setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'Image') {
       fillCanvasImagePropertiesForm(comp);
       resetPropsDialogState('image', readCanvasImagePropertiesForm, 'applyCanvasImageProperties', index, ref);
       switchCanvasImagePropertiesTab('general');
       document.getElementById('canvasImagePropertiesDialog')?.showModal();
       setTemplateEditStatus(comp.name, ref);
-    } else if (comp.type === 'Rectangle') {
+    } else if (comp.type === 'Rectangle' || comp.type === 'RoundedRectangle' || comp.type === 'Wedge') {
       window.StudioShapeProperties?.openShapePropertiesDialog(comp, ref, index);
     } else if (comp.type === 'Ellipse') {
       window.StudioEllipseProperties?.openEllipsePropertiesDialog(comp, ref, index);
@@ -4118,6 +5792,12 @@ async function openPropertiesForComponent(index) {
       window.StudioArcProperties?.openArcPropertiesDialog(comp, ref, index);
     } else if (comp.type === 'Freehand') {
       window.StudioFreehandProperties?.openFreehandPropertiesDialog(comp, ref, index);
+    } else if (comp.type === 'Line') {
+      window.StudioLineProperties?.openLinePropertiesDialog(comp, ref, index);
+    } else if (comp.type === 'Polygon') {
+      window.StudioPolygonProperties?.openPolygonPropertiesDialog(comp, ref, index);
+    } else if (comp.type === 'Polyline') {
+      window.StudioPolylineProperties?.openPolylinePropertiesDialog(comp, ref, index);
     } else if (comp.type === 'Panel') {
       window.StudioPanelProperties?.openPanelPropertiesDialog(comp, ref, index);
     } else {
@@ -4176,7 +5856,7 @@ function initCanvasEditOverlay() {
     if (state.placement || !objectPlacementOverlay?.classList.contains('hidden')) return;
     if (e.button !== 0) return;
 
-    const handle = e.target.closest('.resize-handle');
+    const handle = e.target.closest('.resize-handle, .line-endpoint, .polygon-vertex');
     const hit = e.target.closest('.canvas-graphic-hit');
 
     if (!hit) {
@@ -4223,14 +5903,20 @@ function initCanvasEditOverlay() {
         left: c.left ?? 0,
         top: c.top ?? 0,
         width: c.width ?? 120,
-        height: c.height ?? 32
+        height: c.height ?? 32,
+        ...(c.type === 'Line' ? { ...lineLocalEndpoints(c), lineWidth: c.lineWidth ?? 1 } : {}),
+        ...(isVertexShapeType(c.type) ? { points: (c.points || []).map((p) => ({ x: p.x, y: p.y })), lineWidth: c.lineWidth ?? 1 } : {})
       };
     }
 
     const start = getCanvasPoint(e.clientX, e.clientY);
     if (handle) {
+      const handleId = handle.dataset.handle;
+      const vertexIndex = handle.dataset.vertex;
       state.canvasEditDrag = {
-        mode: `resize-${handle.dataset.handle}`,
+        mode: vertexIndex != null
+          ? `poly-v${vertexIndex}`
+          : (handleId === 'p1' || handleId === 'p2' ? `line-${handleId}` : `resize-${handleId}`),
         index,
         indices: dragIndices,
         origins,
@@ -4293,10 +5979,71 @@ function initCanvasEditOverlay() {
         left = Math.max(0, Math.min(left, canvasW - orig.width));
         top = Math.max(0, Math.min(top, canvasH - orig.height));
         const hitEl = canvasEditOverlay?.querySelector(`.canvas-graphic-hit[data-index="${idx}"]`);
-        if (hitEl) applyGraphicBoundsStyle(hitEl, { left, top, width: orig.width, height: orig.height });
+        if (hitEl) {
+          applyGraphicBoundsStyle(hitEl, { left, top, width: orig.width, height: orig.height });
+          const moved = state.canvasEditCache?.editComponents?.[idx]?.comp;
+          if (moved?.type === 'Line') positionLineEndpointHandles(hitEl, { ...moved, left, top });
+          if (isVertexShapeType(moved?.type)) positionPolygonVertexHandles(hitEl, { ...moved, left, top });
+        }
         drag.pendingByIndex[idx] = { left, top, width: orig.width, height: orig.height };
       }
       drag.moved = true;
+      return;
+    }
+
+    if (drag.mode === 'line-p1' || drag.mode === 'line-p2') {
+      const canvasW = state.previewCanvas.width || 800;
+      const canvasH = state.previewCanvas.height || 600;
+      const orig = drag.orig;
+      const pts = {
+        x1: orig.left + (orig.x1 ?? 0),
+        y1: orig.top + (orig.y1 ?? 0),
+        x2: orig.left + (orig.x2 ?? orig.width),
+        y2: orig.top + (orig.y2 ?? orig.height)
+      };
+      const nx = Math.max(0, Math.min(canvasW, snapCanvasValue(current.x, 'x')));
+      const ny = Math.max(0, Math.min(canvasH, snapCanvasValue(current.y, 'y')));
+      if (drag.mode === 'line-p1') {
+        pts.x1 = nx;
+        pts.y1 = ny;
+      } else {
+        pts.x2 = nx;
+        pts.y2 = ny;
+      }
+      if (Math.hypot(pts.x2 - pts.x1, pts.y2 - pts.y1) < 2) return;
+      const bounds = boundsFromLineEndpoints(pts.x1, pts.y1, pts.x2, pts.y2, linePad(comp));
+      applyGraphicBoundsStyle(hit, bounds);
+      positionLineEndpointHandles(hit, { ...comp, ...bounds });
+      drag.moved = true;
+      drag.pending = bounds;
+      previewPatchByName(comp.name, { ...comp, ...bounds });
+      if (state.propsDialog?.kind === 'line') syncOpenPropsDialogBounds({ ...comp, ...bounds });
+      return;
+    }
+
+    if (typeof drag.mode === 'string' && drag.mode.startsWith('poly-v')) {
+      const canvasW = state.previewCanvas.width || 800;
+      const canvasH = state.previewCanvas.height || 600;
+      const orig = drag.orig;
+      const vi = Number(drag.mode.slice(5));
+      const absPoints = (orig.points || []).map((p) => ({
+        x: orig.left + (Number(p.x) || 0),
+        y: orig.top + (Number(p.y) || 0)
+      }));
+      if (!absPoints[vi]) return;
+      absPoints[vi] = {
+        x: Math.max(0, Math.min(canvasW, snapCanvasValue(current.x, 'x'))),
+        y: Math.max(0, Math.min(canvasH, snapCanvasValue(current.y, 'y')))
+      };
+      const bounds = boundsFromFreehandPoints(absPoints, polygonPad(comp));
+      applyGraphicBoundsStyle(hit, bounds);
+      positionPolygonVertexHandles(hit, { ...comp, ...bounds });
+      drag.moved = true;
+      drag.pending = bounds;
+      previewPatchByName(comp.name, { ...comp, ...bounds });
+      if (state.propsDialog?.kind === 'polygon' || state.propsDialog?.kind === 'polyline') {
+        syncOpenPropsDialogBounds({ ...comp, ...bounds });
+      }
       return;
     }
 
@@ -4335,6 +6082,8 @@ function initCanvasEditOverlay() {
     top = Math.max(0, Math.min(top, canvasH - height));
 
     applyGraphicBoundsStyle(hit, { left, top, width, height });
+    if (comp.type === 'Line') positionLineEndpointHandles(hit, { ...comp, left, top, width, height });
+    if (isVertexShapeType(comp.type)) positionPolygonVertexHandles(hit, { ...comp, left, top, width, height });
     drag.moved = true;
     drag.pending = { left, top, width, height };
     if (comp.type === 'Freehand' && state.propsDialog?.kind === 'freehand') {
@@ -4343,6 +6092,13 @@ function initCanvasEditOverlay() {
         previewComp = { ...previewComp, ...patchFreehandBounds(comp, drag.pending) };
       }
       updateFreehandStudioPreview(previewComp);
+    }
+    if (isVertexShapeType(comp.type) && (state.propsDialog?.kind === 'polygon' || state.propsDialog?.kind === 'polyline')) {
+      let previewComp = { ...comp, ...drag.pending };
+      if (drag.mode !== 'move' && (drag.mode.startsWith('resize-'))) {
+        previewComp = { ...previewComp, ...patchFreehandBounds(comp, drag.pending) };
+      }
+      updatePolygonStudioPreview(previewComp);
     }
   });
 
@@ -4503,15 +6259,15 @@ function handleObjectAction(id) {
     return;
   }
   if (item.action === 'goto-button-properties') {
-    showGotoButtonDialog(item.buttonDefaults || {}).catch((err) => setStatus(`Error: ${err.message}`));
+    startObjectPlacement('goto', item.buttonDefaults || {});
     return;
   }
   if (item.action === 'return-to-button-properties') {
-    window.StudioReturnToButton?.showReturnToButtonDialog(item.buttonDefaults || {}).catch((err) => setStatus(`Error: ${err.message}`));
+    startObjectPlacement('return-to', item.buttonDefaults || {});
     return;
   }
   if (item.action === 'close-display-button-properties') {
-    window.StudioCloseDisplayButton?.showCloseDisplayButtonDialog(item.buttonDefaults || {}).catch((err) => setStatus(`Error: ${err.message}`));
+    startObjectPlacement('close-display', item.buttonDefaults || {});
     return;
   }
   if (item.action === 'display-list-selector-properties') {
@@ -4538,12 +6294,44 @@ function handleObjectAction(id) {
     startObjectPlacement('bar-graph', item.graphDefaults || {});
     return;
   }
+  if (item.action === 'gauge-properties') {
+    startObjectPlacement('gauge', item.graphDefaults || {});
+    return;
+  }
+  if (item.action === 'scale-properties') {
+    startObjectPlacement('scale', item.shapeDefaults || {});
+    return;
+  }
+  if (item.action === 'pause-pen-button-properties') {
+    startObjectPlacement('pause-pen', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'next-pen-button-properties') {
+    startObjectPlacement('next-pen', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'backspace-button-properties') {
+    startObjectPlacement('backspace', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'end-button-properties') {
+    startObjectPlacement('end', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'trend-properties') {
+    startObjectPlacement('trend', item.graphDefaults || {});
+    return;
+  }
   if (item.action === 'recipeplus-button-properties') {
     startObjectPlacement('recipeplus-button', item.buttonDefaults || {});
     return;
   }
   if (item.action === 'recipeplus-selector-properties') {
     startObjectPlacement('recipeplus-selector', item.selectorDefaults || {});
+    return;
+  }
+  if (item.action === 'recipeplus-table-properties') {
+    startObjectPlacement('recipeplus-table', item.tableDefaults || {});
     return;
   }
   if (item.action === 'image-properties') {
@@ -4554,8 +6342,16 @@ function handleObjectAction(id) {
     startObjectPlacement('rectangle', item.shapeDefaults || {});
     return;
   }
+  if (item.action === 'rounded-rectangle-properties') {
+    startObjectPlacement('rounded-rectangle', item.shapeDefaults || {});
+    return;
+  }
   if (item.action === 'ellipse-properties') {
     startObjectPlacement('ellipse', item.shapeDefaults || {});
+    return;
+  }
+  if (item.action === 'wedge-properties') {
+    startObjectPlacement('wedge', item.shapeDefaults || {});
     return;
   }
   if (item.action === 'panel-properties') {
@@ -4568,6 +6364,18 @@ function handleObjectAction(id) {
   }
   if (item.action === 'freehand-properties') {
     startObjectPlacement('freehand', item.freehandDefaults || {});
+    return;
+  }
+  if (item.action === 'line-properties') {
+    startObjectPlacement('line', item.lineDefaults || {});
+    return;
+  }
+  if (item.action === 'polygon-properties') {
+    startObjectPlacement('polygon', item.polygonDefaults || {});
+    return;
+  }
+  if (item.action === 'polyline-properties') {
+    startObjectPlacement('polyline', item.polylineDefaults || {});
     return;
   }
   if (item.component) {
@@ -5476,11 +7284,102 @@ function sanitizeExplorerTree(nodes) {
   }
 }
 
+const HMI_TAG_EXPLORER_GROUPS = [
+  { id: 'PLC_DI', prefix: 'PLC_DI_', folders: ['PLC_DI_Discr', 'PLC_DI_No', 'PLC_DI_Tags'] },
+  { id: 'PLC_DO', prefix: 'PLC_DO_', folders: ['PLC_DO_Discr', 'PLC_DO_No', 'PLC_DO_Tags'] },
+  { id: 'Safety_DI', prefix: 'Safety_DI_', folders: ['Safety_DI_Discr', 'Safety_DI_No', 'Safety_DI_Tags'] },
+  { id: 'Safety_DO', prefix: 'Safety_DO_', folders: ['Safety_DO_Discr', 'Safety_DO_No', 'Safety_DO_Tags'] }
+];
+
+const HMI_TAG_SHORT_LABEL = { Discr: 'Discr', No: 'No', Tags: 'Tags' };
+
+function shortHmiTagFolderLabel(folderName) {
+  if (folderName === PLC_UPLOADED_TAGS_FOLDER) return 'PLC uploaded Tags';
+  const parts = String(folderName).split('_');
+  const last = parts[parts.length - 1];
+  return HMI_TAG_SHORT_LABEL[last] || folderName;
+}
+
+function isPlcUploadedExplorerNode(node) {
+  const key = node?.tagFolder || node?.label || '';
+  return key === PLC_UPLOADED_TAGS_FOLDER
+    || key === 'PLC uploaded Tags'
+    || key === 'PLC uploded Tags';
+}
+
+function collectExplorerTagFolderNodes(list, out = []) {
+  for (const child of list || []) {
+    if (child?.tagFolder) {
+      out.push(child);
+      continue;
+    }
+    if (child?.children?.length) collectExplorerTagFolderNodes(child.children, out);
+  }
+  return out;
+}
+
+function plcUploadedExplorerNode(existing) {
+  return {
+    type: 'folder',
+    id: existing?.id || `tag-folder-${PLC_UPLOADED_TAGS_FOLDER}`,
+    label: 'PLC uploaded Tags',
+    icon: 'folder',
+    tagFolder: PLC_UPLOADED_TAGS_FOLDER
+  };
+}
+
+function groupHmiTagExplorerTree(nodes) {
+  for (const node of nodes || []) {
+    if (node.id === 'hmi-tags') {
+      const collected = collectExplorerTagFolderNodes(node.children);
+      const byName = new Map();
+      for (const child of collected) {
+        const key = child.tagFolder || child.label;
+        if (key) byName.set(key, child);
+      }
+      const groupedFolderNames = new Set(HMI_TAG_EXPLORER_GROUPS.flatMap((group) => group.folders));
+      const extras = collected.filter((child) => {
+        const key = child.tagFolder || child.label;
+        return key && !groupedFolderNames.has(key) && !isPlcUploadedExplorerNode(child);
+      }).map((child) => ({
+        type: 'folder',
+        id: child.id || `tag-folder-${child.tagFolder || child.label}`,
+        label: child.tagFolder || child.label,
+        icon: 'folder',
+        tagFolder: child.tagFolder || child.label
+      }));
+      node.label = 'Tags';
+      node.children = [
+        {
+          type: 'folder',
+          id: 'hmi-tags-list',
+          label: 'HMI Tags',
+          icon: 'folder',
+          children: extras
+        }
+      ];
+      const plc = plcUploadedExplorerNode(byName.get(PLC_UPLOADED_TAGS_FOLDER) || byName.get('PLC uploaded Tags'));
+      const parent = nodes;
+      // PLC uploaded Tags is a sibling of Tags, not nested under it.
+      const idx = parent.indexOf(node);
+      const next = idx >= 0 ? parent[idx + 1] : null;
+      if (!isPlcUploadedExplorerNode(next)) {
+        parent.splice(idx + 1, 0, plc);
+      } else {
+        parent[idx + 1] = { ...next, ...plc, id: next.id || plc.id };
+      }
+      return;
+    }
+    if (node.children?.length) groupHmiTagExplorerTree(node.children);
+  }
+}
+
 async function loadExplorer(projectId) {
   const id = projectId || state.activeProject;
   if (!id) return;
   const data = await fetchJson(`/api/projects/${id}/explorer?_=${Date.now()}`);
   sanitizeExplorerTree(data.tree);
+  groupHmiTagExplorerTree(data.tree);
   explorerProject.textContent = `: ${data.projectName}`;
   explorerTree.innerHTML = '';
   for (const node of data.tree) {
@@ -5505,10 +7404,13 @@ function expandExplorerNode(nodeId) {
 /** Highlight the matching HMI Tags folder in the explorer sidebar (visual only). */
 function highlightExplorerTagFolder(folderName) {
   if (!folderName || !explorerTree) return;
-  for (const id of ['project-root', 'application', 'hmi-tags']) {
-    expandExplorerNode(id);
-  }
-  const nodeId = `tag-folder-${folderName}`;
+  const groupMatch = String(folderName).match(/^(PLC_DI|PLC_DO|Safety_DI|Safety_DO)_/);
+  const isPlcUploaded = folderName === PLC_UPLOADED_TAGS_FOLDER;
+  const ids = ['project-root', 'application', 'hmi-tags'];
+  if (!isPlcUploaded) ids.push('hmi-tags-list');
+  for (const id of ids) expandExplorerNode(id);
+  const isIoFolder = Boolean(groupMatch);
+  const nodeId = isIoFolder ? 'hmi-tags-list' : `tag-folder-${folderName}`;
   const row = explorerTree.querySelector(`.tree-row[data-node-id="${CSS.escape(nodeId)}"]`);
   if (!row) return;
   explorerTree.querySelectorAll('.tree-row').forEach((r) => r.classList.remove('selected'));
@@ -5523,7 +7425,16 @@ function highlightExplorerTagFolder(folderName) {
 }
 
 function expandDefaultExplorerFolders() {
-  for (const id of ['project-root', 'application', 'graphics', 'displays', 'global-objects', 'images']) {
+  for (const id of [
+    'project-root',
+    'application',
+    'hmi-tags',
+    'hmi-tags-list',
+    'graphics',
+    'displays',
+    'global-objects',
+    'images'
+  ]) {
     expandExplorerNode(id);
   }
 }
@@ -5555,7 +7466,7 @@ function renderTreeNode(node, depth) {
   row.dataset.nodeType = node.type;
 
   const hasChildren = Boolean(node.children?.length);
-  const startCollapsed = hasChildren && isDisplayCategoryFolder(node);
+  const startCollapsed = hasChildren && (isDisplayCategoryFolder(node) || node.collapseByDefault);
 
   const toggle = document.createElement('span');
   toggle.className = hasChildren ? 'tree-toggle' : 'tree-toggle tree-toggle-leaf';
@@ -5794,6 +7705,8 @@ function selectNode(row, node) {
     openGlobalObjectPreview(node.id, node.title);
   } else if (node.type === 'image') {
     showImagePropertiesDialog(node);
+  } else if (node.id === 'hmi-tags' || node.id === 'hmi-tags-list') {
+    openTagsPanel().catch((err) => setStatus(`Error: ${err.message}`));
   } else if (node.tagFolder) {
     openTagsPanel(node.tagFolder);
   } else if (node.action) {
@@ -6120,12 +8033,13 @@ function shouldAssignPlcUploadedFolder(raw, folder, format) {
 
 const IO_SYSTEM_FOLDER_RE = /^(PLC_(DI|DO)|Safety_(DI|DO))_(Discr|No|Tags)$/;
 
-const tagsPanelState = { folder: '', selected: '', mode: 'edit', detailAbort: null, ctx: null };
+const tagsPanelState = { folder: '', selected: '', mode: 'edit', detailAbort: null, ctx: null, collapsedGroups: new Set() };
 
 function tagToolbarBtnClass(action, ctx = tagsPanelState.ctx) {
   const folder = ctx?.activeFolder || '';
   const def = ctx?.activeDef;
   const io = isIoSystemFolder(folder);
+  const plc = isPlcUploadedFolder(folder);
   const internal = isInternalTagFolder(folder);
   switch (action) {
     case 'delete':
@@ -6134,7 +8048,7 @@ function tagToolbarBtnClass(action, ctx = tagsPanelState.ctx) {
       return def && isInternalTagFolder(def.folder) ? '' : ' tag-tb-muted';
     case 'insert':
     case 'new-folder':
-      return io ? ' tag-tb-muted' : '';
+      return io || plc ? ' tag-tb-muted' : '';
     case 'delete-folder':
     case 'dup-folder':
       return internal && folder ? '' : ' tag-tb-muted';
@@ -6172,6 +8086,7 @@ async function handleTagToolbarAction(action) {
   }
   const { allDefs, folderDefs, activeFolder, activeDef } = ctx;
   const io = isIoSystemFolder(activeFolder);
+  const plc = isPlcUploadedFolder(activeFolder);
 
   switch (action) {
     case 'delete':
@@ -6189,7 +8104,7 @@ async function handleTagToolbarAction(action) {
       await duplicateSelectedTagInEditor(folderDefs);
       break;
     case 'insert':
-      if (io) {
+      if (io || plc) {
         await openTagsPanel('Temp_Tags', '', { createNew: true });
         setStatus('New internal tags belong in Temp_Tags — opened Temp_Tags for new tag');
         return;
@@ -6290,9 +8205,14 @@ function isIoSystemFolder(folder) {
   return IO_SYSTEM_FOLDER_RE.test(String(folder || '').trim());
 }
 
+function isPlcUploadedFolder(folder) {
+  const f = String(folder || '').trim();
+  return f === PLC_UPLOADED_TAGS_FOLDER || f === 'PLC uploaded Tags';
+}
+
 function isInternalTagFolder(folder) {
   const f = String(folder || '').trim();
-  return Boolean(f) && !isIoSystemFolder(f);
+  return Boolean(f) && !isIoSystemFolder(f) && !isPlcUploadedFolder(f);
 }
 
 function parseFtTagNameInput(input, defaultFolder = '') {
@@ -6380,6 +8300,9 @@ function updateInternalTagTypePanels(type) {
 
 function getTagFolderList(allDefs) {
   const folders = new Set();
+  for (const name of TAG_FOLDER_ORDER) {
+    if (name !== 'Temp_Tags') folders.add(name);
+  }
   for (const name of state.projectConfig?.tagFolders || []) {
     if (name) folders.add(String(name));
   }
@@ -6389,6 +8312,42 @@ function getTagFolderList(allDefs) {
   const ordered = TAG_FOLDER_ORDER.filter((f) => folders.has(f));
   const rest = [...folders].filter((f) => !TAG_FOLDER_ORDER.includes(f)).sort((a, b) => a.localeCompare(b));
   return [...ordered, ...rest];
+}
+
+function buildTagEditorFolderTreeHtml(folders, allDefs, activeFolder) {
+  const groupedNames = new Set(HMI_TAG_EXPLORER_GROUPS.flatMap((group) => group.folders));
+  const countOf = (folder) => allDefs.filter((def) => def.folder === folder).length;
+  const collapsed = tagsPanelState.collapsedGroups || new Set();
+  const leafBtn = (folder, label) => {
+    const active = folder === activeFolder ? ' active' : '';
+    const count = countOf(folder);
+    return `<button type="button" class="tag-folder-btn${active}" data-folder="${escapeHtml(folder)}" title="${escapeHtml(folder)} (${count})"><span class="tag-folder-icon">📁</span>${escapeHtml(label)}</button>`;
+  };
+  if (activeFolder === PLC_UPLOADED_TAGS_FOLDER) {
+    return leafBtn(PLC_UPLOADED_TAGS_FOLDER, 'PLC uploaded Tags')
+      .replace('class="tag-folder-btn', 'class="tag-folder-btn tag-folder-btn-root');
+  }
+  const groupsHtml = HMI_TAG_EXPLORER_GROUPS.map((group) => {
+    const isCollapsed = collapsed.has(group.id);
+    return `<div class="tag-folder-group${isCollapsed ? ' collapsed' : ''}" data-group="${escapeHtml(group.id)}">
+      <button type="button" class="tag-folder-group-toggle" data-group-toggle="${escapeHtml(group.id)}" aria-expanded="${isCollapsed ? 'false' : 'true'}">
+        <span class="tag-folder-twist">${isCollapsed ? '+' : '−'}</span>
+        <span class="tag-folder-icon">📁</span>
+        <span class="tag-folder-group-label">${escapeHtml(group.id)}</span>
+      </button>
+      <div class="tag-folder-group-children">
+        ${group.folders.map((name) => leafBtn(name, shortHmiTagFolderLabel(name))).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  const extraFolders = folders.filter((folder) => !groupedNames.has(folder) && folder !== PLC_UPLOADED_TAGS_FOLDER);
+  const extrasHtml = extraFolders.map((folder) => (
+    leafBtn(folder, folder).replace('class="tag-folder-btn', 'class="tag-folder-btn tag-folder-btn-root')
+  )).join('');
+  const noFolderHtml = allDefs.some((def) => !def.folder)
+    ? `<button type="button" class="tag-folder-btn tag-folder-btn-root${!activeFolder ? ' active' : ''}" data-folder="">(No folder)</button>`
+    : '';
+  return `${groupsHtml}${extrasHtml}${noFolderHtml}` || '<p class="hint" style="padding:8px">No folders</p>';
 }
 
 async function persistTagFolders(folderNames) {
@@ -7134,11 +9093,12 @@ async function openTagsPanel(folderFilter = '', selectedTagName = '', options = 
   await refreshProjectConfig();
   const allDefs = state.projectConfig?.tags || [];
   const folders = getTagFolderList(allDefs);
+  const hmiFolders = folders.filter((folder) => folder !== PLC_UPLOADED_TAGS_FOLDER);
   const activeFolder = folderFilter && (
     folders.includes(folderFilter) || allDefs.some((d) => d.folder === folderFilter)
   )
     ? folderFilter
-    : (folders[0] || '');
+    : (hmiFolders[0] || '');
   tagsPanelState.folder = activeFolder;
 
   const folderDefs = activeFolder
@@ -7242,11 +9202,7 @@ async function openTagsPanel(folderFilter = '', selectedTagName = '', options = 
       </div>
       <div class="tag-editor-split">
         <div class="tag-folder-tree" id="tagFolderTree">
-          ${folders.map((folder) => {
-            const count = allDefs.filter((d) => d.folder === folder).length;
-            return `<button type="button" class="tag-folder-btn${folder === activeFolder ? ' active' : ''}" data-folder="${escapeHtml(folder)}">${escapeHtml(folder)} (${count})</button>`;
-          }).join('') || '<p class="hint" style="padding:8px">No folders</p>'}
-          ${allDefs.some((d) => !d.folder) ? `<button type="button" class="tag-folder-btn${!activeFolder ? ' active' : ''}" data-folder="">(No folder)</button>` : ''}
+          ${buildTagEditorFolderTreeHtml(folders, allDefs, activeFolder)}
         </div>
         <div class="tag-grid-wrap">
           <table class="data-table tag-grid">
@@ -7371,6 +9327,21 @@ async function openTagsPanel(folderFilter = '', selectedTagName = '', options = 
     btn.addEventListener('click', () => {
       if (tagDetailFormIsDirty() && !confirm('You have unsaved tag changes. Switch folder anyway?')) return;
       openTagsPanel(btn.dataset.folder || '').catch((err) => setStatus(`Error: ${err.message}`));
+    });
+  });
+  document.querySelectorAll('[data-group-toggle]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const groupId = btn.dataset.groupToggle;
+      const group = btn.closest('.tag-folder-group');
+      if (!group) return;
+      group.classList.toggle('collapsed');
+      const isCollapsed = group.classList.contains('collapsed');
+      if (!tagsPanelState.collapsedGroups) tagsPanelState.collapsedGroups = new Set();
+      if (isCollapsed) tagsPanelState.collapsedGroups.add(groupId);
+      else tagsPanelState.collapsedGroups.delete(groupId);
+      const twist = btn.querySelector('.tag-folder-twist');
+      if (twist) twist.textContent = isCollapsed ? '+' : '−';
+      btn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
     });
   });
 
@@ -8061,6 +10032,32 @@ function previewProjectWindowSize() {
   applyPreviewZoom();
 }
 
+async function getGraphicLayoutSize() {
+  const rt = state.projectConfig?.runtime || {};
+  if (Number(rt.layoutWidth) > 0 && Number(rt.layoutHeight) > 0) {
+    return { width: Number(rt.layoutWidth), height: Number(rt.layoutHeight) };
+  }
+  try {
+    const tpl = await fetchJson(`/api/runtime/global-objects/Template?project=${encodeURIComponent(state.activeProject)}`);
+    const comps = tpl?.components || [];
+    const header = comps.find((c) => c?.name === 'HeaderBar');
+    const ticker = comps.find((c) => c?.type === 'AlarmTicker');
+    const footer = comps.find((c) => c?.name === 'FooterBar');
+    const width = Number(header?.width) || Number(rt.width) || 800;
+    let height = Number(rt.height) || 600;
+    if (ticker) height = Math.max(Number(ticker.top) || 0, 0) + Math.max(Number(ticker.height) || 0, 0);
+    else if (footer) height = Math.max(Number(footer.top) || 0, 0) + Math.max(Number(footer.height) || 0, 0);
+    if (height < 240) height = Number(rt.height) || 600;
+    const preset = (typeof WINDOW_SIZE_PRESETS !== 'undefined' ? WINDOW_SIZE_PRESETS : []).find((p) => (
+      p.width && p.height && Math.abs(p.width - width) <= 8 && Math.abs(p.height - height) <= 16
+    ));
+    if (preset) return { width: preset.width, height: preset.height };
+    return { width, height };
+  } catch (_) {
+    return { width: Number(rt.width) || 800, height: Number(rt.height) || 600 };
+  }
+}
+
 async function saveProjectSettings(e) {
   e.preventDefault();
   if (!state.activeProject) return;
@@ -8073,6 +10070,16 @@ async function saveProjectSettings(e) {
   }
   const { width, height, windowProfile } = getProjectSettingsWindowSize();
   const executionTarget = document.querySelector('#projectSettingsForm input[name="executionTarget"]:checked')?.value || 'panel-performance';
+  const layout = await getGraphicLayoutSize();
+  const sizeChanged = layout.width !== width || layout.height !== height;
+  let scaleGraphics = false;
+  if (sizeChanged) {
+    scaleGraphics = window.confirm(
+      `The graphic layout is ${layout.width}×${layout.height}, but the project window size is ${width}×${height}.\n\n`
+      + 'Scale all displays and global objects so they fill the new size?\n\n'
+      + 'Choose OK to resize and reposition every object. Choose Cancel to keep objects at their current size (empty space will remain).'
+    );
+  }
 
   const patch = {
     name: appName,
@@ -8091,6 +10098,11 @@ async function saveProjectSettings(e) {
       action: document.getElementById('psInactivityAction').value
     }
   };
+  if (scaleGraphics) {
+    patch.scaleGraphics = true;
+    patch.scaleFromWidth = layout.width;
+    patch.scaleFromHeight = layout.height;
+  }
 
   try {
     const result = await fetchJson(`/api/projects/${state.activeProject}/config`, {
@@ -8102,9 +10114,12 @@ async function saveProjectSettings(e) {
     document.getElementById('projectSettingsDialog').close();
     await loadProjects();
     await loadExplorer(state.activeProject);
+    invalidateOpenCanvasCache?.();
     if (state.selectedScreenId) {
       await reloadDisplayPreview();
-      setStatus(`Project settings saved — display ${state.previewCanvas.width}×${state.previewCanvas.height}`);
+      setStatus(scaleGraphics
+        ? `Project settings saved — graphics scaled to ${width}×${height}`
+        : `Project settings saved — display ${state.previewCanvas.width}×${state.previewCanvas.height}`);
     } else {
       setStatus(`Project settings saved — window size ${width}×${height}`);
     }
@@ -8171,6 +10186,27 @@ function handleToolbarAction(action) {
     case 'fit-window':
       setViewPref('zoom', 100);
       setStatus('Zoom fit — 100%');
+      break;
+    case 'draw-line':
+      handleObjectAction('draw-line');
+      break;
+    case 'draw-rectangle':
+      handleObjectAction('draw-rectangle');
+      break;
+    case 'draw-rounded-rect':
+      handleObjectAction('draw-rounded-rect');
+      break;
+    case 'draw-ellipse':
+      handleObjectAction('draw-ellipse');
+      break;
+    case 'draw-wedge':
+      handleObjectAction('draw-wedge');
+      break;
+    case 'draw-polygon':
+      handleObjectAction('draw-polygon');
+      break;
+    case 'draw-polyline':
+      handleObjectAction('draw-polyline');
       break;
     default:
       if (plannedAlign.includes(action)) setStatus(`${action.replace(/-/g, ' ')} — visual editor planned`);
@@ -9204,7 +11240,7 @@ function getExplorerContextMenuItems(node) {
     return [
       { action: 'new-tag', label: 'New' },
       { action: 'add-component', label: 'Add Component into Project...', disabled: true },
-      { action: 'new-folder', label: 'New Folder', disabled: true },
+      { action: 'new-folder', label: 'New Folder' },
       { separator: true },
       { action: 'clear-all-tags', label: 'Clear All Tags...' },
       { separator: true },
@@ -9496,6 +11532,11 @@ function runExplorerContextAction(action, node) {
       break;
     case 'new-tag':
       openTagsPanel('Temp_Tags', '', { createNew: true }).catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'new-folder':
+      if (node.id === 'hmi-tags' || node.id === 'hmi-tags-list' || node.tagFolder) {
+        createTagFolderFromEditor();
+      }
       break;
     case 'clear-all-tags':
       clearAllTagsFromProject().catch((err) => setStatus(`Error: ${err.message}`));
@@ -9857,7 +11898,7 @@ document.getElementById('cancelProjectSettings').addEventListener('click', () =>
   document.getElementById('projectSettingsDialog').close();
 });
 document.getElementById('helpProjectSettings').addEventListener('click', () => {
-  alert('Project Settings define window size, runtime target, communication, and inactivity behavior for the active Plant HMI application.');
+  alert('Project Settings define window size, runtime target, communication, and inactivity behavior.\n\nWhen the project window size changes, you can scale every display and global object so headers, navigation, and graphics fill the new size.');
 });
 document.getElementById('psWindowProfile').addEventListener('change', (e) => {
   applyWindowProfile(e.target.value);
@@ -10037,11 +12078,22 @@ function runDeferredStudioInits() {
     ],
     [
       () => window.StudioBarGraph?.initBarGraphDialog(),
+      () => window.StudioGauge?.initGaugeDialog(),
+      () => window.StudioScale?.initScaleDialog(),
+      () => window.StudioPausePenButton?.initPausePenButtonDialog(),
+      () => window.StudioNextPenButton?.initNextPenButtonDialog(),
+      () => window.StudioBackspaceButton?.initBackspaceButtonDialog(),
+      () => window.StudioEndButton?.initEndButtonDialog(),
+      () => window.StudioTrend?.initTrendDialog(),
       () => window.StudioRecipePlusButton?.initRecipePlusButtonDialog(),
       () => window.StudioRecipePlusSelector?.initRecipePlusSelectorDialog(),
+      () => window.StudioRecipePlusTable?.initRecipePlusTableDialog(),
       () => window.StudioCommunicationsSetup?.initCommunicationsSetupDialog(),
       () => window.StudioShapeProperties?.initShapePropertiesDialog(),
       () => window.StudioFreehandProperties?.initFreehandPropertiesDialog(),
+      () => window.StudioLineProperties?.initLinePropertiesDialog(),
+      () => window.StudioPolygonProperties?.initPolygonPropertiesDialog(),
+      () => window.StudioPolylineProperties?.initPolylinePropertiesDialog(),
       () => window.StudioEllipseProperties?.initEllipsePropertiesDialog(),
       () => window.StudioArcProperties?.initArcPropertiesDialog(),
       () => window.StudioPanelProperties?.initPanelPropertiesDialog(),
@@ -10078,6 +12130,7 @@ function runNextDeferredDialogInitBatch() {
 
 function flushDeferredDialogInits() {
   if (state.deferredStudioInitsDone) return;
+  if (!state.deferredStudioInitsStarted) runDeferredStudioInits();
   while (state.deferredDialogInitQueue?.length) {
     const batch = state.deferredDialogInitQueue.shift();
     for (const fn of batch) {

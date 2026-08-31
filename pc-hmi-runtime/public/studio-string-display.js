@@ -1,5 +1,8 @@
-/** String Display property dialog */
+/** String Display property dialog — FactoryTalk View parity */
 (function () {
+  let sdPreviewTimer = null;
+  let sdDialogCommitted = false;
+
   function switchTab(tabId) {
     document.querySelectorAll('#stringDisplayDialog .dialog-tab').forEach((el) => {
       el.classList.toggle('active', el.dataset.sdTab === tabId);
@@ -7,6 +10,19 @@
     document.querySelectorAll('#stringDisplayDialog .dialog-tab-panel').forEach((el) => {
       el.classList.toggle('active', el.dataset.sdTabPanel === tabId);
     });
+  }
+
+  function sdGetColor(id) {
+    return window.StudioPropsShared?.getColorFieldValue?.(id)
+      || window.FtColorPicker?.getInputColor?.(document.getElementById(id))
+      || document.getElementById(id)?.value
+      || '#001C38';
+  }
+
+  function sdSetColor(id, raw) {
+    if (window.StudioPropsShared?.setColorFieldValue) window.StudioPropsShared.setColorFieldValue(id, raw);
+    else if (window.FtColorPicker?.setValueSilent) window.FtColorPicker.setValueSilent(document.getElementById(id), raw);
+    else if (document.getElementById(id)) document.getElementById(id).value = raw;
   }
 
   function nextStringDisplayName(components) {
@@ -21,8 +37,8 @@
       tag: '',
       left: 16,
       top: 16,
-      width: 120,
-      height: 80,
+      width: 168,
+      height: 91,
       visible: true,
       borderStyle: 'line',
       borderWidth: 4,
@@ -33,7 +49,7 @@
       backColor: '#001C38',
       useBorderColor: true,
       borderColor: '#001C38',
-      usePatternColor: false,
+      usePatternColor: true,
       patternColor: '#ffffff',
       useForeColor: true,
       foreColor: '#ffffff',
@@ -43,23 +59,77 @@
       bold: false,
       italic: false,
       underline: false,
-      alignment: 'middleLeft',
+      alignment: 'middleCenter',
       wordWrap: true,
       ...overrides
     };
   }
 
-  function syncStringDisplayFields() {
-    document.getElementById('sdBackColor').disabled = !document.getElementById('sdUseBackColor')?.checked;
-    document.getElementById('sdBorderColor').disabled = !document.getElementById('sdUseBorderColor')?.checked;
-    document.getElementById('sdPatternColor').disabled = !document.getElementById('sdUsePatternColor')?.checked;
-    document.getElementById('sdForeColor').disabled = !document.getElementById('sdUseForeColor')?.checked;
+  function scheduleStringDisplayLivePreview() {
+    if (window.state?.propsFormFill) return;
+    if (sdPreviewTimer) clearTimeout(sdPreviewTimer);
+    sdPreviewTimer = setTimeout(() => {
+      sdPreviewTimer = null;
+      if (!document.getElementById('stringDisplayDialog')?.open) return;
+      const comp = readStringDisplayForm();
+      if (window.patchShapeLivePreview) window.patchShapeLivePreview(comp);
+      else if (comp?.name) window.previewPatchByName?.(comp.name, comp);
+      window.updatePropsApplyButton?.(readStringDisplayForm, 'applyStringDisplay');
+    }, 80);
   }
 
-  function wireTools() {
+  function wireStringDisplayTools() {
     if (window.StudioTagTools) StudioTagTools.wirePickButtons();
-    if (window.FtColorPicker) window.FtColorPicker.initAll(document.getElementById('stringDisplayDialog'));
-    syncStringDisplayFields();
+    const dlg = document.getElementById('stringDisplayDialog');
+    if (window.FtColorPicker && dlg) {
+      if (window.FtColorPicker.initAllSync) window.FtColorPicker.initAllSync(dlg);
+      else window.FtColorPicker.initAll(dlg);
+      window.FtColorPicker.refreshAll?.(dlg);
+    }
+    window.StudioPropsShared?.fillPatternSelect('sdPatternStyle', 'sdFilled');
+    document.querySelectorAll('#stringDisplayForm .ft-color-input').forEach((input) => {
+      if (input.dataset.sdPreviewWired === '1') return;
+      input.dataset.sdPreviewWired = '1';
+      input.addEventListener('input', scheduleStringDisplayLivePreview);
+      input.addEventListener('change', scheduleStringDisplayLivePreview);
+    });
+  }
+
+  function presentStringDisplayDialog() {
+    const dialog = document.getElementById('stringDisplayDialog');
+    if (!dialog) {
+      window.setStatus('String Display Properties dialog is missing from Studio');
+      return;
+    }
+    if (dialog.open) return;
+    sdDialogCommitted = false;
+    dialog.classList.add('is-positioned');
+    dialog.style.position = 'fixed';
+    dialog.style.margin = '0';
+    dialog.style.left = '24px';
+    dialog.style.top = '36px';
+    dialog.style.right = 'auto';
+    dialog.style.bottom = 'auto';
+    dialog.style.transform = 'none';
+    dialog.style.zIndex = '30000';
+    dialog.style.maxHeight = 'calc(100vh - 48px)';
+    dialog.style.overflow = 'auto';
+    try {
+      dialog.showModal();
+    } catch (err) {
+      document.querySelectorAll('dialog[open]').forEach((other) => {
+        if (other !== dialog) {
+          try { other.close(); } catch (_) { /* ignore */ }
+        }
+      });
+      try {
+        dialog.showModal();
+      } catch (err2) {
+        dialog.setAttribute('open', '');
+        dialog.style.display = 'block';
+        window.setStatus(`Opened String Display properties without modal: ${err2.message}`);
+      }
+    }
   }
 
   function mergeExistingStringDisplay(read) {
@@ -81,159 +151,182 @@
   }
 
   function fillStringDisplayForm(comp) {
-    document.getElementById('sdBorderStyle').value = comp.borderStyle || 'line';
-    document.getElementById('sdBorderWidth').value = comp.borderWidth ?? 4;
-    document.getElementById('sdBackStyle').value = comp.backStyle || 'solid';
-    document.getElementById('sdPatternStyle').value = comp.patternStyle || 'none';
-    document.getElementById('sdBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
-    document.getElementById('sdUseBackColor').checked = comp.useBackColor !== false;
-    document.getElementById('sdBackColor').value = comp.backColor || '#001C38';
-    document.getElementById('sdUseBorderColor').checked = Boolean(comp.useBorderColor);
-    document.getElementById('sdBorderColor').value = comp.borderColor || '#001C38';
-    document.getElementById('sdUsePatternColor').checked = Boolean(comp.usePatternColor);
-    document.getElementById('sdPatternColor').value = comp.patternColor || '#ffffff';
-    document.getElementById('sdUseForeColor').checked = comp.useForeColor !== false;
-    document.getElementById('sdForeColor').value = comp.foreColor || '#ffffff';
-    document.getElementById('sdBlink').checked = Boolean(comp.blink);
-    document.getElementById('sdFont').value = comp.fontFamily || 'Arial Unicode MS';
-    document.getElementById('sdFontSize').value = String(comp.fontSize ?? 10);
-    document.getElementById('sdBold').classList.toggle('active', Boolean(comp.bold));
-    document.getElementById('sdItalic').classList.toggle('active', Boolean(comp.italic));
-    document.getElementById('sdUnderline').classList.toggle('active', Boolean(comp.underline));
-    document.querySelector(`#stringDisplayForm input[name="sdAlign"][value="${comp.alignment || 'middleLeft'}"]`)?.click();
-    document.getElementById('sdWordWrap').checked = comp.wordWrap !== false;
-    document.getElementById('sdHeight').value = comp.height ?? 80;
-    document.getElementById('sdWidth').value = comp.width ?? 120;
-    document.getElementById('sdTop').value = comp.top ?? 16;
-    document.getElementById('sdLeft').value = comp.left ?? 16;
-    document.getElementById('sdName').value = comp.name || 'StringDisplay1';
-    document.getElementById('sdVisible').checked = comp.visible !== false;
-    document.getElementById('sdTag').value = comp.useCurrentUser ? '' : (comp.tag || '');
-    syncStringDisplayFields();
+    if (window.state) window.state.propsFormFill = true;
+    try {
+      window.StudioPropsShared?.fillPatternSelect('sdPatternStyle', 'sdFilled');
+      document.getElementById('sdBorderStyle').value = comp.borderStyle || 'line';
+      document.getElementById('sdBorderWidth').value = comp.borderWidth ?? 4;
+      document.getElementById('sdBackStyle').value = comp.backStyle || 'solid';
+      const pat = document.getElementById('sdPatternStyle');
+      if (pat) pat.value = comp.patternStyle || 'none';
+      document.getElementById('sdBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
+      sdSetColor('sdBackColor', comp.backColor || '#001C38');
+      sdSetColor('sdBorderColor', comp.borderColor || '#001C38');
+      sdSetColor('sdPatternColor', comp.patternColor || '#ffffff');
+      sdSetColor('sdForeColor', comp.foreColor || '#ffffff');
+      document.getElementById('sdBlink').checked = Boolean(comp.blink);
+      document.getElementById('sdFont').value = comp.fontFamily || 'Arial Unicode MS';
+      document.getElementById('sdFontSize').value = String(comp.fontSize ?? 10);
+      document.getElementById('sdBold').classList.toggle('active', Boolean(comp.bold));
+      document.getElementById('sdItalic').classList.toggle('active', Boolean(comp.italic));
+      document.getElementById('sdUnderline').classList.toggle('active', Boolean(comp.underline));
+      document.querySelectorAll('#stringDisplayForm input[name="sdAlign"]').forEach((el) => {
+        el.checked = el.value === (comp.alignment || 'middleCenter');
+      });
+      document.getElementById('sdWordWrap').checked = comp.wordWrap !== false;
+      document.getElementById('sdHeight').value = comp.height ?? 91;
+      document.getElementById('sdWidth').value = comp.width ?? 168;
+      document.getElementById('sdTop').value = comp.top ?? 16;
+      document.getElementById('sdLeft').value = comp.left ?? 16;
+      document.getElementById('sdName').value = comp.name || 'StringDisplay1';
+      document.getElementById('sdVisible').checked = comp.visible !== false;
+      document.getElementById('sdTag').value = comp.useCurrentUser ? '' : (comp.tag || '');
+    } finally {
+      if (window.state) window.state.propsFormFill = false;
+    }
   }
 
   function readStringDisplayForm() {
     return {
       type: 'StringDisplay',
-      name: document.getElementById('sdName').value.trim() || 'StringDisplay1',
-      tag: document.getElementById('sdTag').value.trim(),
-      left: Number(document.getElementById('sdLeft').value) || 0,
-      top: Number(document.getElementById('sdTop').value) || 0,
-      width: Number(document.getElementById('sdWidth').value) || 120,
-      height: Number(document.getElementById('sdHeight').value) || 80,
-      visible: document.getElementById('sdVisible').checked,
-      borderStyle: document.getElementById('sdBorderStyle').value,
-      borderWidth: Number(document.getElementById('sdBorderWidth').value) || 4,
-      borderUsesBackColor: document.getElementById('sdBorderUsesBackColor').checked,
-      backStyle: document.getElementById('sdBackStyle').value,
-      patternStyle: document.getElementById('sdPatternStyle').value,
-      useBackColor: document.getElementById('sdUseBackColor').checked,
-      backColor: document.getElementById('sdBackColor').value,
-      useBorderColor: document.getElementById('sdUseBorderColor').checked,
-      borderColor: document.getElementById('sdBorderColor').value,
-      usePatternColor: document.getElementById('sdUsePatternColor').checked,
-      patternColor: document.getElementById('sdPatternColor').value,
-      useForeColor: document.getElementById('sdUseForeColor').checked,
-      foreColor: document.getElementById('sdForeColor').value,
-      blink: document.getElementById('sdBlink').checked,
-      fontFamily: document.getElementById('sdFont').value,
-      fontSize: Number(document.getElementById('sdFontSize').value) || 10,
-      bold: document.getElementById('sdBold').classList.contains('active'),
-      italic: document.getElementById('sdItalic').classList.contains('active'),
-      underline: document.getElementById('sdUnderline').classList.contains('active'),
-      alignment: document.querySelector('#stringDisplayForm input[name="sdAlign"]:checked')?.value || 'middleLeft',
-      wordWrap: document.getElementById('sdWordWrap').checked
+      name: document.getElementById('sdName')?.value.trim() || 'StringDisplay1',
+      tag: document.getElementById('sdTag')?.value.trim() || '',
+      left: Number(document.getElementById('sdLeft')?.value) || 0,
+      top: Number(document.getElementById('sdTop')?.value) || 0,
+      width: Number(document.getElementById('sdWidth')?.value) || 168,
+      height: Number(document.getElementById('sdHeight')?.value) || 91,
+      visible: document.getElementById('sdVisible')?.checked !== false,
+      borderStyle: document.getElementById('sdBorderStyle')?.value || 'line',
+      borderWidth: Number(document.getElementById('sdBorderWidth')?.value) || 4,
+      borderUsesBackColor: document.getElementById('sdBorderUsesBackColor')?.checked !== false,
+      backStyle: document.getElementById('sdBackStyle')?.value || 'solid',
+      patternStyle: document.getElementById('sdPatternStyle')?.value || 'none',
+      useBackColor: true,
+      backColor: sdGetColor('sdBackColor'),
+      useBorderColor: true,
+      borderColor: sdGetColor('sdBorderColor'),
+      usePatternColor: true,
+      patternColor: sdGetColor('sdPatternColor'),
+      useForeColor: true,
+      foreColor: sdGetColor('sdForeColor'),
+      blink: Boolean(document.getElementById('sdBlink')?.checked),
+      fontFamily: document.getElementById('sdFont')?.value || 'Arial Unicode MS',
+      fontSize: Number(document.getElementById('sdFontSize')?.value) || 10,
+      bold: document.getElementById('sdBold')?.classList.contains('active'),
+      italic: document.getElementById('sdItalic')?.classList.contains('active'),
+      underline: document.getElementById('sdUnderline')?.classList.contains('active'),
+      alignment: document.querySelector('#stringDisplayForm input[name="sdAlign"]:checked')?.value || 'middleCenter',
+      wordWrap: document.getElementById('sdWordWrap')?.checked !== false
     };
-  }
-
-  function validateStringDisplay(comp) {
-    if (!comp.tag && !comp.useCurrentUser) {
-      window.setStatus('Enter a Value tag on the Connections tab');
-      switchTab('connections');
-      return false;
-    }
-    return true;
   }
 
   async function showStringDisplayDialog(overrides = {}) {
     if (!window.displayIsOpen?.()) {
-      window.setStatus('Open a display or global object first, then choose String Display');
+      window.setStatus('Open a display first, then drag on the canvas to place the String Display');
       return;
     }
-    const canvas = await window.fetchOpenCanvas();
-    const comp = defaultStringDisplayComponent({
-      name: nextStringDisplayName(canvas?.components),
-      ...overrides
-    });
-    fillStringDisplayForm(comp);
-    window.resetPropsDialogState('string-display', readStringDisplayForm, 'applyStringDisplay');
-    switchTab('general');
-    wireTools();
-    document.getElementById('stringDisplayDialog')?.showModal();
+    try {
+      window.flushDeferredDialogInits?.();
+      initStringDisplayDialog();
+      const canvas = await window.fetchOpenCanvas();
+      const comp = defaultStringDisplayComponent({
+        name: nextStringDisplayName(canvas?.components),
+        ...overrides
+      });
+      fillStringDisplayForm(comp);
+      window.resetPropsDialogState('string-display', readStringDisplayForm, 'applyStringDisplay');
+      switchTab('general');
+      wireStringDisplayTools();
+      presentStringDisplayDialog();
+      const previewComp = readStringDisplayForm();
+      if (window.patchShapeLivePreview) window.patchShapeLivePreview(previewComp);
+      else if (previewComp?.name) window.previewPatchByName?.(previewComp.name, previewComp);
+      window.flushPropsApplyButton?.(readStringDisplayForm, 'applyStringDisplay');
+    } catch (err) {
+      window.setStatus(`String Display properties error: ${err.message}`);
+    }
   }
 
   async function applyStringDisplay() {
     const comp = mergeExistingStringDisplay(readStringDisplayForm());
-    if (!validateStringDisplay(comp)) return;
-    await window.upsertCanvasComponent(comp);
+    const ok = await window.upsertCanvasComponent(comp);
+    if (!ok) {
+      window.setStatus('Could not apply — open a display or global object first');
+      return;
+    }
     window.commitPropsSnapshot(readStringDisplayForm, 'applyStringDisplay');
-    window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
+    window.afterCanvasComponentSaved?.(comp);
+    window.setStatus(`Applied ${comp.name}`);
   }
 
   async function saveStringDisplay(e) {
     e.preventDefault();
     const comp = mergeExistingStringDisplay(readStringDisplayForm());
-    if (!validateStringDisplay(comp)) return;
-    await window.upsertCanvasComponent(comp);
+    const ok = await window.upsertCanvasComponent(comp);
+    if (!ok) {
+      window.setStatus('Could not save — open a display or global object first');
+      return;
+    }
+    sdDialogCommitted = true;
+    const editIdx = window.state?.propsDialog?.editIndex;
     document.getElementById('stringDisplayDialog').close();
-    window.clearPropsDialogState();
-    window.activateSelectTool(`Added ${comp.name} to ${window.state.selectedScreenId}`);
+    if (editIdx != null) window.state.canvasSelection.indices = [editIdx];
+    window.setStatus(`Saved ${comp.name}`);
   }
 
   function initStringDisplayDialog() {
     const form = document.getElementById('stringDisplayForm');
-    if (!form) return;
+    if (!form || form.dataset.sdWired === '1') return;
+    form.dataset.sdWired = '1';
+    window.StudioPropsShared?.fillPatternSelect('sdPatternStyle', 'sdFilled');
     form.addEventListener('submit', (e) => saveStringDisplay(e).catch((err) => window.setStatus(`Error: ${err.message}`)));
     document.getElementById('applyStringDisplay')?.addEventListener('click', () => {
       applyStringDisplay().catch((err) => window.setStatus(`Error: ${err.message}`));
     });
-    form.addEventListener('input', () => window.updatePropsApplyButton(readStringDisplayForm, 'applyStringDisplay'));
-    form.addEventListener('change', () => window.updatePropsApplyButton(readStringDisplayForm, 'applyStringDisplay'));
+    form.addEventListener('input', () => {
+      scheduleStringDisplayLivePreview();
+      window.flushPropsApplyButton?.(readStringDisplayForm, 'applyStringDisplay');
+    });
+    form.addEventListener('change', () => {
+      scheduleStringDisplayLivePreview();
+      window.flushPropsApplyButton?.(readStringDisplayForm, 'applyStringDisplay');
+    });
     document.getElementById('cancelStringDisplay')?.addEventListener('click', () => {
       document.getElementById('stringDisplayDialog')?.close();
-      window.clearPropsDialogState();
-      window.activateSelectTool('Placement cancelled');
     });
     document.getElementById('stringDisplayDialog')?.addEventListener('close', () => {
-      if (window.state.placement) window.activateSelectTool();
+      if (sdPreviewTimer) {
+        clearTimeout(sdPreviewTimer);
+        sdPreviewTimer = null;
+      }
+      if (!sdDialogCommitted) window.revertPropsDialogPreview?.();
+      sdDialogCommitted = false;
+      window.clearPropsDialogState?.();
+      window.activateSelectTool?.();
     });
     document.getElementById('helpStringDisplay')?.addEventListener('click', () => {
-      alert('String Display shows a tag value as text with configurable font, alignment, and word wrap.');
+      alert('String Display shows a tag or expression as text. Configure appearance, font, word wrap, and the Value connection. A Value tag is optional until runtime.');
     });
     document.querySelectorAll('#stringDisplayDialog .dialog-tab').forEach((tab) => {
       tab.addEventListener('click', () => switchTab(tab.dataset.sdTab));
     });
-    for (const id of ['sdUseBackColor', 'sdUseBorderColor', 'sdUsePatternColor', 'sdUseForeColor']) {
-      document.getElementById(id)?.addEventListener('change', () => {
-        syncStringDisplayFields();
-        window.updatePropsApplyButton(readStringDisplayForm, 'applyStringDisplay');
-      });
-    }
     for (const id of ['sdBold', 'sdItalic', 'sdUnderline']) {
       document.getElementById(id)?.addEventListener('click', (e) => {
         e.preventDefault();
         e.currentTarget.classList.toggle('active');
-        window.updatePropsApplyButton(readStringDisplayForm, 'applyStringDisplay');
+        scheduleStringDisplayLivePreview();
       });
     }
   }
 
   window.StudioStringDisplay = {
     initStringDisplayDialog,
+    presentStringDisplayDialog,
+    scheduleStringDisplayLivePreview,
     showStringDisplayDialog,
     fillStringDisplayForm,
     readStringDisplayForm,
     switchStringDisplayTab: switchTab,
-    wireStringDisplayTools: wireTools
+    wireStringDisplayTools
   };
 })();

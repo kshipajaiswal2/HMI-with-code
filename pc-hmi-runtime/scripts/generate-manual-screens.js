@@ -1,7 +1,7 @@
 /** Generate 300_Manual_Operation shell + 304_Network ladder screen */
 const fs = require('fs');
 const path = require('path');
-const { buildLegend, wireRect, s } = require('./equipment-status-legend');
+const { buildLegend, wireRect } = require('./equipment-status-legend');
 
 const MS_STATES = [
   {
@@ -165,8 +165,6 @@ function manualTemplateReplace() {
     }
   };
 }
-
-const { buildLegend } = require('./equipment-status-legend');
 
 const MANUAL_SHELL = {
   ManualNav_301_PLC_IO_List: { left: 8, top: 75, width: 66, height: 35 },

@@ -698,10 +698,16 @@ function updatePreviewComponentBounds(index, bounds) {
   const el = screenContent.querySelector(`[data-component-index="${index}"]`);
   if (!comp || !el) return false;
   Object.assign(comp, bounds);
-  if (comp.type === 'Arc' || comp.type === 'Ellipse') {
+  if (comp.type === 'Arc' || comp.type === 'Ellipse' || comp.type === 'Wedge') {
     ComponentRegistry.applyArcAppearance(el, comp);
   } else if (comp.type === 'Freehand') {
     ComponentRegistry.applyFreehandAppearance(el, comp);
+  } else if (comp.type === 'Line') {
+    ComponentRegistry.applyLineAppearance(el, comp);
+  } else if (comp.type === 'Polygon' || comp.type === 'Polyline') {
+    ComponentRegistry.applyPolygonAppearance(el, comp);
+  } else if (comp.type === 'RoundedRectangle') {
+    ComponentRegistry.applyRoundedRectangleAppearance(el, comp);
   } else {
     ComponentRegistry.applyGraphicsObject(el, comp);
   }
@@ -733,12 +739,45 @@ function updatePreviewComponentBoundsByName(name, bounds) {
         patch.points = hit.comp.points.map((p) => ({ x: p.x * sx, y: p.y * sy }));
       }
     }
+  } else if ((hit.comp.type === 'Polygon' || hit.comp.type === 'Polyline') && hit.comp.points?.length) {
+    const oldW = hit.comp.width || 1;
+    const oldH = hit.comp.height || 1;
+    const newW = bounds.width ?? hit.comp.width ?? oldW;
+    const newH = bounds.height ?? hit.comp.height ?? oldH;
+    if (bounds.width != null || bounds.height != null) {
+      const sx = newW / oldW;
+      const sy = newH / oldH;
+      if (Math.abs(sx - 1) > 0.0001 || Math.abs(sy - 1) > 0.0001) {
+        patch.points = hit.comp.points.map((p) => ({ x: p.x * sx, y: p.y * sy }));
+      }
+    }
+  } else if (hit.comp.type === 'Line') {
+    const oldW = hit.comp.width || 1;
+    const oldH = hit.comp.height || 1;
+    const newW = bounds.width ?? hit.comp.width ?? oldW;
+    const newH = bounds.height ?? hit.comp.height ?? oldH;
+    if (bounds.width != null || bounds.height != null) {
+      const sx = newW / oldW;
+      const sy = newH / oldH;
+      if (Math.abs(sx - 1) > 0.0001 || Math.abs(sy - 1) > 0.0001) {
+        patch.x1 = (Number(hit.comp.x1) || 0) * sx;
+        patch.y1 = (Number(hit.comp.y1) || 0) * sy;
+        patch.x2 = (hit.comp.x2 != null ? Number(hit.comp.x2) : oldW) * sx;
+        patch.y2 = (hit.comp.y2 != null ? Number(hit.comp.y2) : oldH) * sy;
+      }
+    }
   }
   Object.assign(hit.comp, patch);
-  if (hit.comp.type === 'Arc' || hit.comp.type === 'Ellipse') {
+  if (hit.comp.type === 'Arc' || hit.comp.type === 'Ellipse' || hit.comp.type === 'Wedge') {
     ComponentRegistry.applyArcAppearance(hit.el, hit.comp);
   } else if (hit.comp.type === 'Freehand') {
     ComponentRegistry.applyFreehandAppearance(hit.el, hit.comp);
+  } else if (hit.comp.type === 'Line') {
+    ComponentRegistry.applyLineAppearance(hit.el, hit.comp);
+  } else if (hit.comp.type === 'Polygon' || hit.comp.type === 'Polyline') {
+    ComponentRegistry.applyPolygonAppearance(hit.el, hit.comp);
+  } else if (hit.comp.type === 'RoundedRectangle') {
+    ComponentRegistry.applyRoundedRectangleAppearance(hit.el, hit.comp);
   } else {
     ComponentRegistry.applyGraphicsObject(hit.el, hit.comp);
   }

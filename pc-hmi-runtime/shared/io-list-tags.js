@@ -214,21 +214,53 @@ function buildAllListRuntimeValues(parameterFiles = null, existingTags = null) {
   return byParameterFile;
 }
 
-function getIoListTagFolders() {
+const PLC_UPLOADED_TAGS_FOLDER = 'PLC uploded Tags';
+
+function getStandardHmiTagFolders() {
   const order = ['di', 'do', 'safetyDi', 'safetyDo'];
-  return [
-    ...order.flatMap((kind) => {
-      const cfg = Builder.IO_LIST_KINDS[kind];
-      return [cfg.discrPrefix, cfg.noPrefix, cfg.tagsPrefix];
-    }),
-    'Temp_Tags'
+  return order.flatMap((kind) => {
+    const cfg = Builder.IO_LIST_KINDS[kind];
+    return [cfg.discrPrefix, cfg.noPrefix, cfg.tagsPrefix];
+  });
+}
+
+function getIoListTagFolders() {
+  return [...getStandardHmiTagFolders(), 'Temp_Tags'];
+}
+
+function getHmiTagExplorerGroups() {
+  const order = [
+    { id: 'PLC_DI', kind: 'di' },
+    { id: 'PLC_DO', kind: 'do' },
+    { id: 'Safety_DI', kind: 'safetyDi' },
+    { id: 'Safety_DO', kind: 'safetyDo' }
   ];
+  return order.map((g) => {
+    const cfg = Builder.IO_LIST_KINDS[g.kind];
+    return {
+      id: g.id,
+      label: g.id,
+      folders: [
+        { name: cfg.discrPrefix, label: 'Discr' },
+        { name: cfg.noPrefix, label: 'No' },
+        { name: cfg.tagsPrefix, label: 'Tags' }
+      ]
+    };
+  });
+}
+
+function getDefaultHmiTagFolderOrder() {
+  return [...getStandardHmiTagFolders(), PLC_UPLOADED_TAGS_FOLDER];
 }
 
 module.exports = {
+  PLC_UPLOADED_TAGS_FOLDER,
   buildAllIoListTagDefs,
   buildAllListRuntimeValues,
   buildListRuntimeValues,
+  getStandardHmiTagFolders,
+  getHmiTagExplorerGroups,
+  getDefaultHmiTagFolderOrder,
   getIoListTagFolders,
   pickPlcSourceTags
 };

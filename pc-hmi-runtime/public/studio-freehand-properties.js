@@ -1,29 +1,8 @@
 /** Freehand property dialog — FactoryTalk View style (General / Common tabs). */
 (function () {
+  const S = window.StudioPropsShared;
   let freehandPreviewTimer = null;
-
-  const PATTERN_OPTIONS = [
-    ['none', 'None'],
-    ['dots', 'Dots'],
-    ['checks', 'Checks'],
-    ['smallBoxes', 'Small Boxes'],
-    ['mediumBoxes', 'Medium Boxes'],
-    ['largeBoxes', 'Large Boxes'],
-    ['verticalLines', 'Vertical Lines'],
-    ['wideVerticalLines', 'Wide Vertical Lines'],
-    ['horizontalLines', 'Horizontal Lines'],
-    ['wideHorizontalLines', 'Wide Horizontal Lines'],
-    ['rightDiagonal', 'Right Diagonal'],
-    ['wideRightDiagonal', 'Wide Right Diagonal'],
-    ['leftDiagonal', 'Left Diagonal'],
-    ['wideLeftDiagonal', 'Wide Left Diagonal'],
-    ['hatch', 'Hatch'],
-    ['bricks', 'Bricks'],
-    ['ovals', 'Ovals'],
-    ['diamonds', 'Diamonds'],
-    ['scales', 'Scales'],
-    ['waves', 'Waves']
-  ];
+  let lastFreehandSize = { width: 166, height: 71 };
 
   function scheduleFreehandLivePreview() {
     if (window.state?.propsFormFill) return;
@@ -31,11 +10,12 @@
     freehandPreviewTimer = setTimeout(() => {
       freehandPreviewTimer = null;
       const comp = readFreehandPropertiesForm();
-      window.updateFreehandStudioPreview?.(comp);
-      if (comp.name && window.previewPatchByName) {
-        window.previewPatchByName(comp.name, comp);
+      if (window.state?.propsDialog?.editIndex == null) {
+        window.updateFreehandStudioPreview?.(comp);
+      } else {
+        window.hideFreehandStudioPreview?.();
       }
-      window.updatePropsApplyButton?.(readFreehandPropertiesForm, 'applyFreehandProperties');
+      S.previewShape(comp, readFreehandPropertiesForm, 'applyFreehandProperties');
     }, 100);
   }
 
@@ -45,26 +25,15 @@
   }
 
   function wireColorInputs() {
-    document.querySelectorAll('#freehandPropertiesForm .ft-color-input').forEach((input) => {
-      if (input.dataset.fhColorWired === '1') return;
-      input.dataset.fhColorWired = '1';
-      input.addEventListener('input', notifyFreehandFormChange);
-      input.addEventListener('change', notifyFreehandFormChange);
-    });
+    S.wireColorInputs('#freehandPropertiesForm', 'fhColorWired', notifyFreehandFormChange);
   }
 
   function switchTab(tabId) {
-    document.querySelectorAll('#freehandPropertiesDialog .dialog-tab').forEach((el) => {
-      el.classList.toggle('active', el.dataset.fhTab === tabId);
-    });
-    document.querySelectorAll('#freehandPropertiesDialog .dialog-tab-panel').forEach((el) => {
-      el.classList.toggle('active', el.dataset.fhTabPanel === tabId);
-    });
+    S.switchDialogTab('freehandPropertiesDialog', 'fhTab', 'fhTabPanel', tabId);
   }
 
   function syncGradientFields() {
-    const isGradient = document.getElementById('fhBackStyle')?.value === 'gradient';
-    document.getElementById('fhGradientExtras')?.classList.toggle('hidden', !isGradient);
+    S.syncGradientExtras('fhBackStyle', 'fhGradientExtras');
   }
 
   function syncPatternFields() {
@@ -82,31 +51,12 @@
     syncGradientFields();
   }
 
-  function setColorFieldValue(id, raw) {
-    const input = document.getElementById(id);
-    if (!input) return;
-    if (window.FtColorPicker?.setValueSilent) {
-      window.FtColorPicker.setValueSilent(input, raw);
-    } else {
-      input.value = raw;
-    }
-  }
-
-  function getColorFieldValue(id) {
-    const input = document.getElementById(id);
-    if (!input) return '#000000';
-    return window.FtColorPicker?.getInputColor?.(input) ?? input.value;
-  }
-
   function wireTools() {
     const dialog = document.getElementById('freehandPropertiesDialog');
-    if (window.FtColorPicker) {
-      window.FtColorPicker.initAllSync(dialog);
-      window.FtColorPicker.refreshAll(dialog);
-    }
+    S.wireColorPicker(dialog);
     wireColorInputs();
     syncColorFields();
-    if (window.FtColorPicker) window.FtColorPicker.refreshAll(dialog);
+    S.wireColorPicker(dialog);
   }
 
   function fillFreehandPropertiesForm(comp) {
@@ -134,11 +84,11 @@
       document.getElementById('fhLineStyle').value = c.lineStyle || 'solid';
       document.getElementById('fhBackStyle').value = c.backStyle || 'solid';
       document.getElementById('fhPatternStyle').value = c.patternStyle || 'none';
-      setColorFieldValue('fhForeColor', c.foreColor || '#000000');
-      setColorFieldValue('fhBackColor', c.backColor || '#808080');
-      setColorFieldValue('fhPatternColor', c.patternColor || '#808080');
+      S.setColorFieldValue('fhForeColor', c.foreColor || '#000000');
+      S.setColorFieldValue('fhBackColor', c.backColor || '#808080');
+      S.setColorFieldValue('fhPatternColor', c.patternColor || '#808080');
       document.getElementById('fhUsePatternColor').checked = Boolean(c.usePatternColor) || (c.patternStyle && c.patternStyle !== 'none');
-      setColorFieldValue('fhEndColor', c.endColor || '#e8e8e8');
+      S.setColorFieldValue('fhEndColor', c.endColor || '#e8e8e8');
       document.getElementById('fhGradientStop').value = c.gradientStop ?? 95;
       document.getElementById('fhGradientDir').value = c.gradientShadingStyle || c.gradientDirection || 'gradientHorizontalFromRight';
       document.getElementById('fhLineWidth').value = c.lineWidth ?? 1;
@@ -151,6 +101,10 @@
       if (Array.isArray(c.points)) {
         document.getElementById('freehandPointsData').value = JSON.stringify(c.points);
       }
+      lastFreehandSize = {
+        width: Number(c.width) || 166,
+        height: Number(c.height) || 71
+      };
       syncPatternFields();
     } finally {
       if (window.state) window.state.propsFormFill = false;
@@ -167,28 +121,37 @@
     } catch {
       points = [];
     }
+    const width = Number(document.getElementById('fhWidth').value) || 64;
+    const height = Number(document.getElementById('fhHeight').value) || 64;
+    const oldW = lastFreehandSize.width || width;
+    const oldH = lastFreehandSize.height || height;
+    if (points.length && (Math.abs(width / oldW - 1) > 0.0001 || Math.abs(height / oldH - 1) > 0.0001)) {
+      const sx = width / oldW;
+      const sy = height / oldH;
+      points = points.map((p) => ({ x: p.x * sx, y: p.y * sy }));
+    }
     const comp = {
       type: 'Freehand',
       name: document.getElementById('fhName').value.trim() || 'Freehand1',
       left: Number(document.getElementById('fhLeft').value) || 0,
       top: Number(document.getElementById('fhTop').value) || 0,
-      width: Number(document.getElementById('fhWidth').value) || 64,
-      height: Number(document.getElementById('fhHeight').value) || 64,
+      width,
+      height,
       visible: document.getElementById('fhVisible').checked,
       lineStyle: document.getElementById('fhLineStyle').value,
       backStyle,
       patternStyle,
       useForeColor: true,
-      foreColor: norm(getColorFieldValue('fhForeColor')),
+      foreColor: norm(S.getColorFieldValue('fhForeColor')),
       useBackColor: backStyle !== 'transparent',
-      backColor: norm(getColorFieldValue('fhBackColor')),
+      backColor: norm(S.getColorFieldValue('fhBackColor')),
       usePatternColor: patternStyle !== 'none' && document.getElementById('fhUsePatternColor').checked,
-      patternColor: norm(getColorFieldValue('fhPatternColor')),
+      patternColor: norm(S.getColorFieldValue('fhPatternColor')),
       lineWidth: Number(document.getElementById('fhLineWidth').value) || 0,
       points
     };
     if (backStyle === 'gradient') {
-      comp.endColor = norm(getColorFieldValue('fhEndColor'));
+      comp.endColor = norm(S.getColorFieldValue('fhEndColor'));
       comp.gradientStop = Number(document.getElementById('fhGradientStop').value) || 95;
       comp.gradientShadingStyle = document.getElementById('fhGradientDir').value;
     }
@@ -204,11 +167,7 @@
     }
     window.commitPropsSnapshot(readFreehandPropertiesForm, 'applyFreehandProperties');
     window.hideFreehandStudioPreview?.();
-    const editIdx = window.resolveEditComponentIndex?.(comp);
-    if (editIdx >= 0) {
-      window.state.canvasSelection.indices = [editIdx];
-      window.refreshCanvasEditOverlaySelection?.();
-    }
+    window.afterCanvasComponentSaved?.(comp);
     window.setStatus(`Applied ${comp.name}`);
   }
 
@@ -229,14 +188,9 @@
 
   function initFreehandPropertiesDialog() {
     const form = document.getElementById('freehandPropertiesForm');
-    if (!form) return;
-    const patternSelect = document.getElementById('fhPatternStyle');
-    if (patternSelect && !patternSelect.dataset.fhFilled) {
-      patternSelect.dataset.fhFilled = '1';
-      patternSelect.innerHTML = PATTERN_OPTIONS.map(([value, label]) =>
-        `<option value="${value}">${label}</option>`
-      ).join('');
-    }
+    if (!form || form.dataset.fhWired === '1') return;
+    form.dataset.fhWired = '1';
+    S.fillPatternSelect('fhPatternStyle', 'fhFilled');
     form.addEventListener('submit', (e) => saveFreehandProperties(e).catch((err) => window.setStatus(`Error: ${err.message}`)));
     document.getElementById('applyFreehandProperties')?.addEventListener('click', () => {
       applyFreehandProperties().catch((err) => window.setStatus(`Error: ${err.message}`));
@@ -266,18 +220,21 @@
 
   function openFreehandPropertiesDialog(comp, ref, editIndex) {
     window.flushDeferredDialogInits?.();
+    initFreehandPropertiesDialog();
     fillFreehandPropertiesForm(comp);
     wireTools();
-    window.resetPropsDialogState('freehand', readFreehandPropertiesForm, 'applyFreehandProperties', editIndex, ref);
+    const idx = S.resolvedEditIndex(comp, ref, editIndex);
+    window.resetPropsDialogState('freehand', readFreehandPropertiesForm, 'applyFreehandProperties', idx, ref);
     switchTab('general');
     window.setTemplateEditStatus?.(comp.name, ref);
     window.showCanvasPropsDialog?.(document.getElementById('freehandPropertiesDialog'));
     const previewComp = readFreehandPropertiesForm();
-    window.updateFreehandStudioPreview?.(previewComp);
-    if (previewComp.name && window.previewPatchByName) {
-      window.previewPatchByName(previewComp.name, previewComp);
+    if (idx == null) {
+      window.updateFreehandStudioPreview?.(previewComp);
+    } else {
+      window.hideFreehandStudioPreview?.();
     }
-    window.flushPropsApplyButton?.(readFreehandPropertiesForm, 'applyFreehandProperties');
+    S.previewShape(previewComp, readFreehandPropertiesForm, 'applyFreehandProperties');
   }
 
   window.StudioFreehandProperties = {

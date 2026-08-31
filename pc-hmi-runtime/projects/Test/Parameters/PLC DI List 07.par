@@ -1,0 +1,32 @@
+!================================================
+! Parameter File
+! Name: PLC DI List 07
+! Syntax: #replacement=tagname
+! List 7 — Data_48…Data_55
+!================================================
+
+#100={PLC_DI_Discr\List_07}
+#101={PLC_DI_Discr\Data_48}
+#102={PLC_DI_Discr\Data_49}
+#103={PLC_DI_Discr\Data_50}
+#104={PLC_DI_Discr\Data_51}
+#105={PLC_DI_Discr\Data_52}
+#106={PLC_DI_Discr\Data_53}
+#107={PLC_DI_Discr\Data_54}
+#108={PLC_DI_Discr\Data_55}
+#201={PLC_DI_No\Data_48}
+#202={PLC_DI_No\Data_49}
+#203={PLC_DI_No\Data_50}
+#204={PLC_DI_No\Data_51}
+#205={PLC_DI_No\Data_52}
+#206={PLC_DI_No\Data_53}
+#207={PLC_DI_No\Data_54}
+#208={PLC_DI_No\Data_55}
+#301={PLC_DI_Tags\Data_48}
+#302={PLC_DI_Tags\Data_49}
+#303={PLC_DI_Tags\Data_50}
+#304={PLC_DI_Tags\Data_51}
+#305={PLC_DI_Tags\Data_52}
+#306={PLC_DI_Tags\Data_53}
+#307={PLC_DI_Tags\Data_54}
+#308={PLC_DI_Tags\Data_55}

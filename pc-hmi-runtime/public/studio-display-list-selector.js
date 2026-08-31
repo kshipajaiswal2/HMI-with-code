@@ -1,5 +1,8 @@
-/** Display List Selector property dialog */
+/** Display List Selector property dialog — FactoryTalk View parity */
 (function () {
+  const DLS_MAX_STATES = 255;
+  let dlsPreviewTimer = null;
+  let dlsDialogCommitted = false;
   let dlsStatesDraft = null;
   let dlsActiveStateId = 'State0';
   let dlsStateClipboard = null;
@@ -35,10 +38,6 @@
     return states;
   }
 
-  function countUserStates(states) {
-    return (states || []).length;
-  }
-
   function switchTab(tabId) {
     document.querySelectorAll('#displayListSelectorDialog .dialog-tab').forEach((el) => {
       el.classList.toggle('active', el.dataset.dlsTab === tabId);
@@ -46,6 +45,28 @@
     document.querySelectorAll('#displayListSelectorDialog .dialog-tab-panel').forEach((el) => {
       el.classList.toggle('active', el.dataset.dlsTabPanel === tabId);
     });
+  }
+
+  function dlsGetColor(id) {
+    return window.StudioPropsShared?.getColorFieldValue?.(id)
+      || window.FtColorPicker?.getInputColor?.(document.getElementById(id))
+      || document.getElementById(id)?.value
+      || '#001C38';
+  }
+
+  function dlsSetColor(id, raw) {
+    if (window.StudioPropsShared?.setColorFieldValue) window.StudioPropsShared.setColorFieldValue(id, raw);
+    else if (window.FtColorPicker?.setValueSilent) window.FtColorPicker.setValueSilent(document.getElementById(id), raw);
+    else if (document.getElementById(id)) document.getElementById(id).value = raw;
+  }
+
+  function fillNumberOfStatesSelect() {
+    const el = document.getElementById('dlsNumberOfStates');
+    if (!el || el.dataset.dlsFilled === '1') return;
+    el.dataset.dlsFilled = '1';
+    const opts = [];
+    for (let i = 1; i <= DLS_MAX_STATES; i++) opts.push(`<option value="${i}">${i}</option>`);
+    el.innerHTML = opts.join('');
   }
 
   function nextDisplayListSelectorName(components) {
@@ -62,29 +83,47 @@
       numberOfStates: count,
       left: 16,
       top: 16,
-      width: 120,
-      height: 80,
+      width: 172,
+      height: 160,
       visible: true,
       borderStyle: 'line',
-      borderWidth: 1,
+      borderWidth: 4,
       borderUsesBackColor: true,
       backStyle: 'solid',
-      backColor: '#001C38',
+      patternStyle: 'none',
       useBackColor: true,
-      shape: 'rectangle',
-      useHighlightColor: false,
-      highlightColor: '#0066cc',
-      audio: true,
-      horizontalMargin: 0,
-      verticalMargin: 0,
+      backColor: '#001C38',
+      useBorderColor: true,
+      borderColor: '#001C38',
+      usePatternColor: true,
+      patternColor: '#ffffff',
+      selectionBackColor: '#d0e7ff',
+      selectionForeColor: '#000000',
+      blink: false,
       fontFamily: 'Arial Unicode MS',
       fontSize: 10,
       bold: false,
       italic: false,
       underline: false,
+      captionTruncate: 'word',
+      keyNavigation: true,
+      wrapAround: true,
       states: defaultDisplayListStates(count),
       ...overrides
     };
+  }
+
+  function scheduleDisplayListLivePreview() {
+    if (window.state?.propsFormFill) return;
+    if (dlsPreviewTimer) clearTimeout(dlsPreviewTimer);
+    dlsPreviewTimer = setTimeout(() => {
+      dlsPreviewTimer = null;
+      if (!document.getElementById('displayListSelectorDialog')?.open) return;
+      const comp = readDisplayListSelectorForm();
+      if (window.patchShapeLivePreview) window.patchShapeLivePreview(comp);
+      else if (comp?.name) window.previewPatchByName?.(comp.name, comp);
+      window.updatePropsApplyButton?.(readDisplayListSelectorForm, 'applyDisplayListSelector');
+    }, 80);
   }
 
   function rebuildDlsStateSelect() {
@@ -98,59 +137,129 @@
   }
 
   function syncDlsStateCount(count) {
-    if (!dlsStatesDraft) dlsStatesDraft = defaultDisplayListStates(count);
-    while (dlsStatesDraft.length < count) {
+    const n = Math.max(1, Math.min(DLS_MAX_STATES, Number(count) || 5));
+    if (!dlsStatesDraft) dlsStatesDraft = defaultDisplayListStates(n);
+    while (dlsStatesDraft.length < n) {
       const i = dlsStatesDraft.length;
-      dlsStatesDraft.push(defaultDisplayListStates(1)[0]);
+      dlsStatesDraft.push({ ...defaultDisplayListStates(1)[0], id: `State${i}`, value: i });
     }
-    if (dlsStatesDraft.length > count) dlsStatesDraft = dlsStatesDraft.slice(0, count);
+    if (dlsStatesDraft.length > n) dlsStatesDraft = dlsStatesDraft.slice(0, n);
     dlsStatesDraft = dlsStatesDraft.map((s, i) => ({ ...s, id: `State${i}`, value: i }));
+    const countEl = document.getElementById('dlsNumberOfStates');
+    if (countEl) countEl.value = String(n);
     rebuildDlsStateSelect();
   }
 
   function syncDlsFields() {
-    document.getElementById('dlsHighlightColor').disabled = !document.getElementById('dlsUseHighlightColor')?.checked;
-    document.getElementById('dlsStateCaptionColor').disabled = !document.getElementById('dlsStateUseCaptionColor')?.checked;
-    document.getElementById('dlsStateCaptionBackColor').disabled = !document.getElementById('dlsStateUseCaptionBackColor')?.checked;
+    const capColor = document.getElementById('dlsStateCaptionColor');
+    if (capColor) capColor.disabled = !document.getElementById('dlsStateUseCaptionColor')?.checked;
+    const capBack = document.getElementById('dlsStateCaptionBackColor');
+    if (capBack) capBack.disabled = !document.getElementById('dlsStateUseCaptionBackColor')?.checked
+      || document.getElementById('dlsStateCaptionBackStyle')?.value !== 'solid';
     const displayPos = document.getElementById('dlsStateDisplayPosition')?.checked;
-    document.getElementById('dlsStateDisplayTop').disabled = !displayPos;
-    document.getElementById('dlsStateDisplayLeft').disabled = !displayPos;
+    const topEl = document.getElementById('dlsStateDisplayTop');
+    const leftEl = document.getElementById('dlsStateDisplayLeft');
+    if (topEl) topEl.disabled = !displayPos;
+    if (leftEl) leftEl.disabled = !displayPos;
     const paramType = document.querySelector('#displayListSelectorForm input[name="dlsStateParameterType"]:checked')?.value || 'file';
-    document.getElementById('dlsStateParameterFile').disabled = paramType !== 'file';
-    document.getElementById('dlsStateParameterList').disabled = paramType !== 'list';
-    document.getElementById('dlsStateCaption').disabled = document.getElementById('dlsStateUseDisplayName')?.checked;
-    const userCount = countUserStates(dlsStatesDraft);
-    document.getElementById('dlsDeleteState').disabled = userCount <= 2;
+    const fileEl = document.getElementById('dlsStateParameterFile');
+    const listEl = document.getElementById('dlsStateParameterList');
+    const fileBtn = document.getElementById('dlsBrowseStateParameterFile');
+    const listBtn = document.getElementById('dlsBrowseStateParameterList');
+    if (fileEl) fileEl.disabled = paramType !== 'file';
+    if (listEl) listEl.disabled = paramType !== 'list';
+    if (fileBtn) fileBtn.disabled = paramType !== 'file';
+    if (listBtn) listBtn.disabled = paramType !== 'list';
+    const captionEl = document.getElementById('dlsStateCaption');
+    if (captionEl) captionEl.disabled = Boolean(document.getElementById('dlsStateUseDisplayName')?.checked);
+    const insertBtn = document.getElementById('dlsStateInsertVariable');
+    if (insertBtn) insertBtn.disabled = Boolean(document.getElementById('dlsStateUseDisplayName')?.checked);
+    const count = dlsStatesDraft?.length || 0;
+    const delBtn = document.getElementById('dlsDeleteState');
+    const insBtn = document.getElementById('dlsInsertState');
+    if (delBtn) delBtn.disabled = count <= 1;
+    if (insBtn) insBtn.disabled = count >= DLS_MAX_STATES;
+    const pasteBtn = document.getElementById('dlsStatePaste');
+    if (pasteBtn) pasteBtn.disabled = !dlsStateClipboard;
   }
 
-  function wireTools() {
+  function wireDisplayListSelectorTools() {
     if (window.StudioTagTools) StudioTagTools.wirePickButtons();
-    if (window.FtColorPicker) window.FtColorPicker.initAll(document.getElementById('displayListSelectorDialog'));
+    const dlg = document.getElementById('displayListSelectorDialog');
+    if (window.FtColorPicker && dlg) {
+      if (window.FtColorPicker.initAllSync) window.FtColorPicker.initAllSync(dlg);
+      else window.FtColorPicker.initAll(dlg);
+      window.FtColorPicker.refreshAll?.(dlg);
+    }
+    fillNumberOfStatesSelect();
+    window.StudioPropsShared?.fillPatternSelect('dlsPatternStyle', 'dlsFilled');
+    document.querySelectorAll('#displayListSelectorForm .ft-color-input').forEach((input) => {
+      if (input.dataset.dlsPreviewWired === '1') return;
+      input.dataset.dlsPreviewWired = '1';
+      input.addEventListener('input', scheduleDisplayListLivePreview);
+      input.addEventListener('change', scheduleDisplayListLivePreview);
+    });
     syncDlsFields();
+  }
+
+  function presentDisplayListSelectorDialog() {
+    const dialog = document.getElementById('displayListSelectorDialog');
+    if (!dialog) {
+      window.setStatus('Display List Selector Properties dialog is missing from Studio');
+      return;
+    }
+    if (dialog.open) return;
+    dlsDialogCommitted = false;
+    dialog.classList.add('is-positioned');
+    dialog.style.position = 'fixed';
+    dialog.style.margin = '0';
+    dialog.style.left = '24px';
+    dialog.style.top = '36px';
+    dialog.style.right = 'auto';
+    dialog.style.bottom = 'auto';
+    dialog.style.transform = 'none';
+    dialog.style.zIndex = '30000';
+    dialog.style.maxHeight = 'calc(100vh - 48px)';
+    dialog.style.overflow = 'auto';
+    try {
+      dialog.showModal();
+    } catch (err) {
+      document.querySelectorAll('dialog[open]').forEach((other) => {
+        if (other !== dialog) {
+          try { other.close(); } catch (_) { /* ignore */ }
+        }
+      });
+      try {
+        dialog.showModal();
+      } catch (err2) {
+        dialog.setAttribute('open', '');
+        dialog.style.display = 'block';
+        window.setStatus(`Opened Display List Selector properties without modal: ${err2.message}`);
+      }
+    }
   }
 
   function saveDlsStateToDraft() {
     if (!dlsStatesDraft) return;
-    const id = dlsActiveStateId;
-    const idx = dlsStatesDraft.findIndex((s) => s.id === id);
+    const idx = dlsStatesDraft.findIndex((s) => s.id === dlsActiveStateId);
     if (idx < 0) return;
     dlsStatesDraft[idx] = {
       ...dlsStatesDraft[idx],
-      target: document.getElementById('dlsStateTarget').value.trim(),
+      target: document.getElementById('dlsStateTarget')?.value.trim() || '',
       parameterType: document.querySelector('#displayListSelectorForm input[name="dlsStateParameterType"]:checked')?.value || 'file',
-      parameterFile: document.getElementById('dlsStateParameterFile').value.trim(),
-      parameterList: document.getElementById('dlsStateParameterList').value.trim(),
-      displayPosition: document.getElementById('dlsStateDisplayPosition').checked,
-      displayTop: Number(document.getElementById('dlsStateDisplayTop').value) || 0,
-      displayLeft: Number(document.getElementById('dlsStateDisplayLeft').value) || 0,
-      useDisplayName: document.getElementById('dlsStateUseDisplayName').checked,
-      caption: document.getElementById('dlsStateCaption').value,
-      useCaptionColor: document.getElementById('dlsStateUseCaptionColor').checked,
-      captionColor: document.getElementById('dlsStateCaptionColor').value,
-      useCaptionBackColor: document.getElementById('dlsStateUseCaptionBackColor').checked,
-      captionBackColor: document.getElementById('dlsStateCaptionBackColor').value,
-      captionBlink: document.getElementById('dlsStateCaptionBlink').checked,
-      captionBackStyle: document.getElementById('dlsStateCaptionBackStyle').value,
+      parameterFile: document.getElementById('dlsStateParameterFile')?.value.trim() || '',
+      parameterList: document.getElementById('dlsStateParameterList')?.value.trim() || '',
+      displayPosition: Boolean(document.getElementById('dlsStateDisplayPosition')?.checked),
+      displayTop: Number(document.getElementById('dlsStateDisplayTop')?.value) || 0,
+      displayLeft: Number(document.getElementById('dlsStateDisplayLeft')?.value) || 0,
+      useDisplayName: Boolean(document.getElementById('dlsStateUseDisplayName')?.checked),
+      caption: document.getElementById('dlsStateCaption')?.value || '',
+      useCaptionColor: Boolean(document.getElementById('dlsStateUseCaptionColor')?.checked),
+      captionColor: dlsGetColor('dlsStateCaptionColor') || '#ffffff',
+      useCaptionBackColor: Boolean(document.getElementById('dlsStateUseCaptionBackColor')?.checked),
+      captionBackColor: dlsGetColor('dlsStateCaptionBackColor') || '#001C38',
+      captionBlink: Boolean(document.getElementById('dlsStateCaptionBlink')?.checked),
+      captionBackStyle: document.getElementById('dlsStateCaptionBackStyle')?.value || 'transparent',
       alignment: document.querySelector('#displayListSelectorForm input[name="dlsStateAlign"]:checked')?.value || 'middleLeft'
     };
   }
@@ -158,9 +267,10 @@
   function loadDlsStateFromDraft(stateId) {
     dlsActiveStateId = stateId;
     const state = dlsStatesDraft?.find((s) => s.id === stateId) || {};
-    document.getElementById('dlsStateSelect').value = stateId;
+    const sel = document.getElementById('dlsStateSelect');
+    if (sel) sel.value = stateId;
     document.getElementById('dlsStateTarget').value = state.target || '';
-    document.getElementById('dlsStateParameterFileRadio').checked = (state.parameterType || 'file') === 'file';
+    document.getElementById('dlsStateParameterFileRadio').checked = (state.parameterType || 'file') !== 'list';
     document.getElementById('dlsStateParameterListRadio').checked = state.parameterType === 'list';
     document.getElementById('dlsStateParameterFile').value = state.parameterFile || '';
     document.getElementById('dlsStateParameterList').value = state.parameterList || '';
@@ -170,12 +280,14 @@
     document.getElementById('dlsStateUseDisplayName').checked = Boolean(state.useDisplayName);
     document.getElementById('dlsStateCaption').value = state.caption ?? '';
     document.getElementById('dlsStateUseCaptionColor').checked = Boolean(state.useCaptionColor);
-    document.getElementById('dlsStateCaptionColor').value = state.captionColor || '#ffffff';
+    dlsSetColor('dlsStateCaptionColor', state.captionColor || '#ffffff');
     document.getElementById('dlsStateUseCaptionBackColor').checked = Boolean(state.useCaptionBackColor);
-    document.getElementById('dlsStateCaptionBackColor').value = state.captionBackColor || '#001C38';
+    dlsSetColor('dlsStateCaptionBackColor', state.captionBackColor || '#001C38');
     document.getElementById('dlsStateCaptionBlink').checked = Boolean(state.captionBlink);
     document.getElementById('dlsStateCaptionBackStyle').value = state.captionBackStyle || 'transparent';
-    document.querySelector(`#displayListSelectorForm input[name="dlsStateAlign"][value="${state.alignment || 'middleLeft'}"]`)?.click();
+    document.querySelectorAll('#displayListSelectorForm input[name="dlsStateAlign"]').forEach((el) => {
+      el.checked = el.value === (state.alignment || 'middleLeft');
+    });
     syncDlsFields();
   }
 
@@ -185,162 +297,228 @@
   }
 
   function fillDisplayListSelectorForm(comp) {
-    const count = comp.numberOfStates ?? (comp.states?.length || 5);
-    dlsStatesDraft = cloneStates(comp.states?.length ? comp.states : defaultDisplayListStates(count));
-    dlsActiveStateId = 'State0';
-    dlsStateClipboard = null;
-    document.getElementById('dlsStatePaste').disabled = true;
-
-    document.getElementById('dlsBorderStyle').value = comp.borderStyle || 'line';
-    document.getElementById('dlsBorderWidth').value = comp.borderWidth ?? 1;
-    document.getElementById('dlsBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
-    document.getElementById('dlsBackStyle').value = comp.backStyle || 'solid';
-    document.getElementById('dlsShape').value = comp.shape || 'rectangle';
-    document.getElementById('dlsUseHighlightColor').checked = Boolean(comp.useHighlightColor);
-    document.getElementById('dlsHighlightColor').value = comp.highlightColor || '#0066cc';
-    document.getElementById('dlsNumberOfStates').value = String(count);
-    document.getElementById('dlsTag').value = comp.tag || '';
-    document.getElementById('dlsHorizontalMargin').value = comp.horizontalMargin ?? 0;
-    document.getElementById('dlsVerticalMargin').value = comp.verticalMargin ?? 0;
-    document.getElementById('dlsAudio').checked = comp.audio !== false;
-    document.getElementById('dlsFont').value = comp.fontFamily || 'Arial Unicode MS';
-    document.getElementById('dlsFontSize').value = String(comp.fontSize ?? 10);
-    document.getElementById('dlsBold').classList.toggle('active', Boolean(comp.bold));
-    document.getElementById('dlsItalic').classList.toggle('active', Boolean(comp.italic));
-    document.getElementById('dlsUnderline').classList.toggle('active', Boolean(comp.underline));
-    document.getElementById('dlsHeight').value = comp.height ?? 80;
-    document.getElementById('dlsWidth').value = comp.width ?? 120;
-    document.getElementById('dlsTop').value = comp.top ?? 16;
-    document.getElementById('dlsLeft').value = comp.left ?? 16;
-    document.getElementById('dlsName').value = comp.name || 'DisplayListSelector1';
-    document.getElementById('dlsVisible').checked = comp.visible !== false;
-    rebuildDlsStateSelect();
+    if (window.state) window.state.propsFormFill = true;
+    try {
+      fillNumberOfStatesSelect();
+      window.StudioPropsShared?.fillPatternSelect('dlsPatternStyle', 'dlsFilled');
+      const count = comp.numberOfStates ?? (comp.states?.length || 5);
+      dlsStatesDraft = cloneStates(comp.states?.length ? comp.states : defaultDisplayListStates(count));
+      dlsActiveStateId = 'State0';
+      dlsStateClipboard = null;
+      document.getElementById('dlsBorderStyle').value = comp.borderStyle || 'line';
+      document.getElementById('dlsBorderWidth').value = comp.borderWidth ?? 4;
+      document.getElementById('dlsBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
+      document.getElementById('dlsBackStyle').value = comp.backStyle === 'transparent' ? 'solid' : (comp.backStyle || 'solid');
+      const pat = document.getElementById('dlsPatternStyle');
+      if (pat) pat.value = comp.patternStyle || 'none';
+      dlsSetColor('dlsBackColor', comp.backColor || '#001C38');
+      dlsSetColor('dlsBorderColor', comp.borderColor || '#001C38');
+      dlsSetColor('dlsPatternColor', comp.patternColor || '#ffffff');
+      dlsSetColor('dlsSelectionBackColor', comp.selectionBackColor || '#d0e7ff');
+      dlsSetColor('dlsSelectionForeColor', comp.selectionForeColor || '#000000');
+      document.getElementById('dlsBlink').checked = Boolean(comp.blink);
+      document.getElementById('dlsNumberOfStates').value = String(count);
+      document.getElementById('dlsFont').value = comp.fontFamily || 'Arial Unicode MS';
+      document.getElementById('dlsFontSize').value = String(comp.fontSize ?? 10);
+      document.getElementById('dlsBold').classList.toggle('active', Boolean(comp.bold));
+      document.getElementById('dlsItalic').classList.toggle('active', Boolean(comp.italic));
+      document.getElementById('dlsUnderline').classList.toggle('active', Boolean(comp.underline));
+      const truncate = comp.captionTruncate === 'character' ? 'character' : 'word';
+      document.querySelectorAll('#displayListSelectorForm input[name="dlsCaptionTruncate"]').forEach((el) => {
+        el.checked = el.value === truncate;
+      });
+      document.getElementById('dlsKeyNavigation').checked = comp.keyNavigation !== false;
+      document.getElementById('dlsWrapAround').checked = comp.wrapAround !== false;
+      document.getElementById('dlsHeight').value = comp.height ?? 160;
+      document.getElementById('dlsWidth').value = comp.width ?? 172;
+      document.getElementById('dlsTop').value = comp.top ?? 16;
+      document.getElementById('dlsLeft').value = comp.left ?? 16;
+      document.getElementById('dlsName').value = comp.name || 'DisplayListSelector1';
+      document.getElementById('dlsVisible').checked = comp.visible !== false;
+      rebuildDlsStateSelect();
+    } finally {
+      if (window.state) window.state.propsFormFill = false;
+    }
   }
 
   function readDisplayListSelectorForm() {
     saveDlsStateToDraft();
     return {
       type: 'DisplayListSelector',
-      name: document.getElementById('dlsName').value.trim() || 'DisplayListSelector1',
-      tag: document.getElementById('dlsTag').value.trim(),
-      numberOfStates: countUserStates(dlsStatesDraft),
-      left: Number(document.getElementById('dlsLeft').value) || 0,
-      top: Number(document.getElementById('dlsTop').value) || 0,
-      width: Number(document.getElementById('dlsWidth').value) || 120,
-      height: Number(document.getElementById('dlsHeight').value) || 80,
-      visible: document.getElementById('dlsVisible').checked,
-      borderStyle: document.getElementById('dlsBorderStyle').value,
-      borderWidth: Number(document.getElementById('dlsBorderWidth').value) || 1,
-      borderUsesBackColor: document.getElementById('dlsBorderUsesBackColor').checked,
-      backStyle: document.getElementById('dlsBackStyle').value,
-      backColor: '#001C38',
+      name: document.getElementById('dlsName')?.value.trim() || 'DisplayListSelector1',
+      tag: '',
+      numberOfStates: dlsStatesDraft?.length || Number(document.getElementById('dlsNumberOfStates')?.value) || 5,
+      left: Number(document.getElementById('dlsLeft')?.value) || 0,
+      top: Number(document.getElementById('dlsTop')?.value) || 0,
+      width: Number(document.getElementById('dlsWidth')?.value) || 172,
+      height: Number(document.getElementById('dlsHeight')?.value) || 160,
+      visible: document.getElementById('dlsVisible')?.checked !== false,
+      borderStyle: document.getElementById('dlsBorderStyle')?.value || 'line',
+      borderWidth: Number(document.getElementById('dlsBorderWidth')?.value) || 4,
+      borderUsesBackColor: document.getElementById('dlsBorderUsesBackColor')?.checked !== false,
+      backStyle: document.getElementById('dlsBackStyle')?.value || 'solid',
+      patternStyle: document.getElementById('dlsPatternStyle')?.value || 'none',
       useBackColor: true,
+      backColor: dlsGetColor('dlsBackColor'),
       useBorderColor: true,
-      borderColor: '#001C38',
-      shape: document.getElementById('dlsShape').value,
-      useHighlightColor: document.getElementById('dlsUseHighlightColor').checked,
-      highlightColor: document.getElementById('dlsHighlightColor').value,
-      audio: document.getElementById('dlsAudio').checked,
-      horizontalMargin: Number(document.getElementById('dlsHorizontalMargin').value) || 0,
-      verticalMargin: Number(document.getElementById('dlsVerticalMargin').value) || 0,
-      fontFamily: document.getElementById('dlsFont').value,
-      fontSize: Number(document.getElementById('dlsFontSize').value) || 10,
-      bold: document.getElementById('dlsBold').classList.contains('active'),
-      italic: document.getElementById('dlsItalic').classList.contains('active'),
-      underline: document.getElementById('dlsUnderline').classList.contains('active'),
+      borderColor: dlsGetColor('dlsBorderColor'),
+      usePatternColor: true,
+      patternColor: dlsGetColor('dlsPatternColor'),
+      selectionBackColor: dlsGetColor('dlsSelectionBackColor') || '#d0e7ff',
+      selectionForeColor: dlsGetColor('dlsSelectionForeColor') || '#000000',
+      blink: Boolean(document.getElementById('dlsBlink')?.checked),
+      fontFamily: document.getElementById('dlsFont')?.value || 'Arial Unicode MS',
+      fontSize: Number(document.getElementById('dlsFontSize')?.value) || 10,
+      bold: document.getElementById('dlsBold')?.classList.contains('active'),
+      italic: document.getElementById('dlsItalic')?.classList.contains('active'),
+      underline: document.getElementById('dlsUnderline')?.classList.contains('active'),
+      captionTruncate: document.querySelector('#displayListSelectorForm input[name="dlsCaptionTruncate"]:checked')?.value || 'word',
+      keyNavigation: document.getElementById('dlsKeyNavigation')?.checked !== false,
+      wrapAround: document.getElementById('dlsWrapAround')?.checked !== false,
       states: cloneStates(dlsStatesDraft)
     };
   }
 
-  function validateDisplayListSelector(comp) {
-    if (!comp.tag) {
-      window.setStatus('Enter a list index tag on the General tab');
-      switchTab('general');
-      return false;
-    }
-    return true;
-  }
-
   async function showDisplayListSelectorDialog(overrides = {}) {
     if (!window.displayIsOpen?.()) {
-      window.setStatus('Open a display first, then choose Display List Selector');
+      window.setStatus('Open a display first, then drag on the canvas to place the Display List Selector');
       return;
     }
-    const canvas = await window.fetchOpenCanvas();
-    const comp = defaultDisplayListSelectorComponent({
-      name: nextDisplayListSelectorName(canvas?.components),
-      ...overrides
-    });
-    fillDisplayListSelectorForm(comp);
-    window.resetPropsDialogState('display-list', readDisplayListSelectorForm, 'applyDisplayListSelector');
-    switchTab('general');
-    wireTools();
-    document.getElementById('displayListSelectorDialog')?.showModal();
+    try {
+      window.flushDeferredDialogInits?.();
+      initDisplayListSelectorDialog();
+      const canvas = await window.fetchOpenCanvas();
+      const comp = defaultDisplayListSelectorComponent({
+        name: nextDisplayListSelectorName(canvas?.components),
+        ...overrides
+      });
+      fillDisplayListSelectorForm(comp);
+      window.resetPropsDialogState('display-list', readDisplayListSelectorForm, 'applyDisplayListSelector');
+      switchTab('general');
+      wireDisplayListSelectorTools();
+      presentDisplayListSelectorDialog();
+      const previewComp = readDisplayListSelectorForm();
+      if (window.patchShapeLivePreview) window.patchShapeLivePreview(previewComp);
+      else if (previewComp?.name) window.previewPatchByName?.(previewComp.name, previewComp);
+      window.flushPropsApplyButton?.(readDisplayListSelectorForm, 'applyDisplayListSelector');
+    } catch (err) {
+      window.setStatus(`Display List Selector properties error: ${err.message}`);
+    }
   }
 
   async function applyDisplayListSelector() {
     const comp = readDisplayListSelectorForm();
-    if (!validateDisplayListSelector(comp)) return;
-    await window.upsertCanvasComponent(comp);
+    const ok = await window.upsertCanvasComponent(comp);
+    if (!ok) {
+      window.setStatus('Could not apply — open a display or global object first');
+      return;
+    }
     window.commitPropsSnapshot(readDisplayListSelectorForm, 'applyDisplayListSelector');
-    window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
+    window.afterCanvasComponentSaved?.(comp);
+    window.setStatus(`Applied ${comp.name}`);
   }
 
   async function saveDisplayListSelector(e) {
     e.preventDefault();
     const comp = readDisplayListSelectorForm();
-    if (!validateDisplayListSelector(comp)) return;
-    await window.upsertCanvasComponent(comp);
+    const ok = await window.upsertCanvasComponent(comp);
+    if (!ok) {
+      window.setStatus('Could not save — open a display or global object first');
+      return;
+    }
+    dlsDialogCommitted = true;
+    const editIdx = window.state?.propsDialog?.editIndex;
     document.getElementById('displayListSelectorDialog').close();
-    window.clearPropsDialogState();
-    window.activateSelectTool(`Added ${comp.name} to ${window.state.selectedScreenId}`);
+    if (editIdx != null) window.state.canvasSelection.indices = [editIdx];
+    window.setStatus(`Saved ${comp.name}`);
+  }
+
+  function insertDlsCaptionText(text) {
+    const area = document.getElementById('dlsStateCaption');
+    if (!area || area.disabled || !text) return;
+    const start = area.selectionStart ?? area.value.length;
+    const end = area.selectionEnd ?? start;
+    area.value = area.value.slice(0, start) + text + area.value.slice(end);
+    area.focus();
+    const pos = start + text.length;
+    area.setSelectionRange(pos, pos);
+    scheduleDisplayListLivePreview();
+  }
+
+  function insertDlsCaptionTag() {
+    window.StudioTagTools?.openTagBrowser(null, (sel) => {
+      const tag = typeof sel === 'string' ? sel : (sel?.name || sel?.tag || '');
+      insertDlsCaptionText(tag);
+    });
+  }
+
+  function hideDlsInsertVariableMenu() {
+    document.getElementById('dlsStateInsertVariableMenu')?.classList.add('hidden');
   }
 
   function initDisplayListSelectorDialog() {
     const form = document.getElementById('displayListSelectorForm');
-    if (!form) return;
+    if (!form || form.dataset.dlsWired === '1') return;
+    fillNumberOfStatesSelect();
+    window.StudioPropsShared?.fillPatternSelect('dlsPatternStyle', 'dlsFilled');
     form.addEventListener('submit', (e) => saveDisplayListSelector(e).catch((err) => window.setStatus(`Error: ${err.message}`)));
     document.getElementById('applyDisplayListSelector')?.addEventListener('click', () => {
       applyDisplayListSelector().catch((err) => window.setStatus(`Error: ${err.message}`));
     });
-    form.addEventListener('input', () => window.updatePropsApplyButton(readDisplayListSelectorForm, 'applyDisplayListSelector'));
-    form.addEventListener('change', () => window.updatePropsApplyButton(readDisplayListSelectorForm, 'applyDisplayListSelector'));
+    form.addEventListener('input', () => {
+      scheduleDisplayListLivePreview();
+      window.flushPropsApplyButton?.(readDisplayListSelectorForm, 'applyDisplayListSelector');
+    });
+    form.addEventListener('change', () => {
+      syncDlsFields();
+      scheduleDisplayListLivePreview();
+      window.flushPropsApplyButton?.(readDisplayListSelectorForm, 'applyDisplayListSelector');
+    });
     document.getElementById('cancelDisplayListSelector')?.addEventListener('click', () => {
+      if (!dlsDialogCommitted) window.revertPropsDialogPreview?.();
+      dlsDialogCommitted = true;
       document.getElementById('displayListSelectorDialog')?.close();
-      window.clearPropsDialogState();
-      window.activateSelectTool('Placement cancelled');
     });
     document.getElementById('displayListSelectorDialog')?.addEventListener('close', () => {
-      if (window.state.placement) window.activateSelectTool();
+      if (dlsPreviewTimer) {
+        clearTimeout(dlsPreviewTimer);
+        dlsPreviewTimer = null;
+      }
+      hideDlsInsertVariableMenu();
+      if (!dlsDialogCommitted) window.revertPropsDialogPreview?.();
+      dlsDialogCommitted = false;
+      window.clearPropsDialogState?.();
+      window.activateSelectTool?.();
     });
     document.getElementById('helpDisplayListSelector')?.addEventListener('click', () => {
-      alert('Display List Selector cycles through displays bound to each state. Configure a display per state and connect a list index tag.');
+      alert('Display List Selector lists displays bound to each state. A display per state is optional until runtime.');
     });
     document.querySelectorAll('#displayListSelectorDialog .dialog-tab').forEach((tab) => {
-      tab.addEventListener('click', () => switchTab(tab.dataset.dlsTab));
+      tab.addEventListener('click', () => {
+        hideDlsInsertVariableMenu();
+        switchTab(tab.dataset.dlsTab);
+      });
     });
     document.getElementById('dlsStateSelect')?.addEventListener('change', (e) => switchDlsState(e.target.value));
     document.getElementById('dlsNumberOfStates')?.addEventListener('change', (e) => {
+      saveDlsStateToDraft();
       syncDlsStateCount(Number(e.target.value) || 5);
-      window.updatePropsApplyButton(readDisplayListSelectorForm, 'applyDisplayListSelector');
+      scheduleDisplayListLivePreview();
     });
     document.getElementById('dlsInsertState')?.addEventListener('click', () => {
       saveDlsStateToDraft();
-      const count = (dlsStatesDraft?.length || 0) + 1;
-      document.getElementById('dlsNumberOfStates').value = String(Math.min(8, count));
-      syncDlsStateCount(Math.min(8, count));
+      const count = Math.min(DLS_MAX_STATES, (dlsStatesDraft?.length || 0) + 1);
+      syncDlsStateCount(count);
       switchDlsState(`State${count - 1}`);
-      window.updatePropsApplyButton(readDisplayListSelectorForm, 'applyDisplayListSelector');
+      scheduleDisplayListLivePreview();
     });
     document.getElementById('dlsDeleteState')?.addEventListener('click', () => {
-      if ((dlsStatesDraft?.length || 0) <= 2) return;
+      if ((dlsStatesDraft?.length || 0) <= 1) return;
       saveDlsStateToDraft();
       const idx = dlsStatesDraft.findIndex((s) => s.id === dlsActiveStateId);
       if (idx >= 0) dlsStatesDraft.splice(idx, 1);
-      const count = dlsStatesDraft.length;
-      document.getElementById('dlsNumberOfStates').value = String(count);
-      syncDlsStateCount(count);
-      window.updatePropsApplyButton(readDisplayListSelectorForm, 'applyDisplayListSelector');
+      syncDlsStateCount(dlsStatesDraft.length);
+      scheduleDisplayListLivePreview();
     });
     document.getElementById('dlsStateCopy')?.addEventListener('click', () => {
       saveDlsStateToDraft();
@@ -357,46 +535,73 @@
       if (idx >= 0) {
         dlsStatesDraft[idx] = { ...dlsStateClipboard, id: dlsStatesDraft[idx].id, value: dlsStatesDraft[idx].value };
         loadDlsStateFromDraft(dlsActiveStateId);
-        window.updatePropsApplyButton(readDisplayListSelectorForm, 'applyDisplayListSelector');
+        scheduleDisplayListLivePreview();
       }
     });
     document.getElementById('dlsBrowseStateDisplay')?.addEventListener('click', () => {
-      window.showDisplayPickerDialog?.(document.getElementById('dlsStateTarget').value || '')
+      window.showDisplayPickerDialog?.(document.getElementById('dlsStateTarget')?.value || '', { kind: 'displays' })
         .then((screenId) => {
-          if (screenId) {
-            document.getElementById('dlsStateTarget').value = screenId;
-            window.updatePropsApplyButton(readDisplayListSelectorForm, 'applyDisplayListSelector');
-          }
+          if (!screenId) return;
+          document.getElementById('dlsStateTarget').value = screenId;
+          scheduleDisplayListLivePreview();
         })
         .catch((err) => window.setStatus(`Error: ${err.message}`));
     });
-    for (const id of ['dlsUseHighlightColor', 'dlsStateUseCaptionColor', 'dlsStateUseCaptionBackColor', 'dlsStateDisplayPosition', 'dlsStateUseDisplayName']) {
-      document.getElementById(id)?.addEventListener('change', () => {
-        syncDlsFields();
-        window.updatePropsApplyButton(readDisplayListSelectorForm, 'applyDisplayListSelector');
-      });
-    }
-    document.querySelectorAll('#displayListSelectorForm input[name="dlsStateParameterType"]').forEach((el) => {
-      el.addEventListener('change', () => {
-        syncDlsFields();
-        window.updatePropsApplyButton(readDisplayListSelectorForm, 'applyDisplayListSelector');
-      });
+    document.getElementById('dlsBrowseStateParameterFile')?.addEventListener('click', () => {
+      window.showDisplayPickerDialog?.(document.getElementById('dlsStateParameterFile')?.value || '', { kind: 'parameter-files' })
+        .then((id) => {
+          if (!id) return;
+          document.getElementById('dlsStateParameterFile').value = id;
+          scheduleDisplayListLivePreview();
+        })
+        .catch((err) => window.setStatus(`Error: ${err.message}`));
+    });
+    document.getElementById('dlsBrowseStateParameterList')?.addEventListener('click', () => {
+      window.showDisplayPickerDialog?.(document.getElementById('dlsStateParameterList')?.value || '', { kind: 'parameter-files' })
+        .then((id) => {
+          if (!id) return;
+          document.getElementById('dlsStateParameterList').value = id;
+          scheduleDisplayListLivePreview();
+        })
+        .catch((err) => window.setStatus(`Error: ${err.message}`));
+    });
+    document.getElementById('dlsStateInsertVariable')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (document.getElementById('dlsStateInsertVariable')?.disabled) return;
+      document.getElementById('dlsStateInsertVariableMenu')?.classList.toggle('hidden');
+    });
+    document.getElementById('dlsStateInsertVariableMenu')?.addEventListener('click', (e) => {
+      const kind = e.target?.dataset?.dlsVar;
+      if (!kind) return;
+      hideDlsInsertVariableMenu();
+      if (kind === 'timedate') insertDlsCaptionText('{#dt}');
+      else insertDlsCaptionTag();
+    });
+    document.addEventListener('click', (e) => {
+      const wrap = document.querySelector('#displayListSelectorDialog .ft-insert-var-wrap');
+      if (wrap && !wrap.contains(e.target)) hideDlsInsertVariableMenu();
     });
     for (const id of ['dlsBold', 'dlsItalic', 'dlsUnderline']) {
       document.getElementById(id)?.addEventListener('click', (e) => {
         e.preventDefault();
         e.currentTarget.classList.toggle('active');
-        window.updatePropsApplyButton(readDisplayListSelectorForm, 'applyDisplayListSelector');
+        scheduleDisplayListLivePreview();
       });
     }
+    form.dataset.dlsWired = '1';
   }
 
   window.StudioDisplayListSelector = {
     initDisplayListSelectorDialog,
+    presentDisplayListSelectorDialog,
+    scheduleDisplayListLivePreview,
     showDisplayListSelectorDialog,
     fillDisplayListSelectorForm,
     readDisplayListSelectorForm,
     switchDisplayListSelectorTab: switchTab,
-    wireDisplayListSelectorTools: wireTools
+    wireDisplayListSelectorTools,
+    nextDisplayListSelectorName,
+    defaultDisplayListSelectorComponent,
+    applyDisplayListSelector
   };
 })();

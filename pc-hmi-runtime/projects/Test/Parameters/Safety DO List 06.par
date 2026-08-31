@@ -1,0 +1,32 @@
+!================================================
+! Parameter File
+! Name: Safety DO List 06
+! Syntax: #replacement=tagname
+! List 6 — Data_40…Data_47
+!================================================
+
+#100={Safety_DO_Discr\Safety_List_06}
+#101={Safety_DO_Discr\Data_40}
+#102={Safety_DO_Discr\Data_41}
+#103={Safety_DO_Discr\Data_42}
+#104={Safety_DO_Discr\Data_43}
+#105={Safety_DO_Discr\Data_44}
+#106={Safety_DO_Discr\Data_45}
+#107={Safety_DO_Discr\Data_46}
+#108={Safety_DO_Discr\Data_47}
+#201={Safety_DO_No\Data_40}
+#202={Safety_DO_No\Data_41}
+#203={Safety_DO_No\Data_42}
+#204={Safety_DO_No\Data_43}
+#205={Safety_DO_No\Data_44}
+#206={Safety_DO_No\Data_45}
+#207={Safety_DO_No\Data_46}
+#208={Safety_DO_No\Data_47}
+#301={Safety_DO_Tags\Data_40}
+#302={Safety_DO_Tags\Data_41}
+#303={Safety_DO_Tags\Data_42}
+#304={Safety_DO_Tags\Data_43}
+#305={Safety_DO_Tags\Data_44}
+#306={Safety_DO_Tags\Data_45}
+#307={Safety_DO_Tags\Data_46}
+#308={Safety_DO_Tags\Data_47}

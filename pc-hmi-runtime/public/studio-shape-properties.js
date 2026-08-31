@@ -1,17 +1,50 @@
-/** Rectangle (Polygon) property dialog — FactoryTalk-style */
+/** Rectangle / Rounded Rectangle / Wedge property dialog — FactoryTalk-style */
 (function () {
+  const S = window.StudioPropsShared;
   let shapePreviewTimer = null;
+  let activeShapeType = 'Rectangle';
+  let lastAngleFields = { startAngle: 0, sweepAngle: 360 };
+
+  function resolveShapeType(type) {
+    if (type === 'RoundedRectangle') return 'RoundedRectangle';
+    if (type === 'Wedge') return 'Wedge';
+    return 'Rectangle';
+  }
+
+  function isRoundedType(type) {
+    return resolveShapeType(type) === 'RoundedRectangle';
+  }
+
+  function isWedgeType(type) {
+    return resolveShapeType(type) === 'Wedge';
+  }
+
+  function defaultNameForType() {
+    if (isWedgeType(activeShapeType)) return 'Wedge1';
+    if (isRoundedType(activeShapeType)) return 'RoundedRectangle1';
+    return 'Rectangle1';
+  }
+
+  function titleForType() {
+    if (isWedgeType(activeShapeType)) return 'Wedge Properties';
+    if (isRoundedType(activeShapeType)) return 'Rounded Rectangle Properties';
+    return 'Rectangle Properties';
+  }
+
+  function defaultForeColor() {
+    return isWedgeType(activeShapeType) ? '#808080' : '#000000';
+  }
+
+  function defaultBackColor() {
+    return isRoundedType(activeShapeType) ? '#ffffff' : '#c0c0c0';
+  }
 
   function scheduleShapeLivePreview() {
     if (window.state?.propsFormFill) return;
     if (shapePreviewTimer) clearTimeout(shapePreviewTimer);
     shapePreviewTimer = setTimeout(() => {
       shapePreviewTimer = null;
-      const comp = readShapePropertiesForm();
-      if (comp.name && window.previewPatchByName) {
-        window.previewPatchByName(comp.name, comp);
-      }
-      window.updatePropsApplyButton?.(readShapePropertiesForm, 'applyShapeProperties');
+      S.previewShape(readShapePropertiesForm(), readShapePropertiesForm, 'applyShapeProperties');
     }, 100);
   }
 
@@ -22,33 +55,30 @@
   }
 
   function wireColorInputs() {
-    document.querySelectorAll('#shapePropertiesForm .ft-color-input').forEach((input) => {
-      if (input.dataset.spColorWired === '1') return;
-      input.dataset.spColorWired = '1';
-      input.addEventListener('input', notifyShapeFormChange);
-      input.addEventListener('change', notifyShapeFormChange);
-    });
+    S.wireColorInputs('#shapePropertiesForm', 'spColorWired', notifyShapeFormChange);
   }
 
-  function titleForType() {
-    return 'Polygon Properties';
+  function normalizeRectPatternStyle(value) {
+    const map = {
+      horizontal: 'horizontalLines',
+      vertical: 'verticalLines',
+      cross: 'hatch',
+      '50Percent': 'checks',
+      percent50: 'checks'
+    };
+    return map[value] || value || 'none';
   }
 
   function syncForeColorHint() {
     const lineW = Number(document.getElementById('spLineWidth')?.value) || 0;
     const hint = document.getElementById('spForeColorHint');
     if (hint) {
-      hint.classList.toggle('hidden', lineW > 0);
+      hint.classList.toggle('hidden', isWedgeType(activeShapeType) || lineW > 0);
     }
   }
 
   function switchTab(tabId) {
-    document.querySelectorAll('#shapePropertiesDialog .dialog-tab').forEach((el) => {
-      el.classList.toggle('active', el.dataset.spTab === tabId);
-    });
-    document.querySelectorAll('#shapePropertiesDialog .dialog-tab-panel').forEach((el) => {
-      el.classList.toggle('active', el.dataset.spTabPanel === tabId);
-    });
+    S.switchDialogTab('shapePropertiesDialog', 'spTab', 'spTabPanel', tabId);
   }
 
   function syncGradientFields() {
@@ -64,79 +94,77 @@
     syncGradientFields();
   }
 
+  function syncPatternFields() {
+    const pattern = document.getElementById('spPatternStyle')?.value || 'none';
+    if (pattern !== 'none') {
+      const usePat = document.getElementById('spUsePatternColor');
+      if (usePat) usePat.checked = true;
+    }
+    syncColorFields();
+  }
+
   function syncColorFields() {
     document.getElementById('spForeColor').disabled = !document.getElementById('spUseForeColor')?.checked;
     document.getElementById('spBackColor').disabled = !document.getElementById('spUseBackColor')?.checked;
     document.getElementById('spPatternColor').disabled = !document.getElementById('spUsePatternColor')?.checked;
-    document.getElementById('spEndColor').disabled = !document.getElementById('spUseBackColor')?.checked;
+    const isGradient = document.getElementById('spBackStyle')?.value === 'gradient';
+    document.getElementById('spEndColor').disabled = !document.getElementById('spUseBackColor')?.checked || !isGradient;
     syncGradientFields();
   }
 
   function wireTools() {
     const dialog = document.getElementById('shapePropertiesDialog');
-    if (window.FtColorPicker) {
-      window.FtColorPicker.initAllSync(dialog);
-      window.FtColorPicker.refreshAll(dialog);
-    }
+    S.wireColorPicker(dialog);
     wireColorInputs();
     syncColorFields();
     syncForeColorHint();
-    if (window.FtColorPicker) window.FtColorPicker.refreshAll(dialog);
+    S.wireColorPicker(dialog);
   }
 
   function fillShapePropertiesForm(comp) {
     if (window.state) window.state.propsFormFill = true;
     try {
+      if (comp?.type) activeShapeType = resolveShapeType(comp.type);
+      lastAngleFields = {
+        startAngle: comp?.startAngle ?? 0,
+        sweepAngle: comp?.sweepAngle ?? 360
+      };
+      S.fillPatternSelect('spPatternStyle', 'spFilled');
       document.getElementById('shapePropertiesTitle').textContent = titleForType();
       document.getElementById('spLineStyle').value = comp.lineStyle || 'solid';
       document.getElementById('spBackStyle').value = comp.backStyle || 'solid';
-      document.getElementById('spPatternStyle').value = comp.patternStyle || 'none';
+      document.getElementById('spPatternStyle').value = normalizeRectPatternStyle(comp.patternStyle);
       document.getElementById('spUseForeColor').checked = comp.useForeColor !== false;
-      setColorFieldValue('spForeColor', comp.foreColor || comp.borderColor || '#c6c6c6');
+      S.setColorFieldValue('spForeColor', comp.foreColor || comp.borderColor || defaultForeColor());
       document.getElementById('spUseBackColor').checked = comp.useBackColor !== false;
-      setColorFieldValue('spBackColor', comp.backColor || '#ffffff');
-      setColorFieldValue('spEndColor', comp.endColor || '#e8e8e8');
+      S.setColorFieldValue('spBackColor', comp.backColor || defaultBackColor());
+      S.setColorFieldValue('spEndColor', comp.endColor || '#e8e8e8');
       document.getElementById('spGradientStop').value = comp.gradientStop ?? 95;
       document.getElementById('spGradientDir').value = comp.gradientShadingStyle || comp.gradientDirection || 'gradientHorizontalFromRight';
       document.getElementById('spUsePatternColor').checked = Boolean(comp.usePatternColor);
-      setColorFieldValue('spPatternColor', comp.patternColor || '#ffffff');
+      S.setColorFieldValue('spPatternColor', comp.patternColor || '#ffffff');
       document.getElementById('spLineWidth').value = comp.lineWidth ?? comp.borderWidth ?? 1;
-      document.getElementById('spHeight').value = comp.height ?? 34;
-      document.getElementById('spWidth').value = comp.width ?? 262;
+      document.getElementById('spHeight').value = comp.height ?? (isWedgeType(activeShapeType) ? 131 : 34);
+      document.getElementById('spWidth').value = comp.width ?? (isWedgeType(activeShapeType) ? 208 : 262);
       document.getElementById('spTop').value = comp.top ?? 0;
       document.getElementById('spLeft').value = comp.left ?? 0;
-      document.getElementById('spName').value = comp.name || 'Rectangle1';
+      document.getElementById('spName').value = comp.name || defaultNameForType();
       document.getElementById('spVisible').checked = comp.visible !== false;
       syncShapeTypeFields();
-      syncColorFields();
+      syncPatternFields();
       syncForeColorHint();
     } finally {
       if (window.state) window.state.propsFormFill = false;
     }
   }
 
-  function setColorFieldValue(id, raw) {
-    const input = document.getElementById(id);
-    if (!input) return;
-    if (window.FtColorPicker?.setValueSilent) {
-      window.FtColorPicker.setValueSilent(input, raw);
-    } else {
-      input.value = raw;
-    }
-  }
-
-  function getColorFieldValue(id) {
-    const input = document.getElementById(id);
-    if (!input) return '#000000';
-    return window.FtColorPicker?.getInputColor?.(input) ?? input.value;
-  }
-
   function readShapePropertiesForm() {
     const backStyle = document.getElementById('spBackStyle').value;
     const norm = window.FtColorPicker?.normalizeColor || ((v) => v);
+    const type = resolveShapeType(activeShapeType);
     const comp = {
-      type: 'Rectangle',
-      name: document.getElementById('spName').value.trim() || 'Rectangle1',
+      type,
+      name: document.getElementById('spName').value.trim() || defaultNameForType(),
       left: Number(document.getElementById('spLeft').value) || 0,
       top: Number(document.getElementById('spTop').value) || 0,
       width: Number(document.getElementById('spWidth').value) || 64,
@@ -146,15 +174,19 @@
       backStyle,
       patternStyle: document.getElementById('spPatternStyle').value,
       useForeColor: document.getElementById('spUseForeColor').checked,
-      foreColor: norm(getColorFieldValue('spForeColor')),
+      foreColor: norm(S.getColorFieldValue('spForeColor')),
       useBackColor: document.getElementById('spUseBackColor').checked,
-      backColor: norm(getColorFieldValue('spBackColor')),
+      backColor: norm(S.getColorFieldValue('spBackColor')),
       usePatternColor: document.getElementById('spUsePatternColor').checked,
-      patternColor: norm(getColorFieldValue('spPatternColor')),
+      patternColor: norm(S.getColorFieldValue('spPatternColor')),
       lineWidth: Number(document.getElementById('spLineWidth').value) || 0
     };
+    if (type === 'Wedge') {
+      comp.startAngle = lastAngleFields.startAngle ?? 0;
+      comp.sweepAngle = lastAngleFields.sweepAngle ?? 360;
+    }
     if (backStyle === 'gradient') {
-      comp.endColor = norm(getColorFieldValue('spEndColor'));
+      comp.endColor = norm(S.getColorFieldValue('spEndColor'));
       comp.gradientStop = Number(document.getElementById('spGradientStop').value) || 95;
       comp.gradientShadingStyle = document.getElementById('spGradientDir').value;
     }
@@ -169,6 +201,7 @@
       return;
     }
     window.commitPropsSnapshot(readShapePropertiesForm, 'applyShapeProperties');
+    window.afterCanvasComponentSaved?.(comp);
     window.setStatus(`Applied ${comp.name}`);
   }
 
@@ -182,12 +215,14 @@
     }
     document.getElementById('shapePropertiesDialog').close();
     window.clearPropsDialogState();
-    window.setStatus(`Saved ${comp.name}`);
+    window.activateSelectTool?.(`Saved ${comp.name}`);
   }
 
   function initShapePropertiesDialog() {
     const form = document.getElementById('shapePropertiesForm');
-    if (!form) return;
+    if (!form || form.dataset.spWired === '1') return;
+    form.dataset.spWired = '1';
+    S.fillPatternSelect('spPatternStyle', 'spFilled');
     form.addEventListener('submit', (e) => saveShapeProperties(e).catch((err) => window.setStatus(`Error: ${err.message}`)));
     document.getElementById('applyShapeProperties')?.addEventListener('click', () => {
       applyShapeProperties().catch((err) => window.setStatus(`Error: ${err.message}`));
@@ -199,7 +234,7 @@
     });
     form.addEventListener('change', () => {
       syncShapeTypeFields();
-      syncColorFields();
+      syncPatternFields();
       syncForeColorHint();
       scheduleShapeLivePreview();
       window.flushPropsApplyButton?.(readShapePropertiesForm, 'applyShapeProperties');
@@ -209,9 +244,13 @@
       window.revertPropsDialogPreview?.();
       document.getElementById('shapePropertiesDialog')?.close();
       window.clearPropsDialogState();
+      window.activateSelectTool?.();
+    });
+    document.getElementById('shapePropertiesDialog')?.addEventListener('close', () => {
+      window.activateSelectTool?.();
     });
     document.getElementById('helpShapeProperties')?.addEventListener('click', () => {
-      alert('Polygon Properties define line style, fill, pattern, and border width — matching FactoryTalk View rectangle objects.');
+      alert(`${titleForType()} define line style, fill, pattern, and line width.`);
     });
     document.querySelectorAll('#shapePropertiesDialog .dialog-tab').forEach((tab) => {
       tab.addEventListener('click', () => switchTab(tab.dataset.spTab));
@@ -220,20 +259,21 @@
 
   function openShapePropertiesDialog(comp, ref, editIndex) {
     window.flushDeferredDialogInits?.();
+    initShapePropertiesDialog();
+    activeShapeType = resolveShapeType(comp?.type);
     fillShapePropertiesForm(comp);
     wireTools();
-    window.resetPropsDialogState('shape', readShapePropertiesForm, 'applyShapeProperties', editIndex, ref);
+    const idx = S.resolvedEditIndex(comp, ref, editIndex);
+    window.resetPropsDialogState('shape', readShapePropertiesForm, 'applyShapeProperties', idx, ref);
     switchTab('general');
     window.setTemplateEditStatus?.(comp.name, ref);
-    document.getElementById('shapePropertiesDialog')?.showModal();
+    window.showCanvasPropsDialog?.(document.getElementById('shapePropertiesDialog'));
     window.flushPropsApplyButton?.(readShapePropertiesForm, 'applyShapeProperties');
+    if (idx == null) scheduleShapeLivePreview();
   }
 
   window.StudioShapeProperties = {
-    fillShapePropertiesForm,
     readShapePropertiesForm,
-    switchShapePropertiesTab: switchTab,
-    wireShapePropertiesTools: wireTools,
     openShapePropertiesDialog,
     initShapePropertiesDialog
   };

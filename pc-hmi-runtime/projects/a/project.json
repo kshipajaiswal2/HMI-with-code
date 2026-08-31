@@ -8,7 +8,9 @@
     "height": 600,
     "displayBackground": "#EBEBEB",
     "executionTarget": "panel-performance",
-    "fullscreen": false
+    "fullscreen": false,
+    "layoutWidth": 800,
+    "layoutHeight": 600
   },
   "inactivity": {
     "enabled": true,
@@ -69,7 +71,7 @@
     },
     "lastOpenedWith": "Plant HMI Studio 1.0",
     "language": "en",
-    "lastOpenedAt": "2026-08-24T05:07:11.153Z"
+    "lastOpenedAt": "2026-08-31T04:41:46.089Z"
   },
   "createdAt": "2026-08-04T10:57:19.614Z",
   "parameterFiles": {

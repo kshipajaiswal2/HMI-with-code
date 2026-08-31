@@ -1,40 +1,14 @@
 /** Arc property dialog — FactoryTalk View style (General / Common tabs). */
 (function () {
+  const S = window.StudioPropsShared;
   let arcPreviewTimer = null;
-
-  const PATTERN_OPTIONS = [
-    ['none', 'None'],
-    ['dots', 'Dots'],
-    ['checks', 'Checks'],
-    ['smallBoxes', 'Small Boxes'],
-    ['mediumBoxes', 'Medium Boxes'],
-    ['largeBoxes', 'Large Boxes'],
-    ['verticalLines', 'Vertical Lines'],
-    ['wideVerticalLines', 'Wide Vertical Lines'],
-    ['horizontalLines', 'Horizontal Lines'],
-    ['wideHorizontalLines', 'Wide Horizontal Lines'],
-    ['rightDiagonal', 'Right Diagonal'],
-    ['wideRightDiagonal', 'Wide Right Diagonal'],
-    ['leftDiagonal', 'Left Diagonal'],
-    ['wideLeftDiagonal', 'Wide Left Diagonal'],
-    ['hatch', 'Hatch'],
-    ['bricks', 'Bricks'],
-    ['ovals', 'Ovals'],
-    ['diamonds', 'Diamonds'],
-    ['scales', 'Scales'],
-    ['waves', 'Waves']
-  ];
 
   function scheduleArcLivePreview() {
     if (window.state?.propsFormFill) return;
     if (arcPreviewTimer) clearTimeout(arcPreviewTimer);
     arcPreviewTimer = setTimeout(() => {
       arcPreviewTimer = null;
-      const comp = readArcPropertiesForm();
-      if (comp.name && window.previewPatchByName) {
-        window.previewPatchByName(comp.name, comp);
-      }
-      window.updatePropsApplyButton?.(readArcPropertiesForm, 'applyArcProperties');
+      S.previewShape(readArcPropertiesForm(), readArcPropertiesForm, 'applyArcProperties');
     }, 100);
   }
 
@@ -44,26 +18,15 @@
   }
 
   function wireColorInputs() {
-    document.querySelectorAll('#arcPropertiesForm .ft-color-input').forEach((input) => {
-      if (input.dataset.apColorWired === '1') return;
-      input.dataset.apColorWired = '1';
-      input.addEventListener('input', notifyArcFormChange);
-      input.addEventListener('change', notifyArcFormChange);
-    });
+    S.wireColorInputs('#arcPropertiesForm', 'apColorWired', notifyArcFormChange);
   }
 
   function switchTab(tabId) {
-    document.querySelectorAll('#arcPropertiesDialog .dialog-tab').forEach((el) => {
-      el.classList.toggle('active', el.dataset.apTab === tabId);
-    });
-    document.querySelectorAll('#arcPropertiesDialog .dialog-tab-panel').forEach((el) => {
-      el.classList.toggle('active', el.dataset.apTabPanel === tabId);
-    });
+    S.switchDialogTab('arcPropertiesDialog', 'apTab', 'apTabPanel', tabId);
   }
 
   function syncGradientFields() {
-    const isGradient = document.getElementById('apBackStyle')?.value === 'gradient';
-    document.getElementById('apGradientExtras')?.classList.toggle('hidden', !isGradient);
+    S.syncGradientExtras('apBackStyle', 'apGradientExtras');
   }
 
   function syncPatternFields() {
@@ -81,31 +44,12 @@
     syncGradientFields();
   }
 
-  function setColorFieldValue(id, raw) {
-    const input = document.getElementById(id);
-    if (!input) return;
-    if (window.FtColorPicker?.setValueSilent) {
-      window.FtColorPicker.setValueSilent(input, raw);
-    } else {
-      input.value = raw;
-    }
-  }
-
-  function getColorFieldValue(id) {
-    const input = document.getElementById(id);
-    if (!input) return '#000000';
-    return window.FtColorPicker?.getInputColor?.(input) ?? input.value;
-  }
-
   function wireTools() {
     const dialog = document.getElementById('arcPropertiesDialog');
-    if (window.FtColorPicker) {
-      window.FtColorPicker.initAllSync(dialog);
-      window.FtColorPicker.refreshAll(dialog);
-    }
+    S.wireColorPicker(dialog);
     wireColorInputs();
     syncColorFields();
-    if (window.FtColorPicker) window.FtColorPicker.refreshAll(dialog);
+    S.wireColorPicker(dialog);
   }
 
   function fillArcPropertiesForm(comp) {
@@ -134,11 +78,11 @@
       document.getElementById('apLineStyle').value = c.lineStyle || 'solid';
       document.getElementById('apBackStyle').value = c.backStyle || 'solid';
       document.getElementById('apPatternStyle').value = c.patternStyle || 'none';
-      setColorFieldValue('apForeColor', c.foreColor || '#808080');
-      setColorFieldValue('apBackColor', c.backColor || '#c0c0c0');
-      setColorFieldValue('apPatternColor', c.patternColor || '#ffffff');
+      S.setColorFieldValue('apForeColor', c.foreColor || '#808080');
+      S.setColorFieldValue('apBackColor', c.backColor || '#c0c0c0');
+      S.setColorFieldValue('apPatternColor', c.patternColor || '#ffffff');
       document.getElementById('apUsePatternColor').checked = Boolean(c.usePatternColor) || (c.patternStyle && c.patternStyle !== 'none');
-      setColorFieldValue('apEndColor', c.endColor || '#e8e8e8');
+      S.setColorFieldValue('apEndColor', c.endColor || '#e8e8e8');
       document.getElementById('apGradientStop').value = c.gradientStop ?? 95;
       document.getElementById('apGradientDir').value = c.gradientShadingStyle || c.gradientDirection || 'gradientHorizontalFromRight';
       document.getElementById('apLineWidth').value = c.lineWidth ?? 1;
@@ -148,6 +92,8 @@
       document.getElementById('apLeft').value = c.left ?? 0;
       document.getElementById('apName').value = c.name || 'Arc1';
       document.getElementById('apVisible').checked = c.visible !== false;
+      document.getElementById('apStartAngle').value = c.startAngle ?? 0;
+      document.getElementById('apSweepAngle').value = c.sweepAngle ?? 360;
       syncPatternFields();
     } finally {
       if (window.state) window.state.propsFormFill = false;
@@ -170,17 +116,21 @@
       backStyle,
       patternStyle,
       useForeColor: true,
-      foreColor: norm(getColorFieldValue('apForeColor')),
+      foreColor: norm(S.getColorFieldValue('apForeColor')),
       useBackColor: backStyle !== 'transparent',
-      backColor: norm(getColorFieldValue('apBackColor')),
+      backColor: norm(S.getColorFieldValue('apBackColor')),
       usePatternColor: patternStyle !== 'none' && document.getElementById('apUsePatternColor').checked,
-      patternColor: norm(getColorFieldValue('apPatternColor')),
+      patternColor: norm(S.getColorFieldValue('apPatternColor')),
       lineWidth: Number(document.getElementById('apLineWidth').value) || 0,
-      startAngle: 0,
-      sweepAngle: 360
+      startAngle: Number.isFinite(Number(document.getElementById('apStartAngle')?.value))
+        ? Number(document.getElementById('apStartAngle').value)
+        : 0,
+      sweepAngle: Number.isFinite(Number(document.getElementById('apSweepAngle')?.value))
+        ? Number(document.getElementById('apSweepAngle').value)
+        : 360
     };
     if (backStyle === 'gradient') {
-      comp.endColor = norm(getColorFieldValue('apEndColor'));
+      comp.endColor = norm(S.getColorFieldValue('apEndColor'));
       comp.gradientStop = Number(document.getElementById('apGradientStop').value) || 95;
       comp.gradientShadingStyle = document.getElementById('apGradientDir').value;
     }
@@ -195,6 +145,7 @@
       return;
     }
     window.commitPropsSnapshot(readArcPropertiesForm, 'applyArcProperties');
+    window.afterCanvasComponentSaved?.(comp);
     window.setStatus(`Applied ${comp.name}`);
   }
 
@@ -208,19 +159,15 @@
     }
     document.getElementById('arcPropertiesDialog').close();
     window.clearPropsDialogState();
+    window.scheduleRefreshCanvasEditOverlay?.();
     window.setStatus(`Saved ${comp.name}`);
   }
 
   function initArcPropertiesDialog() {
     const form = document.getElementById('arcPropertiesForm');
-    if (!form) return;
-    const patternSelect = document.getElementById('apPatternStyle');
-    if (patternSelect && !patternSelect.dataset.apFilled) {
-      patternSelect.dataset.apFilled = '1';
-      patternSelect.innerHTML = PATTERN_OPTIONS.map(([value, label]) =>
-        `<option value="${value}">${label}</option>`
-      ).join('');
-    }
+    if (!form || form.dataset.apWired === '1') return;
+    form.dataset.apWired = '1';
+    S.fillPatternSelect('apPatternStyle', 'apFilled');
     form.addEventListener('submit', (e) => saveArcProperties(e).catch((err) => window.setStatus(`Error: ${err.message}`)));
     document.getElementById('applyArcProperties')?.addEventListener('click', () => {
       applyArcProperties().catch((err) => window.setStatus(`Error: ${err.message}`));
@@ -249,13 +196,16 @@
 
   function openArcPropertiesDialog(comp, ref, editIndex) {
     window.flushDeferredDialogInits?.();
+    initArcPropertiesDialog();
     fillArcPropertiesForm(comp);
     wireTools();
-    window.resetPropsDialogState('arc', readArcPropertiesForm, 'applyArcProperties', editIndex, ref);
+    const idx = S.resolvedEditIndex(comp, ref, editIndex);
+    window.resetPropsDialogState('arc', readArcPropertiesForm, 'applyArcProperties', idx, ref);
     switchTab('general');
     window.setTemplateEditStatus?.(comp.name, ref);
-    document.getElementById('arcPropertiesDialog')?.showModal();
+    window.showCanvasPropsDialog?.(document.getElementById('arcPropertiesDialog'));
     window.flushPropsApplyButton?.(readArcPropertiesForm, 'applyArcProperties');
+    scheduleArcLivePreview();
   }
 
   window.StudioArcProperties = {

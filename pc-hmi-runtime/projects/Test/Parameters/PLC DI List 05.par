@@ -1,0 +1,32 @@
+!================================================
+! Parameter File
+! Name: PLC DI List 05
+! Syntax: #replacement=tagname
+! List 5 — Data_32…Data_39
+!================================================
+
+#100={PLC_DI_Discr\List_05}
+#101={PLC_DI_Discr\Data_32}
+#102={PLC_DI_Discr\Data_33}
+#103={PLC_DI_Discr\Data_34}
+#104={PLC_DI_Discr\Data_35}
+#105={PLC_DI_Discr\Data_36}
+#106={PLC_DI_Discr\Data_37}
+#107={PLC_DI_Discr\Data_38}
+#108={PLC_DI_Discr\Data_39}
+#201={PLC_DI_No\Data_32}
+#202={PLC_DI_No\Data_33}
+#203={PLC_DI_No\Data_34}
+#204={PLC_DI_No\Data_35}
+#205={PLC_DI_No\Data_36}
+#206={PLC_DI_No\Data_37}
+#207={PLC_DI_No\Data_38}
+#208={PLC_DI_No\Data_39}
+#301={PLC_DI_Tags\Data_32}
+#302={PLC_DI_Tags\Data_33}
+#303={PLC_DI_Tags\Data_34}
+#304={PLC_DI_Tags\Data_35}
+#305={PLC_DI_Tags\Data_36}
+#306={PLC_DI_Tags\Data_37}
+#307={PLC_DI_Tags\Data_38}
+#308={PLC_DI_Tags\Data_39}

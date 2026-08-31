@@ -1,0 +1,49 @@
+{
+  "id": "600_Legends",
+  "title": "Legends",
+  "navGroup": "legends",
+  "securityLevel": 0,
+  "components": [
+    {
+      "type": "SectionHeader",
+      "label": "Color & Symbol Legend"
+    },
+    {
+      "type": "LegendTable",
+      "items": [
+        {
+          "color": "#00c000",
+          "label": "Running / Healthy / OK"
+        },
+        {
+          "color": "#0066cc",
+          "label": "Manual Mode"
+        },
+        {
+          "color": "#ff8000",
+          "label": "Warning / Not Ready"
+        },
+        {
+          "color": "#cc0000",
+          "label": "Fault / Stopped / Alarm"
+        },
+        {
+          "color": "#888888",
+          "label": "Inactive / Disabled"
+        },
+        {
+          "color": "#002952",
+          "label": "Acknowledged Alarm"
+        },
+        {
+          "color": "#990033",
+          "label": "Unacknowledged Alarm"
+        }
+      ]
+    }
+  ],
+  "displaySettings": {
+    "backgroundColor": "#EBEBEB",
+    "useProjectSize": true
+  }
+}

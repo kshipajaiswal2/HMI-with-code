@@ -1,0 +1,17 @@
+{
+  "id": "500_Recipe",
+  "title": "Recipe",
+  "subtitle": "Recipe Select",
+  "navGroup": "recipe",
+  "securityLevel": 1,
+  "components": [
+    {
+      "type": "SubNav",
+      "navKey": "recipe"
+    }
+  ],
+  "displaySettings": {
+    "backgroundColor": "#EBEBEB",
+    "useProjectSize": true
+  }
+}

@@ -12,12 +12,13 @@ window.OBJECTS_MENU = [
       { id: 'draw-arc', label: 'Arc', action: 'arc-properties' },
       { id: 'draw-ellipse', label: 'Ellipse', action: 'ellipse-properties' },
       { id: 'draw-freehand', label: 'Freehand', action: 'freehand-properties' },
-      { id: 'draw-line', label: 'Line', planned: true },
-      { id: 'draw-polygon', label: 'Polygon', planned: true },
-      { id: 'draw-polyline', label: 'Polyline', planned: true },
+      { id: 'draw-line', label: 'Line', action: 'line-properties' },
+      { id: 'draw-polygon', label: 'Polygon', action: 'polygon-properties' },
+      { id: 'draw-polyline', label: 'Polyline', action: 'polyline-properties' },
       { id: 'draw-rectangle', label: 'Rectangle', action: 'rectangle-properties' },
-      { id: 'draw-rounded-rect', label: 'Rounded Rectangle', planned: true },
-      { id: 'draw-wedge', label: 'Wedge', planned: true }
+      { id: 'draw-rounded-rect', label: 'Rounded Rectangle', action: 'rounded-rectangle-properties' },
+      { id: 'draw-wedge', label: 'Wedge', action: 'wedge-properties' },
+      { id: 'draw-scale', label: 'Scale', action: 'scale-properties' }
     ]
   },
   {
@@ -57,30 +58,30 @@ window.OBJECTS_MENU = [
   },
   {
     id: 'gauge-graph', label: 'Gauge and Graph', children: [
-      { id: 'gauge-analog', label: 'Analog Gauge', planned: true },
+      { id: 'gauge-analog', label: 'Analog Gauge', action: 'gauge-properties' },
       { id: 'gauge-bar', label: 'Bar Graph', action: 'bar-graph-properties' },
       { id: 'gauge-histogram', label: 'Histogram', planned: true }
     ]
   },
   {
     id: 'trending', label: 'Trending', children: [
-      { id: 'trend-pause', label: 'Pause', planned: true },
-      { id: 'trend-next-pen', label: 'Next Pen', planned: true },
+      { id: 'trend-pause', label: 'Pause', action: 'pause-pen-button-properties' },
+      { id: 'trend-next-pen', label: 'Next Pen', action: 'next-pen-button-properties' },
       { sep: true },
-      { id: 'trend', label: 'Trend', planned: true }
+      { id: 'trend', label: 'Trend', action: 'trend-properties' }
     ]
   },
   {
     id: 'recipe-plus', label: 'RecipePlus', children: [
       { id: 'recipe-btn', label: 'RecipePlus Button', action: 'recipeplus-button-properties' },
       { id: 'recipe-selector', label: 'RecipePlus Selector', action: 'recipeplus-selector-properties' },
-      { id: 'recipe-table', label: 'RecipePlus Table', planned: true }
+      { id: 'recipe-table', label: 'RecipePlus Table', action: 'recipeplus-table-properties' }
     ]
   },
   {
     id: 'key', label: 'Key', children: [
-      { id: 'key-backspace', label: 'Backspace', planned: true },
-      { id: 'key-end', label: 'End', planned: true },
+      { id: 'key-backspace', label: 'Backspace', action: 'backspace-button-properties' },
+      { id: 'key-end', label: 'End', action: 'end-button-properties' },
       { id: 'key-enter', label: 'Enter', planned: true },
       { id: 'key-home', label: 'Home', planned: true },
       { id: 'key-left', label: 'Move Left', planned: true },

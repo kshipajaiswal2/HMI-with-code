@@ -1,40 +1,14 @@
 /** Ellipse property dialog — FactoryTalk View style (General / Common tabs). */
 (function () {
+  const S = window.StudioPropsShared;
   let ellipsePreviewTimer = null;
-
-  const PATTERN_OPTIONS = [
-    ['none', 'None'],
-    ['dots', 'Dots'],
-    ['checks', 'Checks'],
-    ['smallBoxes', 'Small Boxes'],
-    ['mediumBoxes', 'Medium Boxes'],
-    ['largeBoxes', 'Large Boxes'],
-    ['verticalLines', 'Vertical Lines'],
-    ['wideVerticalLines', 'Wide Vertical Lines'],
-    ['horizontalLines', 'Horizontal Lines'],
-    ['wideHorizontalLines', 'Wide Horizontal Lines'],
-    ['rightDiagonal', 'Right Diagonal'],
-    ['wideRightDiagonal', 'Wide Right Diagonal'],
-    ['leftDiagonal', 'Left Diagonal'],
-    ['wideLeftDiagonal', 'Wide Left Diagonal'],
-    ['hatch', 'Hatch'],
-    ['bricks', 'Bricks'],
-    ['ovals', 'Ovals'],
-    ['diamonds', 'Diamonds'],
-    ['scales', 'Scales'],
-    ['waves', 'Waves']
-  ];
 
   function scheduleEllipseLivePreview() {
     if (window.state?.propsFormFill) return;
     if (ellipsePreviewTimer) clearTimeout(ellipsePreviewTimer);
     ellipsePreviewTimer = setTimeout(() => {
       ellipsePreviewTimer = null;
-      const comp = readEllipsePropertiesForm();
-      if (comp.name && window.previewPatchByName) {
-        window.previewPatchByName(comp.name, comp);
-      }
-      window.updatePropsApplyButton?.(readEllipsePropertiesForm, 'applyEllipseProperties');
+      S.previewShape(readEllipsePropertiesForm(), readEllipsePropertiesForm, 'applyEllipseProperties');
     }, 100);
   }
 
@@ -44,26 +18,15 @@
   }
 
   function wireColorInputs() {
-    document.querySelectorAll('#ellipsePropertiesForm .ft-color-input').forEach((input) => {
-      if (input.dataset.epColorWired === '1') return;
-      input.dataset.epColorWired = '1';
-      input.addEventListener('input', notifyEllipseFormChange);
-      input.addEventListener('change', notifyEllipseFormChange);
-    });
+    S.wireColorInputs('#ellipsePropertiesForm', 'epColorWired', notifyEllipseFormChange);
   }
 
   function switchTab(tabId) {
-    document.querySelectorAll('#ellipsePropertiesDialog .dialog-tab').forEach((el) => {
-      el.classList.toggle('active', el.dataset.epTab === tabId);
-    });
-    document.querySelectorAll('#ellipsePropertiesDialog .dialog-tab-panel').forEach((el) => {
-      el.classList.toggle('active', el.dataset.epTabPanel === tabId);
-    });
+    S.switchDialogTab('ellipsePropertiesDialog', 'epTab', 'epTabPanel', tabId);
   }
 
   function syncGradientFields() {
-    const isGradient = document.getElementById('epBackStyle')?.value === 'gradient';
-    document.getElementById('epGradientExtras')?.classList.toggle('hidden', !isGradient);
+    S.syncGradientExtras('epBackStyle', 'epGradientExtras');
   }
 
   function syncPatternFields() {
@@ -81,31 +44,12 @@
     syncGradientFields();
   }
 
-  function setColorFieldValue(id, raw) {
-    const input = document.getElementById(id);
-    if (!input) return;
-    if (window.FtColorPicker?.setValueSilent) {
-      window.FtColorPicker.setValueSilent(input, raw);
-    } else {
-      input.value = raw;
-    }
-  }
-
-  function getColorFieldValue(id) {
-    const input = document.getElementById(id);
-    if (!input) return '#000000';
-    return window.FtColorPicker?.getInputColor?.(input) ?? input.value;
-  }
-
   function wireTools() {
     const dialog = document.getElementById('ellipsePropertiesDialog');
-    if (window.FtColorPicker) {
-      window.FtColorPicker.initAllSync(dialog);
-      window.FtColorPicker.refreshAll(dialog);
-    }
+    S.wireColorPicker(dialog);
     wireColorInputs();
     syncColorFields();
-    if (window.FtColorPicker) window.FtColorPicker.refreshAll(dialog);
+    S.wireColorPicker(dialog);
   }
 
   function fillEllipsePropertiesForm(comp) {
@@ -129,14 +73,16 @@
       ...comp
     };
     try {
+      const title = document.getElementById('ellipsePropertiesTitle');
+      if (title) title.textContent = 'Ellipse Properties';
       document.getElementById('epLineStyle').value = c.lineStyle || 'solid';
       document.getElementById('epBackStyle').value = c.backStyle || 'solid';
       document.getElementById('epPatternStyle').value = c.patternStyle || 'none';
-      setColorFieldValue('epForeColor', c.foreColor || '#808080');
-      setColorFieldValue('epBackColor', c.backColor || '#808080');
-      setColorFieldValue('epPatternColor', c.patternColor || '#ffffff');
+      S.setColorFieldValue('epForeColor', c.foreColor || '#808080');
+      S.setColorFieldValue('epBackColor', c.backColor || '#808080');
+      S.setColorFieldValue('epPatternColor', c.patternColor || '#ffffff');
       document.getElementById('epUsePatternColor').checked = Boolean(c.usePatternColor) || (c.patternStyle && c.patternStyle !== 'none');
-      setColorFieldValue('epEndColor', c.endColor || '#e8e8e8');
+      S.setColorFieldValue('epEndColor', c.endColor || '#e8e8e8');
       document.getElementById('epGradientStop').value = c.gradientStop ?? 95;
       document.getElementById('epGradientDir').value = c.gradientShadingStyle || c.gradientDirection || 'gradientHorizontalFromRight';
       document.getElementById('epLineWidth').value = c.lineWidth ?? 1;
@@ -168,15 +114,15 @@
       backStyle,
       patternStyle,
       useForeColor: true,
-      foreColor: norm(getColorFieldValue('epForeColor')),
+      foreColor: norm(S.getColorFieldValue('epForeColor')),
       useBackColor: backStyle !== 'transparent',
-      backColor: norm(getColorFieldValue('epBackColor')),
+      backColor: norm(S.getColorFieldValue('epBackColor')),
       usePatternColor: patternStyle !== 'none' && document.getElementById('epUsePatternColor').checked,
-      patternColor: norm(getColorFieldValue('epPatternColor')),
+      patternColor: norm(S.getColorFieldValue('epPatternColor')),
       lineWidth: Number(document.getElementById('epLineWidth').value) || 0
     };
     if (backStyle === 'gradient') {
-      comp.endColor = norm(getColorFieldValue('epEndColor'));
+      comp.endColor = norm(S.getColorFieldValue('epEndColor'));
       comp.gradientStop = Number(document.getElementById('epGradientStop').value) || 95;
       comp.gradientShadingStyle = document.getElementById('epGradientDir').value;
     }
@@ -191,6 +137,7 @@
       return;
     }
     window.commitPropsSnapshot(readEllipsePropertiesForm, 'applyEllipseProperties');
+    window.afterCanvasComponentSaved?.(comp);
     window.setStatus(`Applied ${comp.name}`);
   }
 
@@ -204,19 +151,14 @@
     }
     document.getElementById('ellipsePropertiesDialog').close();
     window.clearPropsDialogState();
-    window.setStatus(`Saved ${comp.name}`);
+    window.activateSelectTool?.(`Saved ${comp.name}`);
   }
 
   function initEllipsePropertiesDialog() {
     const form = document.getElementById('ellipsePropertiesForm');
-    if (!form) return;
-    const patternSelect = document.getElementById('epPatternStyle');
-    if (patternSelect && !patternSelect.dataset.epFilled) {
-      patternSelect.dataset.epFilled = '1';
-      patternSelect.innerHTML = PATTERN_OPTIONS.map(([value, label]) =>
-        `<option value="${value}">${label}</option>`
-      ).join('');
-    }
+    if (!form || form.dataset.epWired === '1') return;
+    form.dataset.epWired = '1';
+    S.fillPatternSelect('epPatternStyle', 'epFilled');
     form.addEventListener('submit', (e) => saveEllipseProperties(e).catch((err) => window.setStatus(`Error: ${err.message}`)));
     document.getElementById('applyEllipseProperties')?.addEventListener('click', () => {
       applyEllipseProperties().catch((err) => window.setStatus(`Error: ${err.message}`));
@@ -234,9 +176,13 @@
       window.revertPropsDialogPreview?.();
       document.getElementById('ellipsePropertiesDialog')?.close();
       window.clearPropsDialogState();
+      window.activateSelectTool?.();
+    });
+    document.getElementById('ellipsePropertiesDialog')?.addEventListener('close', () => {
+      window.activateSelectTool?.();
     });
     document.getElementById('helpEllipseProperties')?.addEventListener('click', () => {
-      alert('Ellipse Properties define line style, fill, pattern, and line width — matching FactoryTalk View ellipse objects.');
+      alert('Ellipse Properties define line style, fill, pattern, and line width.');
     });
     document.querySelectorAll('#ellipsePropertiesDialog .dialog-tab').forEach((tab) => {
       tab.addEventListener('click', () => switchTab(tab.dataset.epTab));
@@ -245,13 +191,16 @@
 
   function openEllipsePropertiesDialog(comp, ref, editIndex) {
     window.flushDeferredDialogInits?.();
+    initEllipsePropertiesDialog();
     fillEllipsePropertiesForm(comp);
     wireTools();
-    window.resetPropsDialogState('ellipse', readEllipsePropertiesForm, 'applyEllipseProperties', editIndex, ref);
+    const idx = S.resolvedEditIndex(comp, ref, editIndex);
+    window.resetPropsDialogState('ellipse', readEllipsePropertiesForm, 'applyEllipseProperties', idx, ref);
     switchTab('general');
     window.setTemplateEditStatus?.(comp.name, ref);
-    document.getElementById('ellipsePropertiesDialog')?.showModal();
+    window.showCanvasPropsDialog?.(document.getElementById('ellipsePropertiesDialog'));
     window.flushPropsApplyButton?.(readEllipsePropertiesForm, 'applyEllipseProperties');
+    if (idx == null) scheduleEllipseLivePreview();
   }
 
   window.StudioEllipseProperties = {

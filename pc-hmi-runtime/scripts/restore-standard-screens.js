@@ -17,7 +17,7 @@ function readFromGit(screenId) {
 let count = 0;
 for (const entry of lib.screens) {
   const content = readFromGit(entry.id);
-  for (const dir of ['screens', 'projects/_template/screens']) {
+  for (const dir of ['screens', 'projects/_template/Gfx']) {
     const dest = path.join(ROOT, dir, `${entry.id}.json`);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, content.endsWith('\n') ? content : `${content}\n`);

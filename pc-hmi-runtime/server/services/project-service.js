@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { defaultTemplateComponents } = require('../../config/template-components');
 const { composeScreen } = require('../../config/template-compose');
+const IoListTags = require('../../shared/io-list-tags');
 
 const DISPLAY_FOLDERS = [
   { id: '100_Overview', label: '100 Overview', navGroup: 'overview' },
@@ -210,7 +211,8 @@ const PROJECT_FOLDERS = [
   'ProjectSettings',
   'RecipePlus',
   'Startup',
-  'Tag'
+  'Tag',
+  IoListTags.PLC_UPLOADED_TAGS_FOLDER
 ];
 
 function pauseMs(ms) {
@@ -253,6 +255,32 @@ function writeJsonFileSafe(filePath, data, attempts = 6) {
     }
   }
   throw lastErr;
+}
+
+function isPlcUploadedTag(tag) {
+  const folder = String(tag?.folder || '').trim();
+  return folder === IoListTags.PLC_UPLOADED_TAGS_FOLDER
+    || folder === 'PLC uploaded Tags';
+}
+
+function splitProjectTags(tags) {
+  const hmiTags = [];
+  const plcTags = [];
+  for (const tag of tags || []) {
+    if (isPlcUploadedTag(tag)) plcTags.push(tag);
+    else hmiTags.push(tag);
+  }
+  return { hmiTags, plcTags };
+}
+
+function tagCsvLines(tags) {
+  const csvLines = ['Tag Name,Type,Description,PLC Address'];
+  for (const t of tags || []) {
+    const desc = String(t.description || '').replace(/"/g, '""');
+    const plc = String(t.plcAddress || t.connection || t.alias || '').replace(/"/g, '""');
+    csvLines.push(`"${t.name}","${t.type}","${desc}","${plc}"`);
+  }
+  return csvLines.join('\r\n') + '\r\n';
 }
 
 class ProjectService {
@@ -362,7 +390,7 @@ class ProjectService {
     };
 
     if (JSON.stringify(tplCfg) !== JSON.stringify(next)) {
-      writeJsonFileSafe(tplPath, next);
+      this.writeProjectConfigFile('_template', next);
     }
   }
 
@@ -398,6 +426,7 @@ class ProjectService {
     this.ensureDefaultGlobalObjects(projectId);
     this.ensureStandardScreens(projectId);
     this.seedDefaultImages(projectId);
+    this.ensurePlcUploadedTagsFile(projectId);
     this._layoutEnsured.add(projectId);
   }
 
@@ -423,7 +452,7 @@ class ProjectService {
     const defaultBg = config.runtime.displayBackground || DEFAULT_DISPLAY_BACKGROUND;
     if (!config.runtime.displayBackground) {
       config.runtime.displayBackground = defaultBg;
-      writeJsonFileSafe(path.join(base, 'project.json'), config);
+      this.writeProjectConfigFile(projectId, config);
     }
 
     const normalizeDisplayFile = (file) => {
@@ -463,6 +492,172 @@ class ProjectService {
     }
 
     this.ensureTemplateShell(projectId);
+  }
+
+  scalePx(value, factor, min = 0) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return value;
+    return Math.max(min, Math.round(n * factor));
+  }
+
+  scaleGraphicComponent(comp, sx, sy) {
+    if (!comp || typeof comp !== 'object' || Array.isArray(comp)) return;
+    const avg = (sx + sy) / 2;
+    const posX = ['left', 'x', 'x1', 'x2', 'startX', 'endX', 'displayLeft', 'cx'];
+    const posY = ['top', 'y', 'y1', 'y2', 'startY', 'endY', 'displayTop', 'cy'];
+    const sizeX = ['width', 'radiusX', 'rx'];
+    const sizeY = ['height', 'radiusY', 'ry'];
+    for (const key of posX) {
+      if (comp[key] != null && comp[key] !== '') comp[key] = this.scalePx(comp[key], sx, 0);
+    }
+    for (const key of posY) {
+      if (comp[key] != null && comp[key] !== '') comp[key] = this.scalePx(comp[key], sy, 0);
+    }
+    for (const key of sizeX) {
+      if (comp[key] != null && comp[key] !== '') comp[key] = this.scalePx(comp[key], sx, 1);
+    }
+    for (const key of sizeY) {
+      if (comp[key] != null && comp[key] !== '') comp[key] = this.scalePx(comp[key], sy, 1);
+    }
+    if (comp.fontSize != null && comp.fontSize !== '') {
+      comp.fontSize = this.scalePx(comp.fontSize, avg, 6);
+    }
+    for (const key of ['lineWidth', 'borderWidth', 'radius', 'innerRadius', 'horizontalMargin', 'verticalMargin']) {
+      if (comp[key] != null && comp[key] !== '') {
+        const min = (key === 'lineWidth' || key === 'borderWidth') ? 0 : 0;
+        comp[key] = this.scalePx(comp[key], avg, min);
+      }
+    }
+    if (Array.isArray(comp.points)) {
+      comp.points = comp.points.map((pt) => {
+        if (Array.isArray(pt) && pt.length >= 2) {
+          return [this.scalePx(pt[0], sx, 0), this.scalePx(pt[1], sy, 0), ...pt.slice(2)];
+        }
+        if (!pt || typeof pt !== 'object') return pt;
+        const next = { ...pt };
+        if (next.x != null) next.x = this.scalePx(next.x, sx, 0);
+        if (next.y != null) next.y = this.scalePx(next.y, sy, 0);
+        return next;
+      });
+    }
+    if (Array.isArray(comp.components)) {
+      for (const child of comp.components) this.scaleGraphicComponent(child, sx, sy);
+    }
+    if (Array.isArray(comp.children)) {
+      for (const child of comp.children) this.scaleGraphicComponent(child, sx, sy);
+    }
+    if (Array.isArray(comp.states)) {
+      for (const st of comp.states) this.scaleGraphicComponent(st, sx, sy);
+    }
+    if (Array.isArray(comp.objects)) {
+      for (const child of comp.objects) this.scaleGraphicComponent(child, sx, sy);
+    }
+    if (Array.isArray(comp.path)) {
+      comp.path = comp.path.map((pt) => {
+        if (Array.isArray(pt) && pt.length >= 2) {
+          return [this.scalePx(pt[0], sx, 0), this.scalePx(pt[1], sy, 0), ...pt.slice(2)];
+        }
+        return pt;
+      });
+    }
+  }
+
+  scaleGraphicDocument(data, sx, sy) {
+    if (!data || typeof data !== 'object') return data;
+    if (Array.isArray(data.components)) {
+      for (const comp of data.components) this.scaleGraphicComponent(comp, sx, sy);
+    }
+    for (const key of Object.keys(data)) {
+      if (!key.endsWith('Shell') || !data[key] || typeof data[key] !== 'object' || Array.isArray(data[key])) continue;
+      for (const name of Object.keys(data[key])) {
+        this.scaleGraphicComponent(data[key][name], sx, sy);
+      }
+    }
+    if (data.template?.replace && typeof data.template.replace === 'object') {
+      for (const key of Object.keys(data.template.replace)) {
+        const patch = data.template.replace[key];
+        if (!patch || typeof patch !== 'object') continue;
+        if (patch.displayLeft != null) patch.displayLeft = this.scalePx(patch.displayLeft, sx, 0);
+        if (patch.displayTop != null) patch.displayTop = this.scalePx(patch.displayTop, sy, 0);
+      }
+    }
+    const ds = data.displaySettings;
+    if (ds && !ds.useProjectSize) {
+      if (ds.width != null) ds.width = this.scalePx(ds.width, sx, 1);
+      if (ds.height != null) ds.height = this.scalePx(ds.height, sy, 1);
+    }
+    return data;
+  }
+
+  inferGraphicLayoutSize(projectId) {
+    const config = this.readProjectConfig(projectId) || {};
+    const rt = config.runtime || {};
+    if (Number(rt.layoutWidth) > 0 && Number(rt.layoutHeight) > 0) {
+      return { width: Number(rt.layoutWidth), height: Number(rt.layoutHeight) };
+    }
+    const template = this.getGlobalObject(projectId, 'Template');
+    const comps = template?.components || [];
+    const header = comps.find((c) => c?.name === 'HeaderBar');
+    const ticker = comps.find((c) => c?.type === 'AlarmTicker');
+    const footer = comps.find((c) => c?.name === 'FooterBar');
+    const width = Number(header?.width) || Number(rt.width) || 800;
+    let height = Number(rt.height) || 600;
+    if (ticker) height = Math.max(Number(ticker.top) || 0, 0) + Math.max(Number(ticker.height) || 0, 0);
+    else if (footer) height = Math.max(Number(footer.top) || 0, 0) + Math.max(Number(footer.height) || 0, 0);
+    if (height < 240) height = Number(rt.height) || 600;
+    const preset = WINDOW_SIZE_PRESETS.find((p) => (
+      Math.abs(p.width - width) <= 8 && Math.abs(p.height - height) <= 16
+    ));
+    if (preset) return { width: preset.width, height: preset.height };
+    return { width, height };
+  }
+
+  scaleProjectGraphics(projectId, fromWidth, fromHeight, toWidth, toHeight) {
+    if (!this.projectExists(projectId) || projectId === '_template') return { scaled: false };
+    const fromW = Number(fromWidth);
+    const fromH = Number(fromHeight);
+    const toW = Number(toWidth);
+    const toH = Number(toHeight);
+    if (!(fromW > 0 && fromH > 0 && toW > 0 && toH > 0)) return { scaled: false };
+    if (fromW === toW && fromH === toH) return { scaled: false, fromWidth: fromW, fromHeight: fromH, toWidth: toW, toHeight: toH };
+    const sx = toW / fromW;
+    const sy = toH / fromH;
+    const scaleDir = (dir) => {
+      if (!fs.existsSync(dir)) return 0;
+      let count = 0;
+      for (const f of fs.readdirSync(dir)) {
+        if (!f.endsWith('.json')) continue;
+        const file = path.join(dir, f);
+        try {
+          const data = JSON.parse(readFileWithRetry(file));
+          this.scaleGraphicDocument(data, sx, sy);
+          writeJsonFileSafe(file, data);
+          count += 1;
+        } catch (err) {
+          console.warn(`Graphic scale skipped ${path.basename(file)}: ${err.message}`);
+        }
+      }
+      return count;
+    };
+    const displays = scaleDir(this.gfxDir(projectId));
+    const globalObjects = scaleDir(this.globalObjectsDir(projectId));
+    const config = this.readProjectConfig(projectId);
+    config.runtime = {
+      ...(config.runtime || {}),
+      layoutWidth: toW,
+      layoutHeight: toH
+    };
+    this.writeProjectConfigFile(projectId, config);
+    this.syncProjectArtifacts(projectId);
+    return {
+      scaled: true,
+      fromWidth: fromW,
+      fromHeight: fromH,
+      toWidth: toW,
+      toHeight: toH,
+      displays,
+      globalObjects
+    };
   }
 
   ensureTemplateShell(projectId) {
@@ -726,17 +921,20 @@ class ProjectService {
       return;
     }
 
+    const { hmiTags, plcTags } = splitProjectTags(config.tags);
+
     const tagDir = path.join(this.projectPath(projectId), 'Tag');
     fs.mkdirSync(tagDir, { recursive: true });
-    const csvLines = ['Tag Name,Type,Description,PLC Address'];
-    for (const t of config.tags || []) {
-      const desc = String(t.description || '').replace(/"/g, '""');
-      const plc = String(t.plcAddress || t.connection || t.alias || '').replace(/"/g, '""');
-      csvLines.push(`"${t.name}","${t.type}","${desc}","${plc}"`);
-    }
     fs.writeFileSync(
       path.join(tagDir, `${projectId}-Tags.CSV`),
-      csvLines.join('\r\n') + '\r\n',
+      tagCsvLines(hmiTags),
+      'utf8'
+    );
+
+    this.writePlcUploadedTags(projectId, plcTags);
+    fs.writeFileSync(
+      path.join(this.plcUploadedTagsDir(projectId), `${projectId}-PLC-uploaded-Tags.CSV`),
+      tagCsvLines(plcTags),
       'utf8'
     );
 
@@ -744,7 +942,7 @@ class ProjectService {
     fs.mkdirSync(settingsDir, { recursive: true });
     writeJsonFileSafe(
       path.join(settingsDir, 'project.json'),
-      config
+      { ...config, tags: hmiTags }
     );
 
     const alarmDir = path.join(this.projectPath(projectId), 'M_Alarms');
@@ -767,12 +965,9 @@ class ProjectService {
       const fileName = `${entry.id}.json`;
       const refSrc = useReference ? path.join(refGfxDir, fileName) : null;
       const templateSrc = path.join(templateGfx, fileName);
-      const legacySrc = path.join(this.templateDir, 'screens', fileName);
       const from = (refSrc && fs.existsSync(refSrc))
         ? refSrc
-        : fs.existsSync(templateSrc)
-          ? templateSrc
-          : legacySrc;
+        : templateSrc;
       if (fs.existsSync(from)) {
         fs.copyFileSync(from, path.join(projectGfx, fileName));
       }
@@ -818,7 +1013,7 @@ class ProjectService {
       };
     }
 
-    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+    this.writeProjectConfigFile(projectId, cfg, { preservePlcIfEmpty: !useReference });
     this.syncProjectArtifacts(projectId);
   }
 
@@ -873,6 +1068,64 @@ class ProjectService {
     return path.join(this.projectsDir, id);
   }
 
+  plcUploadedTagsDir(projectId) {
+    return path.join(this.projectPath(projectId), IoListTags.PLC_UPLOADED_TAGS_FOLDER);
+  }
+
+  plcUploadedTagsFile(projectId) {
+    return path.join(this.plcUploadedTagsDir(projectId), 'tags.json');
+  }
+
+  ensurePlcUploadedTagsFile(projectId) {
+    const dir = this.plcUploadedTagsDir(projectId);
+    fs.mkdirSync(dir, { recursive: true });
+    const file = this.plcUploadedTagsFile(projectId);
+    if (!fs.existsSync(file)) {
+      writeJsonFileSafe(file, {
+        folder: IoListTags.PLC_UPLOADED_TAGS_FOLDER,
+        tags: []
+      });
+    }
+  }
+
+  readPlcUploadedTags(projectId) {
+    const file = this.plcUploadedTagsFile(projectId);
+    if (!fs.existsSync(file)) return [];
+    try {
+      const data = JSON.parse(readFileWithRetry(file));
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data?.tags)) return data.tags;
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  writePlcUploadedTags(projectId, tags) {
+    this.ensurePlcUploadedTagsFile(projectId);
+    const normalized = (tags || []).map((tag) => ({
+      ...tag,
+      folder: IoListTags.PLC_UPLOADED_TAGS_FOLDER
+    }));
+    writeJsonFileSafe(this.plcUploadedTagsFile(projectId), {
+      folder: IoListTags.PLC_UPLOADED_TAGS_FOLDER,
+      tags: normalized
+    });
+  }
+
+  writeProjectConfigFile(projectId, config, options = {}) {
+    const { hmiTags, plcTags } = splitProjectTags(config.tags);
+    writeJsonFileSafe(
+      path.join(this.projectPath(projectId), 'project.json'),
+      { ...config, tags: hmiTags }
+    );
+    if (options.preservePlcIfEmpty && !plcTags.length) {
+      this.ensurePlcUploadedTagsFile(projectId);
+      return;
+    }
+    this.writePlcUploadedTags(projectId, plcTags);
+  }
+
   getDefaultNewProjectSourceId() {
     return STARTER_REFERENCE_PROJECT;
   }
@@ -906,7 +1159,19 @@ class ProjectService {
   readProjectConfig(projectId) {
     const file = path.join(this.projectPath(projectId), 'project.json');
     if (!fs.existsSync(file)) return {};
-    return JSON.parse(readFileWithRetry(file));
+    const config = JSON.parse(readFileWithRetry(file));
+    const { hmiTags, plcTags: leakedPlcTags } = splitProjectTags(config.tags);
+    const plcByName = new Map();
+    for (const tag of [...this.readPlcUploadedTags(projectId), ...leakedPlcTags]) {
+      if (tag?.name) plcByName.set(tag.name, tag);
+    }
+    const plcTags = [...plcByName.values()];
+    config.tags = [...hmiTags, ...plcTags];
+    if (leakedPlcTags.length) {
+      writeJsonFileSafe(file, { ...config, tags: hmiTags });
+      this.writePlcUploadedTags(projectId, plcTags);
+    }
+    return config;
   }
 
   readNavigation(projectId) {
@@ -1114,8 +1379,13 @@ class ProjectService {
 
   updateProjectConfig(projectId, patch) {
     if (!this.projectExists(projectId)) throw new Error('Project not found');
-    const file = path.join(this.projectPath(projectId), 'project.json');
-    const config = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const config = this.readProjectConfig(projectId);
+    const scaleGraphics = Boolean(patch.scaleGraphics);
+    const scaleFromWidth = Number(patch.scaleFromWidth);
+    const scaleFromHeight = Number(patch.scaleFromHeight);
+    delete patch.scaleGraphics;
+    delete patch.scaleFromWidth;
+    delete patch.scaleFromHeight;
     if (patch.name !== undefined) {
       const trimmed = String(patch.name).trim();
       const current = String(config.name || '').trim();
@@ -1160,12 +1430,20 @@ class ProjectService {
         config[key] = patch[key];
       }
     }
-    writeJsonFileSafe(file, config);
+    this.writeProjectConfigFile(projectId, config);
+    if (scaleGraphics) {
+      const from = (scaleFromWidth > 0 && scaleFromHeight > 0)
+        ? { width: scaleFromWidth, height: scaleFromHeight }
+        : this.inferGraphicLayoutSize(projectId);
+      const toW = Number(config.runtime?.width) || from.width;
+      const toH = Number(config.runtime?.height) || from.height;
+      this.scaleProjectGraphics(projectId, from.width, from.height, toW, toH);
+    }
     if (patch.runtime) {
       this.syncAllDisplaySizesToProject(projectId);
     }
     this.syncProjectArtifacts(projectId);
-    return config;
+    return this.readProjectConfig(projectId);
   }
 
   updateScreen(projectId, screenId, patch) {
@@ -1298,14 +1576,9 @@ class ProjectService {
       if (folder) tagFolders.add(folder);
     }
 
-    let orderedFolders = [];
-    try {
-      const IoListTags = require('../../shared/io-list-tags');
-      orderedFolders = IoListTags.getIoListTagFolders().filter((name) => tagFolders.has(name));
-    } catch {
-      orderedFolders = [];
-    }
-    for (const preferred of ['PLC uploded Tags', 'Temp_Tags']) {
+    const IoListTags = require('../../shared/io-list-tags');
+    const orderedFolders = [...IoListTags.getDefaultHmiTagFolderOrder()];
+    for (const preferred of ['Temp_Tags']) {
       if (tagFolders.has(preferred) && !orderedFolders.includes(preferred)) {
         orderedFolders.push(preferred);
       }
@@ -1314,15 +1587,31 @@ class ProjectService {
       if (!orderedFolders.includes(folderName)) orderedFolders.push(folderName);
     }
 
-    const hmiTagChildren = orderedFolders.length
-      ? orderedFolders.map((folderName) => ({
+    const groupedNames = new Set();
+    for (const group of IoListTags.getHmiTagExplorerGroups()) {
+      for (const folder of group.folders) groupedNames.add(folder.name);
+    }
+
+    const plcUploadedName = IoListTags.PLC_UPLOADED_TAGS_FOLDER;
+    const extraFolderNodes = orderedFolders
+      .filter((folderName) => !groupedNames.has(folderName) && folderName !== plcUploadedName)
+      .map((folderName) => ({
         type: 'folder',
         id: `tag-folder-${folderName}`,
         label: folderName,
         icon: 'folder',
         tagFolder: folderName
-      }))
-      : [{ type: 'item', id: 'hmi-tags-list', label: 'Tags', icon: 'tags', action: 'tags' }];
+      }));
+
+    const hmiTagChildren = [
+      {
+        type: 'folder',
+        id: 'hmi-tags-list',
+        label: 'HMI Tags',
+        icon: 'folder',
+        children: extraFolderNodes
+      }
+    ];
 
     const { isPlcDeviceTag } = require('../../shared/tag-connections');
     const plcDeviceTags = (config.tags || []).filter(isPlcDeviceTag);
@@ -1366,9 +1655,16 @@ class ProjectService {
       {
         type: 'folder',
         id: 'hmi-tags',
-        label: 'HMI Tags',
+        label: 'Tags',
         icon: 'tags',
         children: hmiTagChildren
+      },
+      {
+        type: 'folder',
+        id: `tag-folder-${plcUploadedName}`,
+        label: 'PLC uploaded Tags',
+        icon: 'folder',
+        tagFolder: plcUploadedName
       },
       {
         type: 'folder',
@@ -1558,12 +1854,26 @@ class ProjectService {
         height: preset.height
       };
     }
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    this.writeProjectConfigFile(id, config, { preservePlcIfEmpty: true });
 
     this.seedProjectFromTemplate(id);
     this.ensureProjectLayout(id);
     this.removeLegacyScreensDir(id);
     this.syncAllDisplaySizesToProject(id);
+    const layout = this.inferGraphicLayoutSize(id);
+    const toW = Number(config.runtime?.width) || layout.width;
+    const toH = Number(config.runtime?.height) || layout.height;
+    if (layout.width !== toW || layout.height !== toH) {
+      this.scaleProjectGraphics(id, layout.width, layout.height, toW, toH);
+    } else {
+      const latest = this.readProjectConfig(id);
+      latest.runtime = {
+        ...(latest.runtime || {}),
+        layoutWidth: toW,
+        layoutHeight: toH
+      };
+      this.writeProjectConfigFile(id, latest, { preservePlcIfEmpty: true });
+    }
     this.syncProjectArtifacts(id);
 
     this.setActiveId(id);

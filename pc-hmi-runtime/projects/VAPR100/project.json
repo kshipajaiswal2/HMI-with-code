@@ -232,6 +232,1014 @@
       "name": "Alarm.HighTemp",
       "type": "bool",
       "description": "High temp alarm"
+    },
+    {
+      "name": "PLC_DI_Discr.List_02",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "PLC DI list 02 title",
+      "initialValue": "PLC DI List 02"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_08",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI09 System Start PB",
+      "initialValue": "DI09 System Start PB"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_09",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI10 System Stop PB",
+      "initialValue": "DI10 System Stop PB"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_10",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI11 System Reset PB",
+      "initialValue": "DI11 System Reset PB"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_11",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI12 Safety Reset PB",
+      "initialValue": "DI12 Safety Reset PB"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_12",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI13 Spare DI",
+      "initialValue": "DI13 Spare DI"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_13",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI14 Spare DI",
+      "initialValue": "DI14 Spare DI"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_14",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI15 Spare DI",
+      "initialValue": "DI15 Spare DI"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_15",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI16 Chopper Air Pressure Switch",
+      "initialValue": "DI16 Chopper Air Pressure Switch"
+    },
+    {
+      "name": "PLC_DI_No.Data_08",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "9",
+      "initialValue": 9
+    },
+    {
+      "name": "PLC_DI_No.Data_09",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "10",
+      "initialValue": 10
+    },
+    {
+      "name": "PLC_DI_No.Data_10",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "11",
+      "initialValue": 11
+    },
+    {
+      "name": "PLC_DI_No.Data_11",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "12",
+      "initialValue": 12
+    },
+    {
+      "name": "PLC_DI_No.Data_12",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "13",
+      "initialValue": 13
+    },
+    {
+      "name": "PLC_DI_No.Data_13",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "14",
+      "initialValue": 14
+    },
+    {
+      "name": "PLC_DI_No.Data_14",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "15",
+      "initialValue": 15
+    },
+    {
+      "name": "PLC_DI_No.Data_15",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "16",
+      "initialValue": 16
+    },
+    {
+      "name": "PLC_DI_Tags.Data_08",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI09 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_09",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI10 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_10",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI11 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_11",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI12 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_12",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI13 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_13",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI14 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_14",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI15 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_15",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI16 value",
+      "initialValue": false
+    },
+    {
+      "name": "Temp_Tags.IO_LIST",
+      "type": "int",
+      "folder": "Temp_Tags",
+      "dataSource": "memory",
+      "description": "Active IO list tab (1=input, 2=output)",
+      "initialValue": 2
+    },
+    {
+      "name": "PLC_DI_Discr.List_01",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "PLC DI list 01 title",
+      "initialValue": "PLC DI List 01"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_00",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI01 System Start PB",
+      "initialValue": "DI01 System Start PB"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_01",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI02 System Stop PB",
+      "initialValue": "DI02 System Stop PB"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_02",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI03 System Reset PB",
+      "initialValue": "DI03 System Reset PB"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_03",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI04 Safety Reset PB",
+      "initialValue": "DI04 Safety Reset PB"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_04",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI05 Spare DI",
+      "initialValue": "DI05 Spare DI"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_05",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI06 Spare DI",
+      "initialValue": "DI06 Spare DI"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_06",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI07 Spare DI",
+      "initialValue": "DI07 Spare DI"
+    },
+    {
+      "name": "PLC_DI_Discr.Data_07",
+      "type": "string",
+      "folder": "PLC_DI_Discr",
+      "dataSource": "memory",
+      "description": "DI08 Chopper Air Pressure Switch",
+      "initialValue": "DI08 Chopper Air Pressure Switch"
+    },
+    {
+      "name": "PLC_DI_No.Data_00",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "1",
+      "initialValue": 1
+    },
+    {
+      "name": "PLC_DI_No.Data_01",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "2",
+      "initialValue": 2
+    },
+    {
+      "name": "PLC_DI_No.Data_02",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "3",
+      "initialValue": 3
+    },
+    {
+      "name": "PLC_DI_No.Data_03",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "4",
+      "initialValue": 4
+    },
+    {
+      "name": "PLC_DI_No.Data_04",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "5",
+      "initialValue": 5
+    },
+    {
+      "name": "PLC_DI_No.Data_05",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "6",
+      "initialValue": 6
+    },
+    {
+      "name": "PLC_DI_No.Data_06",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "7",
+      "initialValue": 7
+    },
+    {
+      "name": "PLC_DI_No.Data_07",
+      "type": "int",
+      "folder": "PLC_DI_No",
+      "dataSource": "memory",
+      "description": "8",
+      "initialValue": 8
+    },
+    {
+      "name": "PLC_DI_Tags.Data_00",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI01 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_01",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI02 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_02",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI03 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_03",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI04 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_04",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI05 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_05",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI06 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_06",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI07 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DI_Tags.Data_07",
+      "type": "bool",
+      "folder": "PLC_DI_Tags",
+      "dataSource": "memory",
+      "description": "DI08 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DO_Discr.List_01",
+      "type": "string",
+      "folder": "PLC_DO_Discr",
+      "dataSource": "memory",
+      "description": "PLC DO list 01 title",
+      "initialValue": "PLC DO List 01"
+    },
+    {
+      "name": "PLC_DO_Discr.Data_00",
+      "type": "string",
+      "folder": "PLC_DO_Discr",
+      "dataSource": "memory",
+      "description": "DO01 Run Lamp @ Main Panel",
+      "initialValue": "DO01 Run Lamp @ Main Panel"
+    },
+    {
+      "name": "PLC_DO_Discr.Data_01",
+      "type": "string",
+      "folder": "PLC_DO_Discr",
+      "dataSource": "memory",
+      "description": "DO02 Fault Lamp @ Main Panel",
+      "initialValue": "DO02 Fault Lamp @ Main Panel"
+    },
+    {
+      "name": "PLC_DO_Discr.Data_02",
+      "type": "string",
+      "folder": "PLC_DO_Discr",
+      "dataSource": "memory",
+      "description": "DO03 Horn @ Main Panel",
+      "initialValue": "DO03 Horn @ Main Panel"
+    },
+    {
+      "name": "PLC_DO_Discr.Data_03",
+      "type": "string",
+      "folder": "PLC_DO_Discr",
+      "dataSource": "memory",
+      "description": "DO04 Stack Light Green",
+      "initialValue": "DO04 Stack Light Green"
+    },
+    {
+      "name": "PLC_DO_Discr.Data_04",
+      "type": "string",
+      "folder": "PLC_DO_Discr",
+      "dataSource": "memory",
+      "description": "DO05 Stack Light Amber",
+      "initialValue": "DO05 Stack Light Amber"
+    },
+    {
+      "name": "PLC_DO_Discr.Data_05",
+      "type": "string",
+      "folder": "PLC_DO_Discr",
+      "dataSource": "memory",
+      "description": "DO06 Stack Light Red",
+      "initialValue": "DO06 Stack Light Red"
+    },
+    {
+      "name": "PLC_DO_Discr.Data_06",
+      "type": "string",
+      "folder": "PLC_DO_Discr",
+      "dataSource": "memory",
+      "description": "DO07 Conveyor Forward",
+      "initialValue": "DO07 Conveyor Forward"
+    },
+    {
+      "name": "PLC_DO_Discr.Data_07",
+      "type": "string",
+      "folder": "PLC_DO_Discr",
+      "dataSource": "memory",
+      "description": "DO08 Conveyor Reverse",
+      "initialValue": "DO08 Conveyor Reverse"
+    },
+    {
+      "name": "PLC_DO_No.Data_00",
+      "type": "int",
+      "folder": "PLC_DO_No",
+      "dataSource": "memory",
+      "description": "1",
+      "initialValue": 1
+    },
+    {
+      "name": "PLC_DO_No.Data_01",
+      "type": "int",
+      "folder": "PLC_DO_No",
+      "dataSource": "memory",
+      "description": "2",
+      "initialValue": 2
+    },
+    {
+      "name": "PLC_DO_No.Data_02",
+      "type": "int",
+      "folder": "PLC_DO_No",
+      "dataSource": "memory",
+      "description": "3",
+      "initialValue": 3
+    },
+    {
+      "name": "PLC_DO_No.Data_03",
+      "type": "int",
+      "folder": "PLC_DO_No",
+      "dataSource": "memory",
+      "description": "4",
+      "initialValue": 4
+    },
+    {
+      "name": "PLC_DO_No.Data_04",
+      "type": "int",
+      "folder": "PLC_DO_No",
+      "dataSource": "memory",
+      "description": "5",
+      "initialValue": 5
+    },
+    {
+      "name": "PLC_DO_No.Data_05",
+      "type": "int",
+      "folder": "PLC_DO_No",
+      "dataSource": "memory",
+      "description": "6",
+      "initialValue": 6
+    },
+    {
+      "name": "PLC_DO_No.Data_06",
+      "type": "int",
+      "folder": "PLC_DO_No",
+      "dataSource": "memory",
+      "description": "7",
+      "initialValue": 7
+    },
+    {
+      "name": "PLC_DO_No.Data_07",
+      "type": "int",
+      "folder": "PLC_DO_No",
+      "dataSource": "memory",
+      "description": "8",
+      "initialValue": 8
+    },
+    {
+      "name": "PLC_DO_Tags.Data_00",
+      "type": "bool",
+      "folder": "PLC_DO_Tags",
+      "dataSource": "memory",
+      "description": "DO01 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DO_Tags.Data_01",
+      "type": "bool",
+      "folder": "PLC_DO_Tags",
+      "dataSource": "memory",
+      "description": "DO02 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DO_Tags.Data_02",
+      "type": "bool",
+      "folder": "PLC_DO_Tags",
+      "dataSource": "memory",
+      "description": "DO03 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DO_Tags.Data_03",
+      "type": "bool",
+      "folder": "PLC_DO_Tags",
+      "dataSource": "memory",
+      "description": "DO04 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DO_Tags.Data_04",
+      "type": "bool",
+      "folder": "PLC_DO_Tags",
+      "dataSource": "memory",
+      "description": "DO05 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DO_Tags.Data_05",
+      "type": "bool",
+      "folder": "PLC_DO_Tags",
+      "dataSource": "memory",
+      "description": "DO06 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DO_Tags.Data_06",
+      "type": "bool",
+      "folder": "PLC_DO_Tags",
+      "dataSource": "memory",
+      "description": "DO07 value",
+      "initialValue": false
+    },
+    {
+      "name": "PLC_DO_Tags.Data_07",
+      "type": "bool",
+      "folder": "PLC_DO_Tags",
+      "dataSource": "memory",
+      "description": "DO08 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DI_Discr.Safety_List_01",
+      "type": "string",
+      "folder": "Safety_DI_Discr",
+      "dataSource": "memory",
+      "description": "Safety DI list 01 title",
+      "initialValue": "Safety DI List 01"
+    },
+    {
+      "name": "Safety_DI_Discr.Data_00",
+      "type": "string",
+      "folder": "Safety_DI_Discr",
+      "dataSource": "memory",
+      "description": "SDI01 E-Stop Channel 1",
+      "initialValue": "SDI01 E-Stop Channel 1"
+    },
+    {
+      "name": "Safety_DI_Discr.Data_01",
+      "type": "string",
+      "folder": "Safety_DI_Discr",
+      "dataSource": "memory",
+      "description": "SDI02 E-Stop Channel 2",
+      "initialValue": "SDI02 E-Stop Channel 2"
+    },
+    {
+      "name": "Safety_DI_Discr.Data_02",
+      "type": "string",
+      "folder": "Safety_DI_Discr",
+      "dataSource": "memory",
+      "description": "SDI03 Safety Door 1",
+      "initialValue": "SDI03 Safety Door 1"
+    },
+    {
+      "name": "Safety_DI_Discr.Data_03",
+      "type": "string",
+      "folder": "Safety_DI_Discr",
+      "dataSource": "memory",
+      "description": "SDI04 Safety Door 2",
+      "initialValue": "SDI04 Safety Door 2"
+    },
+    {
+      "name": "Safety_DI_Discr.Data_04",
+      "type": "string",
+      "folder": "Safety_DI_Discr",
+      "dataSource": "memory",
+      "description": "SDI05 Light Curtain",
+      "initialValue": "SDI05 Light Curtain"
+    },
+    {
+      "name": "Safety_DI_Discr.Data_05",
+      "type": "string",
+      "folder": "Safety_DI_Discr",
+      "dataSource": "memory",
+      "description": "SDI06 Spare Safety DI",
+      "initialValue": "SDI06 Spare Safety DI"
+    },
+    {
+      "name": "Safety_DI_Discr.Data_06",
+      "type": "string",
+      "folder": "Safety_DI_Discr",
+      "dataSource": "memory",
+      "description": "SDI07 Spare Safety DI",
+      "initialValue": "SDI07 Spare Safety DI"
+    },
+    {
+      "name": "Safety_DI_Discr.Data_07",
+      "type": "string",
+      "folder": "Safety_DI_Discr",
+      "dataSource": "memory",
+      "description": "SDI08 Reset PB",
+      "initialValue": "SDI08 Reset PB"
+    },
+    {
+      "name": "Safety_DI_No.Data_00",
+      "type": "int",
+      "folder": "Safety_DI_No",
+      "dataSource": "memory",
+      "description": "1",
+      "initialValue": 1
+    },
+    {
+      "name": "Safety_DI_No.Data_01",
+      "type": "int",
+      "folder": "Safety_DI_No",
+      "dataSource": "memory",
+      "description": "2",
+      "initialValue": 2
+    },
+    {
+      "name": "Safety_DI_No.Data_02",
+      "type": "int",
+      "folder": "Safety_DI_No",
+      "dataSource": "memory",
+      "description": "3",
+      "initialValue": 3
+    },
+    {
+      "name": "Safety_DI_No.Data_03",
+      "type": "int",
+      "folder": "Safety_DI_No",
+      "dataSource": "memory",
+      "description": "4",
+      "initialValue": 4
+    },
+    {
+      "name": "Safety_DI_No.Data_04",
+      "type": "int",
+      "folder": "Safety_DI_No",
+      "dataSource": "memory",
+      "description": "5",
+      "initialValue": 5
+    },
+    {
+      "name": "Safety_DI_No.Data_05",
+      "type": "int",
+      "folder": "Safety_DI_No",
+      "dataSource": "memory",
+      "description": "6",
+      "initialValue": 6
+    },
+    {
+      "name": "Safety_DI_No.Data_06",
+      "type": "int",
+      "folder": "Safety_DI_No",
+      "dataSource": "memory",
+      "description": "7",
+      "initialValue": 7
+    },
+    {
+      "name": "Safety_DI_No.Data_07",
+      "type": "int",
+      "folder": "Safety_DI_No",
+      "dataSource": "memory",
+      "description": "8",
+      "initialValue": 8
+    },
+    {
+      "name": "Safety_DI_Tags.Data_00",
+      "type": "bool",
+      "folder": "Safety_DI_Tags",
+      "dataSource": "memory",
+      "description": "SDI01 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DI_Tags.Data_01",
+      "type": "bool",
+      "folder": "Safety_DI_Tags",
+      "dataSource": "memory",
+      "description": "SDI02 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DI_Tags.Data_02",
+      "type": "bool",
+      "folder": "Safety_DI_Tags",
+      "dataSource": "memory",
+      "description": "SDI03 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DI_Tags.Data_03",
+      "type": "bool",
+      "folder": "Safety_DI_Tags",
+      "dataSource": "memory",
+      "description": "SDI04 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DI_Tags.Data_04",
+      "type": "bool",
+      "folder": "Safety_DI_Tags",
+      "dataSource": "memory",
+      "description": "SDI05 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DI_Tags.Data_05",
+      "type": "bool",
+      "folder": "Safety_DI_Tags",
+      "dataSource": "memory",
+      "description": "SDI06 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DI_Tags.Data_06",
+      "type": "bool",
+      "folder": "Safety_DI_Tags",
+      "dataSource": "memory",
+      "description": "SDI07 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DI_Tags.Data_07",
+      "type": "bool",
+      "folder": "Safety_DI_Tags",
+      "dataSource": "memory",
+      "description": "SDI08 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DO_Discr.Safety_List_01",
+      "type": "string",
+      "folder": "Safety_DO_Discr",
+      "dataSource": "memory",
+      "description": "Safety DO list 01 title",
+      "initialValue": "Safety DO List 01"
+    },
+    {
+      "name": "Safety_DO_Discr.Data_00",
+      "type": "string",
+      "folder": "Safety_DO_Discr",
+      "dataSource": "memory",
+      "description": "SDO01 Safety Relay K1",
+      "initialValue": "SDO01 Safety Relay K1"
+    },
+    {
+      "name": "Safety_DO_Discr.Data_01",
+      "type": "string",
+      "folder": "Safety_DO_Discr",
+      "dataSource": "memory",
+      "description": "SDO02 Safety Relay K2",
+      "initialValue": "SDO02 Safety Relay K2"
+    },
+    {
+      "name": "Safety_DO_Discr.Data_02",
+      "type": "string",
+      "folder": "Safety_DO_Discr",
+      "dataSource": "memory",
+      "description": "SDO03 Door Lock 1",
+      "initialValue": "SDO03 Door Lock 1"
+    },
+    {
+      "name": "Safety_DO_Discr.Data_03",
+      "type": "string",
+      "folder": "Safety_DO_Discr",
+      "dataSource": "memory",
+      "description": "SDO04 Door Lock 2",
+      "initialValue": "SDO04 Door Lock 2"
+    },
+    {
+      "name": "Safety_DO_Discr.Data_04",
+      "type": "string",
+      "folder": "Safety_DO_Discr",
+      "dataSource": "memory",
+      "description": "SDO05 Stack Light Red",
+      "initialValue": "SDO05 Stack Light Red"
+    },
+    {
+      "name": "Safety_DO_Discr.Data_05",
+      "type": "string",
+      "folder": "Safety_DO_Discr",
+      "dataSource": "memory",
+      "description": "SDO06 Spare Safety DO",
+      "initialValue": "SDO06 Spare Safety DO"
+    },
+    {
+      "name": "Safety_DO_Discr.Data_06",
+      "type": "string",
+      "folder": "Safety_DO_Discr",
+      "dataSource": "memory",
+      "description": "SDO07 Spare Safety DO",
+      "initialValue": "SDO07 Spare Safety DO"
+    },
+    {
+      "name": "Safety_DO_Discr.Data_07",
+      "type": "string",
+      "folder": "Safety_DO_Discr",
+      "dataSource": "memory",
+      "description": "SDO08 Spare Safety DO",
+      "initialValue": "SDO08 Spare Safety DO"
+    },
+    {
+      "name": "Safety_DO_No.Data_00",
+      "type": "int",
+      "folder": "Safety_DO_No",
+      "dataSource": "memory",
+      "description": "1",
+      "initialValue": 1
+    },
+    {
+      "name": "Safety_DO_No.Data_01",
+      "type": "int",
+      "folder": "Safety_DO_No",
+      "dataSource": "memory",
+      "description": "2",
+      "initialValue": 2
+    },
+    {
+      "name": "Safety_DO_No.Data_02",
+      "type": "int",
+      "folder": "Safety_DO_No",
+      "dataSource": "memory",
+      "description": "3",
+      "initialValue": 3
+    },
+    {
+      "name": "Safety_DO_No.Data_03",
+      "type": "int",
+      "folder": "Safety_DO_No",
+      "dataSource": "memory",
+      "description": "4",
+      "initialValue": 4
+    },
+    {
+      "name": "Safety_DO_No.Data_04",
+      "type": "int",
+      "folder": "Safety_DO_No",
+      "dataSource": "memory",
+      "description": "5",
+      "initialValue": 5
+    },
+    {
+      "name": "Safety_DO_No.Data_05",
+      "type": "int",
+      "folder": "Safety_DO_No",
+      "dataSource": "memory",
+      "description": "6",
+      "initialValue": 6
+    },
+    {
+      "name": "Safety_DO_No.Data_06",
+      "type": "int",
+      "folder": "Safety_DO_No",
+      "dataSource": "memory",
+      "description": "7",
+      "initialValue": 7
+    },
+    {
+      "name": "Safety_DO_No.Data_07",
+      "type": "int",
+      "folder": "Safety_DO_No",
+      "dataSource": "memory",
+      "description": "8",
+      "initialValue": 8
+    },
+    {
+      "name": "Safety_DO_Tags.Data_00",
+      "type": "bool",
+      "folder": "Safety_DO_Tags",
+      "dataSource": "memory",
+      "description": "SDO01 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DO_Tags.Data_01",
+      "type": "bool",
+      "folder": "Safety_DO_Tags",
+      "dataSource": "memory",
+      "description": "SDO02 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DO_Tags.Data_02",
+      "type": "bool",
+      "folder": "Safety_DO_Tags",
+      "dataSource": "memory",
+      "description": "SDO03 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DO_Tags.Data_03",
+      "type": "bool",
+      "folder": "Safety_DO_Tags",
+      "dataSource": "memory",
+      "description": "SDO04 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DO_Tags.Data_04",
+      "type": "bool",
+      "folder": "Safety_DO_Tags",
+      "dataSource": "memory",
+      "description": "SDO05 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DO_Tags.Data_05",
+      "type": "bool",
+      "folder": "Safety_DO_Tags",
+      "dataSource": "memory",
+      "description": "SDO06 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DO_Tags.Data_06",
+      "type": "bool",
+      "folder": "Safety_DO_Tags",
+      "dataSource": "memory",
+      "description": "SDO07 value",
+      "initialValue": false
+    },
+    {
+      "name": "Safety_DO_Tags.Data_07",
+      "type": "bool",
+      "folder": "Safety_DO_Tags",
+      "dataSource": "memory",
+      "description": "SDO08 value",
+      "initialValue": false
     }
   ],
   "alarms": [
@@ -267,6 +1275,136 @@
   },
   "studio": {
     "lastOpenedWith": "Plant HMI Studio 1.0",
-    "lastOpenedAt": "2026-08-18T11:18:02.584Z"
+    "lastOpenedAt": "2026-08-27T11:16:07.501Z"
+  },
+  "parameterFiles": {
+    "PLC DI List 01": {
+      "description": "PLC DI list 01",
+      "kind": "di",
+      "listNum": 1,
+      "replacements": {
+        "#100": "PLC_DI_Discr.List_01",
+        "#101": "PLC_DI_Discr.Data_00",
+        "#201": "PLC_DI_No.Data_00",
+        "#301": "PLC_DI_Tags.Data_00",
+        "#102": "PLC_DI_Discr.Data_01",
+        "#202": "PLC_DI_No.Data_01",
+        "#302": "PLC_DI_Tags.Data_01",
+        "#103": "PLC_DI_Discr.Data_02",
+        "#203": "PLC_DI_No.Data_02",
+        "#303": "PLC_DI_Tags.Data_02",
+        "#104": "PLC_DI_Discr.Data_03",
+        "#204": "PLC_DI_No.Data_03",
+        "#304": "PLC_DI_Tags.Data_03",
+        "#105": "PLC_DI_Discr.Data_04",
+        "#205": "PLC_DI_No.Data_04",
+        "#305": "PLC_DI_Tags.Data_04",
+        "#106": "PLC_DI_Discr.Data_05",
+        "#206": "PLC_DI_No.Data_05",
+        "#306": "PLC_DI_Tags.Data_05",
+        "#107": "PLC_DI_Discr.Data_06",
+        "#207": "PLC_DI_No.Data_06",
+        "#307": "PLC_DI_Tags.Data_06",
+        "#108": "PLC_DI_Discr.Data_07",
+        "#208": "PLC_DI_No.Data_07",
+        "#308": "PLC_DI_Tags.Data_07"
+      }
+    },
+    "PLC DO List 01": {
+      "description": "PLC DO list 01",
+      "kind": "do",
+      "listNum": 1,
+      "replacements": {
+        "#100": "PLC_DO_Discr.List_01",
+        "#101": "PLC_DO_Discr.Data_00",
+        "#201": "PLC_DO_No.Data_00",
+        "#301": "PLC_DO_Tags.Data_00",
+        "#102": "PLC_DO_Discr.Data_01",
+        "#202": "PLC_DO_No.Data_01",
+        "#302": "PLC_DO_Tags.Data_01",
+        "#103": "PLC_DO_Discr.Data_02",
+        "#203": "PLC_DO_No.Data_02",
+        "#303": "PLC_DO_Tags.Data_02",
+        "#104": "PLC_DO_Discr.Data_03",
+        "#204": "PLC_DO_No.Data_03",
+        "#304": "PLC_DO_Tags.Data_03",
+        "#105": "PLC_DO_Discr.Data_04",
+        "#205": "PLC_DO_No.Data_04",
+        "#305": "PLC_DO_Tags.Data_04",
+        "#106": "PLC_DO_Discr.Data_05",
+        "#206": "PLC_DO_No.Data_05",
+        "#306": "PLC_DO_Tags.Data_05",
+        "#107": "PLC_DO_Discr.Data_06",
+        "#207": "PLC_DO_No.Data_06",
+        "#307": "PLC_DO_Tags.Data_06",
+        "#108": "PLC_DO_Discr.Data_07",
+        "#208": "PLC_DO_No.Data_07",
+        "#308": "PLC_DO_Tags.Data_07"
+      }
+    },
+    "Safety DI List 01": {
+      "description": "Safety DI list 01",
+      "kind": "safetyDi",
+      "listNum": 1,
+      "replacements": {
+        "#100": "Safety_DI_Discr.Safety_List_01",
+        "#101": "Safety_DI_Discr.Data_00",
+        "#201": "Safety_DI_No.Data_00",
+        "#301": "Safety_DI_Tags.Data_00",
+        "#102": "Safety_DI_Discr.Data_01",
+        "#202": "Safety_DI_No.Data_01",
+        "#302": "Safety_DI_Tags.Data_01",
+        "#103": "Safety_DI_Discr.Data_02",
+        "#203": "Safety_DI_No.Data_02",
+        "#303": "Safety_DI_Tags.Data_02",
+        "#104": "Safety_DI_Discr.Data_03",
+        "#204": "Safety_DI_No.Data_03",
+        "#304": "Safety_DI_Tags.Data_03",
+        "#105": "Safety_DI_Discr.Data_04",
+        "#205": "Safety_DI_No.Data_04",
+        "#305": "Safety_DI_Tags.Data_04",
+        "#106": "Safety_DI_Discr.Data_05",
+        "#206": "Safety_DI_No.Data_05",
+        "#306": "Safety_DI_Tags.Data_05",
+        "#107": "Safety_DI_Discr.Data_06",
+        "#207": "Safety_DI_No.Data_06",
+        "#307": "Safety_DI_Tags.Data_06",
+        "#108": "Safety_DI_Discr.Data_07",
+        "#208": "Safety_DI_No.Data_07",
+        "#308": "Safety_DI_Tags.Data_07"
+      }
+    },
+    "Safety DO List 01": {
+      "description": "Safety DO list 01",
+      "kind": "safetyDo",
+      "listNum": 1,
+      "replacements": {
+        "#100": "Safety_DO_Discr.Safety_List_01",
+        "#101": "Safety_DO_Discr.Data_00",
+        "#201": "Safety_DO_No.Data_00",
+        "#301": "Safety_DO_Tags.Data_00",
+        "#102": "Safety_DO_Discr.Data_01",
+        "#202": "Safety_DO_No.Data_01",
+        "#302": "Safety_DO_Tags.Data_01",
+        "#103": "Safety_DO_Discr.Data_02",
+        "#203": "Safety_DO_No.Data_02",
+        "#303": "Safety_DO_Tags.Data_02",
+        "#104": "Safety_DO_Discr.Data_03",
+        "#204": "Safety_DO_No.Data_03",
+        "#304": "Safety_DO_Tags.Data_03",
+        "#105": "Safety_DO_Discr.Data_04",
+        "#205": "Safety_DO_No.Data_04",
+        "#305": "Safety_DO_Tags.Data_04",
+        "#106": "Safety_DO_Discr.Data_05",
+        "#206": "Safety_DO_No.Data_05",
+        "#306": "Safety_DO_Tags.Data_05",
+        "#107": "Safety_DO_Discr.Data_06",
+        "#207": "Safety_DO_No.Data_06",
+        "#307": "Safety_DO_Tags.Data_06",
+        "#108": "Safety_DO_Discr.Data_07",
+        "#208": "Safety_DO_No.Data_07",
+        "#308": "Safety_DO_Tags.Data_07"
+      }
+    }
   }
 }

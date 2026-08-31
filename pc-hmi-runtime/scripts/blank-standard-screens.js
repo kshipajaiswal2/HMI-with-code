@@ -32,11 +32,11 @@ function processDir(dir) {
 
 let total = 0;
 total += processDir(path.join(ROOT, 'screens'));
-total += processDir(path.join(ROOT, 'projects', '_template', 'screens'));
+total += processDir(path.join(ROOT, 'projects', '_template', 'Gfx'));
 
 for (const entry of fs.readdirSync(path.join(ROOT, 'projects'), { withFileTypes: true })) {
   if (!entry.isDirectory() || entry.name === '_template') continue;
-  total += processDir(path.join(ROOT, 'projects', entry.name, 'screens'));
+  total += processDir(path.join(ROOT, 'projects', entry.name, 'Gfx'));
 }
 
 console.log(`Blanked ${total} display files.`);

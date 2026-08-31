@@ -1,41 +1,15 @@
 /** Panel property dialog — FactoryTalk View style (General / Common tabs). */
 (function () {
+  const S = window.StudioPropsShared;
   let panelPreviewTimer = null;
   let editingChildren = [];
-
-  const PATTERN_OPTIONS = [
-    ['none', 'None'],
-    ['dots', 'Dots'],
-    ['checks', 'Checks'],
-    ['smallBoxes', 'Small Boxes'],
-    ['mediumBoxes', 'Medium Boxes'],
-    ['largeBoxes', 'Large Boxes'],
-    ['verticalLines', 'Vertical Lines'],
-    ['wideVerticalLines', 'Wide Vertical Lines'],
-    ['horizontalLines', 'Horizontal Lines'],
-    ['wideHorizontalLines', 'Wide Horizontal Lines'],
-    ['rightDiagonal', 'Right Diagonal'],
-    ['wideRightDiagonal', 'Wide Right Diagonal'],
-    ['leftDiagonal', 'Left Diagonal'],
-    ['wideLeftDiagonal', 'Wide Left Diagonal'],
-    ['hatch', 'Hatch'],
-    ['bricks', 'Bricks'],
-    ['ovals', 'Ovals'],
-    ['diamonds', 'Diamonds'],
-    ['scales', 'Scales'],
-    ['waves', 'Waves']
-  ];
 
   function schedulePanelLivePreview() {
     if (window.state?.propsFormFill) return;
     if (panelPreviewTimer) clearTimeout(panelPreviewTimer);
     panelPreviewTimer = setTimeout(() => {
       panelPreviewTimer = null;
-      const comp = readPanelPropertiesForm();
-      if (comp.name && window.previewPatchByName) {
-        window.previewPatchByName(comp.name, comp);
-      }
-      window.updatePropsApplyButton?.(readPanelPropertiesForm, 'applyPanelProperties');
+      S.previewShape(readPanelPropertiesForm(), readPanelPropertiesForm, 'applyPanelProperties');
     }, 100);
   }
 
@@ -46,26 +20,15 @@
   }
 
   function wireColorInputs() {
-    document.querySelectorAll('#panelPropertiesForm .ft-color-input').forEach((input) => {
-      if (input.dataset.ppColorWired === '1') return;
-      input.dataset.ppColorWired = '1';
-      input.addEventListener('input', notifyPanelFormChange);
-      input.addEventListener('change', notifyPanelFormChange);
-    });
+    S.wireColorInputs('#panelPropertiesForm', 'ppColorWired', notifyPanelFormChange);
   }
 
   function switchTab(tabId) {
-    document.querySelectorAll('#panelPropertiesDialog .dialog-tab').forEach((el) => {
-      el.classList.toggle('active', el.dataset.ppTab === tabId);
-    });
-    document.querySelectorAll('#panelPropertiesDialog .dialog-tab-panel').forEach((el) => {
-      el.classList.toggle('active', el.dataset.ppTabPanel === tabId);
-    });
+    S.switchDialogTab('panelPropertiesDialog', 'ppTab', 'ppTabPanel', tabId);
   }
 
   function syncGradientFields() {
-    const isGradient = document.getElementById('ppBackStyle')?.value === 'gradient';
-    document.getElementById('ppGradientExtras')?.classList.toggle('hidden', !isGradient);
+    S.syncGradientExtras('ppBackStyle', 'ppGradientExtras');
   }
 
   function syncPatternFields() {
@@ -97,31 +60,12 @@
     syncGradientFields();
   }
 
-  function setColorFieldValue(id, raw) {
-    const input = document.getElementById(id);
-    if (!input) return;
-    if (window.FtColorPicker?.setValueSilent) {
-      window.FtColorPicker.setValueSilent(input, raw);
-    } else {
-      input.value = raw;
-    }
-  }
-
-  function getColorFieldValue(id) {
-    const input = document.getElementById(id);
-    if (!input) return '#000000';
-    return window.FtColorPicker?.getInputColor?.(input) ?? input.value;
-  }
-
   function wireTools() {
     const dialog = document.getElementById('panelPropertiesDialog');
-    if (window.FtColorPicker) {
-      window.FtColorPicker.initAllSync(dialog);
-      window.FtColorPicker.refreshAll(dialog);
-    }
+    S.wireColorPicker(dialog);
     wireColorInputs();
     syncColorFields();
-    if (window.FtColorPicker) window.FtColorPicker.refreshAll(dialog);
+    S.wireColorPicker(dialog);
   }
 
   function fillPanelPropertiesForm(comp) {
@@ -152,11 +96,11 @@
       document.getElementById('ppPatternStyle').value = c.patternStyle || 'none';
       document.getElementById('ppBorderUsesBackColor').checked = c.borderUsesBackColor !== false;
       document.getElementById('ppUsePatternColor').checked = Boolean(c.usePatternColor) || (c.patternStyle && c.patternStyle !== 'none');
-      setColorFieldValue('ppPatternColor', c.patternColor || '#ffffff');
-      setColorFieldValue('ppBackColor', c.backColor || '#001C38');
-      setColorFieldValue('ppBorderColor', c.borderColor || c.backColor || '#001C38');
+      S.setColorFieldValue('ppPatternColor', c.patternColor || '#ffffff');
+      S.setColorFieldValue('ppBackColor', c.backColor || '#001C38');
+      S.setColorFieldValue('ppBorderColor', c.borderColor || c.backColor || '#001C38');
       document.getElementById('ppBlink').checked = Boolean(c.blink);
-      setColorFieldValue('ppEndColor', c.endColor || '#e8e8e8');
+      S.setColorFieldValue('ppEndColor', c.endColor || '#e8e8e8');
       document.getElementById('ppGradientStop').value = c.gradientStop ?? 95;
       document.getElementById('ppGradientDir').value = c.gradientShadingStyle || c.gradientDirection || 'gradientHorizontalFromRight';
       document.getElementById('ppHeight').value = c.height ?? 103;
@@ -191,15 +135,15 @@
       patternStyle,
       borderUsesBackColor: document.getElementById('ppBorderUsesBackColor').checked,
       usePatternColor,
-      patternColor: norm(getColorFieldValue('ppPatternColor')),
-      backColor: norm(getColorFieldValue('ppBackColor')),
-      borderColor: norm(getColorFieldValue('ppBorderColor')),
+      patternColor: norm(S.getColorFieldValue('ppPatternColor')),
+      backColor: norm(S.getColorFieldValue('ppBackColor')),
+      borderColor: norm(S.getColorFieldValue('ppBorderColor')),
       useBackColor: true,
       blink: document.getElementById('ppBlink').checked,
       children: editingChildren
     };
     if (backStyle === 'gradient') {
-      comp.endColor = norm(getColorFieldValue('ppEndColor'));
+      comp.endColor = norm(S.getColorFieldValue('ppEndColor'));
       comp.gradientStop = Number(document.getElementById('ppGradientStop').value) || 95;
       comp.gradientShadingStyle = document.getElementById('ppGradientDir').value;
     }
@@ -214,6 +158,7 @@
       return;
     }
     window.commitPropsSnapshot(readPanelPropertiesForm, 'applyPanelProperties');
+    window.afterCanvasComponentSaved?.(comp);
     window.setStatus(`Applied ${comp.name}`);
   }
 
@@ -227,19 +172,15 @@
     }
     document.getElementById('panelPropertiesDialog').close();
     window.clearPropsDialogState();
+    window.scheduleRefreshCanvasEditOverlay?.();
     window.setStatus(`Saved ${comp.name}`);
   }
 
   function initPanelPropertiesDialog() {
     const form = document.getElementById('panelPropertiesForm');
-    if (!form) return;
-    const patternSelect = document.getElementById('ppPatternStyle');
-    if (patternSelect && !patternSelect.dataset.ppFilled) {
-      patternSelect.dataset.ppFilled = '1';
-      patternSelect.innerHTML = PATTERN_OPTIONS.map(([value, label]) =>
-        `<option value="${value}">${label}</option>`
-      ).join('');
-    }
+    if (!form || form.dataset.ppWired === '1') return;
+    form.dataset.ppWired = '1';
+    S.fillPatternSelect('ppPatternStyle', 'ppFilled');
     form.addEventListener('submit', (e) => savePanelProperties(e).catch((err) => window.setStatus(`Error: ${err.message}`)));
     document.getElementById('applyPanelProperties')?.addEventListener('click', () => {
       applyPanelProperties().catch((err) => window.setStatus(`Error: ${err.message}`));
@@ -271,12 +212,14 @@
 
   function openPanelPropertiesDialog(comp, ref, editIndex) {
     window.flushDeferredDialogInits?.();
+    initPanelPropertiesDialog();
     fillPanelPropertiesForm(comp);
     wireTools();
-    window.resetPropsDialogState('panel', readPanelPropertiesForm, 'applyPanelProperties', editIndex, ref);
+    const idx = S.resolvedEditIndex(comp, ref, editIndex);
+    window.resetPropsDialogState('panel', readPanelPropertiesForm, 'applyPanelProperties', idx, ref);
     switchTab('general');
     window.setTemplateEditStatus?.(comp.name, ref);
-    document.getElementById('panelPropertiesDialog')?.showModal();
+    window.showCanvasPropsDialog?.(document.getElementById('panelPropertiesDialog'));
     window.flushPropsApplyButton?.(readPanelPropertiesForm, 'applyPanelProperties');
   }
 

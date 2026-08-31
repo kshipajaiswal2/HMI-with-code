@@ -10,28 +10,28 @@
   },
   "overviewShell": {
     "OverviewNav_101_Production_Data": {
-      "left": 8,
-      "top": 75,
-      "width": 66,
-      "height": 35
+      "left": 13,
+      "top": 128,
+      "width": 106,
+      "height": 60
     },
     "OverviewNav_102_Prestart": {
-      "left": 8,
-      "top": 131,
-      "width": 66,
-      "height": 35
+      "left": 13,
+      "top": 224,
+      "width": 106,
+      "height": 60
     },
     "OverviewNav_103_Safety": {
-      "left": 8,
-      "top": 188,
-      "width": 66,
-      "height": 35
+      "left": 13,
+      "top": 321,
+      "width": 106,
+      "height": 60
     },
     "OverviewNav_104_Mimic_Screen": {
-      "left": 8,
-      "top": 244,
-      "width": 66,
-      "height": 35
+      "left": 13,
+      "top": 416,
+      "width": 106,
+      "height": 60
     }
   },
   "template": {

@@ -1,5 +1,8 @@
-/** Numeric Display property dialog */
+/** Numeric Display property dialog — FactoryTalk View parity */
 (function () {
+  let ndPreviewTimer = null;
+  let ndDialogCommitted = false;
+
   function switchTab(tabId) {
     document.querySelectorAll('#numericDisplayDialog .dialog-tab').forEach((el) => {
       el.classList.toggle('active', el.dataset.ndTab === tabId);
@@ -7,6 +10,30 @@
     document.querySelectorAll('#numericDisplayDialog .dialog-tab-panel').forEach((el) => {
       el.classList.toggle('active', el.dataset.ndTabPanel === tabId);
     });
+  }
+
+  function ndGetColor(id) {
+    return window.StudioPropsShared?.getColorFieldValue?.(id)
+      || window.FtColorPicker?.getInputColor?.(document.getElementById(id))
+      || document.getElementById(id)?.value
+      || '#001C38';
+  }
+
+  function ndSetColor(id, raw) {
+    if (window.StudioPropsShared?.setColorFieldValue) window.StudioPropsShared.setColorFieldValue(id, raw);
+    else if (window.FtColorPicker?.setValueSilent) window.FtColorPicker.setValueSilent(document.getElementById(id), raw);
+    else if (document.getElementById(id)) document.getElementById(id).value = raw;
+  }
+
+  function fillNdRangeSelect(id, from, to, selected, filledKey) {
+    const el = document.getElementById(id);
+    if (!el || el.dataset[filledKey] === '1') return;
+    el.dataset[filledKey] = '1';
+    const opts = [];
+    for (let n = from; n <= to; n++) {
+      opts.push(`<option value="${n}"${n === selected ? ' selected' : ''}>${n}</option>`);
+    }
+    el.innerHTML = opts.join('');
   }
 
   function nextNumericDisplayName(components) {
@@ -18,7 +45,7 @@
     return {
       type: 'NumericDisplay',
       name: 'NumericDisplay1',
-      tag: 'Production.Count',
+      tag: '',
       polarityTag: '',
       left: 16,
       top: 16,
@@ -36,7 +63,7 @@
       borderColor: '#001C38',
       usePatternColor: false,
       patternColor: '#ffffff',
-      useForeColor: true,
+      useForeColor: false,
       foreColor: '#ffffff',
       blink: false,
       fontFamily: 'Arial Unicode MS',
@@ -53,181 +80,285 @@
     };
   }
 
-  function syncNumericDisplayFields() {
-    document.getElementById('ndBackColor').disabled = !document.getElementById('ndUseBackColor')?.checked;
-    document.getElementById('ndBorderColor').disabled = !document.getElementById('ndUseBorderColor')?.checked;
-    document.getElementById('ndPatternColor').disabled = !document.getElementById('ndUsePatternColor')?.checked;
-    document.getElementById('ndForeColor').disabled = !document.getElementById('ndUseForeColor')?.checked;
+  function scheduleNumericLivePreview() {
+    if (window.state?.propsFormFill) return;
+    if (ndPreviewTimer) clearTimeout(ndPreviewTimer);
+    ndPreviewTimer = setTimeout(() => {
+      ndPreviewTimer = null;
+      const comp = readNumericDisplayForm();
+      if (window.patchShapeLivePreview) window.patchShapeLivePreview(comp);
+      else if (comp?.name) window.previewPatchByName?.(comp.name, comp);
+      window.updatePropsApplyButton?.(readNumericDisplayForm, 'applyNumericDisplay');
+    }, 80);
   }
 
-  function wireTools() {
+  function syncNumericDisplayFields() {
+    const pat = document.getElementById('ndPatternColor');
+    if (pat) pat.disabled = !document.getElementById('ndUsePatternColor')?.checked;
+    const fore = document.getElementById('ndForeColor');
+    if (fore) fore.disabled = !document.getElementById('ndUseForeColor')?.checked;
+  }
+
+  function wireNumericDisplayTools() {
     if (window.StudioTagTools) StudioTagTools.wirePickButtons();
-    if (window.FtColorPicker) window.FtColorPicker.initAll(document.getElementById('numericDisplayDialog'));
+    const dlg = document.getElementById('numericDisplayDialog');
+    if (window.FtColorPicker && dlg) {
+      if (window.FtColorPicker.initAllSync) window.FtColorPicker.initAllSync(dlg);
+      else window.FtColorPicker.initAll(dlg);
+      window.FtColorPicker.refreshAll?.(dlg);
+    }
+    document.querySelectorAll('#numericDisplayForm .ft-color-input').forEach((input) => {
+      if (input.dataset.ndPreviewWired === '1') return;
+      input.dataset.ndPreviewWired = '1';
+      input.addEventListener('input', scheduleNumericLivePreview);
+      input.addEventListener('change', scheduleNumericLivePreview);
+    });
     syncNumericDisplayFields();
+  }
+
+  function presentNumericDisplayDialog() {
+    const dialog = document.getElementById('numericDisplayDialog');
+    if (!dialog) {
+      window.setStatus('Numeric Display Properties dialog is missing from Studio');
+      return;
+    }
+    if (dialog.open) return;
+    ndDialogCommitted = false;
+    dialog.classList.add('is-positioned');
+    dialog.style.position = 'fixed';
+    dialog.style.margin = '0';
+    dialog.style.left = '24px';
+    dialog.style.top = '36px';
+    dialog.style.right = 'auto';
+    dialog.style.bottom = 'auto';
+    dialog.style.transform = 'none';
+    dialog.style.zIndex = '30000';
+    dialog.style.maxHeight = 'calc(100vh - 48px)';
+    dialog.style.overflow = 'auto';
+    try {
+      dialog.showModal();
+    } catch (err) {
+      document.querySelectorAll('dialog[open]').forEach((other) => {
+        if (other !== dialog) {
+          try { other.close(); } catch (_) { /* ignore */ }
+        }
+      });
+      try {
+        dialog.showModal();
+      } catch (err2) {
+        dialog.setAttribute('open', '');
+        dialog.style.display = 'block';
+        window.setStatus(`Opened Numeric Display properties without modal: ${err2.message}`);
+      }
+    }
+  }
+
+  function mapFillLeftWith(raw) {
+    const v = String(raw || 'none').toLowerCase();
+    if (v === 'zero' || v === 'zeroes') return 'zeroes';
+    if (v === 'space' || v === 'spaces') return 'spaces';
+    return 'none';
   }
 
   function fillNumericDisplayForm(comp) {
-    document.getElementById('ndBorderStyle').value = comp.borderStyle || 'line';
-    document.getElementById('ndBorderWidth').value = comp.borderWidth ?? 4;
-    document.getElementById('ndBackStyle').value = comp.backStyle || 'solid';
-    document.getElementById('ndPatternStyle').value = comp.patternStyle || 'none';
-    document.getElementById('ndBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
-    document.getElementById('ndUseBackColor').checked = comp.useBackColor !== false;
-    document.getElementById('ndBackColor').value = comp.backColor || '#001C38';
-    document.getElementById('ndUseBorderColor').checked = Boolean(comp.useBorderColor);
-    document.getElementById('ndBorderColor').value = comp.borderColor || '#001C38';
-    document.getElementById('ndUsePatternColor').checked = Boolean(comp.usePatternColor);
-    document.getElementById('ndPatternColor').value = comp.patternColor || '#ffffff';
-    document.getElementById('ndUseForeColor').checked = comp.useForeColor !== false;
-    document.getElementById('ndForeColor').value = comp.foreColor || '#ffffff';
-    document.getElementById('ndBlink').checked = Boolean(comp.blink);
-    document.getElementById('ndFont').value = comp.fontFamily || 'Arial Unicode MS';
-    document.getElementById('ndFontSize').value = String(comp.fontSize ?? 10);
-    document.getElementById('ndBold').classList.toggle('active', Boolean(comp.bold));
-    document.getElementById('ndItalic').classList.toggle('active', Boolean(comp.italic));
-    document.getElementById('ndUnderline').classList.toggle('active', Boolean(comp.underline));
-    document.querySelector(`#numericDisplayForm input[name="ndAlign"][value="${comp.alignment || 'middleCenter'}"]`)?.click();
-    document.getElementById('ndNumberOfDigits').value = String(comp.numberOfDigits ?? 5);
-    document.getElementById('ndFillLeftWith').value = comp.fillLeftWith || 'none';
-    document.getElementById('ndDecimalPlaces').value = String(comp.decimalPlaces ?? 0);
-    document.getElementById('ndHeight').value = comp.height ?? 28;
-    document.getElementById('ndWidth').value = comp.width ?? 80;
-    document.getElementById('ndTop').value = comp.top ?? 16;
-    document.getElementById('ndLeft').value = comp.left ?? 16;
-    document.getElementById('ndName').value = comp.name || 'NumericDisplay1';
-    document.getElementById('ndVisible').checked = comp.visible !== false;
-    document.getElementById('ndTag').value = comp.tag || '';
-    document.getElementById('ndPolarityTag').value = comp.polarityTag || '';
-    syncNumericDisplayFields();
+    if (window.state) window.state.propsFormFill = true;
+    try {
+      fillNdRangeSelect('ndNumberOfDigits', 1, 17, 5, 'ndDigitsFilled');
+      fillNdRangeSelect('ndDecimalPlaces', 0, 15, 0, 'ndDecFilled');
+      window.StudioPropsShared?.fillPatternSelect('ndPatternStyle', 'ndFilled');
+      document.getElementById('ndBorderStyle').value = comp.borderStyle || 'line';
+      document.getElementById('ndBorderWidth').value = comp.borderWidth ?? 4;
+      document.getElementById('ndBackStyle').value = comp.backStyle || 'solid';
+      const pat = document.getElementById('ndPatternStyle');
+      if (pat) pat.value = comp.patternStyle || 'none';
+      document.getElementById('ndBorderUsesBackColor').checked = comp.borderUsesBackColor !== false;
+      ndSetColor('ndBackColor', comp.backColor || '#001C38');
+      ndSetColor('ndBorderColor', comp.borderColor || '#001C38');
+      const usePat = document.getElementById('ndUsePatternColor');
+      if (usePat) usePat.checked = Boolean(comp.usePatternColor);
+      ndSetColor('ndPatternColor', comp.patternColor || '#ffffff');
+      const useFore = document.getElementById('ndUseForeColor');
+      if (useFore) useFore.checked = Boolean(comp.useForeColor);
+      ndSetColor('ndForeColor', comp.foreColor || '#ffffff');
+      document.getElementById('ndBlink').checked = Boolean(comp.blink);
+      document.getElementById('ndFont').value = comp.fontFamily || 'Arial Unicode MS';
+      document.getElementById('ndFontSize').value = String(comp.fontSize ?? 10);
+      document.getElementById('ndBold').classList.toggle('active', Boolean(comp.bold));
+      document.getElementById('ndItalic').classList.toggle('active', Boolean(comp.italic));
+      document.getElementById('ndUnderline').classList.toggle('active', Boolean(comp.underline));
+      document.querySelectorAll('#numericDisplayForm input[name="ndAlign"]').forEach((el) => {
+        el.checked = el.value === (comp.alignment || 'middleCenter');
+      });
+      document.getElementById('ndNumberOfDigits').value = String(comp.numberOfDigits ?? 5);
+      document.getElementById('ndFillLeftWith').value = mapFillLeftWith(comp.fillLeftWith);
+      document.getElementById('ndDecimalPlaces').value = String(comp.decimalPlaces ?? comp.decimals ?? 0);
+      document.getElementById('ndHeight').value = comp.height ?? 28;
+      document.getElementById('ndWidth').value = comp.width ?? 80;
+      document.getElementById('ndTop').value = comp.top ?? 16;
+      document.getElementById('ndLeft').value = comp.left ?? 16;
+      document.getElementById('ndName').value = comp.name || 'NumericDisplay1';
+      document.getElementById('ndVisible').checked = comp.visible !== false;
+      document.getElementById('ndTag').value = comp.tag || '';
+      document.getElementById('ndPolarityTag').value = comp.polarityTag || '';
+      syncNumericDisplayFields();
+    } finally {
+      if (window.state) window.state.propsFormFill = false;
+    }
   }
 
   function readNumericDisplayForm() {
-    const decimalPlaces = Number(document.getElementById('ndDecimalPlaces').value) || 0;
+    const decimalPlaces = Number(document.getElementById('ndDecimalPlaces')?.value);
+    const dec = Number.isFinite(decimalPlaces) ? decimalPlaces : 0;
     return {
       type: 'NumericDisplay',
-      name: document.getElementById('ndName').value.trim() || 'NumericDisplay1',
-      tag: document.getElementById('ndTag').value.trim(),
-      polarityTag: document.getElementById('ndPolarityTag').value.trim(),
-      left: Number(document.getElementById('ndLeft').value) || 0,
-      top: Number(document.getElementById('ndTop').value) || 0,
-      width: Number(document.getElementById('ndWidth').value) || 80,
-      height: Number(document.getElementById('ndHeight').value) || 28,
-      visible: document.getElementById('ndVisible').checked,
-      borderStyle: document.getElementById('ndBorderStyle').value,
-      borderWidth: Number(document.getElementById('ndBorderWidth').value) || 4,
-      borderUsesBackColor: document.getElementById('ndBorderUsesBackColor').checked,
-      backStyle: document.getElementById('ndBackStyle').value,
-      patternStyle: document.getElementById('ndPatternStyle').value,
-      useBackColor: document.getElementById('ndUseBackColor').checked,
-      backColor: document.getElementById('ndBackColor').value,
-      useBorderColor: document.getElementById('ndUseBorderColor').checked,
-      borderColor: document.getElementById('ndBorderColor').value,
-      usePatternColor: document.getElementById('ndUsePatternColor').checked,
-      patternColor: document.getElementById('ndPatternColor').value,
-      useForeColor: document.getElementById('ndUseForeColor').checked,
-      foreColor: document.getElementById('ndForeColor').value,
-      blink: document.getElementById('ndBlink').checked,
-      fontFamily: document.getElementById('ndFont').value,
-      fontSize: Number(document.getElementById('ndFontSize').value) || 10,
-      bold: document.getElementById('ndBold').classList.contains('active'),
-      italic: document.getElementById('ndItalic').classList.contains('active'),
-      underline: document.getElementById('ndUnderline').classList.contains('active'),
+      name: document.getElementById('ndName')?.value.trim() || 'NumericDisplay1',
+      tag: document.getElementById('ndTag')?.value.trim() || '',
+      polarityTag: document.getElementById('ndPolarityTag')?.value.trim() || '',
+      left: Number(document.getElementById('ndLeft')?.value) || 0,
+      top: Number(document.getElementById('ndTop')?.value) || 0,
+      width: Number(document.getElementById('ndWidth')?.value) || 80,
+      height: Number(document.getElementById('ndHeight')?.value) || 28,
+      visible: document.getElementById('ndVisible')?.checked !== false,
+      borderStyle: document.getElementById('ndBorderStyle')?.value || 'line',
+      borderWidth: Number(document.getElementById('ndBorderWidth')?.value) || 4,
+      borderUsesBackColor: document.getElementById('ndBorderUsesBackColor')?.checked !== false,
+      backStyle: document.getElementById('ndBackStyle')?.value || 'solid',
+      patternStyle: document.getElementById('ndPatternStyle')?.value || 'none',
+      useBackColor: true,
+      backColor: ndGetColor('ndBackColor'),
+      useBorderColor: true,
+      borderColor: ndGetColor('ndBorderColor'),
+      usePatternColor: Boolean(document.getElementById('ndUsePatternColor')?.checked),
+      patternColor: ndGetColor('ndPatternColor'),
+      useForeColor: Boolean(document.getElementById('ndUseForeColor')?.checked),
+      foreColor: ndGetColor('ndForeColor'),
+      blink: Boolean(document.getElementById('ndBlink')?.checked),
+      fontFamily: document.getElementById('ndFont')?.value || 'Arial Unicode MS',
+      fontSize: Number(document.getElementById('ndFontSize')?.value) || 10,
+      bold: document.getElementById('ndBold')?.classList.contains('active'),
+      italic: document.getElementById('ndItalic')?.classList.contains('active'),
+      underline: document.getElementById('ndUnderline')?.classList.contains('active'),
       alignment: document.querySelector('#numericDisplayForm input[name="ndAlign"]:checked')?.value || 'middleCenter',
-      numberOfDigits: Number(document.getElementById('ndNumberOfDigits').value) || 5,
-      fillLeftWith: document.getElementById('ndFillLeftWith').value || 'none',
-      decimalPlaces,
-      format: decimalPlaces > 0 ? 'float' : 'integer',
-      decimals: decimalPlaces
+      numberOfDigits: Number(document.getElementById('ndNumberOfDigits')?.value) || 5,
+      fillLeftWith: document.getElementById('ndFillLeftWith')?.value || 'none',
+      decimalPlaces: dec,
+      format: dec > 0 ? 'float' : 'integer',
+      decimals: dec
     };
   }
 
   async function showNumericDisplayDialog(overrides = {}) {
     if (!window.displayIsOpen?.()) {
-      window.setStatus('Open a display or global object first, then choose Numeric Display');
+      window.setStatus('Open a display first, then drag on the canvas to place the Numeric Display');
       return;
     }
-    const canvas = await window.fetchOpenCanvas();
-    const comp = defaultNumericDisplayComponent({
-      name: nextNumericDisplayName(canvas?.components),
-      ...overrides
-    });
-    fillNumericDisplayForm(comp);
-    window.resetPropsDialogState('numeric', readNumericDisplayForm, 'applyNumericDisplay');
-    switchTab('general');
-    wireTools();
-    document.getElementById('numericDisplayDialog')?.showModal();
+    try {
+      window.flushDeferredDialogInits?.();
+      initNumericDisplayDialog();
+      const canvas = await window.fetchOpenCanvas();
+      const comp = defaultNumericDisplayComponent({
+        name: nextNumericDisplayName(canvas?.components),
+        ...overrides
+      });
+      fillNumericDisplayForm(comp);
+      window.resetPropsDialogState('numeric', readNumericDisplayForm, 'applyNumericDisplay');
+      switchTab('general');
+      wireNumericDisplayTools();
+      presentNumericDisplayDialog();
+      const previewComp = readNumericDisplayForm();
+      if (window.patchShapeLivePreview) window.patchShapeLivePreview(previewComp);
+      else if (previewComp?.name) window.previewPatchByName?.(previewComp.name, previewComp);
+      window.flushPropsApplyButton?.(readNumericDisplayForm, 'applyNumericDisplay');
+    } catch (err) {
+      window.setStatus(`Numeric Display properties error: ${err.message}`);
+    }
   }
 
   async function applyNumericDisplay() {
     const comp = readNumericDisplayForm();
-    if (!comp.tag) {
-      window.setStatus('Enter a Value tag on the Connections tab');
-      switchTab('connections');
+    const ok = await window.upsertCanvasComponent(comp);
+    if (!ok) {
+      window.setStatus('Could not apply — open a display or global object first');
       return;
     }
-    await window.upsertCanvasComponent(comp);
     window.commitPropsSnapshot(readNumericDisplayForm, 'applyNumericDisplay');
-    window.setStatus(`Applied ${comp.name} on ${window.state.selectedScreenId}`);
+    window.afterCanvasComponentSaved?.(comp);
+    window.setStatus(`Applied ${comp.name}`);
   }
 
   async function saveNumericDisplay(e) {
     e.preventDefault();
     const comp = readNumericDisplayForm();
-    if (!comp.tag) {
-      window.setStatus('Enter a Value tag on the Connections tab');
-      switchTab('connections');
+    const ok = await window.upsertCanvasComponent(comp);
+    if (!ok) {
+      window.setStatus('Could not save — open a display or global object first');
       return;
     }
-    await window.upsertCanvasComponent(comp);
+    ndDialogCommitted = true;
+    const editIdx = window.state?.propsDialog?.editIndex;
     document.getElementById('numericDisplayDialog').close();
-    window.clearPropsDialogState();
-    window.activateSelectTool(`Added ${comp.name} to ${window.state.selectedScreenId}`);
+    if (editIdx != null) window.state.canvasSelection.indices = [editIdx];
+    window.setStatus(`Saved ${comp.name}`);
   }
 
   function initNumericDisplayDialog() {
     const form = document.getElementById('numericDisplayForm');
-    if (!form) return;
+    if (!form || form.dataset.ndWired === '1') return;
+    form.dataset.ndWired = '1';
+    fillNdRangeSelect('ndNumberOfDigits', 1, 17, 5, 'ndDigitsFilled');
+    fillNdRangeSelect('ndDecimalPlaces', 0, 15, 0, 'ndDecFilled');
+    window.StudioPropsShared?.fillPatternSelect('ndPatternStyle', 'ndFilled');
     form.addEventListener('submit', (e) => saveNumericDisplay(e).catch((err) => window.setStatus(`Error: ${err.message}`)));
     document.getElementById('applyNumericDisplay')?.addEventListener('click', () => {
       applyNumericDisplay().catch((err) => window.setStatus(`Error: ${err.message}`));
     });
-    form.addEventListener('input', () => window.updatePropsApplyButton(readNumericDisplayForm, 'applyNumericDisplay'));
-    form.addEventListener('change', () => window.updatePropsApplyButton(readNumericDisplayForm, 'applyNumericDisplay'));
+    form.addEventListener('input', () => {
+      scheduleNumericLivePreview();
+      window.flushPropsApplyButton?.(readNumericDisplayForm, 'applyNumericDisplay');
+    });
+    form.addEventListener('change', () => {
+      syncNumericDisplayFields();
+      scheduleNumericLivePreview();
+      window.flushPropsApplyButton?.(readNumericDisplayForm, 'applyNumericDisplay');
+    });
     document.getElementById('cancelNumericDisplay')?.addEventListener('click', () => {
       document.getElementById('numericDisplayDialog')?.close();
-      window.clearPropsDialogState();
-      window.activateSelectTool('Placement cancelled');
     });
     document.getElementById('numericDisplayDialog')?.addEventListener('close', () => {
-      if (window.state.placement) window.activateSelectTool();
+      if (!ndDialogCommitted) window.revertPropsDialogPreview?.();
+      ndDialogCommitted = false;
+      window.clearPropsDialogState?.();
+      window.activateSelectTool?.();
     });
     document.getElementById('helpNumericDisplay')?.addEventListener('click', () => {
-      alert('Numeric Display shows a tag value with configurable digits, decimals, and appearance.');
+      alert('Numeric Display shows a tag value with configurable digits, fill, decimal places, and appearance. Polarity inverts the sign when the Polarity connection is on.');
     });
     document.querySelectorAll('#numericDisplayDialog .dialog-tab').forEach((tab) => {
       tab.addEventListener('click', () => switchTab(tab.dataset.ndTab));
     });
-    for (const id of ['ndUseBackColor', 'ndUseBorderColor', 'ndUsePatternColor', 'ndUseForeColor']) {
+    for (const id of ['ndUsePatternColor', 'ndUseForeColor']) {
       document.getElementById(id)?.addEventListener('change', () => {
         syncNumericDisplayFields();
-        window.updatePropsApplyButton(readNumericDisplayForm, 'applyNumericDisplay');
+        scheduleNumericLivePreview();
       });
     }
     for (const id of ['ndBold', 'ndItalic', 'ndUnderline']) {
       document.getElementById(id)?.addEventListener('click', (e) => {
         e.preventDefault();
         e.currentTarget.classList.toggle('active');
-        window.updatePropsApplyButton(readNumericDisplayForm, 'applyNumericDisplay');
+        scheduleNumericLivePreview();
       });
     }
   }
 
   window.StudioNumericDisplay = {
     initNumericDisplayDialog,
+    presentNumericDisplayDialog,
+    scheduleNumericLivePreview,
     showNumericDisplayDialog,
     fillNumericDisplayForm,
     readNumericDisplayForm,
     switchNumericDisplayTab: switchTab,
-    wireNumericDisplayTools: wireTools
+    wireNumericDisplayTools
   };
 })();

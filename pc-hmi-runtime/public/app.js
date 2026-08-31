@@ -389,6 +389,16 @@ function createContext() {
       await apiPost('/api/runtime/logout', {});
     },
 
+    async addUserGroup({ username, password, role }) {
+      const res = await apiPost('/api/runtime/add-user', { username, password, role });
+      return res.json();
+    },
+
+    async deleteUserGroup({ username }) {
+      const res = await apiPost('/api/runtime/delete-user', { username });
+      return res.json();
+    },
+
     _bindings: bindings
   };
 }

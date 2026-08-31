@@ -144,6 +144,9 @@ html, body {
 .runtime-comm-status { min-height: 1.2em; font-size: 12px; margin: 8px 0 12px; }
 .runtime-comm-status.ok { color: var(--ok); }
 .runtime-comm-status.error { color: var(--danger, #c0392b); }
+.runtime-adduser-dialog { max-width: 420px; }
+.runtime-adduser-dialog .dialog-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.runtime-adduser-dialog .dialog-field span { font-size: 12px; color: var(--text-muted); }
 .header-indicator {
   padding: 4px 10px; border-radius: 4px;
   font-size: 11px; font-weight: 700; color: #fff;

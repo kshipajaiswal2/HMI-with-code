@@ -4866,6 +4866,340 @@ const ComponentRegistry = {
     return btn;
   },
 
+  AddUserGroupButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    if (comp.image) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    const openAddUserDialog = () => {
+      const dlg = ComponentRegistry.ensureRuntimeAddUserDialog();
+      const status = dlg.querySelector('#runtimeAddUserStatus');
+      const nameEl = dlg.querySelector('#runtimeAddUserName');
+      const passEl = dlg.querySelector('#runtimeAddUserPassword');
+      const confirmEl = dlg.querySelector('#runtimeAddUserConfirm');
+      const roleEl = dlg.querySelector('#runtimeAddUserRole');
+      const submitBtn = dlg.querySelector('#runtimeAddUserSubmit');
+      nameEl.value = '';
+      passEl.value = '';
+      confirmEl.value = '';
+      roleEl.value = 'Operator';
+      status.textContent = '';
+      status.className = 'runtime-comm-status';
+      submitBtn.disabled = false;
+      submitBtn.onclick = async () => {
+        const username = nameEl.value.trim();
+        const password = passEl.value;
+        const confirmPassword = confirmEl.value;
+        if (!username) {
+          status.textContent = 'Username is required';
+          status.className = 'runtime-comm-status error';
+          nameEl.focus();
+          return;
+        }
+        if (!password) {
+          status.textContent = 'Password is required';
+          status.className = 'runtime-comm-status error';
+          passEl.focus();
+          return;
+        }
+        if (password !== confirmPassword) {
+          status.textContent = 'Passwords do not match';
+          status.className = 'runtime-comm-status error';
+          confirmEl.focus();
+          return;
+        }
+        submitBtn.disabled = true;
+        status.textContent = 'Adding user...';
+        status.className = 'runtime-comm-status';
+        try {
+          const result = await ctx.addUserGroup({ username, password, role: roleEl.value });
+          if (result?.success) {
+            status.textContent = `User "${username}" added to ${roleEl.value}s.`;
+            status.className = 'runtime-comm-status ok';
+            setTimeout(() => {
+              try { dlg.close(); } catch (_) { /* ignore */ }
+            }, 900);
+          } else {
+            status.textContent = result?.error || 'Could not add user';
+            status.className = 'runtime-comm-status error';
+            submitBtn.disabled = false;
+          }
+        } catch (err) {
+          status.textContent = err.message || 'Could not add user';
+          status.className = 'runtime-comm-status error';
+          submitBtn.disabled = false;
+        }
+      };
+      try {
+        dlg.showModal();
+      } catch (err) {
+        dlg.setAttribute('open', '');
+      }
+      nameEl.focus();
+    };
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'AddUserGroupButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'AddUserGroupButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', openAddUserDialog);
+    }
+    return btn;
+  },
+
+  DeleteUserGroupButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    if (comp.image) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    const openDeleteUserDialog = () => {
+      const dlg = ComponentRegistry.ensureRuntimeDeleteUserDialog();
+      const status = dlg.querySelector('#runtimeDeleteUserStatus');
+      const nameEl = dlg.querySelector('#runtimeDeleteUserName');
+      const submitBtn = dlg.querySelector('#runtimeDeleteUserSubmit');
+      nameEl.value = '';
+      status.textContent = '';
+      status.className = 'runtime-comm-status';
+      submitBtn.disabled = false;
+      submitBtn.onclick = async () => {
+        const username = nameEl.value.trim();
+        if (!username) {
+          status.textContent = 'Username is required';
+          status.className = 'runtime-comm-status error';
+          nameEl.focus();
+          return;
+        }
+        submitBtn.disabled = true;
+        status.textContent = 'Checking username...';
+        status.className = 'runtime-comm-status';
+        try {
+          const result = await ctx.deleteUserGroup({ username });
+          if (result?.success) {
+            status.textContent = `User "${username}" deleted.`;
+            status.className = 'runtime-comm-status ok';
+            setTimeout(() => {
+              try { dlg.close(); } catch (_) { /* ignore */ }
+            }, 900);
+          } else {
+            // "except check the name" — surface the not-found/validation error clearly and
+            // leave the dialog open so the operator can correct the username and retry.
+            status.textContent = result?.error || `No user found with the username "${username}"`;
+            status.className = 'runtime-comm-status error';
+            submitBtn.disabled = false;
+            nameEl.focus();
+            nameEl.select();
+          }
+        } catch (err) {
+          status.textContent = err.message || 'Could not delete user';
+          status.className = 'runtime-comm-status error';
+          submitBtn.disabled = false;
+        }
+      };
+      try {
+        dlg.showModal();
+      } catch (err) {
+        dlg.setAttribute('open', '');
+      }
+      nameEl.focus();
+    };
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'DeleteUserGroupButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'DeleteUserGroupButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', openDeleteUserDialog);
+    }
+    return btn;
+  },
+
   RecipePlusSelector(comp, ctx) {
     const el = document.createElement('div');
     el.className = 'ft-recipeplus-selector ft-graphic';
@@ -5667,6 +6001,30 @@ const ComponentRegistry = {
       const len = input.value.length;
       try { input.setSelectionRange(len, len); } catch (_) { /* ignore */ }
     }
+    if (key === 'Home' || key === 'ArrowUp' || key === 'PageUp') {
+      try { input.setSelectionRange(0, 0); } catch (_) { /* ignore */ }
+    }
+    if (key === 'ArrowDown' || key === 'PageDown') {
+      const len = input.value.length;
+      try { input.setSelectionRange(len, len); } catch (_) { /* ignore */ }
+    }
+    if (key === 'ArrowLeft') {
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? start;
+      try {
+        if (start !== end) input.setSelectionRange(start, start);
+        else if (start > 0) input.setSelectionRange(start - 1, start - 1);
+      } catch (_) { /* ignore */ }
+    }
+    if (key === 'ArrowRight') {
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? start;
+      const len = input.value.length;
+      try {
+        if (start !== end) input.setSelectionRange(end, end);
+        else if (end < len) input.setSelectionRange(end + 1, end + 1);
+      } catch (_) { /* ignore */ }
+    }
     input.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true }));
   },
 
@@ -5918,6 +6276,1200 @@ const ComponentRegistry = {
           ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'End');
         }
       });
+    }
+    return btn;
+  },
+
+  EnterButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-enter-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Enter');
+    if (imageName) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      const missing = document.createElement('span');
+      missing.className = 'ft-goto-btn-missing hidden';
+      missing.setAttribute('aria-hidden', 'true');
+      imgEl.addEventListener('error', () => {
+        imgEl.style.display = 'none';
+        missing.classList.remove('hidden');
+      });
+      btn.appendChild(missing);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'EnterButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'EnterButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', () => {
+        if (typeof ctx.sendKeyPress === 'function') {
+          ctx.sendKeyPress({
+            key: 'Enter',
+            sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
+            linkedObject: (comp.linkedObject || '').trim(),
+            audio: comp.audio !== false
+          });
+        } else {
+          ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'Enter');
+        }
+      });
+    }
+    return btn;
+  },
+
+  HomeButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-home-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Home');
+    if (imageName) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      const missing = document.createElement('span');
+      missing.className = 'ft-goto-btn-missing hidden';
+      missing.setAttribute('aria-hidden', 'true');
+      imgEl.addEventListener('error', () => {
+        imgEl.style.display = 'none';
+        missing.classList.remove('hidden');
+      });
+      btn.appendChild(missing);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'HomeButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'HomeButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', () => {
+        if (typeof ctx.sendKeyPress === 'function') {
+          ctx.sendKeyPress({
+            key: 'Home',
+            sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
+            linkedObject: (comp.linkedObject || '').trim(),
+            audio: comp.audio !== false
+          });
+        } else {
+          ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'Home');
+        }
+      });
+    }
+    return btn;
+  },
+
+  MoveLeftButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-move-left-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Arrow Left');
+    if (imageName) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      const missing = document.createElement('span');
+      missing.className = 'ft-goto-btn-missing hidden';
+      missing.setAttribute('aria-hidden', 'true');
+      imgEl.addEventListener('error', () => {
+        imgEl.style.display = 'none';
+        missing.classList.remove('hidden');
+      });
+      btn.appendChild(missing);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'MoveLeftButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'MoveLeftButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      return btn;
+    }
+
+    const doPress = () => {
+      if (typeof ctx.sendKeyPress === 'function') {
+        ctx.sendKeyPress({
+          key: 'ArrowLeft',
+          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
+          linkedObject: (comp.linkedObject || '').trim(),
+          audio: comp.audio !== false
+        });
+      } else {
+        ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'ArrowLeft');
+      }
+    };
+    const rate = Number(comp.autoRepeatRate) || 0;
+    const delay = comp.autoRepeatDelay ?? 400;
+    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
+    let repeatTimer = null;
+    let delayTimer = null;
+
+    const stopRepeat = () => {
+      if (delayTimer) clearTimeout(delayTimer);
+      if (repeatTimer) clearInterval(repeatTimer);
+      delayTimer = null;
+      repeatTimer = null;
+    };
+
+    const startRepeat = () => {
+      doPress();
+      if (intervalMs <= 0) return;
+      delayTimer = setTimeout(() => {
+        repeatTimer = setInterval(doPress, intervalMs);
+      }, delay);
+    };
+
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
+    btn.addEventListener('mouseup', stopRepeat);
+    btn.addEventListener('mouseleave', stopRepeat);
+    btn.addEventListener('click', (e) => e.preventDefault());
+    if (comp.touch !== false) {
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
+      btn.addEventListener('touchend', stopRepeat);
+      btn.addEventListener('touchcancel', stopRepeat);
+    }
+    return btn;
+  },
+
+  MoveRightButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-move-right-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Arrow Right');
+    if (imageName) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      const missing = document.createElement('span');
+      missing.className = 'ft-goto-btn-missing hidden';
+      missing.setAttribute('aria-hidden', 'true');
+      imgEl.addEventListener('error', () => {
+        imgEl.style.display = 'none';
+        missing.classList.remove('hidden');
+      });
+      btn.appendChild(missing);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'MoveRightButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'MoveRightButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      return btn;
+    }
+
+    const doPress = () => {
+      if (typeof ctx.sendKeyPress === 'function') {
+        ctx.sendKeyPress({
+          key: 'ArrowRight',
+          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
+          linkedObject: (comp.linkedObject || '').trim(),
+          audio: comp.audio !== false
+        });
+      } else {
+        ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'ArrowRight');
+      }
+    };
+    const rate = Number(comp.autoRepeatRate) || 0;
+    const delay = comp.autoRepeatDelay ?? 400;
+    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
+    let repeatTimer = null;
+    let delayTimer = null;
+
+    const stopRepeat = () => {
+      if (delayTimer) clearTimeout(delayTimer);
+      if (repeatTimer) clearInterval(repeatTimer);
+      delayTimer = null;
+      repeatTimer = null;
+    };
+
+    const startRepeat = () => {
+      doPress();
+      if (intervalMs <= 0) return;
+      delayTimer = setTimeout(() => {
+        repeatTimer = setInterval(doPress, intervalMs);
+      }, delay);
+    };
+
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
+    btn.addEventListener('mouseup', stopRepeat);
+    btn.addEventListener('mouseleave', stopRepeat);
+    btn.addEventListener('click', (e) => e.preventDefault());
+    if (comp.touch !== false) {
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
+      btn.addEventListener('touchend', stopRepeat);
+      btn.addEventListener('touchcancel', stopRepeat);
+    }
+    return btn;
+  },
+
+  MoveUpButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-move-up-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Arrow Up');
+    if (imageName) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      const missing = document.createElement('span');
+      missing.className = 'ft-goto-btn-missing hidden';
+      missing.setAttribute('aria-hidden', 'true');
+      imgEl.addEventListener('error', () => {
+        imgEl.style.display = 'none';
+        missing.classList.remove('hidden');
+      });
+      btn.appendChild(missing);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'MoveUpButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'MoveUpButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      return btn;
+    }
+
+    const doPress = () => {
+      if (typeof ctx.sendKeyPress === 'function') {
+        ctx.sendKeyPress({
+          key: 'ArrowUp',
+          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
+          linkedObject: (comp.linkedObject || '').trim(),
+          audio: comp.audio !== false
+        });
+      } else {
+        ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'ArrowUp');
+      }
+    };
+    const rate = Number(comp.autoRepeatRate) || 0;
+    const delay = comp.autoRepeatDelay ?? 400;
+    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
+    let repeatTimer = null;
+    let delayTimer = null;
+
+    const stopRepeat = () => {
+      if (delayTimer) clearTimeout(delayTimer);
+      if (repeatTimer) clearInterval(repeatTimer);
+      delayTimer = null;
+      repeatTimer = null;
+    };
+
+    const startRepeat = () => {
+      doPress();
+      if (intervalMs <= 0) return;
+      delayTimer = setTimeout(() => {
+        repeatTimer = setInterval(doPress, intervalMs);
+      }, delay);
+    };
+
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
+    btn.addEventListener('mouseup', stopRepeat);
+    btn.addEventListener('mouseleave', stopRepeat);
+    btn.addEventListener('click', (e) => e.preventDefault());
+    if (comp.touch !== false) {
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
+      btn.addEventListener('touchend', stopRepeat);
+      btn.addEventListener('touchcancel', stopRepeat);
+    }
+    return btn;
+  },
+
+  MoveDownButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-move-down-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Arrow Down');
+    if (imageName) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      const missing = document.createElement('span');
+      missing.className = 'ft-goto-btn-missing hidden';
+      missing.setAttribute('aria-hidden', 'true');
+      imgEl.addEventListener('error', () => {
+        imgEl.style.display = 'none';
+        missing.classList.remove('hidden');
+      });
+      btn.appendChild(missing);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'MoveDownButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'MoveDownButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      return btn;
+    }
+
+    const doPress = () => {
+      if (typeof ctx.sendKeyPress === 'function') {
+        ctx.sendKeyPress({
+          key: 'ArrowDown',
+          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
+          linkedObject: (comp.linkedObject || '').trim(),
+          audio: comp.audio !== false
+        });
+      } else {
+        ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'ArrowDown');
+      }
+    };
+    const rate = Number(comp.autoRepeatRate) || 0;
+    const delay = comp.autoRepeatDelay ?? 400;
+    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
+    let repeatTimer = null;
+    let delayTimer = null;
+
+    const stopRepeat = () => {
+      if (delayTimer) clearTimeout(delayTimer);
+      if (repeatTimer) clearInterval(repeatTimer);
+      delayTimer = null;
+      repeatTimer = null;
+    };
+
+    const startRepeat = () => {
+      doPress();
+      if (intervalMs <= 0) return;
+      delayTimer = setTimeout(() => {
+        repeatTimer = setInterval(doPress, intervalMs);
+      }, delay);
+    };
+
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
+    btn.addEventListener('mouseup', stopRepeat);
+    btn.addEventListener('mouseleave', stopRepeat);
+    btn.addEventListener('click', (e) => e.preventDefault());
+    if (comp.touch !== false) {
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
+      btn.addEventListener('touchend', stopRepeat);
+      btn.addEventListener('touchcancel', stopRepeat);
+    }
+    return btn;
+  },
+
+  PageDownButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-page-down-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Page Down');
+    if (imageName) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      const missing = document.createElement('span');
+      missing.className = 'ft-goto-btn-missing hidden';
+      missing.setAttribute('aria-hidden', 'true');
+      imgEl.addEventListener('error', () => {
+        imgEl.style.display = 'none';
+        missing.classList.remove('hidden');
+      });
+      btn.appendChild(missing);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'PageDownButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'PageDownButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      return btn;
+    }
+
+    const doPress = () => {
+      if (typeof ctx.sendKeyPress === 'function') {
+        ctx.sendKeyPress({
+          key: 'PageDown',
+          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
+          linkedObject: (comp.linkedObject || '').trim(),
+          audio: comp.audio !== false
+        });
+      } else {
+        ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'PageDown');
+      }
+    };
+    const rate = Number(comp.autoRepeatRate) || 0;
+    const delay = comp.autoRepeatDelay ?? 400;
+    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
+    let repeatTimer = null;
+    let delayTimer = null;
+
+    const stopRepeat = () => {
+      if (delayTimer) clearTimeout(delayTimer);
+      if (repeatTimer) clearInterval(repeatTimer);
+      delayTimer = null;
+      repeatTimer = null;
+    };
+
+    const startRepeat = () => {
+      doPress();
+      if (intervalMs <= 0) return;
+      delayTimer = setTimeout(() => {
+        repeatTimer = setInterval(doPress, intervalMs);
+      }, delay);
+    };
+
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
+    btn.addEventListener('mouseup', stopRepeat);
+    btn.addEventListener('mouseleave', stopRepeat);
+    btn.addEventListener('click', (e) => e.preventDefault());
+    if (comp.touch !== false) {
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
+      btn.addEventListener('touchend', stopRepeat);
+      btn.addEventListener('touchcancel', stopRepeat);
+    }
+    return btn;
+  },
+
+  PageUpButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-page-up-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Page Up');
+    if (imageName) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      const missing = document.createElement('span');
+      missing.className = 'ft-goto-btn-missing hidden';
+      missing.setAttribute('aria-hidden', 'true');
+      imgEl.addEventListener('error', () => {
+        imgEl.style.display = 'none';
+        missing.classList.remove('hidden');
+      });
+      btn.appendChild(missing);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'PageUpButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'PageUpButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      return btn;
+    }
+
+    const doPress = () => {
+      if (typeof ctx.sendKeyPress === 'function') {
+        ctx.sendKeyPress({
+          key: 'PageUp',
+          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
+          linkedObject: (comp.linkedObject || '').trim(),
+          audio: comp.audio !== false
+        });
+      } else {
+        ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'PageUp');
+      }
+    };
+    const rate = Number(comp.autoRepeatRate) || 0;
+    const delay = comp.autoRepeatDelay ?? 400;
+    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
+    let repeatTimer = null;
+    let delayTimer = null;
+
+    const stopRepeat = () => {
+      if (delayTimer) clearTimeout(delayTimer);
+      if (repeatTimer) clearInterval(repeatTimer);
+      delayTimer = null;
+      repeatTimer = null;
+    };
+
+    const startRepeat = () => {
+      doPress();
+      if (intervalMs <= 0) return;
+      delayTimer = setTimeout(() => {
+        repeatTimer = setInterval(doPress, intervalMs);
+      }, delay);
+    };
+
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
+    btn.addEventListener('mouseup', stopRepeat);
+    btn.addEventListener('mouseleave', stopRepeat);
+    btn.addEventListener('click', (e) => e.preventDefault());
+    if (comp.touch !== false) {
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
+      btn.addEventListener('touchend', stopRepeat);
+      btn.addEventListener('touchcancel', stopRepeat);
     }
     return btn;
   },
@@ -7178,6 +8730,92 @@ const ComponentRegistry = {
     const pid = ctx.projectId || '';
     if (!pid || !fileName) return '';
     return `/projects/${encodeURIComponent(pid)}/Images/${encodeURIComponent(fileName)}`;
+  },
+
+  ensureRuntimeAddUserDialog() {
+    let dlg = document.getElementById('runtimeAddUserDialog');
+    if (dlg) return dlg;
+    dlg = document.createElement('dialog');
+    dlg.id = 'runtimeAddUserDialog';
+    dlg.className = 'dialog runtime-adduser-dialog';
+    dlg.innerHTML = `
+      <form method="dialog" onsubmit="return false">
+        <h3>Add User/Group</h3>
+        <p class="dialog-hint">Create a new user account and assign it to a role/group.</p>
+        <label class="dialog-field">
+          <span>Username</span>
+          <input type="text" id="runtimeAddUserName" autocomplete="off" />
+        </label>
+        <label class="dialog-field">
+          <span>Password</span>
+          <input type="password" id="runtimeAddUserPassword" autocomplete="new-password" />
+        </label>
+        <label class="dialog-field">
+          <span>Confirm password</span>
+          <input type="password" id="runtimeAddUserConfirm" autocomplete="new-password" />
+        </label>
+        <label class="dialog-field">
+          <span>Role / Group</span>
+          <select id="runtimeAddUserRole">
+            <option value="Operator" selected>Operator</option>
+            <option value="Engineer">Engineer</option>
+            <option value="Administrator">Administrator</option>
+          </select>
+        </label>
+        <div id="runtimeAddUserStatus" class="runtime-comm-status"></div>
+        <div class="dialog-actions">
+          <button type="button" id="runtimeAddUserCancel">Cancel</button>
+          <button type="button" id="runtimeAddUserSubmit" class="primary">Add User</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(dlg);
+    dlg.querySelector('#runtimeAddUserCancel').addEventListener('click', () => {
+      try { dlg.close(); } catch (_) { /* ignore */ }
+    });
+    dlg.addEventListener('cancel', () => {
+      const status = dlg.querySelector('#runtimeAddUserStatus');
+      if (status) {
+        status.textContent = '';
+        status.className = 'runtime-comm-status';
+      }
+    });
+    return dlg;
+  },
+
+  ensureRuntimeDeleteUserDialog() {
+    let dlg = document.getElementById('runtimeDeleteUserDialog');
+    if (dlg) return dlg;
+    dlg = document.createElement('dialog');
+    dlg.id = 'runtimeDeleteUserDialog';
+    dlg.className = 'dialog runtime-adduser-dialog';
+    dlg.innerHTML = `
+      <form method="dialog" onsubmit="return false">
+        <h3>Delete User/Group</h3>
+        <p class="dialog-hint">Enter the username to remove. The username is checked before anything is deleted.</p>
+        <label class="dialog-field">
+          <span>Username</span>
+          <input type="text" id="runtimeDeleteUserName" autocomplete="off" />
+        </label>
+        <div id="runtimeDeleteUserStatus" class="runtime-comm-status"></div>
+        <div class="dialog-actions">
+          <button type="button" id="runtimeDeleteUserCancel">Cancel</button>
+          <button type="button" id="runtimeDeleteUserSubmit" class="primary">Delete User</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(dlg);
+    dlg.querySelector('#runtimeDeleteUserCancel').addEventListener('click', () => {
+      try { dlg.close(); } catch (_) { /* ignore */ }
+    });
+    dlg.addEventListener('cancel', () => {
+      const status = dlg.querySelector('#runtimeDeleteUserStatus');
+      if (status) {
+        status.textContent = '';
+        status.className = 'runtime-comm-status';
+      }
+    });
+    return dlg;
   },
 
   formatValue(val, comp) {

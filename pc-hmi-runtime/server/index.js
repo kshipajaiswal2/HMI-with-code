@@ -737,6 +737,59 @@ app.post('/api/runtime/logout', (_req, res) => {
   res.json({ success: true });
 });
 
+app.post('/api/runtime/add-user', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    const { username, password, role } = req.body || {};
+    const result = userService.addUser({ username, password, role });
+    if (!result.success) {
+      res.status(400).json(result);
+      return;
+    }
+    const pid = resolveProjectId(req);
+    try {
+      projectConfig = projectService.updateProjectConfig(pid, { users: userService.users });
+    } catch (err) {
+      console.error('Failed to persist new user:', err.message);
+      res.status(500).json({ success: false, error: 'User created but could not be saved to the project' });
+      return;
+    }
+    io.emit('user-list-changed', {
+      users: userService.users.map((u) => ({ username: u.username, role: u.role, level: u.level }))
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/delete-user', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    const { username } = req.body || {};
+    const result = userService.deleteUser({ username });
+    if (!result.success) {
+      res.status(404).json(result);
+      return;
+    }
+    const pid = resolveProjectId(req);
+    try {
+      projectConfig = projectService.updateProjectConfig(pid, { users: userService.users });
+    } catch (err) {
+      console.error('Failed to persist user deletion:', err.message);
+      res.status(500).json({ success: false, error: 'User deleted but the project could not be saved' });
+      return;
+    }
+    if (result.loggedOutSelf) io.emit('user-changed', null);
+    io.emit('user-list-changed', {
+      users: userService.users.map((u) => ({ username: u.username, role: u.role, level: u.level }))
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 io.on('connection', (socket) => {
   const communication = getEffectiveCommunication();
   socket.emit('init', {

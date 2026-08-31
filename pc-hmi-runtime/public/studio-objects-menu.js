@@ -82,20 +82,20 @@ window.OBJECTS_MENU = [
     id: 'key', label: 'Key', children: [
       { id: 'key-backspace', label: 'Backspace', action: 'backspace-button-properties' },
       { id: 'key-end', label: 'End', action: 'end-button-properties' },
-      { id: 'key-enter', label: 'Enter', planned: true },
-      { id: 'key-home', label: 'Home', planned: true },
-      { id: 'key-left', label: 'Move Left', planned: true },
-      { id: 'key-right', label: 'Move Right', planned: true },
-      { id: 'key-down', label: 'Move Down', planned: true },
-      { id: 'key-up', label: 'Move Up', planned: true },
-      { id: 'key-pagedown', label: 'Page Down', planned: true },
-      { id: 'key-pageup', label: 'Page Up', planned: true }
+      { id: 'key-enter', label: 'Enter', action: 'enter-button-properties' },
+      { id: 'key-home', label: 'Home', action: 'home-button-properties' },
+      { id: 'key-left', label: 'Move Left', action: 'move-left-button-properties' },
+      { id: 'key-right', label: 'Move Right', action: 'move-right-button-properties' },
+      { id: 'key-down', label: 'Move Down', action: 'move-down-button-properties' },
+      { id: 'key-up', label: 'Move Up', action: 'move-up-button-properties' },
+      { id: 'key-pagedown', label: 'Page Down', action: 'page-down-button-properties' },
+      { id: 'key-pageup', label: 'Page Up', action: 'page-up-button-properties' }
     ]
   },
   {
     id: 'user-mgmt', label: 'User Management', children: [
-      { id: 'user-add', label: 'Add User/Group', planned: true },
-      { id: 'user-delete', label: 'Delete User/Group', planned: true },
+      { id: 'user-add', label: 'Add User/Group', action: 'add-user-group-button-properties' },
+      { id: 'user-delete', label: 'Delete User/Group', action: 'delete-user-group-button-properties' },
       { id: 'user-modify-group', label: 'Modify Group Membership', planned: true },
       { id: 'user-unlock', label: 'Unlock User', planned: true },
       { id: 'user-enable', label: 'Enable User', planned: true },

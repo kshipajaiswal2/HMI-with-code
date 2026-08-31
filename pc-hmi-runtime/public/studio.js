@@ -126,7 +126,7 @@ const freehandStrokePreview = document.getElementById('freehandStrokePreview');
 
 const CANVAS_GRAPHIC_TYPES = new Set([
   'Text', 'Image', 'NumericDisplay', 'NumericInputEnable', 'NumericInputCursorPoint', 'StringDisplay', 'StringInputEnable', 'MomentaryButton', 'MaintainedButton', 'LatchedButton', 'MultistateButton', 'InterlockedButton', 'RampButton',
-  'MultistateIndicator', 'SymbolIndicator', 'ListIndicator', 'BarGraph', 'Gauge', 'Scale', 'PausePenButton', 'NextPenButton', 'BackspaceButton', 'EndButton', 'Trend', 'RecipePlusButton', 'RecipePlusSelector', 'RecipePlusTable',
+  'MultistateIndicator', 'SymbolIndicator', 'ListIndicator', 'BarGraph', 'Gauge', 'Scale', 'PausePenButton', 'NextPenButton', 'BackspaceButton', 'EndButton', 'EnterButton', 'HomeButton', 'MoveLeftButton', 'MoveRightButton', 'MoveUpButton', 'MoveDownButton', 'PageDownButton', 'PageUpButton', 'Trend', 'RecipePlusButton', 'RecipePlusSelector', 'RecipePlusTable', 'AddUserGroupButton', 'DeleteUserGroupButton',
   'GotoButton', 'ReturnToButton', 'CloseDisplayButton', 'DisplayListSelector', 'TimeDateDisplay', 'StringDisplay', 'AlarmTicker', 'Rectangle', 'RoundedRectangle', 'Ellipse', 'Wedge', 'Arc', 'Freehand', 'Line', 'Polygon', 'Polyline', 'Panel',
   'SafetyLadderDiagram'
 ]);
@@ -418,6 +418,86 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       window.StudioEndButton?.presentEndButtonDialog();
       window.StudioEndButton?.scheduleEndLivePreview();
       setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'EnterButton') {
+      flushDeferredDialogInits();
+      window.StudioEnterButton?.initEnterButtonDialog();
+      window.StudioEnterButton?.fillEnterButtonForm(comp);
+      resetPropsDialogState('enter', window.StudioEnterButton.readEnterButtonForm, 'applyEnterButton', null, ref);
+      window.StudioEnterButton?.switchEnterButtonTab('general');
+      window.StudioEnterButton?.wireEnterButtonTools();
+      window.StudioEnterButton?.presentEnterButtonDialog();
+      window.StudioEnterButton?.scheduleEnterLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'HomeButton') {
+      flushDeferredDialogInits();
+      window.StudioHomeButton?.initHomeButtonDialog();
+      window.StudioHomeButton?.fillHomeButtonForm(comp);
+      resetPropsDialogState('home', window.StudioHomeButton.readHomeButtonForm, 'applyHomeButton', null, ref);
+      window.StudioHomeButton?.switchHomeButtonTab('general');
+      window.StudioHomeButton?.wireHomeButtonTools();
+      window.StudioHomeButton?.presentHomeButtonDialog();
+      window.StudioHomeButton?.scheduleHomeLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'MoveLeftButton') {
+      flushDeferredDialogInits();
+      window.StudioMoveLeftButton?.initMoveLeftButtonDialog();
+      window.StudioMoveLeftButton?.fillMoveLeftButtonForm(comp);
+      resetPropsDialogState('move-left', window.StudioMoveLeftButton.readMoveLeftButtonForm, 'applyMoveLeftButton', null, ref);
+      window.StudioMoveLeftButton?.switchMoveLeftButtonTab('general');
+      window.StudioMoveLeftButton?.wireMoveLeftButtonTools();
+      window.StudioMoveLeftButton?.presentMoveLeftButtonDialog();
+      window.StudioMoveLeftButton?.scheduleMoveLeftButtonLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'MoveRightButton') {
+      flushDeferredDialogInits();
+      window.StudioMoveRightButton?.initMoveRightButtonDialog();
+      window.StudioMoveRightButton?.fillMoveRightButtonForm(comp);
+      resetPropsDialogState('move-right', window.StudioMoveRightButton.readMoveRightButtonForm, 'applyMoveRightButton', null, ref);
+      window.StudioMoveRightButton?.switchMoveRightButtonTab('general');
+      window.StudioMoveRightButton?.wireMoveRightButtonTools();
+      window.StudioMoveRightButton?.presentMoveRightButtonDialog();
+      window.StudioMoveRightButton?.scheduleMoveRightButtonLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'MoveUpButton') {
+      flushDeferredDialogInits();
+      window.StudioMoveUpButton?.initMoveUpButtonDialog();
+      window.StudioMoveUpButton?.fillMoveUpButtonForm(comp);
+      resetPropsDialogState('move-up', window.StudioMoveUpButton.readMoveUpButtonForm, 'applyMoveUpButton', null, ref);
+      window.StudioMoveUpButton?.switchMoveUpButtonTab('general');
+      window.StudioMoveUpButton?.wireMoveUpButtonTools();
+      window.StudioMoveUpButton?.presentMoveUpButtonDialog();
+      window.StudioMoveUpButton?.scheduleMoveUpButtonLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'MoveDownButton') {
+      flushDeferredDialogInits();
+      window.StudioMoveDownButton?.initMoveDownButtonDialog();
+      window.StudioMoveDownButton?.fillMoveDownButtonForm(comp);
+      resetPropsDialogState('move-down', window.StudioMoveDownButton.readMoveDownButtonForm, 'applyMoveDownButton', null, ref);
+      window.StudioMoveDownButton?.switchMoveDownButtonTab('general');
+      window.StudioMoveDownButton?.wireMoveDownButtonTools();
+      window.StudioMoveDownButton?.presentMoveDownButtonDialog();
+      window.StudioMoveDownButton?.scheduleMoveDownButtonLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'PageDownButton') {
+      flushDeferredDialogInits();
+      window.StudioPageDownButton?.initPageDownButtonDialog();
+      window.StudioPageDownButton?.fillPageDownButtonForm(comp);
+      resetPropsDialogState('page-down', window.StudioPageDownButton.readPageDownButtonForm, 'applyPageDownButton', null, ref);
+      window.StudioPageDownButton?.switchPageDownButtonTab('general');
+      window.StudioPageDownButton?.wirePageDownButtonTools();
+      window.StudioPageDownButton?.presentPageDownButtonDialog();
+      window.StudioPageDownButton?.schedulePageDownButtonLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'PageUpButton') {
+      flushDeferredDialogInits();
+      window.StudioPageUpButton?.initPageUpButtonDialog();
+      window.StudioPageUpButton?.fillPageUpButtonForm(comp);
+      resetPropsDialogState('page-up', window.StudioPageUpButton.readPageUpButtonForm, 'applyPageUpButton', null, ref);
+      window.StudioPageUpButton?.switchPageUpButtonTab('general');
+      window.StudioPageUpButton?.wirePageUpButtonTools();
+      window.StudioPageUpButton?.presentPageUpButtonDialog();
+      window.StudioPageUpButton?.schedulePageUpButtonLivePreview();
+      setTemplateEditStatus(name, ref);
     } else if (comp.type === 'Trend') {
       flushDeferredDialogInits();
       window.StudioTrend?.initTrendDialog();
@@ -437,6 +517,26 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       window.StudioRecipePlusButton?.wireRecipePlusButtonTools();
       window.StudioRecipePlusButton?.presentRecipePlusButtonDialog();
       window.StudioRecipePlusButton?.scheduleRecipePlusLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'AddUserGroupButton') {
+      flushDeferredDialogInits();
+      window.StudioAddUserGroupButton?.initAddUserGroupButtonDialog();
+      window.StudioAddUserGroupButton?.fillAddUserGroupButtonForm(comp);
+      resetPropsDialogState('add-user-group', window.StudioAddUserGroupButton.readAddUserGroupButtonForm, 'applyAddUserGroupButton', null, ref);
+      window.StudioAddUserGroupButton?.switchAddUserGroupButtonTab('general');
+      window.StudioAddUserGroupButton?.wireAddUserGroupButtonTools();
+      window.StudioAddUserGroupButton?.presentAddUserGroupButtonDialog();
+      window.StudioAddUserGroupButton?.scheduleAddUserGroupLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'DeleteUserGroupButton') {
+      flushDeferredDialogInits();
+      window.StudioDeleteUserGroupButton?.initDeleteUserGroupButtonDialog();
+      window.StudioDeleteUserGroupButton?.fillDeleteUserGroupButtonForm(comp);
+      resetPropsDialogState('delete-user-group', window.StudioDeleteUserGroupButton.readDeleteUserGroupButtonForm, 'applyDeleteUserGroupButton', null, ref);
+      window.StudioDeleteUserGroupButton?.switchDeleteUserGroupButtonTab('general');
+      window.StudioDeleteUserGroupButton?.wireDeleteUserGroupButtonTools();
+      window.StudioDeleteUserGroupButton?.presentDeleteUserGroupButtonDialog();
+      window.StudioDeleteUserGroupButton?.scheduleDeleteUserGroupLivePreview();
       setTemplateEditStatus(name, ref);
     } else if (comp.type === 'RecipePlusSelector') {
       flushDeferredDialogInits();
@@ -1935,6 +2035,28 @@ function syncOpenPropsDialogBounds(comp) {
       rpbTop.value = comp.top ?? rpbTop.value;
       rpbLeft.value = comp.left ?? rpbLeft.value;
       flushPropsApplyButton(window.StudioRecipePlusButton.readRecipePlusButtonForm, 'applyRecipePlusButton');
+    } else if (kind === 'add-user-group') {
+      const augHeight = document.getElementById('augHeight');
+      const augWidth = document.getElementById('augWidth');
+      const augTop = document.getElementById('augTop');
+      const augLeft = document.getElementById('augLeft');
+      if (!augHeight) return;
+      augHeight.value = comp.height ?? augHeight.value;
+      augWidth.value = comp.width ?? augWidth.value;
+      augTop.value = comp.top ?? augTop.value;
+      augLeft.value = comp.left ?? augLeft.value;
+      flushPropsApplyButton(window.StudioAddUserGroupButton.readAddUserGroupButtonForm, 'applyAddUserGroupButton');
+    } else if (kind === 'delete-user-group') {
+      const dugHeight = document.getElementById('dugHeight');
+      const dugWidth = document.getElementById('dugWidth');
+      const dugTop = document.getElementById('dugTop');
+      const dugLeft = document.getElementById('dugLeft');
+      if (!dugHeight) return;
+      dugHeight.value = comp.height ?? dugHeight.value;
+      dugWidth.value = comp.width ?? dugWidth.value;
+      dugTop.value = comp.top ?? dugTop.value;
+      dugLeft.value = comp.left ?? dugLeft.value;
+      flushPropsApplyButton(window.StudioDeleteUserGroupButton.readDeleteUserGroupButtonForm, 'applyDeleteUserGroupButton');
     } else if (kind === 'recipeplus-selector') {
       const rpsHeight = document.getElementById('rpsHeight');
       const rpsWidth = document.getElementById('rpsWidth');
@@ -4719,6 +4841,10 @@ function startObjectPlacement(kind, defaults = {}) {
     setStatus('Drag on the display to draw the Trend, then properties will open (Esc to cancel)');
   } else if (kind === 'recipeplus-button') {
     setStatus('Drag on the display to draw the RecipePlus Button, then properties will open (Esc to cancel)');
+  } else if (kind === 'add-user-group') {
+    setStatus('Drag on the display to draw the Add User/Group Button, then properties will open (Esc to cancel)');
+  } else if (kind === 'delete-user-group') {
+    setStatus('Drag on the display to draw the Delete User/Group Button, then properties will open (Esc to cancel)');
   } else if (kind === 'recipeplus-selector') {
     setStatus('Drag on the display to draw the RecipePlus Selector, then properties will open (Esc to cancel)');
   } else if (kind === 'recipeplus-table') {
@@ -4904,6 +5030,54 @@ async function completeObjectPlacement(rect) {
         return;
       }
       await window.StudioEndButton?.showEndButtonDialog(defaults);
+    } else if (kind === 'enter') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioEnterButton?.showEnterButtonDialog(defaults);
+    } else if (kind === 'home') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioHomeButton?.showHomeButtonDialog(defaults);
+    } else if (kind === 'move-left') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioMoveLeftButton?.showMoveLeftButtonDialog(defaults);
+    } else if (kind === 'move-right') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioMoveRightButton?.showMoveRightButtonDialog(defaults);
+    } else if (kind === 'move-up') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioMoveUpButton?.showMoveUpButtonDialog(defaults);
+    } else if (kind === 'move-down') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioMoveDownButton?.showMoveDownButtonDialog(defaults);
+    } else if (kind === 'page-down') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioPageDownButton?.showPageDownButtonDialog(defaults);
+    } else if (kind === 'page-up') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioPageUpButton?.showPageUpButtonDialog(defaults);
     } else if (kind === 'trend') {
       if (!displayIsOpen()) {
         setStatus('Open a display or global object first');
@@ -4916,6 +5090,18 @@ async function completeObjectPlacement(rect) {
         return;
       }
       await window.StudioRecipePlusButton?.showRecipePlusButtonDialog(defaults);
+    } else if (kind === 'add-user-group') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioAddUserGroupButton?.showAddUserGroupButtonDialog(defaults);
+    } else if (kind === 'delete-user-group') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioDeleteUserGroupButton?.showDeleteUserGroupButtonDialog(defaults);
     } else if (kind === 'recipeplus-selector') {
       if (!displayIsOpen()) {
         setStatus('Open a display or global object first');
@@ -5090,8 +5276,8 @@ function initObjectPlacement() {
       updateFreehandStrokePreview([start, current]);
       return;
     }
-    const minW = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'numeric') ? 40 : state.placement.kind === 'image' ? 32 : 24;
-    const minH = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'numeric') ? 24 : state.placement.kind === 'image' ? 32 : 16;
+    const minW = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'enter' || state.placement.kind === 'home' || state.placement.kind === 'move-left' || state.placement.kind === 'move-right' || state.placement.kind === 'move-up' || state.placement.kind === 'move-down' || state.placement.kind === 'page-down' || state.placement.kind === 'page-up' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'add-user-group' || state.placement.kind === 'delete-user-group' || state.placement.kind === 'numeric') ? 40 : state.placement.kind === 'image' ? 32 : 24;
+    const minH = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'enter' || state.placement.kind === 'home' || state.placement.kind === 'move-left' || state.placement.kind === 'move-right' || state.placement.kind === 'move-up' || state.placement.kind === 'move-down' || state.placement.kind === 'page-down' || state.placement.kind === 'page-up' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'add-user-group' || state.placement.kind === 'delete-user-group' || state.placement.kind === 'numeric') ? 24 : state.placement.kind === 'image' ? 32 : 16;
     updatePlacementRubberband(normalizePlacementRect(start.x, start.y, current.x, current.y, minW, minH));
   });
 
@@ -5112,8 +5298,8 @@ function initObjectPlacement() {
       completeLinePlacement(start, current).catch((err) => setStatus(`Error: ${err.message}`));
       return;
     }
-    const minW = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'numeric') ? 40 : state.placement.kind === 'image' ? 32 : 24;
-    const minH = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'numeric') ? 24 : state.placement.kind === 'image' ? 32 : 16;
+    const minW = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'enter' || state.placement.kind === 'home' || state.placement.kind === 'move-left' || state.placement.kind === 'move-right' || state.placement.kind === 'move-up' || state.placement.kind === 'move-down' || state.placement.kind === 'page-down' || state.placement.kind === 'page-up' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'add-user-group' || state.placement.kind === 'delete-user-group' || state.placement.kind === 'numeric') ? 40 : state.placement.kind === 'image' ? 32 : 24;
+    const minH = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'enter' || state.placement.kind === 'home' || state.placement.kind === 'move-left' || state.placement.kind === 'move-right' || state.placement.kind === 'move-up' || state.placement.kind === 'move-down' || state.placement.kind === 'page-down' || state.placement.kind === 'page-up' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'add-user-group' || state.placement.kind === 'delete-user-group' || state.placement.kind === 'numeric') ? 24 : state.placement.kind === 'image' ? 32 : 16;
     const rect = normalizePlacementRect(start.x, start.y, current.x, current.y, minW, minH);
     completeObjectPlacement(rect).catch((err) => setStatus(`Error: ${err.message}`));
   });
@@ -5738,6 +5924,86 @@ async function openPropertiesForComponent(index) {
       window.StudioEndButton?.presentEndButtonDialog();
       window.StudioEndButton?.scheduleEndLivePreview();
       setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'EnterButton') {
+      flushDeferredDialogInits();
+      window.StudioEnterButton?.initEnterButtonDialog();
+      window.StudioEnterButton?.fillEnterButtonForm(comp);
+      resetPropsDialogState('enter', window.StudioEnterButton.readEnterButtonForm, 'applyEnterButton', index, entry.ref);
+      window.StudioEnterButton?.switchEnterButtonTab('general');
+      window.StudioEnterButton?.wireEnterButtonTools();
+      window.StudioEnterButton?.presentEnterButtonDialog();
+      window.StudioEnterButton?.scheduleEnterLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'HomeButton') {
+      flushDeferredDialogInits();
+      window.StudioHomeButton?.initHomeButtonDialog();
+      window.StudioHomeButton?.fillHomeButtonForm(comp);
+      resetPropsDialogState('home', window.StudioHomeButton.readHomeButtonForm, 'applyHomeButton', index, entry.ref);
+      window.StudioHomeButton?.switchHomeButtonTab('general');
+      window.StudioHomeButton?.wireHomeButtonTools();
+      window.StudioHomeButton?.presentHomeButtonDialog();
+      window.StudioHomeButton?.scheduleHomeLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'MoveLeftButton') {
+      flushDeferredDialogInits();
+      window.StudioMoveLeftButton?.initMoveLeftButtonDialog();
+      window.StudioMoveLeftButton?.fillMoveLeftButtonForm(comp);
+      resetPropsDialogState('move-left', window.StudioMoveLeftButton.readMoveLeftButtonForm, 'applyMoveLeftButton', index, entry.ref);
+      window.StudioMoveLeftButton?.switchMoveLeftButtonTab('general');
+      window.StudioMoveLeftButton?.wireMoveLeftButtonTools();
+      window.StudioMoveLeftButton?.presentMoveLeftButtonDialog();
+      window.StudioMoveLeftButton?.scheduleMoveLeftButtonLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'MoveRightButton') {
+      flushDeferredDialogInits();
+      window.StudioMoveRightButton?.initMoveRightButtonDialog();
+      window.StudioMoveRightButton?.fillMoveRightButtonForm(comp);
+      resetPropsDialogState('move-right', window.StudioMoveRightButton.readMoveRightButtonForm, 'applyMoveRightButton', index, entry.ref);
+      window.StudioMoveRightButton?.switchMoveRightButtonTab('general');
+      window.StudioMoveRightButton?.wireMoveRightButtonTools();
+      window.StudioMoveRightButton?.presentMoveRightButtonDialog();
+      window.StudioMoveRightButton?.scheduleMoveRightButtonLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'MoveUpButton') {
+      flushDeferredDialogInits();
+      window.StudioMoveUpButton?.initMoveUpButtonDialog();
+      window.StudioMoveUpButton?.fillMoveUpButtonForm(comp);
+      resetPropsDialogState('move-up', window.StudioMoveUpButton.readMoveUpButtonForm, 'applyMoveUpButton', index, entry.ref);
+      window.StudioMoveUpButton?.switchMoveUpButtonTab('general');
+      window.StudioMoveUpButton?.wireMoveUpButtonTools();
+      window.StudioMoveUpButton?.presentMoveUpButtonDialog();
+      window.StudioMoveUpButton?.scheduleMoveUpButtonLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'MoveDownButton') {
+      flushDeferredDialogInits();
+      window.StudioMoveDownButton?.initMoveDownButtonDialog();
+      window.StudioMoveDownButton?.fillMoveDownButtonForm(comp);
+      resetPropsDialogState('move-down', window.StudioMoveDownButton.readMoveDownButtonForm, 'applyMoveDownButton', index, entry.ref);
+      window.StudioMoveDownButton?.switchMoveDownButtonTab('general');
+      window.StudioMoveDownButton?.wireMoveDownButtonTools();
+      window.StudioMoveDownButton?.presentMoveDownButtonDialog();
+      window.StudioMoveDownButton?.scheduleMoveDownButtonLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'PageDownButton') {
+      flushDeferredDialogInits();
+      window.StudioPageDownButton?.initPageDownButtonDialog();
+      window.StudioPageDownButton?.fillPageDownButtonForm(comp);
+      resetPropsDialogState('page-down', window.StudioPageDownButton.readPageDownButtonForm, 'applyPageDownButton', index, entry.ref);
+      window.StudioPageDownButton?.switchPageDownButtonTab('general');
+      window.StudioPageDownButton?.wirePageDownButtonTools();
+      window.StudioPageDownButton?.presentPageDownButtonDialog();
+      window.StudioPageDownButton?.schedulePageDownButtonLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'PageUpButton') {
+      flushDeferredDialogInits();
+      window.StudioPageUpButton?.initPageUpButtonDialog();
+      window.StudioPageUpButton?.fillPageUpButtonForm(comp);
+      resetPropsDialogState('page-up', window.StudioPageUpButton.readPageUpButtonForm, 'applyPageUpButton', index, entry.ref);
+      window.StudioPageUpButton?.switchPageUpButtonTab('general');
+      window.StudioPageUpButton?.wirePageUpButtonTools();
+      window.StudioPageUpButton?.presentPageUpButtonDialog();
+      window.StudioPageUpButton?.schedulePageUpButtonLivePreview();
+      setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'Trend') {
       flushDeferredDialogInits();
       window.StudioTrend?.initTrendDialog();
@@ -5757,6 +6023,26 @@ async function openPropertiesForComponent(index) {
       window.StudioRecipePlusButton?.wireRecipePlusButtonTools();
       window.StudioRecipePlusButton?.presentRecipePlusButtonDialog();
       window.StudioRecipePlusButton?.scheduleRecipePlusLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'AddUserGroupButton') {
+      flushDeferredDialogInits();
+      window.StudioAddUserGroupButton?.initAddUserGroupButtonDialog();
+      window.StudioAddUserGroupButton?.fillAddUserGroupButtonForm(comp);
+      resetPropsDialogState('add-user-group', window.StudioAddUserGroupButton.readAddUserGroupButtonForm, 'applyAddUserGroupButton', index, entry.ref);
+      window.StudioAddUserGroupButton?.switchAddUserGroupButtonTab('general');
+      window.StudioAddUserGroupButton?.wireAddUserGroupButtonTools();
+      window.StudioAddUserGroupButton?.presentAddUserGroupButtonDialog();
+      window.StudioAddUserGroupButton?.scheduleAddUserGroupLivePreview();
+      setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'DeleteUserGroupButton') {
+      flushDeferredDialogInits();
+      window.StudioDeleteUserGroupButton?.initDeleteUserGroupButtonDialog();
+      window.StudioDeleteUserGroupButton?.fillDeleteUserGroupButtonForm(comp);
+      resetPropsDialogState('delete-user-group', window.StudioDeleteUserGroupButton.readDeleteUserGroupButtonForm, 'applyDeleteUserGroupButton', index, entry.ref);
+      window.StudioDeleteUserGroupButton?.switchDeleteUserGroupButtonTab('general');
+      window.StudioDeleteUserGroupButton?.wireDeleteUserGroupButtonTools();
+      window.StudioDeleteUserGroupButton?.presentDeleteUserGroupButtonDialog();
+      window.StudioDeleteUserGroupButton?.scheduleDeleteUserGroupLivePreview();
       setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'RecipePlusSelector') {
       flushDeferredDialogInits();
@@ -6318,12 +6604,52 @@ function handleObjectAction(id) {
     startObjectPlacement('end', item.buttonDefaults || {});
     return;
   }
+  if (item.action === 'enter-button-properties') {
+    startObjectPlacement('enter', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'home-button-properties') {
+    startObjectPlacement('home', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'move-left-button-properties') {
+    startObjectPlacement('move-left', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'move-right-button-properties') {
+    startObjectPlacement('move-right', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'move-up-button-properties') {
+    startObjectPlacement('move-up', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'move-down-button-properties') {
+    startObjectPlacement('move-down', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'page-down-button-properties') {
+    startObjectPlacement('page-down', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'page-up-button-properties') {
+    startObjectPlacement('page-up', item.buttonDefaults || {});
+    return;
+  }
   if (item.action === 'trend-properties') {
     startObjectPlacement('trend', item.graphDefaults || {});
     return;
   }
   if (item.action === 'recipeplus-button-properties') {
     startObjectPlacement('recipeplus-button', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'add-user-group-button-properties') {
+    startObjectPlacement('add-user-group', item.buttonDefaults || {});
+    return;
+  }
+  if (item.action === 'delete-user-group-button-properties') {
+    startObjectPlacement('delete-user-group', item.buttonDefaults || {});
     return;
   }
   if (item.action === 'recipeplus-selector-properties') {
@@ -12088,6 +12414,8 @@ function runDeferredStudioInits() {
       () => window.StudioRecipePlusButton?.initRecipePlusButtonDialog(),
       () => window.StudioRecipePlusSelector?.initRecipePlusSelectorDialog(),
       () => window.StudioRecipePlusTable?.initRecipePlusTableDialog(),
+      () => window.StudioAddUserGroupButton?.initAddUserGroupButtonDialog(),
+      () => window.StudioDeleteUserGroupButton?.initDeleteUserGroupButtonDialog(),
       () => window.StudioCommunicationsSetup?.initCommunicationsSetupDialog(),
       () => window.StudioShapeProperties?.initShapePropertiesDialog(),
       () => window.StudioFreehandProperties?.initFreehandPropertiesDialog(),

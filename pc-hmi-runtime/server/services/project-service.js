@@ -530,9 +530,6 @@ class ProjectService {
     }
     if (Array.isArray(comp.points)) {
       comp.points = comp.points.map((pt) => {
-        if (Array.isArray(pt) && pt.length >= 2) {
-          return [this.scalePx(pt[0], sx, 0), this.scalePx(pt[1], sy, 0), ...pt.slice(2)];
-        }
         if (!pt || typeof pt !== 'object') return pt;
         const next = { ...pt };
         if (next.x != null) next.x = this.scalePx(next.x, sx, 0);
@@ -549,17 +546,6 @@ class ProjectService {
     if (Array.isArray(comp.states)) {
       for (const st of comp.states) this.scaleGraphicComponent(st, sx, sy);
     }
-    if (Array.isArray(comp.objects)) {
-      for (const child of comp.objects) this.scaleGraphicComponent(child, sx, sy);
-    }
-    if (Array.isArray(comp.path)) {
-      comp.path = comp.path.map((pt) => {
-        if (Array.isArray(pt) && pt.length >= 2) {
-          return [this.scalePx(pt[0], sx, 0), this.scalePx(pt[1], sy, 0), ...pt.slice(2)];
-        }
-        return pt;
-      });
-    }
   }
 
   scaleGraphicDocument(data, sx, sy) {
@@ -567,10 +553,9 @@ class ProjectService {
     if (Array.isArray(data.components)) {
       for (const comp of data.components) this.scaleGraphicComponent(comp, sx, sy);
     }
-    for (const key of Object.keys(data)) {
-      if (!key.endsWith('Shell') || !data[key] || typeof data[key] !== 'object' || Array.isArray(data[key])) continue;
-      for (const name of Object.keys(data[key])) {
-        this.scaleGraphicComponent(data[key][name], sx, sy);
+    if (data.overviewShell && typeof data.overviewShell === 'object') {
+      for (const key of Object.keys(data.overviewShell)) {
+        this.scaleGraphicComponent(data.overviewShell[key], sx, sy);
       }
     }
     if (data.template?.replace && typeof data.template.replace === 'object') {
@@ -648,7 +633,6 @@ class ProjectService {
       layoutHeight: toH
     };
     this.writeProjectConfigFile(projectId, config);
-    this.syncProjectArtifacts(projectId);
     return {
       scaled: true,
       fromWidth: fromW,
@@ -1865,14 +1849,6 @@ class ProjectService {
     const toH = Number(config.runtime?.height) || layout.height;
     if (layout.width !== toW || layout.height !== toH) {
       this.scaleProjectGraphics(id, layout.width, layout.height, toW, toH);
-    } else {
-      const latest = this.readProjectConfig(id);
-      latest.runtime = {
-        ...(latest.runtime || {}),
-        layoutWidth: toW,
-        layoutHeight: toH
-      };
-      this.writeProjectConfigFile(id, latest, { preservePlcIfEmpty: true });
     }
     this.syncProjectArtifacts(id);
 

@@ -96,14 +96,14 @@ window.OBJECTS_MENU = [
     id: 'user-mgmt', label: 'User Management', children: [
       { id: 'user-add', label: 'Add User/Group', action: 'add-user-group-button-properties' },
       { id: 'user-delete', label: 'Delete User/Group', action: 'delete-user-group-button-properties' },
-      { id: 'user-modify-group', label: 'Modify Group Membership', planned: true },
-      { id: 'user-unlock', label: 'Unlock User', planned: true },
-      { id: 'user-enable', label: 'Enable User', planned: true },
-      { id: 'user-disable', label: 'Disable User', planned: true },
+      { id: 'user-modify-group', label: 'Modify Group Membership', action: 'modify-group-membership-button-properties' },
+      { id: 'user-unlock', label: 'Unlock User', action: 'unlock-user-button-properties' },
+      { id: 'user-enable', label: 'Enable User', action: 'enable-user-button-properties' },
+      { id: 'user-disable', label: 'Disable User', action: 'disable-user-button-properties' },
       { id: 'user-login', label: 'Login', component: { type: 'LoginPanel' } },
-      { id: 'user-logout', label: 'Logout', planned: true },
-      { id: 'user-password', label: 'Password', planned: true },
-      { id: 'user-change-props', label: 'Change User Properties', planned: true }
+      { id: 'user-logout', label: 'Logout', component: { type: 'ActionButton', label: 'Logout', action: 'logout' } },
+      { id: 'user-password', label: 'Password', action: 'change-password-button-properties' },
+      { id: 'user-change-props', label: 'Change User Properties', action: 'change-user-properties-button-properties' }
     ]
   },
   {

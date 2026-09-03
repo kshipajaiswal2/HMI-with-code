@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 const { TagService } = require('./services/tag-service');
 const { AlarmService } = require('./services/alarm-service');
 const { UserService } = require('./services/user-service');
+const { GroupService } = require('./services/group-service');
 const { createCommunicationDriver } = require('./services/communication/driver-factory');
 const { seedDemoTagValues } = require('./services/communication/demo-tag-seeds');
 const { TagLogicService } = require('./services/tag-logic-service');
@@ -26,7 +27,8 @@ const deployService = new DeployService(ROOT);
 const tagService = new TagService();
 const alarmService = new AlarmService(tagService);
 const tagLogicService = new TagLogicService(tagService);
-let userService = new UserService([]);
+let groupService = new GroupService([]);
+let userService = new UserService([], groupService);
 let navigationConfig = {};
 let projectConfig = {};
 let driver = null;
@@ -96,7 +98,25 @@ function loadProjectRuntimeInner(projectId) {
   projectConfig = projectService.readProjectConfig(id);
   navigationConfig = projectService.readNavigation(id);
   runtimeCommunicationOverride = null;
-  userService = new UserService(projectConfig.users || []);
+  const groupsWereMissing = !(projectConfig.groups && projectConfig.groups.length);
+  groupService = new GroupService(projectConfig.groups || []);
+  const projectUsers = projectConfig.users || [];
+  const migration = UserService.migrateLegacyUsers(projectUsers, groupService);
+  userService = new UserService(projectUsers, groupService);
+  // Persist the migration/default-groups seeding to project.json IMMEDIATELY, not whenever the
+  // next unrelated user-management route happens to save `users`/`groups` again. Studio reads
+  // project.json directly (its own Runtime Security panel, including the "can't delete a group
+  // still in use" guard) without going through this runtime service at all — if a legacy
+  // project's users stayed in the old `{role,level}` shape on disk, Studio would see zero
+  // members for every built-in group and could let one be deleted while real (not-yet-migrated
+  // on disk) users still depend on it, silently demoting them on the next load.
+  if (groupsWereMissing || migration.changed) {
+    try {
+      projectConfig = projectService.updateProjectConfig(id, { groups: groupService.groups, users: projectUsers });
+    } catch (err) {
+      console.error('Failed to persist group/user migration on project load:', err.message);
+    }
+  }
 
   const runtimeTags = TagLogicService.mergeBuiltinRuntimeTags(
     TagLogicService.mergeBuiltinSafetyTags(projectConfig.tags || [])
@@ -551,8 +571,24 @@ app.get('/api/runtime/screens/:id', (req, res) => {
   res.set('Cache-Control', 'no-store');
   const raw = req.query.raw === '1' || req.query.raw === 'true';
   const rawFile = req.query.file === '1' || req.query.file === 'true';
+  const studioEdit = req.query.studioEdit === '1' || req.query.studioEdit === 'true';
   const screen = projectService.getScreen(resolveProjectId(req), req.params.id, { raw, rawFile });
   if (!screen) return res.status(404).json({ error: 'Screen not found' });
+  // Server-side backstop for screen-level security (defense in depth — the primary,
+  // friendly enforcement is the client-side check in app.js's loadScreen, which shows a real
+  // "Access Denied" message and never even issues this fetch when the current user's level is
+  // too low). Not applied to `raw`/`file` requests (Studio's own design-time screen loads for
+  // editing/composition) or to `studioEdit=1` requests (Studio's live-preview iframe — no real
+  // runtime login is involved there, so gating it would incorrectly block a secured screen's
+  // design-time preview just because no one happens to be logged in on the real runtime
+  // session right now).
+  if (!raw && !rawFile && !studioEdit) {
+    const requiredLevel = Number(screen.securityLevel) || 0;
+    if (requiredLevel > 0 && !userService.canAccess(requiredLevel)) {
+      res.status(403).json({ error: 'Access denied', securityLevel: requiredLevel });
+      return;
+    }
+  }
   res.json(screen);
 });
 
@@ -737,11 +773,41 @@ app.post('/api/runtime/logout', (_req, res) => {
   res.json({ success: true });
 });
 
+// Every user-management mutation below (add/delete/unlock/enable/disable/modify-group/
+// change-password/change-user-properties, and now group create/edit/delete) is an
+// administrative action, so it requires the CURRENT runtime session
+// (userService.currentUser, the same singleton /login sets) to already be logged in at
+// GroupService.ADMIN_LEVEL (3) or higher — a fixed threshold, not a lookup of whatever the
+// "Administrators" group happens to be named right now, so renaming that built-in group can
+// never accidentally lock every admin action. Login/Logout themselves stay open — this only
+// gates the account/group-management actions that come after someone is already signed in.
+// Must be called AFTER ensureRuntimeLoaded(req), since that can swap `userService` to a
+// different project's instance.
+function requireAdministrator(res) {
+  if (!userService.canAccess(GroupService.ADMIN_LEVEL)) {
+    // Re-derive the display level/role live from current group state for the message text —
+    // don't read the (possibly stale) cached `current.level`/`.role`, since canAccess() above
+    // already decided this live and the message should never contradict that decision.
+    const current = userService.getCurrentUser();
+    const liveLevel = current ? groupService.getLevel(current.groups) : 0;
+    const liveRole = current ? groupService.primaryGroupName(current.groups) : null;
+    res.status(403).json({
+      success: false,
+      error: current
+        ? `This action requires an Administrator login (current user "${current.username}" is ${liveRole}, level ${liveLevel})`
+        : 'You must be logged in as an Administrator to do this'
+    });
+    return false;
+  }
+  return true;
+}
+
 app.post('/api/runtime/add-user', async (req, res) => {
   try {
     await ensureRuntimeLoaded(req);
-    const { username, password, role } = req.body || {};
-    const result = userService.addUser({ username, password, role });
+    if (!requireAdministrator(res)) return;
+    const { username, password, groups } = req.body || {};
+    const result = userService.addUser({ username, password, groups });
     if (!result.success) {
       res.status(400).json(result);
       return;
@@ -754,9 +820,7 @@ app.post('/api/runtime/add-user', async (req, res) => {
       res.status(500).json({ success: false, error: 'User created but could not be saved to the project' });
       return;
     }
-    io.emit('user-list-changed', {
-      users: userService.users.map((u) => ({ username: u.username, role: u.role, level: u.level }))
-    });
+    io.emit('user-list-changed', { users: userService.users.map((u) => userService.summarize(u)) });
     res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -766,6 +830,7 @@ app.post('/api/runtime/add-user', async (req, res) => {
 app.post('/api/runtime/delete-user', async (req, res) => {
   try {
     await ensureRuntimeLoaded(req);
+    if (!requireAdministrator(res)) return;
     const { username } = req.body || {};
     const result = userService.deleteUser({ username });
     if (!result.success) {
@@ -781,9 +846,245 @@ app.post('/api/runtime/delete-user', async (req, res) => {
       return;
     }
     if (result.loggedOutSelf) io.emit('user-changed', null);
-    io.emit('user-list-changed', {
-      users: userService.users.map((u) => ({ username: u.username, role: u.role, level: u.level }))
-    });
+    io.emit('user-list-changed', { users: userService.users.map((u) => userService.summarize(u)) });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Shared response handler for the "find a user by name, mutate one field" routes below
+// (Unlock/Enable/Disable/Modify Group/Password/Change Properties) — all of them look the
+// user up by username first ("check the name") before touching anything, persist the users
+// array the same way add-user/delete-user already do, and broadcast the same two socket
+// events so every connected client stays in sync.
+function respondUserMutation(req, res, result) {
+  if (!result.success) {
+    const status = /No user found/i.test(result.error || '') ? 404 : 400;
+    res.status(status).json(result);
+    return;
+  }
+  const pid = resolveProjectId(req);
+  try {
+    projectConfig = projectService.updateProjectConfig(pid, { users: userService.users });
+  } catch (err) {
+    console.error('Failed to persist user change:', err.message);
+    res.status(500).json({ success: false, error: 'Change applied but the project could not be saved' });
+    return;
+  }
+  if (result.loggedOutSelf) io.emit('user-changed', null);
+  io.emit('user-list-changed', { users: userService.users.map((u) => userService.summarize(u)) });
+  res.json(result);
+}
+
+app.post('/api/runtime/unlock-user', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    if (!requireAdministrator(res)) return;
+    const { username } = req.body || {};
+    respondUserMutation(req, res, userService.unlockUser({ username }));
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/enable-user', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    if (!requireAdministrator(res)) return;
+    const { username } = req.body || {};
+    respondUserMutation(req, res, userService.setUserEnabled({ username, enabled: true }));
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/disable-user', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    if (!requireAdministrator(res)) return;
+    const { username } = req.body || {};
+    respondUserMutation(req, res, userService.setUserEnabled({ username, enabled: false }));
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/modify-group', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    if (!requireAdministrator(res)) return;
+    const { username, groups } = req.body || {};
+    respondUserMutation(req, res, userService.modifyGroup({ username, groups }));
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/add-user-to-group', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    if (!requireAdministrator(res)) return;
+    const { username, group } = req.body || {};
+    respondUserMutation(req, res, userService.addUserToGroup({ username, group }));
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/remove-user-from-group', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    if (!requireAdministrator(res)) return;
+    const { username, group } = req.body || {};
+    respondUserMutation(req, res, userService.removeUserFromGroup({ username, group }));
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/change-password', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    if (!requireAdministrator(res)) return;
+    const { username, password } = req.body || {};
+    respondUserMutation(req, res, userService.changePassword({ username, password }));
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Read-only lookup so a "full-replace" dialog (Modify Group Membership, Change User
+// Properties) can pre-populate its checklist/checkbox with the target user's ACTUAL current
+// groups/enabled state before the admin edits and submits it — without this, those dialogs had
+// no way to know what a user's current groups were and always pre-checked a generic default,
+// so submitting without deliberately re-checking every box the user should keep would silently
+// wipe their real memberships (or re-enable a deliberately-disabled account). Left ungated like
+// /api/runtime/groups: it's read-only, and every field it returns is already broadcast to every
+// connected client unauthenticated via `user-list-changed` on any mutation, so this adds no new
+// exposure — only the mutations themselves (which this dialog still has to go through
+// change-user-properties/modify-group) are Administrator-gated.
+app.get('/api/runtime/find-user', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    const user = userService.findUser(req.query.username);
+    if (!user) {
+      res.status(404).json({ success: false, error: `No user found with the username "${req.query.username || ''}"` });
+      return;
+    }
+    res.json({ success: true, user: userService.summarize(user) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/change-user-properties', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    if (!requireAdministrator(res)) return;
+    const { username, groups, enabled } = req.body || {};
+    respondUserMutation(req, res, userService.changeUserProperties({ username, groups, enabled }));
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------------------
+// Groups CRUD — real, editable groups (create/rename/re-level/delete), replacing the old
+// fixed 3-role model. All mutations are Administrator-gated like the user-management routes
+// above; listing is open (a runtime popup needs the group list to build its checkboxes even
+// before anyone has logged in, e.g. to show what a new account COULD be assigned to — though
+// actually creating/assigning still requires an Administrator via the routes those popups
+// call). Every mutation persists via projectService.updateProjectConfig(pid, { groups }),
+// the exact same catch-all-key mechanism `users` already relies on.
+// ---------------------------------------------------------------------------------------
+app.get('/api/runtime/groups', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    res.json({ success: true, groups: groupService.listGroups() });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/create-group', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    if (!requireAdministrator(res)) return;
+    const { name, level } = req.body || {};
+    const result = groupService.createGroup({ name, level });
+    if (!result.success) {
+      res.status(400).json(result);
+      return;
+    }
+    const pid = resolveProjectId(req);
+    try {
+      projectConfig = projectService.updateProjectConfig(pid, { groups: groupService.groups });
+    } catch (err) {
+      console.error('Failed to persist new group:', err.message);
+      res.status(500).json({ success: false, error: 'Group created but could not be saved to the project' });
+      return;
+    }
+    io.emit('groups-changed', { groups: groupService.listGroups() });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/edit-group', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    if (!requireAdministrator(res)) return;
+    const { id, name, level } = req.body || {};
+    const result = groupService.editGroup({ id, name, level });
+    if (!result.success) {
+      res.status(404).json(result);
+      return;
+    }
+    const pid = resolveProjectId(req);
+    try {
+      projectConfig = projectService.updateProjectConfig(pid, { groups: groupService.groups });
+    } catch (err) {
+      console.error('Failed to persist group edit:', err.message);
+      res.status(500).json({ success: false, error: 'Group updated but could not be saved to the project' });
+      return;
+    }
+    io.emit('groups-changed', { groups: groupService.listGroups() });
+    io.emit('user-list-changed', { users: userService.users.map((u) => userService.summarize(u)) });
+    // A level/name edit can change what the CURRENTLY logged-in session displays and is
+    // allowed to do (canAccess itself is already computed live — see UserService.canAccess —
+    // but the cached currentUser the client mirrors from `user-changed` is not, so refresh and
+    // re-broadcast it here or that session's UI would keep showing its pre-edit level until it
+    // happens to log out and back in).
+    const refreshedCurrentUser = userService.refreshCurrentUser();
+    if (refreshedCurrentUser) io.emit('user-changed', refreshedCurrentUser);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/runtime/delete-group', async (req, res) => {
+  try {
+    await ensureRuntimeLoaded(req);
+    if (!requireAdministrator(res)) return;
+    const { id } = req.body || {};
+    const usersInUse = userService.usersInGroup(groupService.findGroup(id)?.id || id);
+    const result = groupService.deleteGroup({ id }, usersInUse);
+    if (!result.success) {
+      res.status(400).json(result);
+      return;
+    }
+    const pid = resolveProjectId(req);
+    try {
+      projectConfig = projectService.updateProjectConfig(pid, { groups: groupService.groups });
+    } catch (err) {
+      console.error('Failed to persist group deletion:', err.message);
+      res.status(500).json({ success: false, error: 'Group deleted but could not be saved to the project' });
+      return;
+    }
+    io.emit('groups-changed', { groups: groupService.listGroups() });
     res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

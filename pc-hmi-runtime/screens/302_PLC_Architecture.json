@@ -43,34 +43,34 @@
   },
   "manualShell": {
     "ManualNav_301_PLC_IO_List": {
-      "left": 13,
-      "top": 128,
-      "width": 106,
-      "height": 60
+      "left": 8,
+      "top": 75,
+      "width": 66,
+      "height": 35
     },
     "ManualNav_302_PLC_Architecture": {
-      "left": 13,
-      "top": 224,
-      "width": 106,
-      "height": 60
+      "left": 8,
+      "top": 131,
+      "width": 66,
+      "height": 35
     },
     "ManualNav_303_Run_Count": {
-      "left": 13,
-      "top": 321,
-      "width": 106,
-      "height": 60
+      "left": 8,
+      "top": 188,
+      "width": 66,
+      "height": 35
     },
     "ManualNav_304_Network": {
-      "left": 13,
-      "top": 416,
-      "width": 106,
-      "height": 60
+      "left": 8,
+      "top": 244,
+      "width": 66,
+      "height": 35
     },
     "ManualNav_305_Cycle_Time": {
-      "left": 13,
-      "top": 512,
-      "width": 106,
-      "height": 60
+      "left": 8,
+      "top": 300,
+      "width": 66,
+      "height": 35
     }
   }
 }

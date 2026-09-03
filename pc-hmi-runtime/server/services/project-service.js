@@ -1628,7 +1628,7 @@ class ProjectService {
         icon: 'system',
         children: [
           { type: 'item', id: 'project-settings', label: 'Project Settings', icon: 'settings' },
-          { type: 'item', id: 'runtime-security', label: 'Runtime Security', icon: 'lock' },
+          { type: 'item', id: 'runtime-security', label: 'Runtime Security', icon: 'lock', action: 'user-groups' },
           { type: 'item', id: 'diagnostics-setup', label: 'Diagnostics List Setup', icon: 'diag' },
           { type: 'item', id: 'audit-trail-setup', label: 'Audit Trail Setup', icon: 'audit' },
           { type: 'item', id: 'csv-export-setup', label: 'CSV Export Setup', icon: 'csv' },

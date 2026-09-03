@@ -54,6 +54,7 @@ const ComponentRegistry = {
     btn.textContent = comp.label;
     btn.addEventListener('click', () => {
       if (comp.action === 'ackAllAlarms') ctx.acknowledgeAllAlarms();
+      else if (comp.action === 'logout') ctx.logout();
     });
     return btn;
   },
@@ -4948,25 +4949,40 @@ const ComponentRegistry = {
     btn.appendChild(cap);
     btn.classList.toggle('ft-blink', Boolean(comp.blink));
 
-    const openAddUserDialog = () => {
+    const openAddUserDialog = async () => {
       const dlg = ComponentRegistry.ensureRuntimeAddUserDialog();
       const status = dlg.querySelector('#runtimeAddUserStatus');
       const nameEl = dlg.querySelector('#runtimeAddUserName');
       const passEl = dlg.querySelector('#runtimeAddUserPassword');
       const confirmEl = dlg.querySelector('#runtimeAddUserConfirm');
-      const roleEl = dlg.querySelector('#runtimeAddUserRole');
+      const groupsEl = dlg.querySelector('#runtimeAddUserGroups');
       const submitBtn = dlg.querySelector('#runtimeAddUserSubmit');
       nameEl.value = '';
       passEl.value = '';
       confirmEl.value = '';
-      roleEl.value = 'Operator';
+      groupsEl.innerHTML = 'Loading groups…';
       status.textContent = '';
       status.className = 'runtime-comm-status';
       submitBtn.disabled = false;
+      try {
+        dlg.showModal();
+      } catch (err) {
+        dlg.setAttribute('open', '');
+      }
+      nameEl.focus();
+      try {
+        const res = await ctx.listGroups();
+        const groups = res?.groups || [];
+        const lowest = [...groups].sort((a, b) => a.level - b.level)[0];
+        ComponentRegistry.renderGroupChecklist(groupsEl, groups, lowest ? [lowest.id] : []);
+      } catch (err) {
+        groupsEl.innerHTML = `<p class="dialog-hint">Could not load groups: ${err.message}</p>`;
+      }
       submitBtn.onclick = async () => {
         const username = nameEl.value.trim();
         const password = passEl.value;
         const confirmPassword = confirmEl.value;
+        const groups = ComponentRegistry.readGroupChecklist(groupsEl);
         if (!username) {
           status.textContent = 'Username is required';
           status.className = 'runtime-comm-status error';
@@ -4985,13 +5001,18 @@ const ComponentRegistry = {
           confirmEl.focus();
           return;
         }
+        if (!groups.length) {
+          status.textContent = 'Select at least one group';
+          status.className = 'runtime-comm-status error';
+          return;
+        }
         submitBtn.disabled = true;
         status.textContent = 'Adding user...';
         status.className = 'runtime-comm-status';
         try {
-          const result = await ctx.addUserGroup({ username, password, role: roleEl.value });
+          const result = await ctx.addUserGroup({ username, password, groups });
           if (result?.success) {
-            status.textContent = `User "${username}" added to ${roleEl.value}s.`;
+            status.textContent = `User "${username}" added (${result.user?.role || 'group assigned'}).`;
             status.className = 'runtime-comm-status ok';
             setTimeout(() => {
               try { dlg.close(); } catch (_) { /* ignore */ }
@@ -5007,12 +5028,6 @@ const ComponentRegistry = {
           submitBtn.disabled = false;
         }
       };
-      try {
-        dlg.showModal();
-      } catch (err) {
-        dlg.setAttribute('open', '');
-      }
-      nameEl.focus();
     };
 
     if (studioEdit) {
@@ -5196,6 +5211,1033 @@ const ComponentRegistry = {
       });
     } else {
       btn.addEventListener('click', openDeleteUserDialog);
+    }
+    return btn;
+  },
+
+ModifyGroupMembershipButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    if (comp.image) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    const openRuntimeDialog = async () => {
+      const dlg = ComponentRegistry.ensureModifyGroupDialog();
+      const status = dlg.querySelector('#runtimeModifyGroupStatus');
+      const nameEl = dlg.querySelector('#runtimeModifyGroupName');
+      const groupsEl = dlg.querySelector('#runtimeModifyGroupGroups');
+      const submitBtn = dlg.querySelector('#runtimeModifyGroupSubmit');
+      nameEl.value = '';
+      groupsEl.innerHTML = 'Loading groups…';
+      status.textContent = '';
+      status.className = 'runtime-comm-status';
+      submitBtn.disabled = false;
+      try {
+        dlg.showModal();
+      } catch (err) {
+        dlg.setAttribute('open', '');
+      }
+      nameEl.focus();
+      let loadedGroups = [];
+      try {
+        const res = await ctx.listGroups();
+        loadedGroups = res?.groups || [];
+        const lowest = [...loadedGroups].sort((a, b) => a.level - b.level)[0];
+        ComponentRegistry.renderGroupChecklist(groupsEl, loadedGroups, lowest ? [lowest.id] : []);
+      } catch (err) {
+        groupsEl.innerHTML = `<p class="dialog-hint">Could not load groups: ${err.message}</p>`;
+      }
+      // Re-check the boxes to match the TARGET user's actual current groups as soon as a real
+      // username is entered — this is a full-replace action (whatever's checked at submit time
+      // becomes the user's entire group list), so without this the checklist would keep
+      // whatever default it opened with and submitting could silently strip groups the admin
+      // never meant to remove, just because they didn't happen to re-check them.
+      nameEl.onblur = async () => {
+        const username = nameEl.value.trim();
+        if (!username || !loadedGroups.length) return;
+        try {
+          const lookup = await ctx.findUser({ username });
+          if (lookup?.success && lookup.user) {
+            ComponentRegistry.renderGroupChecklist(groupsEl, loadedGroups, lookup.user.groups || []);
+          }
+        } catch (_) { /* leave the checklist as-is; submit-time still validates the username */ }
+      };
+      submitBtn.onclick = async () => {
+        const username = nameEl.value.trim();
+        const groups = ComponentRegistry.readGroupChecklist(groupsEl);
+        if (!username) {
+          status.textContent = 'Username is required';
+          status.className = 'runtime-comm-status error';
+          nameEl.focus();
+          return;
+        }
+        if (!groups.length) {
+          status.textContent = 'Select at least one group';
+          status.className = 'runtime-comm-status error';
+          return;
+        }
+        submitBtn.disabled = true;
+        status.textContent = 'Checking username...';
+        status.className = 'runtime-comm-status';
+        try {
+          const result = await ctx.modifyGroupMembership({ username, groups });
+          if (result?.success) {
+            status.textContent = `User "${username}" moved to ${result.user?.role || 'the selected group(s)'}.`;
+            status.className = 'runtime-comm-status ok';
+            setTimeout(() => {
+              try { dlg.close(); } catch (_) { /* ignore */ }
+            }, 900);
+          } else {
+            status.textContent = result?.error || `No user found with the username "${username}"`;
+            status.className = 'runtime-comm-status error';
+            submitBtn.disabled = false;
+            nameEl.focus();
+            nameEl.select();
+          }
+        } catch (err) {
+          status.textContent = err.message || 'Could not complete the request';
+          status.className = 'runtime-comm-status error';
+          submitBtn.disabled = false;
+        }
+      };
+    };
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'ModifyGroupMembershipButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'ModifyGroupMembershipButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', openRuntimeDialog);
+    }
+    return btn;
+  },
+
+  UnlockUserButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    if (comp.image) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    const openRuntimeDialog = () => {
+      const dlg = ComponentRegistry.ensureUnlockUserDialog();
+      const status = dlg.querySelector('#runtimeUnlockUserStatus');
+      const nameEl = dlg.querySelector('#runtimeUnlockUserName');
+      const submitBtn = dlg.querySelector('#runtimeUnlockUserSubmit');
+      nameEl.value = '';
+      status.textContent = '';
+      status.className = 'runtime-comm-status';
+      submitBtn.disabled = false;
+      submitBtn.onclick = async () => {
+        const username = nameEl.value.trim();
+        if (!username) {
+          status.textContent = 'Username is required';
+          status.className = 'runtime-comm-status error';
+          nameEl.focus();
+          return;
+        }
+        submitBtn.disabled = true;
+        status.textContent = 'Checking username...';
+        status.className = 'runtime-comm-status';
+        try {
+          const result = await ctx.unlockUser({ username: username });
+          if (result?.success) {
+            status.textContent = `User "${username}" unlocked.`;
+            status.className = 'runtime-comm-status ok';
+            setTimeout(() => {
+              try { dlg.close(); } catch (_) { /* ignore */ }
+            }, 900);
+          } else {
+            status.textContent = result?.error || `No user found with the username "${username}"`;
+            status.className = 'runtime-comm-status error';
+            submitBtn.disabled = false;
+            nameEl.focus();
+            nameEl.select();
+          }
+        } catch (err) {
+          status.textContent = err.message || 'Could not complete the request';
+          status.className = 'runtime-comm-status error';
+          submitBtn.disabled = false;
+        }
+      };
+      try {
+        dlg.showModal();
+      } catch (err) {
+        dlg.setAttribute('open', '');
+      }
+      nameEl.focus();
+    };
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'UnlockUserButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'UnlockUserButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', openRuntimeDialog);
+    }
+    return btn;
+  },
+
+  EnableUserButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    if (comp.image) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    const openRuntimeDialog = () => {
+      const dlg = ComponentRegistry.ensureEnableUserDialog();
+      const status = dlg.querySelector('#runtimeEnableUserStatus');
+      const nameEl = dlg.querySelector('#runtimeEnableUserName');
+      const submitBtn = dlg.querySelector('#runtimeEnableUserSubmit');
+      nameEl.value = '';
+      status.textContent = '';
+      status.className = 'runtime-comm-status';
+      submitBtn.disabled = false;
+      submitBtn.onclick = async () => {
+        const username = nameEl.value.trim();
+        if (!username) {
+          status.textContent = 'Username is required';
+          status.className = 'runtime-comm-status error';
+          nameEl.focus();
+          return;
+        }
+        submitBtn.disabled = true;
+        status.textContent = 'Checking username...';
+        status.className = 'runtime-comm-status';
+        try {
+          const result = await ctx.enableUser({ username: username });
+          if (result?.success) {
+            status.textContent = `User "${username}" enabled.`;
+            status.className = 'runtime-comm-status ok';
+            setTimeout(() => {
+              try { dlg.close(); } catch (_) { /* ignore */ }
+            }, 900);
+          } else {
+            status.textContent = result?.error || `No user found with the username "${username}"`;
+            status.className = 'runtime-comm-status error';
+            submitBtn.disabled = false;
+            nameEl.focus();
+            nameEl.select();
+          }
+        } catch (err) {
+          status.textContent = err.message || 'Could not complete the request';
+          status.className = 'runtime-comm-status error';
+          submitBtn.disabled = false;
+        }
+      };
+      try {
+        dlg.showModal();
+      } catch (err) {
+        dlg.setAttribute('open', '');
+      }
+      nameEl.focus();
+    };
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'EnableUserButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'EnableUserButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', openRuntimeDialog);
+    }
+    return btn;
+  },
+
+  DisableUserButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    if (comp.image) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    const openRuntimeDialog = () => {
+      const dlg = ComponentRegistry.ensureDisableUserDialog();
+      const status = dlg.querySelector('#runtimeDisableUserStatus');
+      const nameEl = dlg.querySelector('#runtimeDisableUserName');
+      const submitBtn = dlg.querySelector('#runtimeDisableUserSubmit');
+      nameEl.value = '';
+      status.textContent = '';
+      status.className = 'runtime-comm-status';
+      submitBtn.disabled = false;
+      submitBtn.onclick = async () => {
+        const username = nameEl.value.trim();
+        if (!username) {
+          status.textContent = 'Username is required';
+          status.className = 'runtime-comm-status error';
+          nameEl.focus();
+          return;
+        }
+        submitBtn.disabled = true;
+        status.textContent = 'Checking username...';
+        status.className = 'runtime-comm-status';
+        try {
+          const result = await ctx.disableUser({ username: username });
+          if (result?.success) {
+            status.textContent = `User "${username}" disabled.`;
+            status.className = 'runtime-comm-status ok';
+            setTimeout(() => {
+              try { dlg.close(); } catch (_) { /* ignore */ }
+            }, 900);
+          } else {
+            status.textContent = result?.error || `No user found with the username "${username}"`;
+            status.className = 'runtime-comm-status error';
+            submitBtn.disabled = false;
+            nameEl.focus();
+            nameEl.select();
+          }
+        } catch (err) {
+          status.textContent = err.message || 'Could not complete the request';
+          status.className = 'runtime-comm-status error';
+          submitBtn.disabled = false;
+        }
+      };
+      try {
+        dlg.showModal();
+      } catch (err) {
+        dlg.setAttribute('open', '');
+      }
+      nameEl.focus();
+    };
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'DisableUserButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'DisableUserButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', openRuntimeDialog);
+    }
+    return btn;
+  },
+
+  PasswordButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    if (comp.image) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    const openRuntimeDialog = () => {
+      const dlg = ComponentRegistry.ensureChangePasswordDialog();
+      const status = dlg.querySelector('#runtimeChangePasswordStatus');
+      const nameEl = dlg.querySelector('#runtimeChangePasswordName');
+      const passEl = dlg.querySelector('#runtimeChangePasswordPassword');
+      const confirmEl = dlg.querySelector('#runtimeChangePasswordConfirm');
+      const submitBtn = dlg.querySelector('#runtimeChangePasswordSubmit');
+      nameEl.value = '';
+      passEl.value = '';
+      confirmEl.value = '';
+      status.textContent = '';
+      status.className = 'runtime-comm-status';
+      submitBtn.disabled = false;
+      submitBtn.onclick = async () => {
+        const username = nameEl.value.trim();
+        if (!username) {
+          status.textContent = 'Username is required';
+          status.className = 'runtime-comm-status error';
+          nameEl.focus();
+          return;
+        }
+        const password = passEl.value;
+        const confirmPassword = confirmEl.value;
+        if (!password) {
+          status.textContent = 'New password is required';
+          status.className = 'runtime-comm-status error';
+          passEl.focus();
+          return;
+        }
+        if (password !== confirmPassword) {
+          status.textContent = 'Passwords do not match';
+          status.className = 'runtime-comm-status error';
+          confirmEl.focus();
+          return;
+        }
+        submitBtn.disabled = true;
+        status.textContent = 'Checking username...';
+        status.className = 'runtime-comm-status';
+        try {
+          const result = await ctx.changeUserPassword({ username: username, password: password });
+          if (result?.success) {
+            status.textContent = `Password changed for "${username}".`;
+            status.className = 'runtime-comm-status ok';
+            setTimeout(() => {
+              try { dlg.close(); } catch (_) { /* ignore */ }
+            }, 900);
+          } else {
+            status.textContent = result?.error || `No user found with the username "${username}"`;
+            status.className = 'runtime-comm-status error';
+            submitBtn.disabled = false;
+            nameEl.focus();
+            nameEl.select();
+          }
+        } catch (err) {
+          status.textContent = err.message || 'Could not complete the request';
+          status.className = 'runtime-comm-status error';
+          submitBtn.disabled = false;
+        }
+      };
+      try {
+        dlg.showModal();
+      } catch (err) {
+        dlg.setAttribute('open', '');
+      }
+      nameEl.focus();
+    };
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'PasswordButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'PasswordButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', openRuntimeDialog);
+    }
+    return btn;
+  },
+
+  ChangeUserPropertiesButton(comp, ctx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    if (comp.image) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    const openRuntimeDialog = async () => {
+      const dlg = ComponentRegistry.ensureChangePropertiesDialog();
+      const status = dlg.querySelector('#runtimeChangePropertiesStatus');
+      const nameEl = dlg.querySelector('#runtimeChangePropertiesName');
+      const groupsEl = dlg.querySelector('#runtimeChangePropertiesGroups');
+      const enabledEl = dlg.querySelector('#runtimeChangePropertiesEnabled');
+      const submitBtn = dlg.querySelector('#runtimeChangePropertiesSubmit');
+      nameEl.value = '';
+      groupsEl.innerHTML = 'Loading groups…';
+      enabledEl.checked = true;
+      status.textContent = '';
+      status.className = 'runtime-comm-status';
+      submitBtn.disabled = false;
+      try {
+        dlg.showModal();
+      } catch (err) {
+        dlg.setAttribute('open', '');
+      }
+      nameEl.focus();
+      let loadedGroups = [];
+      try {
+        const res = await ctx.listGroups();
+        loadedGroups = res?.groups || [];
+        const lowest = [...loadedGroups].sort((a, b) => a.level - b.level)[0];
+        ComponentRegistry.renderGroupChecklist(groupsEl, loadedGroups, lowest ? [lowest.id] : []);
+      } catch (err) {
+        groupsEl.innerHTML = `<p class="dialog-hint">Could not load groups: ${err.message}</p>`;
+      }
+      // Same reasoning as Modify Group Membership: this is a full-replace action for both the
+      // group list AND the enabled flag, so pre-populate both from the TARGET user's real
+      // current state once a real username is entered — otherwise submitting without touching
+      // either field could silently strip real group memberships or re-enable a deliberately
+      // disabled account, just because the dialog opened with generic defaults.
+      nameEl.onblur = async () => {
+        const username = nameEl.value.trim();
+        if (!username || !loadedGroups.length) return;
+        try {
+          const lookup = await ctx.findUser({ username });
+          if (lookup?.success && lookup.user) {
+            ComponentRegistry.renderGroupChecklist(groupsEl, loadedGroups, lookup.user.groups || []);
+            enabledEl.checked = lookup.user.enabled !== false;
+          }
+        } catch (_) { /* leave the form as-is; submit-time still validates the username */ }
+      };
+      submitBtn.onclick = async () => {
+        const username = nameEl.value.trim();
+        const groups = ComponentRegistry.readGroupChecklist(groupsEl);
+        if (!username) {
+          status.textContent = 'Username is required';
+          status.className = 'runtime-comm-status error';
+          nameEl.focus();
+          return;
+        }
+        if (!groups.length) {
+          status.textContent = 'Select at least one group';
+          status.className = 'runtime-comm-status error';
+          return;
+        }
+        submitBtn.disabled = true;
+        status.textContent = 'Checking username...';
+        status.className = 'runtime-comm-status';
+        try {
+          const result = await ctx.changeUserProperties({ username, groups, enabled: enabledEl.checked });
+          if (result?.success) {
+            status.textContent = `Properties updated for "${username}".`;
+            status.className = 'runtime-comm-status ok';
+            setTimeout(() => {
+              try { dlg.close(); } catch (_) { /* ignore */ }
+            }, 900);
+          } else {
+            status.textContent = result?.error || `No user found with the username "${username}"`;
+            status.className = 'runtime-comm-status error';
+            submitBtn.disabled = false;
+            nameEl.focus();
+            nameEl.select();
+          }
+        } catch (err) {
+          status.textContent = err.message || 'Could not complete the request';
+          status.className = 'runtime-comm-status error';
+          submitBtn.disabled = false;
+        }
+      };
+    };
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'ChangeUserPropertiesButton',
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'ChangeUserPropertiesButton',
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', openRuntimeDialog);
     }
     return btn;
   },
@@ -8732,6 +9774,31 @@ const ComponentRegistry = {
     return `/projects/${encodeURIComponent(pid)}/Images/${encodeURIComponent(fileName)}`;
   },
 
+  // Shared by every User Management runtime popup that needs to pick group membership
+  // (Add User/Group, Modify Group Membership, Change User Properties): renders a checkbox
+  // per real, live group (fetched via ctx.listGroups(), never hardcoded) into `container`,
+  // and reads back the checked group ids. A user can check more than one — real multi-group
+  // membership, not the old single Role select.
+  renderGroupChecklist(container, groups, checkedIds = []) {
+    if (!container) return;
+    if (!groups.length) {
+      container.innerHTML = '<p class="dialog-hint">No groups defined yet — an Administrator needs to create one in Studio under Runtime Security first.</p>';
+      return;
+    }
+    const sorted = [...groups].sort((a, b) => b.level - a.level || a.name.localeCompare(b.name));
+    container.innerHTML = sorted.map((g) => `
+      <label class="dialog-checklist-item">
+        <input type="checkbox" value="${escapeHtml(g.id)}" ${checkedIds.includes(g.id) ? 'checked' : ''} />
+        <span>${escapeHtml(g.name)} (level ${g.level})</span>
+      </label>
+    `).join('');
+  },
+
+  readGroupChecklist(container) {
+    if (!container) return [];
+    return Array.from(container.querySelectorAll('input[type="checkbox"]:checked')).map((el) => el.value);
+  },
+
   ensureRuntimeAddUserDialog() {
     let dlg = document.getElementById('runtimeAddUserDialog');
     if (dlg) return dlg;
@@ -8754,14 +9821,10 @@ const ComponentRegistry = {
           <span>Confirm password</span>
           <input type="password" id="runtimeAddUserConfirm" autocomplete="new-password" />
         </label>
-        <label class="dialog-field">
-          <span>Role / Group</span>
-          <select id="runtimeAddUserRole">
-            <option value="Operator" selected>Operator</option>
-            <option value="Engineer">Engineer</option>
-            <option value="Administrator">Administrator</option>
-          </select>
-        </label>
+        <div class="dialog-field">
+          <span>Groups</span>
+          <div id="runtimeAddUserGroups" class="dialog-group-checklist">Loading groups…</div>
+        </div>
         <div id="runtimeAddUserStatus" class="runtime-comm-status"></div>
         <div class="dialog-actions">
           <button type="button" id="runtimeAddUserCancel">Cancel</button>
@@ -8810,6 +9873,236 @@ const ComponentRegistry = {
     });
     dlg.addEventListener('cancel', () => {
       const status = dlg.querySelector('#runtimeDeleteUserStatus');
+      if (status) {
+        status.textContent = '';
+        status.className = 'runtime-comm-status';
+      }
+    });
+    return dlg;
+  },
+
+ensureModifyGroupDialog() {
+    let dlg = document.getElementById('runtimeModifyGroupDialog');
+    if (dlg) return dlg;
+    dlg = document.createElement('dialog');
+    dlg.id = 'runtimeModifyGroupDialog';
+    dlg.className = 'dialog runtime-adduser-dialog';
+    dlg.innerHTML = `
+      <form method="dialog" onsubmit="return false">
+        <h3>Modify Group Membership</h3>
+        <p class="dialog-hint">Enter the username and check the group(s) it should belong to — this REPLACES the user's full group membership. The username is checked before anything changes.</p>
+        <label class="dialog-field">
+          <span>Username</span>
+          <input type="text" id="runtimeModifyGroupName" autocomplete="off" />
+        </label>
+        <div class="dialog-field">
+          <span>Groups</span>
+          <div id="runtimeModifyGroupGroups" class="dialog-group-checklist">Loading groups…</div>
+        </div>
+        <div id="runtimeModifyGroupStatus" class="runtime-comm-status"></div>
+        <div class="dialog-actions">
+          <button type="button" id="runtimeModifyGroupCancel">Cancel</button>
+          <button type="button" id="runtimeModifyGroupSubmit" class="primary">Modify</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(dlg);
+    dlg.querySelector('#runtimeModifyGroupCancel').addEventListener('click', () => {
+      try { dlg.close(); } catch (_) { /* ignore */ }
+    });
+    dlg.addEventListener('cancel', () => {
+      const status = dlg.querySelector('#runtimeModifyGroupStatus');
+      if (status) {
+        status.textContent = '';
+        status.className = 'runtime-comm-status';
+      }
+    });
+    return dlg;
+  },
+
+  ensureUnlockUserDialog() {
+    let dlg = document.getElementById('runtimeUnlockUserDialog');
+    if (dlg) return dlg;
+    dlg = document.createElement('dialog');
+    dlg.id = 'runtimeUnlockUserDialog';
+    dlg.className = 'dialog runtime-adduser-dialog';
+    dlg.innerHTML = `
+      <form method="dialog" onsubmit="return false">
+        <h3>Unlock User</h3>
+        <p class="dialog-hint">Enter the username to unlock. The username is checked before anything changes.</p>
+        <label class="dialog-field">
+          <span>Username</span>
+          <input type="text" id="runtimeUnlockUserName" autocomplete="off" />
+        </label>
+        <div id="runtimeUnlockUserStatus" class="runtime-comm-status"></div>
+        <div class="dialog-actions">
+          <button type="button" id="runtimeUnlockUserCancel">Cancel</button>
+          <button type="button" id="runtimeUnlockUserSubmit" class="primary">Unlock</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(dlg);
+    dlg.querySelector('#runtimeUnlockUserCancel').addEventListener('click', () => {
+      try { dlg.close(); } catch (_) { /* ignore */ }
+    });
+    dlg.addEventListener('cancel', () => {
+      const status = dlg.querySelector('#runtimeUnlockUserStatus');
+      if (status) {
+        status.textContent = '';
+        status.className = 'runtime-comm-status';
+      }
+    });
+    return dlg;
+  },
+
+  ensureEnableUserDialog() {
+    let dlg = document.getElementById('runtimeEnableUserDialog');
+    if (dlg) return dlg;
+    dlg = document.createElement('dialog');
+    dlg.id = 'runtimeEnableUserDialog';
+    dlg.className = 'dialog runtime-adduser-dialog';
+    dlg.innerHTML = `
+      <form method="dialog" onsubmit="return false">
+        <h3>Enable User</h3>
+        <p class="dialog-hint">Enter the username to enable. The username is checked before anything changes.</p>
+        <label class="dialog-field">
+          <span>Username</span>
+          <input type="text" id="runtimeEnableUserName" autocomplete="off" />
+        </label>
+        <div id="runtimeEnableUserStatus" class="runtime-comm-status"></div>
+        <div class="dialog-actions">
+          <button type="button" id="runtimeEnableUserCancel">Cancel</button>
+          <button type="button" id="runtimeEnableUserSubmit" class="primary">Enable</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(dlg);
+    dlg.querySelector('#runtimeEnableUserCancel').addEventListener('click', () => {
+      try { dlg.close(); } catch (_) { /* ignore */ }
+    });
+    dlg.addEventListener('cancel', () => {
+      const status = dlg.querySelector('#runtimeEnableUserStatus');
+      if (status) {
+        status.textContent = '';
+        status.className = 'runtime-comm-status';
+      }
+    });
+    return dlg;
+  },
+
+  ensureDisableUserDialog() {
+    let dlg = document.getElementById('runtimeDisableUserDialog');
+    if (dlg) return dlg;
+    dlg = document.createElement('dialog');
+    dlg.id = 'runtimeDisableUserDialog';
+    dlg.className = 'dialog runtime-adduser-dialog';
+    dlg.innerHTML = `
+      <form method="dialog" onsubmit="return false">
+        <h3>Disable User</h3>
+        <p class="dialog-hint">Enter the username to disable. The username is checked before anything changes.</p>
+        <label class="dialog-field">
+          <span>Username</span>
+          <input type="text" id="runtimeDisableUserName" autocomplete="off" />
+        </label>
+        <div id="runtimeDisableUserStatus" class="runtime-comm-status"></div>
+        <div class="dialog-actions">
+          <button type="button" id="runtimeDisableUserCancel">Cancel</button>
+          <button type="button" id="runtimeDisableUserSubmit" class="primary">Disable</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(dlg);
+    dlg.querySelector('#runtimeDisableUserCancel').addEventListener('click', () => {
+      try { dlg.close(); } catch (_) { /* ignore */ }
+    });
+    dlg.addEventListener('cancel', () => {
+      const status = dlg.querySelector('#runtimeDisableUserStatus');
+      if (status) {
+        status.textContent = '';
+        status.className = 'runtime-comm-status';
+      }
+    });
+    return dlg;
+  },
+
+  ensureChangePasswordDialog() {
+    let dlg = document.getElementById('runtimeChangePasswordDialog');
+    if (dlg) return dlg;
+    dlg = document.createElement('dialog');
+    dlg.id = 'runtimeChangePasswordDialog';
+    dlg.className = 'dialog runtime-adduser-dialog';
+    dlg.innerHTML = `
+      <form method="dialog" onsubmit="return false">
+        <h3>Change Password</h3>
+        <p class="dialog-hint">Enter the username and its new password. The username is checked before anything changes.</p>
+        <label class="dialog-field">
+          <span>Username</span>
+          <input type="text" id="runtimeChangePasswordName" autocomplete="off" />
+        </label>
+        <label class="dialog-field">
+          <span>New password</span>
+          <input type="password" id="runtimeChangePasswordPassword" autocomplete="new-password" />
+        </label>
+        <label class="dialog-field">
+          <span>Confirm new password</span>
+          <input type="password" id="runtimeChangePasswordConfirm" autocomplete="new-password" />
+        </label>
+        <div id="runtimeChangePasswordStatus" class="runtime-comm-status"></div>
+        <div class="dialog-actions">
+          <button type="button" id="runtimeChangePasswordCancel">Cancel</button>
+          <button type="button" id="runtimeChangePasswordSubmit" class="primary">Save</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(dlg);
+    dlg.querySelector('#runtimeChangePasswordCancel').addEventListener('click', () => {
+      try { dlg.close(); } catch (_) { /* ignore */ }
+    });
+    dlg.addEventListener('cancel', () => {
+      const status = dlg.querySelector('#runtimeChangePasswordStatus');
+      if (status) {
+        status.textContent = '';
+        status.className = 'runtime-comm-status';
+      }
+    });
+    return dlg;
+  },
+
+  ensureChangePropertiesDialog() {
+    let dlg = document.getElementById('runtimeChangePropertiesDialog');
+    if (dlg) return dlg;
+    dlg = document.createElement('dialog');
+    dlg.id = 'runtimeChangePropertiesDialog';
+    dlg.className = 'dialog runtime-adduser-dialog';
+    dlg.innerHTML = `
+      <form method="dialog" onsubmit="return false">
+        <h3>Change User Properties</h3>
+        <p class="dialog-hint">Enter the username, then update its group membership and enabled state. The username is checked before anything changes.</p>
+        <label class="dialog-field">
+          <span>Username</span>
+          <input type="text" id="runtimeChangePropertiesName" autocomplete="off" />
+        </label>
+        <div class="dialog-field">
+          <span>Groups</span>
+          <div id="runtimeChangePropertiesGroups" class="dialog-group-checklist">Loading groups…</div>
+        </div>
+        <label class="dialog-field dialog-check">
+          <input type="checkbox" id="runtimeChangePropertiesEnabled" checked />
+          <span>Enabled</span>
+        </label>
+        <div id="runtimeChangePropertiesStatus" class="runtime-comm-status"></div>
+        <div class="dialog-actions">
+          <button type="button" id="runtimeChangePropertiesCancel">Cancel</button>
+          <button type="button" id="runtimeChangePropertiesSubmit" class="primary">Save</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(dlg);
+    dlg.querySelector('#runtimeChangePropertiesCancel').addEventListener('click', () => {
+      try { dlg.close(); } catch (_) { /* ignore */ }
+    });
+    dlg.addEventListener('cancel', () => {
+      const status = dlg.querySelector('#runtimeChangePropertiesStatus');
       if (status) {
         status.textContent = '';
         status.className = 'runtime-comm-status';

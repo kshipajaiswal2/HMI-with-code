@@ -389,14 +389,85 @@ function createContext() {
       await apiPost('/api/runtime/logout', {});
     },
 
-    async addUserGroup({ username, password, role }) {
-      const res = await apiPost('/api/runtime/add-user', { username, password, role });
+    async addUserGroup({ username, password, groups }) {
+      const res = await apiPost('/api/runtime/add-user', { username, password, groups });
       return res.json();
     },
 
     async deleteUserGroup({ username }) {
       const res = await apiPost('/api/runtime/delete-user', { username });
       return res.json();
+    },
+
+    async unlockUser({ username }) {
+      const res = await apiPost('/api/runtime/unlock-user', { username });
+      return res.json();
+    },
+
+    async enableUser({ username }) {
+      const res = await apiPost('/api/runtime/enable-user', { username });
+      return res.json();
+    },
+
+    async disableUser({ username }) {
+      const res = await apiPost('/api/runtime/disable-user', { username });
+      return res.json();
+    },
+
+    async modifyGroupMembership({ username, groups }) {
+      const res = await apiPost('/api/runtime/modify-group', { username, groups });
+      return res.json();
+    },
+
+    async addUserToGroup({ username, group }) {
+      const res = await apiPost('/api/runtime/add-user-to-group', { username, group });
+      return res.json();
+    },
+
+    async removeUserFromGroup({ username, group }) {
+      const res = await apiPost('/api/runtime/remove-user-from-group', { username, group });
+      return res.json();
+    },
+
+    async changeUserPassword({ username, password }) {
+      const res = await apiPost('/api/runtime/change-password', { username, password });
+      return res.json();
+    },
+
+    async changeUserProperties({ username, groups, enabled }) {
+      const res = await apiPost('/api/runtime/change-user-properties', { username, groups, enabled });
+      return res.json();
+    },
+
+    async listGroups() {
+      const res = await fetchWithTimeout(apiUrl('/api/runtime/groups'));
+      return res.json();
+    },
+
+    async findUser({ username }) {
+      const res = await fetchWithTimeout(apiUrl(`/api/runtime/find-user?username=${encodeURIComponent(username || '')}`));
+      return res.json();
+    },
+
+    async createGroup({ name, level }) {
+      const res = await apiPost('/api/runtime/create-group', { name, level });
+      return res.json();
+    },
+
+    async editGroup({ id, name, level }) {
+      const res = await apiPost('/api/runtime/edit-group', { id, name, level });
+      return res.json();
+    },
+
+    async deleteGroup({ id }) {
+      const res = await apiPost('/api/runtime/delete-group', { id });
+      return res.json();
+    },
+
+    checkAccess(requiredLevel) {
+      if (!requiredLevel) return true;
+      if (!state.currentUser) return requiredLevel === 0;
+      return state.currentUser.level >= requiredLevel;
     },
 
     _bindings: bindings
@@ -500,9 +571,32 @@ async function loadScreen(screenId, options = {}) {
   state.userCallbacks = [];
 
   try {
-    const res = await fetchWithTimeout(apiUrl(`/api/runtime/screens/${encodeURIComponent(screenId)}?_=${Date.now()}`));
+    // studioEdit=1 tells the server (see server/index.js's screens/:id route) this is
+    // Studio's own live-preview iframe, not a real runtime session, so its server-side
+    // screen-security backstop doesn't block a secured screen's design-time preview just
+    // because no one happens to be logged in on the actual runtime session right now.
+    const studioEditParam = STUDIO_EDIT ? '&studioEdit=1' : '';
+    const res = await fetchWithTimeout(apiUrl(`/api/runtime/screens/${encodeURIComponent(screenId)}?_=${Date.now()}${studioEditParam}`));
     if (!res.ok) throw new Error('not found');
     let screen = await res.json();
+
+    // Screen-level security — the primary, friendly enforcement point (server/index.js's
+    // screens/:id route also blocks this same fetch as a backstop, but that path just looks
+    // like "not found" to this catch below; checking here first is what shows the real
+    // "Access Denied" message and stops before any composition/render work happens). Skipped
+    // entirely in STUDIO_EDIT mode — that's Studio's own live-preview iframe rendering a
+    // screen for editing, with no runtime login involved at all, not a real operator session;
+    // gating it would incorrectly block every secured screen's design-time preview.
+    const requiredLevel = STUDIO_EDIT ? 0 : (Number(screen.securityLevel) || 0);
+    if (requiredLevel > 0 && !(state.currentUser && state.currentUser.level >= requiredLevel)) {
+      renderAccessDenied(screen);
+      state.currentScreen = screenId;
+      state.activeParameterFile = null;
+      updateNav(null);
+      screenTitle.textContent = screen.title || screenId.replace(/^\d+_/, '').replace(/_/g, ' ');
+      return;
+    }
+
     if (!screen._composed || composedSideShellMissing(screen)) {
       const raw = await fetchRawScreen(screenId);
       screen = await composeWithTemplate(raw ? { ...raw, _composed: false } : screen);

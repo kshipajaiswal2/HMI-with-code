@@ -31,9 +31,12 @@ Open **http://127.0.0.1:8080** for Plant HMI Studio.
 | Goal | Command |
 |------|---------|
 | Studio in browser | `npm start` → http://127.0.0.1:8080 |
+| Studio with file watching | `npm run dev` |
 | Studio desktop app | `npm run desktop` |
 | Operator runtime | `npm run desktop:runtime` |
 | Full-screen kiosk | `npm run desktop:kiosk` |
+| Run automated tests | `npm test` |
+| Build a panel deployment package | `npm run build:panel -- <projectId>` |
 
 Default login: `operator` / `operator` · `engineer` / `engineer` · `admin` / `admin`
 
@@ -56,12 +59,16 @@ JSON is the **project format**. The **panel PC runs Plant HMI Runtime**, which r
 
 ## Deploy to a panel PC
 
-1. Copy `pc-hmi-runtime/projects/<YourProject>/` to the target machine.
-2. Install Node.js on the panel (or use the packaged Electron app when available).
-3. Run `npm start` or `npm run desktop:runtime`.
-4. Open `http://127.0.0.1:8080/runtime.html?project=<YourProject>`.
+1. Build a deployment package from `pc-hmi-runtime/`:
+  `npm run build:panel -- <projectId>`
+2. Copy the generated package from `pc-hmi-runtime/deploy/packages/` to the target machine.
+3. Extract it and run the included start script, or copy
+  `pc-hmi-runtime/projects/<YourProject>/` and start the runtime manually.
+4. For a manual setup, install Node.js and run
+  `npm run desktop:runtime`, or open
+  `http://127.0.0.1:8080/runtime.html?project=<YourProject>` after `npm start`.
 
-Automated FTP/USB transfer is planned (Tools → Transfer Utility in Studio).
+Studio’s **Tools → Transfer Utility** can also create a ZIP or folder deployment.
 
 ---
 

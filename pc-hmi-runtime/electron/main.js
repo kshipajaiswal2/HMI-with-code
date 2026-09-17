@@ -11,6 +11,7 @@ const net = require('net');
 const ROOT = path.join(__dirname, '..');
 
 let serverProcess = null;
+let ownsServer = false;
 let listenPort = Number(process.env.PORT) || 8080;
 let serverReady = false;
 const windows = { studio: null, runtime: null };
@@ -123,12 +124,36 @@ function seedPackagedProjects(src, dest) {
   fs.writeFileSync(marker, new Date().toISOString(), 'utf8');
 }
 
-function findListenPort(preferred) {
+function probePlantHmi(port) {
   return new Promise((resolve) => {
+    const req = http.get({
+      hostname: '127.0.0.1',
+      port: Number(port) || 8080,
+      path: '/api/runtime/status',
+      timeout: 800
+    }, (res) => {
+      res.resume();
+      resolve(res.statusCode === 200);
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.on('error', () => resolve(false));
+  });
+}
+
+function findListenPort(preferred) {
+  return new Promise((resolve, reject) => {
     const tryListen = (port) => {
       const server = net.createServer();
-      server.once('error', () => tryListen(0));
-      server.listen(port, '127.0.0.1', () => {
+      server.once('error', (err) => {
+        if (Number(port) !== 0) tryListen(0);
+        else reject(err);
+      });
+      // Must match server/index.js (0.0.0.0) and exclusive:true, otherwise Windows
+      // reports 127.0.0.1:8080 free while Express then crashes with EADDRINUSE.
+      server.listen({ port: Number(port) || 0, host: '0.0.0.0', exclusive: true }, () => {
         const actual = server.address().port;
         server.close(() => resolve(actual));
       });
@@ -261,9 +286,16 @@ if (gotLock) {
     try {
       const projectsDir = resolveProjectsDir();
       if (app.isPackaged) seedPackagedProjects(path.join(ROOT, 'projects'), projectsDir);
-      listenPort = await findListenPort(process.env.PORT || 8080);
-      logLine(`starting server on ${listenPort} projects=${projectsDir}`);
-      await startServer({ port: listenPort, projectsDir });
+      const preferredPort = Number(process.env.PORT) || 8080;
+      if (await probePlantHmi(preferredPort)) {
+        listenPort = preferredPort;
+        logLine(`reusing Plant HMI already running on ${listenPort}`);
+      } else {
+        listenPort = await findListenPort(preferredPort);
+        logLine(`starting server on ${listenPort} projects=${projectsDir}`);
+        await startServer({ port: listenPort, projectsDir });
+        ownsServer = true;
+      }
       serverReady = true;
       createAppWindow(initial.mode, initial.kiosk);
       while (pendingLaunches.length) {
@@ -274,7 +306,7 @@ if (gotLock) {
       logLine(`Failed to start Plant HMI: ${err.message}`);
       dialog.showErrorBox(
         'Plant HMI failed to start',
-        `The runtime server did not start.\n\n${err.message}\n\nAnother copy of Plant HMI may already be running. Close it from Task Manager and try again.`
+        `The runtime server did not start.\n\n${err.message}\n\nIf another Plant HMI or npm start is using port 8080, close it in Task Manager and try again.\n\nLog: ${logPath()}`
       );
       app.quit();
     }
@@ -282,11 +314,11 @@ if (gotLock) {
 
   app.on('window-all-closed', () => {
     if (hasOpenWindows()) return;
-    if (serverProcess) serverProcess.kill();
+    if (ownsServer && serverProcess) serverProcess.kill();
     if (process.platform !== 'darwin') app.quit();
   });
 
   app.on('before-quit', () => {
-    if (serverProcess) serverProcess.kill();
+    if (ownsServer && serverProcess) serverProcess.kill();
   });
 }

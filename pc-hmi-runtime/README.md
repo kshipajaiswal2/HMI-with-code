@@ -47,8 +47,15 @@ This produces two files in `dist\`:
 - `PlantHMI-Setup-<version>.exe` — installer (Start Menu + desktop shortcuts)
 - `PlantHMI-Portable-<version>.exe` — single-file app, no install step
 
-Copy either file to the target PC. No Node.js or npm is required there. The
-installer is per-user (no admin rights) and creates three Start Menu
+Copy either file to the target PC with **USB, a shared folder, or OneDrive**. Do **not** attach the `.exe` to Teams or Outlook — those block executable attachments (`file type that is not permitted`). Zip it first if you must send it by chat:
+
+```powershell
+Compress-Archive -Path "dist\PlantHMI-Setup-0.2.0.exe" -DestinationPath "dist\PlantHMI-Setup-0.2.0.zip" -Force
+```
+
+Then send `PlantHMI-Setup-0.2.0.zip`. The other PC unzips and runs the setup file. No Node.js or npm is required there.
+
+The installer is per-user (no admin rights) and creates three Start Menu
 shortcuts plus a desktop shortcut:
 
 | Shortcut | Launches |
@@ -304,7 +311,7 @@ Static project files are served at `/projects/<id>/`.
 |---------|-----|
 | `package.json` not found | `cd pc-hmi-runtime` before npm commands |
 | `npm install` stuck on spinner | Wait — Electron download is slow on first run |
-| Port 8080 already in use | Stop the old server process and restart |
+| Port 8080 already in use / “Plant HMI failed to start” | Another Studio (`npm start` or a previous Plant HMI) is holding 8080. Close it in Task Manager, or just launch again — the desktop app now reuses a live server or picks a free port. |
 | Blank Studio / old UI | Hard refresh **Ctrl+F5** |
 | Image size shows 0×0 | Restart server after updates; images may be PNG with `.bmp` extension (now detected by content) |
 | Changes not visible | Restart `npm start` after server-side code changes |

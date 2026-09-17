@@ -1196,6 +1196,15 @@ alarmService.on('change', (state) => {
   io.emit('alarm-update', state);
 });
 
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use. Close the other Plant HMI / npm start process and try again.`);
+  } else {
+    console.error(`Failed to bind port ${PORT}: ${err.message}`);
+  }
+  process.exit(1);
+});
+
 server.listen(PORT, '0.0.0.0', () => {
   try {
     const active = projectService.getActiveProject();

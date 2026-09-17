@@ -10,6 +10,8 @@ const { UserService } = require('./services/user-service');
 const { GroupService } = require('./services/group-service');
 const { createCommunicationDriver } = require('./services/communication/driver-factory');
 const { seedDemoTagValues } = require('./services/communication/demo-tag-seeds');
+const { MacroService } = require('./services/macro-service');
+const { DataLogService } = require('./services/data-log-service');
 const { TagLogicService } = require('./services/tag-logic-service');
 const { ProjectService } = require('./services/project-service');
 const { DeployService } = require('./services/deploy-service');
@@ -18,15 +20,19 @@ const ParameterFiles = require('../public/parameter-files');
 const IoListTags = require('../shared/io-list-tags');
 const ParameterFileService = require('./services/parameter-file-service');
 const ParameterFileBuilder = require('../shared/parameter-file-builder');
+const FsBrowseService = require('./services/fs-browse-service');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = process.env.PORT || 8080;
+const PROJECTS_DIR = process.env.PLANTHMI_PROJECTS || path.join(ROOT, 'projects');
 
-const projectService = new ProjectService(ROOT);
+const projectService = new ProjectService(ROOT, { projectsDir: PROJECTS_DIR });
 const deployService = new DeployService(ROOT);
 const tagService = new TagService();
 const alarmService = new AlarmService(tagService);
 const tagLogicService = new TagLogicService(tagService);
+const macroService = new MacroService(tagService);
+const dataLogService = new DataLogService(tagService);
 let groupService = new GroupService([]);
 let userService = new UserService([], groupService);
 let navigationConfig = {};
@@ -128,7 +134,11 @@ function loadProjectRuntimeInner(projectId) {
   tagLogicService.loadRules(runtimeTags);
   alarmService.definitions = [];
   alarmService.active = [];
-  alarmService.loadDefinitions(projectConfig.alarms || []);
+  alarmService.loadDefinitions(projectConfig.alarms || [], {
+    maxHistory: projectConfig.alarmSetup?.advanced?.maxHistory
+  });
+  macroService.load(projectConfig.macros || {});
+  dataLogService.load(projectConfig.dataLogModels || {});
 
   const communication = getEffectiveCommunication();
   if (driver) driver.disconnect();
@@ -181,10 +191,41 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(ROOT, 'public')));
 app.use('/shared', express.static(path.join(ROOT, 'shared')));
 app.use('/config', express.static(path.join(ROOT, 'config')));
-app.use('/projects', express.static(path.join(ROOT, 'projects')));
+app.use('/projects', express.static(PROJECTS_DIR));
 
 app.get('/', (_req, res) => {
   res.sendFile(path.join(ROOT, 'public', 'studio.html'));
+});
+
+app.get('/api/studio/fs/roots', (_req, res) => {
+  try {
+    res.json({
+      documents: FsBrowseService.documentsPath(),
+      folders: FsBrowseService.specialFolders()
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/studio/fs/list', (req, res) => {
+  try {
+    if (String(req.query.drives || '') === '1') {
+      return res.json({ folders: FsBrowseService.listDrives() });
+    }
+    res.json({ folders: FsBrowseService.listChildren(req.query.path) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/studio/fs/mkdir', (req, res) => {
+  try {
+    const dest = FsBrowseService.makeFolder(req.body?.path, req.body?.name);
+    res.json({ success: true, path: dest });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.get('/api/projects/:id/graphics/export-targets', (req, res) => {
@@ -612,6 +653,39 @@ app.get('/api/runtime/tags', async (req, res) => {
 
 app.get('/api/runtime/alarms', (_req, res) => {
   res.json(alarmService.getState());
+});
+
+app.post('/api/runtime/macros/run', async (req, res) => {
+  await ensureRuntimeLoaded(req);
+  const name = String(req.body?.name || req.body?.macro || '').trim();
+  if (!name) return res.status(400).json({ error: 'Macro name required' });
+  const result = macroService.run(name);
+  if (!result.ok) return res.status(404).json({ error: result.error });
+  tagService.syncConnections();
+  tagLogicService.evaluate();
+  alarmService.evaluate();
+  io.emit('tags', tagService.getSubscribedSnapshot());
+  res.json({ success: true, ...result });
+});
+
+app.get('/api/runtime/macros', async (req, res) => {
+  await ensureRuntimeLoaded(req);
+  res.json({ macros: macroService.list() });
+});
+
+app.get('/api/runtime/data-log', async (req, res) => {
+  await ensureRuntimeLoaded(req);
+  res.json({ models: dataLogService.list() });
+});
+
+app.get('/api/runtime/data-log/:name', async (req, res) => {
+  await ensureRuntimeLoaded(req);
+  const data = dataLogService.getSamples(req.params.name, {
+    since: req.query.since,
+    limit: req.query.limit
+  });
+  if (!data) return res.status(404).json({ error: 'Data log model not found' });
+  res.json(data);
 });
 
 app.post('/api/runtime/alarms/acknowledge', (req, res) => {

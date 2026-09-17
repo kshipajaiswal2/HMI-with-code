@@ -108,7 +108,7 @@ window.OBJECTS_MENU = [
   },
   {
     id: 'advanced', label: 'Advanced', children: [
-      { id: 'adv-control-list', label: 'Control List Selector', planned: true },
+      { id: 'adv-control-list', label: 'Control List Selector', action: 'control-list-selector-properties' },
       { id: 'adv-piloted-list', label: 'Piloted Control List Selector', planned: true },
       { id: 'adv-print', label: 'Display Print', planned: true },
       { id: 'adv-language', label: 'Language Switch Button', planned: true },

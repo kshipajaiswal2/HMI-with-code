@@ -67,13 +67,14 @@ function seedDemoTagValues(tagService) {
     'IO.DO_002': false,
     'IO.AI_001': 72.5,
     'Temp.IO_LIST': 2,
+    'Temp_Tags.IO_LIST': 2,
     'Alarm.EStop': false,
     'Alarm.DoorOpen': false,
     'Alarm.LowAir': false,
     'Alarm.MotorFault': false,
     'Alarm.HighTemp': false,
     'System.HMI_BuzzerSilence': 0,
-    'Alarmtext': 'ABCDE FGHIJK LMNOPQ RSTUV WXYZ ABCDE FGHIJK LMNOPQ RSTUV WXYZ'
+    'Alarmtext': ''
   };
 
   for (const [name, value] of Object.entries(seeds)) {

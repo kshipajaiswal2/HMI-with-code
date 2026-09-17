@@ -15,10 +15,25 @@ function gradRect(name, left, top, width, height) {
 }
 
 function wireLine(name, left, top, width, height, color = '#008080') {
+  const horizontal = width >= height;
+  const stroke = Math.max(1, Math.min(width, height, 2));
+  if (horizontal) {
+    const y = Math.max(0.5, stroke / 2);
+    return {
+      type: 'Line', name, left, top, width, height: Math.max(2, stroke),
+      x1: 0, y1: y, x2: width, y2: y,
+      visible: true, lineStyle: 'solid', lineWidth: stroke,
+      backStyle: 'transparent', useBackColor: false,
+      useForeColor: true, foreColor: color
+    };
+  }
+  const x = Math.max(0.5, stroke / 2);
   return {
-    type: 'Rectangle', name, left, top, width, height, visible: true,
-    backStyle: 'solid', backColor: color, useBackColor: true,
-    foreColor: color, lineWidth: 0
+    type: 'Line', name, left, top, width: Math.max(2, stroke), height,
+    x1: x, y1: 0, x2: x, y2: height,
+    visible: true, lineStyle: 'solid', lineWidth: stroke,
+    backStyle: 'transparent', useBackColor: false,
+    useForeColor: true, foreColor: color
   };
 }
 
@@ -32,15 +47,19 @@ const PARAM_FILES = [
   'PLC DI List 07'
 ];
 
-function secondaryNav(label, index, active) {
+function secondaryNav(label, index, kind, active) {
   const tops = [101, 173, 245, 317, 389, 461, 533];
+  const files = kind === 'in'
+    ? ['PLC DI List 01', 'PLC DI List 02', 'PLC DI List 03', 'PLC DI List 04', 'PLC DI List 05', 'PLC DI List 06', 'PLC DI List 07']
+    : PARAM_FILES;
+  const prefix = kind === 'in' ? 'PlcIoSubNavIn' : 'PlcIoSubNav';
   return {
     type: 'GotoButton',
-    name: `PlcIoSubNav_${String(index).padStart(2, '0')}`,
+    name: `${prefix}_${String(index).padStart(2, '0')}`,
     label,
     target: '301_PLC_IO_List',
     parameterType: 'file',
-    parameterFile: PARAM_FILES[index - 1],
+    parameterFile: files[index - 1],
     parameterList: '',
     left: s(128),
     top: s(tops[index - 1]),
@@ -61,25 +80,49 @@ function secondaryNav(label, index, active) {
     alignment: 'middleCenter',
     wordWrap: true,
     visible: true,
-    audio: true
+    audio: true,
+    visibleWhen: { tag: 'Temp_Tags.IO_LIST', equals: kind === 'in' ? 1 : 2 }
   };
 }
 
-function toggleBtn(name, label, left, active) {
+function interlockedTab(name, label, left, buttonValue) {
+  const caption = label;
+  const state = (id, extras = {}) => ({
+    id,
+    backColor: '#E0E0E0',
+    borderColor: 'silver',
+    useBackColor: true,
+    useBorderColor: true,
+    blink: false,
+    patternStyle: 'none',
+    caption,
+    captionColor: '#000000',
+    useCaptionColor: true,
+    captionBackStyle: 'transparent',
+    wordWrap: true,
+    alignment: 'middleCenter',
+    ...extras
+  });
   return {
-    type: 'GotoButton',
+    type: 'InterlockedButton',
     name,
-    label,
+    tag: 'Temp_Tags.IO_LIST',
+    buttonValue,
     target: '301_PLC_IO_List',
+    parameterType: 'file',
+    parameterFile: buttonValue === 1 ? 'PLC DI List 01' : 'PLC DO List 01',
+    caption,
+    label: caption,
     left: s(left),
     top: s(122),
     width: s(85),
     height: s(45),
+    visible: true,
     useBackColor: true,
     backColor: '#E0E0E0',
     backStyle: 'solid',
     borderStyle: 'raised',
-    borderWidth: active ? 4 : 3,
+    borderWidth: 4,
     borderUsesBackColor: false,
     useBorderColor: true,
     borderColor: 'silver',
@@ -87,16 +130,30 @@ function toggleBtn(name, label, left, active) {
     bold: true,
     alignment: 'middleCenter',
     wordWrap: true,
-    visible: true,
-    audio: true
+    audio: true,
+    touch: true,
+    states: [state('State0'), state('State1')]
   };
 }
 
 function buildPlcIoList() {
   const comps = [];
 
-  // Secondary column nav — Output List 01–06 + Input List 07 (FT 402_IO_List Group16 default)
-  const subLabels = [
+  // Input list buttons sit under Output list buttons at the same coordinates
+  // (FactoryTalk Group19 / Group16). Runtime visibility swaps them; Studio
+  // shows both so you can layer / arrange.
+  const inLabels = [
+    'PLC Input\nList 01',
+    'PLC Input\nList 02',
+    'PLC Input\nList 03',
+    'PLC Input\nList 04',
+    'PLC Input\nList 05',
+    'PLC Input\nList 06',
+    'PLC Input\nList 07'
+  ];
+  inLabels.forEach((label, i) => comps.push(secondaryNav(label, i + 1, 'in', i === 0)));
+
+  const outLabels = [
     'PLC Output\nList 01',
     'PLC Output\nList 02',
     'PLC Output\nList 03',
@@ -105,11 +162,11 @@ function buildPlcIoList() {
     'PLC Output\nList 06',
     'PLC Input\nList 07'
   ];
-  subLabels.forEach((label, i) => comps.push(secondaryNav(label, i + 1, i === 0)));
+  outLabels.forEach((label, i) => comps.push(secondaryNav(label, i + 1, 'out', i === 0)));
 
   // Top toggle tabs
-  comps.push(toggleBtn('PlcIoTabInput', 'PLC Input\nList', 385, false));
-  comps.push(toggleBtn('PlcIoTabOutput', 'PLC Output\nList', 537, true));
+  comps.push(interlockedTab('PlcIoTabInput', 'PLC Input\nList', 385, 1));
+  comps.push(interlockedTab('PlcIoTabOutput', 'PLC Output\nList', 537, 2));
 
   // Main table frame (FT Polygon4 @ 237,185 647×417)
   const tableL = s(237);
@@ -130,7 +187,7 @@ function buildPlcIoList() {
 
   // Column divider (FT Line11 @ left=752 — white, not teal)
   const divL = s(752);
-  comps.push(wireLine('PlcIoColDivider', divL, s(231), 2, s(371), '#FFFFFF'));
+  comps.push(wireLine('PlcIoColDivider', divL, s(231), 2, s(371), '#008080'));
 
   // Horizontal row dividers (FT Line3–Line9)
   for (const ftTop of [230, 273, 316, 362, 406, 452, 497, 551]) {
@@ -139,15 +196,12 @@ function buildPlcIoList() {
 
   // Header labels
   comps.push({
-    type: 'Text', name: 'PlcIoHeaderDesc', caption: 'Description',
+    type: 'StringDisplay', name: 'PlcIoHeaderDesc', tag: '#100',
     left: s(289), top: s(194), width: s(543), height: s(30),
-    fontFamily: 'Arial', fontSize: 16, bold: true, backStyle: 'transparent',
-    alignment: 'middleCenter', wordWrap: false
-  });
-  comps.push({
-    type: 'Text', name: 'PlcIoHeaderVal', caption: 'Value',
-    left: s(766), top: s(194), width: s(105), height: s(30),
-    fontFamily: 'Arial', fontSize: 16, bold: true, backStyle: 'transparent',
+    visible: true, borderStyle: 'none', borderWidth: 0, borderUsesBackColor: false,
+    backStyle: 'transparent', useBackColor: false,
+    fontFamily: 'Arial', fontSize: 16, bold: true,
+    foreColor: '#000000', useForeColor: true,
     alignment: 'middleCenter', wordWrap: false
   });
 

@@ -68,7 +68,7 @@
       document.getElementById('lnLineStyle').value = comp.lineStyle || 'solid';
       document.getElementById('lnBackStyle').value = comp.backStyle === 'transparent' ? 'transparent' : 'solid';
       document.getElementById('lnUseForeColor').checked = comp.useForeColor !== false;
-      S.setColorFieldValue('lnForeColor', comp.foreColor || '#808080');
+      S.setColorFieldValue('lnForeColor', comp.foreColor || '#000000');
       document.getElementById('lnUseBackColor').checked = comp.useBackColor === true && comp.backStyle !== 'transparent';
       S.setColorFieldValue('lnBackColor', comp.backColor || '#c0c0c0');
       document.getElementById('lnLineWidth').value = comp.lineWidth ?? 1;

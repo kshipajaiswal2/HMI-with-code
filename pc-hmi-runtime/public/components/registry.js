@@ -925,6 +925,10 @@ const ComponentRegistry = {
       renderState(state1 || state0);
       const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
       if (writeTag) ctx.writeTag(writeTag, buttonValue);
+      const pf = String(comp.parameterFile || '').trim();
+      if (pf && ctx.navigate) {
+        ctx.navigate(comp.target || ctx.currentScreen, { parameterFile: pf });
+      }
     };
 
     btn.addEventListener('mousedown', (e) => { e.preventDefault(); press(); });
@@ -1679,6 +1683,8 @@ const ComponentRegistry = {
       renderAppearance(comp.caption ?? comp.label ?? '');
     }
 
+    ComponentRegistry.registerFocusTarget(el, ctx, comp);
+
     const getMin = () => {
       if (comp.useVariableMinMax && comp.minimumTag) {
         const v = Number(ComponentRegistry.readIndicatorRef(comp.minimumTag, ctx));
@@ -1820,6 +1826,8 @@ const ComponentRegistry = {
       });
       return el;
     }
+
+    ComponentRegistry.registerFocusTarget(el, ctx, comp);
 
     const getMin = () => {
       if (comp.useVariableMinMax && comp.minimumTag) {
@@ -3256,7 +3264,7 @@ const ComponentRegistry = {
           id: entry.id
         }));
       }
-      if (!rows.length && comp.demoMessage) {
+      if (!rows.length && comp.demoMessage && ctx.studioEdit) {
         rows = [{ time: Date.now(), message: comp.demoMessage, demo: true }];
       }
       return rows;
@@ -4102,33 +4110,36 @@ const ComponentRegistry = {
 
     el.querySelector('svg')?.remove();
 
-    const w = Math.max(1, Number(comp.width) || 1);
-    const h = Math.max(1, Number(comp.height) || 1);
-    const x1 = Number.isFinite(Number(comp.x1)) ? Number(comp.x1) : 0;
-    const y1 = Number.isFinite(Number(comp.y1)) ? Number(comp.y1) : 0;
-    const x2 = Number.isFinite(Number(comp.x2)) ? Number(comp.x2) : w;
-    const y2 = Number.isFinite(Number(comp.y2)) ? Number(comp.y2) : h;
-
-    const lineW = comp.lineWidth ?? 1;
+    const lineW = Math.max(0, Number(comp.lineWidth) || 0);
     const lineStyle = comp.lineStyle || 'solid';
     const useFore = comp.useForeColor !== false && lineStyle !== 'none' && lineW > 0;
     if (!useFore) return;
 
+    const w = Math.max(1, Number(comp.width) || 1);
+    const h = Math.max(1, Number(comp.height) || 1);
+    const x1 = Number.isFinite(Number(comp.x1)) ? Number(comp.x1) : 0;
+    const y1 = Number.isFinite(Number(comp.y1)) ? Number(comp.y1) : (h <= lineW * 2 ? h / 2 : 0);
+    const x2 = Number.isFinite(Number(comp.x2)) ? Number(comp.x2) : w;
+    const y2 = Number.isFinite(Number(comp.y2)) ? Number(comp.y2) : (h <= lineW * 2 ? h / 2 : h);
+
+    // Pad so a horizontal/vertical stroke is not clipped by a 1px viewBox.
+    const pad = Math.max(2, Math.ceil(lineW / 2) + 1);
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-    svg.setAttribute('width', '100%');
-    svg.setAttribute('height', '100%');
+    svg.setAttribute('viewBox', `${-pad} ${-pad} ${w + pad * 2} ${h + pad * 2}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('overflow', 'visible');
     svg.setAttribute('aria-hidden', 'true');
-    svg.style.cssText = 'position:absolute;left:0;top:0;display:block;pointer-events:none;overflow:visible';
+    svg.style.cssText = `position:absolute;left:${-pad}px;top:${-pad}px;width:${w + pad * 2}px;height:${h + pad * 2}px;display:block;pointer-events:none;overflow:visible`;
 
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', String(x1));
     line.setAttribute('y1', String(y1));
     line.setAttribute('x2', String(x2));
     line.setAttribute('y2', String(y2));
-    line.setAttribute('stroke', comp.foreColor || '#808080');
-    line.setAttribute('stroke-width', String(lineW));
-    line.setAttribute('stroke-linecap', 'round');
+    line.setAttribute('stroke', comp.foreColor || '#000000');
+    line.setAttribute('stroke-width', String(Math.max(1, lineW)));
+    line.setAttribute('stroke-linecap', 'butt');
+    line.setAttribute('vector-effect', 'non-scaling-stroke');
     const dash = ComponentRegistry.lineStyleToDashArray(lineStyle, lineW);
     if (dash) line.setAttribute('stroke-dasharray', dash);
     svg.appendChild(line);
@@ -4294,6 +4305,25 @@ const ComponentRegistry = {
       el.classList.add('ft-ladder-wire');
     } else if (comp.name?.includes('BarL') || comp.name?.includes('BarR') || comp.name?.startsWith('SafetyBusDrop') || comp.name?.startsWith('SafetyBusRise')) {
       el.classList.add('ft-ladder-bar');
+    }
+    const w = Number(comp.width) || 0;
+    const h = Number(comp.height) || 0;
+    const color = comp.backColor || comp.foreColor || '#000000';
+    const isHLine = h > 0 && h <= 2 && w >= h * 4;
+    const isVLine = w > 0 && w <= 2 && h >= w * 4;
+    if ((isHLine || isVLine) && (comp.lineWidth == null || Number(comp.lineWidth) === 0)) {
+      el.style.background = 'none';
+      el.style.backgroundColor = 'transparent';
+      el.style.border = 'none';
+      el.style.boxSizing = 'border-box';
+      if (isHLine) {
+        el.style.height = '0px';
+        el.style.borderTop = `${Math.max(1, h)}px solid ${color}`;
+      } else {
+        el.style.width = '0px';
+        el.style.borderLeft = `${Math.max(1, w)}px solid ${color}`;
+      }
+      return el;
     }
     const borderMode = comp.borderMode;
     ComponentRegistry.applyShapeFill(el, comp);
@@ -5215,7 +5245,7 @@ const ComponentRegistry = {
     return btn;
   },
 
-ModifyGroupMembershipButton(comp, ctx) {
+  ModifyGroupMembershipButton(comp, ctx) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
@@ -7000,6 +7030,35 @@ ModifyGroupMembershipButton(comp, ctx) {
     return `${name}.bmp`;
   },
 
+  registerFocusTarget(el, ctx, comp) {
+    if (!el || !ctx || ctx.studioEdit) return;
+    el.dataset.keyTarget = '1';
+    const mark = () => {
+      if (!comp?.name) return;
+      ctx.focusedObjectName = comp.name;
+      ctx.focusObject = comp.name;
+    };
+    el.addEventListener('focusin', mark);
+    el.addEventListener('mousedown', mark);
+  },
+
+  bindRuntimeKeyPress(btn, ctx, comp, key) {
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (typeof ctx.sendKeyPress === 'function') {
+        ctx.sendKeyPress({
+          key,
+          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
+          linkedObject: (comp.linkedObject || '').trim(),
+          audio: comp.audio !== false
+        });
+      } else {
+        ComponentRegistry.sendKeyToInputTarget(ctx, comp, key);
+      }
+    });
+  },
+
   sendKeyToInputTarget(ctx, comp, key) {
     const sendPressTo = comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus';
     const linkedObject = (comp.linkedObject || '').trim();
@@ -7007,67 +7066,83 @@ ModifyGroupMembershipButton(comp, ctx) {
     const escapeName = (name) => {
       try { return CSS.escape(name); } catch (_) { return String(name).replace(/"/g, '\\"'); }
     };
+    const findHost = (name) => {
+      if (!name) return null;
+      return root.querySelector(`[data-name="${escapeName(name)}"]`);
+    };
     const findInHost = (host) => {
       if (!host) return null;
       if (host.matches?.('input, textarea')) return host;
       return host.querySelector?.('input, textarea') || null;
     };
-    let input = null;
-    if (sendPressTo === 'linkedObject' && linkedObject) {
-      input = findInHost(root.querySelector(`[data-name="${escapeName(linkedObject)}"]`));
-    }
-    if (!input) {
+    const isKeyButton = (el) => el?.matches?.('.ft-enter-btn, .ft-end-btn, .ft-backspace-btn, .ft-home-btn, .ft-goto-btn');
+    let host = null;
+    if (sendPressTo === 'linkedObject' && linkedObject) host = findHost(linkedObject);
+    if (!host) host = findHost(ctx.focusedObjectName || ctx.focusObject);
+    if (!host) {
       const active = document.activeElement;
-      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) input = active;
-    }
-    if (!input && (ctx.focusedObjectName || ctx.focusObject)) {
-      input = findInHost(root.querySelector(`[data-name="${escapeName(ctx.focusedObjectName || ctx.focusObject)}"]`));
-    }
-    if (!input || input.disabled || input.readOnly) return;
-    input.focus();
-    if (key === 'Backspace') {
-      const start = input.selectionStart ?? input.value.length;
-      const end = input.selectionEnd ?? start;
-      if (typeof start === 'number' && typeof end === 'number') {
-        if (start !== end) {
-          input.value = input.value.slice(0, start) + input.value.slice(end);
-          input.setSelectionRange(start, start);
-        } else if (start > 0) {
-          input.value = input.value.slice(0, start - 1) + input.value.slice(start);
-          input.setSelectionRange(start - 1, start - 1);
-        }
-        input.dispatchEvent(new Event('input', { bubbles: true }));
+      if (active && active !== document.body && !isKeyButton(active)) {
+        host = active.closest?.('[data-key-target="1"]') || active.closest?.('.ft-graphic') || active;
       }
     }
-    if (key === 'End') {
-      const len = input.value.length;
-      try { input.setSelectionRange(len, len); } catch (_) { /* ignore */ }
+    if (!host) return;
+
+    const input = findInHost(host);
+    if (input && !input.disabled && !input.readOnly) {
+      input.focus();
+      if (key === 'Backspace') {
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? start;
+        if (typeof start === 'number' && typeof end === 'number') {
+          if (start !== end) {
+            input.value = input.value.slice(0, start) + input.value.slice(end);
+            input.setSelectionRange(start, start);
+          } else if (start > 0) {
+            input.value = input.value.slice(0, start - 1) + input.value.slice(start);
+            input.setSelectionRange(start - 1, start - 1);
+          }
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+      if (key === 'End') {
+        const len = input.value.length;
+        try { input.setSelectionRange(len, len); } catch (_) { /* ignore */ }
+      }
+      if (key === 'Home' || key === 'ArrowUp' || key === 'PageUp') {
+        try { input.setSelectionRange(0, 0); } catch (_) { /* ignore */ }
+      }
+      if (key === 'ArrowDown' || key === 'PageDown') {
+        const len = input.value.length;
+        try { input.setSelectionRange(len, len); } catch (_) { /* ignore */ }
+      }
+      if (key === 'ArrowLeft') {
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? start;
+        try {
+          if (start !== end) input.setSelectionRange(start, start);
+          else if (start > 0) input.setSelectionRange(start - 1, start - 1);
+        } catch (_) { /* ignore */ }
+      }
+      if (key === 'ArrowRight') {
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? start;
+        const len = input.value.length;
+        try {
+          if (start !== end) input.setSelectionRange(end, end);
+          else if (end < len) input.setSelectionRange(end + 1, end + 1);
+        } catch (_) { /* ignore */ }
+      }
+      input.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true }));
+      input.dispatchEvent(new KeyboardEvent('keyup', { key, code: key, bubbles: true, cancelable: true }));
+      return;
     }
-    if (key === 'Home' || key === 'ArrowUp' || key === 'PageUp') {
-      try { input.setSelectionRange(0, 0); } catch (_) { /* ignore */ }
+
+    if (typeof host.focus === 'function') {
+      try { host.focus(); } catch (_) { /* ignore */ }
     }
-    if (key === 'ArrowDown' || key === 'PageDown') {
-      const len = input.value.length;
-      try { input.setSelectionRange(len, len); } catch (_) { /* ignore */ }
-    }
-    if (key === 'ArrowLeft') {
-      const start = input.selectionStart ?? input.value.length;
-      const end = input.selectionEnd ?? start;
-      try {
-        if (start !== end) input.setSelectionRange(start, start);
-        else if (start > 0) input.setSelectionRange(start - 1, start - 1);
-      } catch (_) { /* ignore */ }
-    }
-    if (key === 'ArrowRight') {
-      const start = input.selectionStart ?? input.value.length;
-      const end = input.selectionEnd ?? start;
-      const len = input.value.length;
-      try {
-        if (start !== end) input.setSelectionRange(end, end);
-        else if (end < len) input.setSelectionRange(end + 1, end + 1);
-      } catch (_) { /* ignore */ }
-    }
-    input.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true }));
+    const evtInit = { key, code: key, bubbles: true, cancelable: true };
+    host.dispatchEvent(new KeyboardEvent('keydown', evtInit));
+    host.dispatchEvent(new KeyboardEvent('keyup', evtInit));
   },
 
   BackspaceButton(comp, ctx) {
@@ -7180,18 +7255,7 @@ ModifyGroupMembershipButton(comp, ctx) {
         }, '*');
       });
     } else {
-      btn.addEventListener('click', () => {
-        if (typeof ctx.sendKeyPress === 'function') {
-          ctx.sendKeyPress({
-            key: 'Backspace',
-            sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
-            linkedObject: (comp.linkedObject || '').trim(),
-            audio: comp.audio !== false
-          });
-        } else {
-          ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'Backspace');
-        }
-      });
+      ComponentRegistry.bindRuntimeKeyPress(btn, ctx, comp, 'Backspace');
     }
     return btn;
   },
@@ -7306,18 +7370,7 @@ ModifyGroupMembershipButton(comp, ctx) {
         }, '*');
       });
     } else {
-      btn.addEventListener('click', () => {
-        if (typeof ctx.sendKeyPress === 'function') {
-          ctx.sendKeyPress({
-            key: 'End',
-            sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
-            linkedObject: (comp.linkedObject || '').trim(),
-            audio: comp.audio !== false
-          });
-        } else {
-          ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'End');
-        }
-      });
+      ComponentRegistry.bindRuntimeKeyPress(btn, ctx, comp, 'End');
     }
     return btn;
   },
@@ -7432,18 +7485,7 @@ ModifyGroupMembershipButton(comp, ctx) {
         }, '*');
       });
     } else {
-      btn.addEventListener('click', () => {
-        if (typeof ctx.sendKeyPress === 'function') {
-          ctx.sendKeyPress({
-            key: 'Enter',
-            sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
-            linkedObject: (comp.linkedObject || '').trim(),
-            audio: comp.audio !== false
-          });
-        } else {
-          ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'Enter');
-        }
-      });
+      ComponentRegistry.bindRuntimeKeyPress(btn, ctx, comp, 'Enter');
     }
     return btn;
   },
@@ -7558,18 +7600,7 @@ ModifyGroupMembershipButton(comp, ctx) {
         }, '*');
       });
     } else {
-      btn.addEventListener('click', () => {
-        if (typeof ctx.sendKeyPress === 'function') {
-          ctx.sendKeyPress({
-            key: 'Home',
-            sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
-            linkedObject: (comp.linkedObject || '').trim(),
-            audio: comp.audio !== false
-          });
-        } else {
-          ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'Home');
-        }
-      });
+      ComponentRegistry.bindRuntimeKeyPress(btn, ctx, comp, 'Home');
     }
     return btn;
   },
@@ -8796,6 +8827,7 @@ ModifyGroupMembershipButton(comp, ctx) {
     el.style.boxSizing = 'border-box';
     el.tabIndex = studioEdit ? -1 : (comp.keyNavigation !== false ? 0 : -1);
     el.classList.toggle('ft-blink', Boolean(comp.blink));
+    ComponentRegistry.registerFocusTarget(el, ctx, comp);
 
     const fontBase = {
       fontFamily: comp.fontFamily || 'Arial Unicode MS',
@@ -8917,6 +8949,7 @@ ModifyGroupMembershipButton(comp, ctx) {
         row.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
+          el.focus();
           goToIndex(index);
         });
       });
@@ -8963,6 +8996,334 @@ ModifyGroupMembershipButton(comp, ctx) {
       });
     }
     return states;
+  },
+
+  defaultControlListSelectorStates(count = 5) {
+    const states = [];
+    for (let i = 0; i < count; i++) {
+      states.push({
+        id: `State${i}`,
+        value: i,
+        caption: `State${i}`,
+        useCaptionColor: false,
+        captionColor: '#ffffff',
+        useCaptionBackColor: true,
+        captionBackColor: '#001C38',
+        captionBlink: false,
+        captionBackStyle: 'transparent',
+        alignment: 'center'
+      });
+    }
+    return states;
+  },
+
+  /**
+   * Control List Selector: a multi-row list of discrete states, driven by a single
+   * value tag. Behaves like a small combo-list: click a row or use Up/Down/PageUp/
+   * PageDown to browse, and (when writeOnEnter is true) press Enter to commit the
+   * write. Commit writes comp.tag, pulses comp.enterTag high for enterKeyHoldTime,
+   * and - if comp.enterHandshakeTag is configured - waits up to enterKeyHandshakeTime
+   * for the PLC to confirm via handshakeResetType ('nonZeroValue' or the safer
+   * edge-triggered 'zeroToNonZero') before treating the write as committed; on
+   * timeout the control reverts to the last committed state and flashes an error.
+   */
+  ControlListSelector(comp, ctx) {
+    const el = document.createElement('div');
+    el.className = 'ft-control-list-selector ft-graphic';
+    if (comp.name) el.dataset.name = comp.name;
+    if (comp.visible === false) {
+      el.style.display = 'none';
+      return el;
+    }
+
+    ComponentRegistry.applyGraphicsObject(el, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    const states = comp.states?.length
+      ? comp.states
+      : ComponentRegistry.defaultControlListSelectorStates(comp.numberOfStates ?? 5);
+
+    ComponentRegistry.applyButtonAppearance(el, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 4,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(el, {
+      ...comp,
+      usePatternColor: Boolean(comp.usePatternColor),
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.padding = '0';
+    el.style.overflow = 'hidden';
+    el.style.boxSizing = 'border-box';
+    el.tabIndex = studioEdit ? -1 : (comp.keyNavigation !== false ? 0 : -1);
+    el.classList.toggle('ft-blink', Boolean(comp.blink));
+    ComponentRegistry.registerFocusTarget(el, ctx, comp);
+
+    const fontBase = {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: Boolean(comp.bold),
+      italic: Boolean(comp.italic),
+      underline: Boolean(comp.underline)
+    };
+    const truncate = comp.captionTruncate === 'character' ? 'character' : 'word';
+    const alignIdFor = (a) => (a === 'left' ? 'middleLeft' : a === 'right' ? 'middleRight' : 'middleCenter');
+
+    let pendingIndex = 0;
+    let committedIndex = 0;
+
+    const rowEls = states.map((stateDef, index) => {
+      const row = document.createElement('div');
+      row.className = 'ft-display-list-row';
+      row.dataset.index = String(index);
+      const arrow = document.createElement('span');
+      arrow.className = 'ft-display-list-arrow';
+      arrow.setAttribute('aria-hidden', 'true');
+      const cap = document.createElement('span');
+      cap.className = 'ft-display-list-caption';
+      cap.classList.add(truncate === 'character' ? 'truncate-character' : 'truncate-word');
+      row.appendChild(arrow);
+      row.appendChild(cap);
+      el.appendChild(row);
+      return { row, arrow, cap, stateDef };
+    });
+
+    const paint = () => {
+      rowEls.forEach(({ row, cap, stateDef }, i) => {
+        const isPending = i === pendingIndex;
+        const isCommitted = i === committedIndex;
+        row.classList.toggle('is-selected', isPending);
+        row.classList.toggle('is-committed', isCommitted && !isPending);
+        cap.textContent = stateDef.caption ?? '';
+        const alignId = alignIdFor(stateDef.alignment || 'center');
+        cap.style.textAlign = alignId === 'middleRight' ? 'right' : (alignId === 'middleCenter' ? 'center' : 'left');
+        if (isPending) {
+          const useSelBack = comp.useSelectionBackColor !== false;
+          row.style.backgroundColor = useSelBack ? (comp.selectionBackColor || '#bcd9ff') : 'transparent';
+          ComponentRegistry.applyCaptionStyle(cap, {
+            ...fontBase,
+            foreColor: comp.useSelectionForeColor
+              ? (comp.selectionForeColor || '#000000')
+              : (stateDef.useCaptionColor ? (stateDef.captionColor || '#ffffff') : '#000000'),
+            useForeColor: true,
+            wordWrap: false,
+            alignment: alignId
+          });
+        } else {
+          row.style.backgroundColor = 'transparent';
+          ComponentRegistry.applyCaptionStyle(cap, {
+            ...fontBase,
+            foreColor: stateDef.captionColor || '#ffffff',
+            useForeColor: Boolean(stateDef.useCaptionColor),
+            wordWrap: false,
+            alignment: alignId
+          });
+        }
+        if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid' && !isPending) {
+          cap.style.backgroundColor = stateDef.captionBackColor || '#001C38';
+        } else {
+          cap.style.backgroundColor = '';
+        }
+        cap.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
+      });
+    };
+
+    const indexFromValue = (val) => {
+      const resolved = ComponentRegistry.resolveMultistateState(states, val);
+      const idx = states.findIndex((s) => s.id === resolved?.id);
+      return idx < 0 ? 0 : idx;
+    };
+
+    committedIndex = studioEdit ? 0 : (comp.tag ? indexFromValue(ctx.getTagValue?.(comp.tag)) : 0);
+    pendingIndex = committedIndex;
+    paint();
+
+    if (studioEdit) {
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: 'ControlListSelector',
+          source: comp._source || ''
+        }, '*');
+      });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: 'ControlListSelector',
+          source: comp._source || ''
+        }, '*');
+      });
+      return el;
+    }
+
+    let awaitingHandshake = false;
+    let controlDelayUntil = 0;
+    let handshakeTimer = null;
+    let pulseTimer = null;
+    let sawHandshakeReset = false;
+
+    const clearHandshakeWait = () => {
+      awaitingHandshake = false;
+      if (handshakeTimer) { clearTimeout(handshakeTimer); handshakeTimer = null; }
+      el.classList.remove('ft-cls-waiting');
+    };
+
+    const flashError = () => {
+      el.classList.add('ft-cls-error');
+      setTimeout(() => {
+        if (el.isConnected) el.classList.remove('ft-cls-error');
+      }, 600);
+    };
+
+    const finishCommit = (success) => {
+      clearHandshakeWait();
+      if (!el.isConnected) return;
+      if (success) {
+        committedIndex = pendingIndex;
+      } else {
+        pendingIndex = committedIndex;
+        flashError();
+      }
+      paint();
+    };
+
+    const handshakeRef = comp.enterHandshakeTag || '';
+    const resetType = comp.handshakeResetType === 'zeroToNonZero' ? 'zeroToNonZero' : 'nonZeroValue';
+    const isConfirmedVal = (val) => {
+      const n = Number(val);
+      if (!Number.isNaN(n)) return n !== 0;
+      return Boolean(val);
+    };
+
+    if (handshakeRef) {
+      ComponentRegistry.bindIndicatorRef(handshakeRef, (val) => {
+        if (!el.isConnected || !awaitingHandshake) return;
+        if (resetType === 'zeroToNonZero') {
+          if (!sawHandshakeReset) {
+            if (!isConfirmedVal(val)) sawHandshakeReset = true;
+            return;
+          }
+          if (isConfirmedVal(val)) finishCommit(true);
+        } else if (isConfirmedVal(val)) {
+          finishCommit(true);
+        }
+      }, ctx);
+    }
+
+    const commitPending = () => {
+      if (awaitingHandshake) return;
+      const now = Date.now();
+      if (now < controlDelayUntil) return;
+      controlDelayUntil = now + Math.max(0, comp.enterKeyControlDelay ?? 400);
+
+      const stateDef = states[pendingIndex];
+      const writeTag = comp.tag ? ComponentRegistry.resolveWriteTagName(comp.tag) : null;
+      if (writeTag) ctx.writeTag(writeTag, stateDef?.value ?? pendingIndex);
+
+      const enterWrite = comp.enterTag ? ComponentRegistry.resolveWriteTagName(comp.enterTag) : null;
+      const holdTime = Math.max(0, comp.enterKeyHoldTime ?? 250);
+      if (enterWrite) {
+        ctx.writeTag(enterWrite, 1);
+        pulseTimer = setTimeout(() => {
+          if (!el.isConnected) return;
+          ctx.writeTag(enterWrite, 0);
+        }, holdTime);
+      }
+
+      if (handshakeRef) {
+        awaitingHandshake = true;
+        sawHandshakeReset = false;
+        el.classList.add('ft-cls-waiting');
+        const initial = ComponentRegistry.readIndicatorRef(handshakeRef, ctx);
+        if (resetType === 'zeroToNonZero' && !isConfirmedVal(initial)) {
+          sawHandshakeReset = true;
+        } else if (resetType === 'nonZeroValue' && isConfirmedVal(initial)) {
+          finishCommit(true);
+          return;
+        }
+        handshakeTimer = setTimeout(() => {
+          if (!el.isConnected) return;
+          finishCommit(false);
+        }, Math.max(0, comp.enterKeyHandshakeTime ?? 4000));
+      } else {
+        committedIndex = pendingIndex;
+      }
+      paint();
+    };
+
+    const setPending = (index) => {
+      if (!rowEls.length || awaitingHandshake) return;
+      let next = index;
+      if (comp.wrapAround !== false) {
+        next = ((index % rowEls.length) + rowEls.length) % rowEls.length;
+      } else {
+        next = Math.max(0, Math.min(rowEls.length - 1, index));
+      }
+      pendingIndex = next;
+      paint();
+    };
+
+    const selectAndMaybeCommit = (index) => {
+      setPending(index);
+      if (comp.writeOnEnter === false) commitPending();
+    };
+
+    if (comp.tag) {
+      ComponentRegistry.bindIndicatorRef(comp.tag, (val) => {
+        if (!el.isConnected || awaitingHandshake) return;
+        const idx = indexFromValue(val);
+        committedIndex = idx;
+        pendingIndex = idx;
+        paint();
+      }, ctx);
+    }
+
+    rowEls.forEach(({ row }, index) => {
+        row.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          el.focus();
+          selectAndMaybeCommit(index);
+        });
+    });
+
+    if (comp.keyNavigation !== false) {
+      const pageStep = Math.max(1, Math.min(5, rowEls.length - 1));
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          selectAndMaybeCommit(pendingIndex + 1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          selectAndMaybeCommit(pendingIndex - 1);
+        } else if (e.key === 'PageDown') {
+          e.preventDefault();
+          selectAndMaybeCommit(pendingIndex + pageStep);
+        } else if (e.key === 'PageUp') {
+          e.preventDefault();
+          selectAndMaybeCommit(pendingIndex - pageStep);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          commitPending();
+        }
+      });
+    }
+
+    return el;
   },
 
   formatFtShortDateTime(date = new Date()) {
@@ -9327,6 +9688,8 @@ ModifyGroupMembershipButton(comp, ctx) {
       renderAppearance(comp.caption ?? '');
     }
 
+    ComponentRegistry.registerFocusTarget(el, ctx, comp);
+
     const commitValue = (raw) => {
       const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
       if (!writeTag) return;
@@ -9406,21 +9769,42 @@ ModifyGroupMembershipButton(comp, ctx) {
     el.appendChild(timeEl);
     el.appendChild(textEl);
     const fallback = (comp.caption != null && comp.caption !== '')
-      ? comp.caption
+      ? String(comp.caption)
       : 'ABCDE FGHIJK LMNOPQ RSTUV WXYZ ABCDE FGHIJK LMNOPQ RSTUV WXYZ';
+    const isPlaceholderMessage = (text) => {
+      const value = String(text || '').replace(/\s+/g, ' ').trim();
+      return !value || /ABCDE\s+FGHIJK/i.test(value);
+    };
+    const applyMessage = (message) => {
+      const text = message == null ? '' : String(message);
+      if (studioEdit) {
+        timeEl.textContent = ComponentRegistry.formatFtShortDateTime();
+        textEl.textContent = text.trim() ? text : fallback;
+        el.classList.add('has-message');
+        return;
+      }
+      if (isPlaceholderMessage(text)) {
+        timeEl.textContent = '';
+        textEl.textContent = '';
+        el.classList.remove('has-message');
+        return;
+      }
+      timeEl.textContent = ComponentRegistry.formatFtShortDateTime();
+      textEl.textContent = text;
+      el.classList.add('has-message');
+    };
     const tickTime = () => {
+      if (!studioEdit && !textEl.textContent) return;
       timeEl.textContent = ComponentRegistry.formatFtShortDateTime();
     };
-    tickTime();
+    if (studioEdit) tickTime();
     if (!studioEdit) {
       const timerId = setInterval(tickTime, 1000);
       el.dataset.tickerTimer = String(timerId);
     }
     const render = (alarms) => {
       const active = alarms?.active?.filter((a) => !a.acknowledged) || [];
-      textEl.textContent = active.length
-        ? active.map((a) => a.message).join('   ')
-        : fallback;
+      applyMessage(active.map((a) => a.message).filter(Boolean).join('   '));
     };
     render({ active: [] });
     ctx.onAlarmUpdate(render);
@@ -9584,9 +9968,50 @@ ModifyGroupMembershipButton(comp, ctx) {
     if (comp.width != null) el.style.width = `${comp.width}px`;
     if (comp.height != null) el.style.height = `${comp.height}px`;
     el.classList.add('ft-graphic');
+    const layer = Number(comp.zIndex);
+    if (Number.isFinite(layer)) el.style.zIndex = String(layer);
+    const decorative = new Set([
+      'Rectangle', 'RoundedRectangle', 'Ellipse', 'Wedge', 'Arc',
+      'Freehand', 'Line', 'Polygon', 'Polyline',
+      'Text', 'Image', 'StringDisplay', 'NumericDisplay', 'TimeDateDisplay', 'Scale'
+    ]);
+    if (decorative.has(comp.type)) el.style.pointerEvents = 'none';
     if (comp.type === 'RoundedRectangle') {
       el.style.borderRadius = `${ComponentRegistry.roundedRectCornerRadius(comp)}px`;
       el.style.overflow = 'hidden';
+    }
+  },
+
+  applyRuntimeVisibility(el, comp, ctx) {
+    const rule = comp.visibleWhen
+      || (Array.isArray(comp.animations)
+        ? comp.animations.find((a) => a && (a.type === 'visibility' || a.expressionTrueState === 'visible'))
+        : null);
+    if (!rule || !el) return;
+    if (ctx?.studioEdit) return;
+    const originalDisplay = el.style.display || '';
+    const tag = String(rule.tag || '').trim()
+      || (String(rule.expression || '').match(/\{([^}]+)\}/) || [])[1]?.replace(/\\/g, '.')
+      || '';
+    const equals = rule.equals;
+    const apply = (val) => {
+      let visible = true;
+      if (equals !== undefined) {
+        visible = Number(val) === Number(equals) || String(val) === String(equals);
+      } else if (rule.expression) {
+        const n = Number(val);
+        const expr = String(rule.expression).replace(/\{[^}]+\}/g, Number.isFinite(n) ? String(n) : JSON.stringify(val ?? ''));
+        try {
+          visible = Boolean(Function(`"use strict"; return (${expr});`)());
+        } catch {
+          visible = Boolean(val);
+        }
+      }
+      el.style.display = visible ? originalDisplay : 'none';
+    };
+    if (tag && ctx?.bindTag) {
+      ctx.bindTag(tag, apply);
+      if (ctx.getTagValue) apply(ctx.getTagValue(tag));
     }
   },
 
@@ -10134,7 +10559,12 @@ ensureModifyGroupDialog() {
       fallback.textContent = `Unknown: ${comp.type}`;
       return fallback;
     }
-    return renderer(comp, ctx);
+    const el = renderer(comp, ctx);
+    if (el && ctx && ctx.layerIndex != null && el.style && !el.style.zIndex) {
+      el.style.zIndex = String(ctx.layerIndex);
+    }
+    ComponentRegistry.applyRuntimeVisibility(el, comp, ctx);
+    return el;
   }
 };
 

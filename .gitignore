@@ -8,6 +8,7 @@ server.log
 # Generated / disposable build outputs
 generated/
 web-hmi-bridge/ftio/reimport/packages/
+pc-hmi-runtime/dist/
 
 # Temp / debug artifacts
 tmp-*

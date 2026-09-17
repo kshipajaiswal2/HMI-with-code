@@ -12,6 +12,7 @@ const state = {
   openDisplays: [],
   activeObjectTool: 'select',
   explorerFilter: '',
+  explorerView: 'application',
   contextMenuNode: null,
   previewCanvas: { width: 800, height: 600 },
   previewLoadToken: 0,
@@ -39,7 +40,7 @@ const state = {
 
 window.StudioState = state;
 
-const MENU_IDS = ['fileMenu', 'editMenu', 'viewMenu', 'objectsMenu', 'applicationMenu', 'toolsMenu'];
+const MENU_IDS = ['fileMenu', 'editMenu', 'viewMenu', 'objectsMenu', 'applicationMenu', 'recipeMenu', 'toolsMenu'];
 
 const DEFAULT_VIEW_PREFS = {
   statusBar: true,
@@ -127,12 +128,13 @@ const freehandStrokePreview = document.getElementById('freehandStrokePreview');
 const CANVAS_GRAPHIC_TYPES = new Set([
   'Text', 'Image', 'NumericDisplay', 'NumericInputEnable', 'NumericInputCursorPoint', 'StringDisplay', 'StringInputEnable', 'MomentaryButton', 'MaintainedButton', 'LatchedButton', 'MultistateButton', 'InterlockedButton', 'RampButton',
   'MultistateIndicator', 'SymbolIndicator', 'ListIndicator', 'BarGraph', 'Gauge', 'Scale', 'PausePenButton', 'NextPenButton', 'BackspaceButton', 'EndButton', 'EnterButton', 'HomeButton', 'MoveLeftButton', 'MoveRightButton', 'MoveUpButton', 'MoveDownButton', 'PageDownButton', 'PageUpButton', 'Trend', 'RecipePlusButton', 'RecipePlusSelector', 'RecipePlusTable', 'AddUserGroupButton', 'DeleteUserGroupButton', 'ModifyGroupMembershipButton', 'UnlockUserButton', 'EnableUserButton', 'DisableUserButton', 'PasswordButton', 'ChangeUserPropertiesButton',
-  'GotoButton', 'ReturnToButton', 'CloseDisplayButton', 'DisplayListSelector', 'TimeDateDisplay', 'StringDisplay', 'AlarmTicker', 'Rectangle', 'RoundedRectangle', 'Ellipse', 'Wedge', 'Arc', 'Freehand', 'Line', 'Polygon', 'Polyline', 'Panel',
-  'SafetyLadderDiagram'
+  'GotoButton', 'ReturnToButton', 'CloseDisplayButton', 'DisplayListSelector', 'TimeDateDisplay', 'AlarmTicker', 'Rectangle', 'RoundedRectangle', 'Ellipse', 'Wedge', 'Arc', 'Freehand', 'Line', 'Polygon', 'Polyline', 'Panel',
+  'SafetyLadderDiagram', 'ControlListSelector'
 ]);
 const displayGrid = document.getElementById('displayGrid');
 const explorerTree = document.getElementById('explorerTree');
-const explorerProject = document.getElementById('explorerProject');
+const explorerCommTree = document.getElementById('explorerCommTree');
+const explorerTitle = document.getElementById('explorerTitle');
 const projectSelect = document.getElementById('projectSelect');
 const workspace = document.getElementById('workspace');
 const previewFrame = document.getElementById('previewFrame');
@@ -175,8 +177,29 @@ function exposeStudioGlobals() {
   window.isEditingGlobalObject = isEditingGlobalObject;
   window.showImageBrowserDialog = showImageBrowserDialog;
   window.showDisplayPickerDialog = showDisplayPickerDialog;
+  window.loadScreenInWorkspace = loadScreenInWorkspace;
+  window.hidePreviewStage = hidePreviewStage;
+  window.loadExplorer = loadExplorer;
   window.fetchJson = fetchJson;
   window.refreshProjectConfig = refreshProjectConfig;
+  window.getSelectedCanvasIndices = getSelectedCanvasIndices;
+  window.getPrimaryCanvasSelectionIndex = getPrimaryCanvasSelectionIndex;
+  window.patchOpenCanvas = patchOpenCanvas;
+  window.pushUndoBefore = pushUndoBefore;
+  window.updateCanvasPreview = updateCanvasPreview;
+  window.removeTemplateOverride = removeTemplateOverride;
+  window.uniquePastedName = uniquePastedName;
+  window.defaultImageComponent = defaultImageComponent;
+  window.nextImageObjectName = nextImageObjectName;
+  window.cloneComponentForClipboard = cloneComponentForClipboard;
+  window.pasteClipboardComponents = pasteClipboardComponents;
+  window.fetchProjectImages = fetchProjectImages;
+  window.openGlobalObjectPreview = openGlobalObjectPreview;
+  window.openPropertiesForComponent = openPropertiesForComponent;
+  window.updateEditClipboardUI = updateEditClipboardUI;
+  window.refreshObjectExplorer = refreshObjectExplorer;
+  window.refreshPropertyPanel = refreshPropertyPanel;
+  window.showCreateRuntimeDialog = showCreateRuntimeDialog;
 }
 
 function closeAllMenus() {
@@ -219,6 +242,10 @@ function toggleApplicationMenu() {
 
 function toggleToolsMenu() {
   toggleMenu('toolsMenu');
+}
+
+function toggleRecipeMenu() {
+  toggleMenu('recipeMenu');
 }
 
 function updateObjectsMenuChecks() {
@@ -597,6 +624,16 @@ async function openPropertiesByGraphicName(name, componentType = '', source = ''
       window.StudioChangeUserPropertiesButton?.wireChangeUserPropertiesButtonTools();
       window.StudioChangeUserPropertiesButton?.presentChangeUserPropertiesButtonDialog();
       window.StudioChangeUserPropertiesButton?.scheduleChangeUserPropertiesLivePreview();
+      setTemplateEditStatus(name, ref);
+    } else if (comp.type === 'ControlListSelector') {
+      flushDeferredDialogInits();
+      window.StudioControlListSelector?.initControlListSelectorDialog();
+      window.StudioControlListSelector?.fillControlListSelectorForm(comp);
+      resetPropsDialogState('control-list', window.StudioControlListSelector.readControlListSelectorForm, 'applyControlListSelector', null, ref);
+      window.StudioControlListSelector?.switchControlListSelectorTab('general');
+      window.StudioControlListSelector?.wireControlListSelectorTools();
+      window.StudioControlListSelector?.presentControlListSelectorDialog();
+      window.StudioControlListSelector?.scheduleControlListSelectorLivePreview();
       setTemplateEditStatus(name, ref);
     } else if (comp.type === 'RecipePlusSelector') {
       flushDeferredDialogInits();
@@ -1115,6 +1152,74 @@ function getPrimaryCanvasSelectionIndex() {
 
 function canvasSelectionIncludes(index) {
   return getSelectedCanvasIndices().includes(index);
+}
+
+function getSelectedDisplayArrangeTargets() {
+  const edits = state.canvasEditCache?.editComponents || [];
+  const seen = new Set();
+  const targets = [];
+  for (const editIdx of getSelectedCanvasIndices()) {
+    const entry = edits[editIdx];
+    const displayIndex = entry?.ref?.type === 'display'
+      ? entry.ref.index
+      : entry?.comp?._displayIndex;
+    if (!Number.isInteger(displayIndex) || displayIndex < 0 || seen.has(displayIndex)) continue;
+    if (entry?.ref?.type === 'template' || entry?.ref?.type === 'template-override' || entry?.ref?.type === 'shell') continue;
+    seen.add(displayIndex);
+    targets.push({ editIdx, displayIndex, name: entry.comp?.name });
+  }
+  return targets.sort((a, b) => a.displayIndex - b.displayIndex);
+}
+
+async function arrangeCanvasSelection(action) {
+  const targets = getSelectedDisplayArrangeTargets();
+  if (!targets.length) {
+    setStatus('Select a display object to arrange (template objects stay on the global object)');
+    return;
+  }
+  const canvas = await fetchOpenCanvas();
+  const components = [...(canvas.components || [])];
+  const indices = targets.map((t) => t.displayIndex).filter((i) => i < components.length);
+  if (!indices.length) return;
+  await pushUndoBefore({ screenKeys: ['components'] });
+  const moving = indices.map((i) => components[i]);
+  if (action === 'front') {
+    for (let i = indices.length - 1; i >= 0; i -= 1) components.splice(indices[i], 1);
+    components.push(...moving);
+  } else if (action === 'back') {
+    for (let i = indices.length - 1; i >= 0; i -= 1) components.splice(indices[i], 1);
+    components.unshift(...moving);
+  } else if (action === 'forward') {
+    for (let i = indices.length - 1; i >= 0; i -= 1) {
+      const idx = indices[i];
+      if (idx >= components.length - 1 || indices.includes(idx + 1)) continue;
+      const [item] = components.splice(idx, 1);
+      components.splice(idx + 1, 0, item);
+    }
+  } else if (action === 'backward') {
+    for (let i = 0; i < indices.length; i += 1) {
+      const idx = indices[i];
+      if (idx <= 0 || indices.includes(idx - 1)) continue;
+      const [item] = components.splice(idx, 1);
+      components.splice(idx - 1, 0, item);
+    }
+  }
+  await patchOpenCanvas({ components });
+  await updateCanvasPreview({ forceReload: true });
+  await refreshCanvasEditOverlay().catch(() => {});
+  const names = new Set(targets.map((t) => t.name).filter(Boolean));
+  const edits = state.canvasEditCache?.editComponents || [];
+  state.canvasSelection.indices = edits
+    .map((entry, i) => (names.has(entry.comp?.name) ? i : -1))
+    .filter((i) => i >= 0);
+  refreshCanvasEditOverlaySelection();
+  const labels = {
+    front: 'Brought to front',
+    back: 'Sent to back',
+    forward: 'Brought forward',
+    backward: 'Sent backward'
+  };
+  setStatus(labels[action] || 'Layer order updated');
 }
 
 function isGeometryPatch(patch) {
@@ -2183,6 +2288,17 @@ function syncOpenPropsDialogBounds(comp) {
       cupTop.value = comp.top ?? cupTop.value;
       cupLeft.value = comp.left ?? cupLeft.value;
       flushPropsApplyButton(window.StudioChangeUserPropertiesButton.readChangeUserPropertiesButtonForm, 'applyChangeUserPropertiesButton');
+    } else if (kind === 'control-list') {
+      const clsHeight = document.getElementById('clsHeight');
+      const clsWidth = document.getElementById('clsWidth');
+      const clsTop = document.getElementById('clsTop');
+      const clsLeft = document.getElementById('clsLeft');
+      if (!clsHeight) return;
+      clsHeight.value = comp.height ?? clsHeight.value;
+      clsWidth.value = comp.width ?? clsWidth.value;
+      clsTop.value = comp.top ?? clsTop.value;
+      clsLeft.value = comp.left ?? clsLeft.value;
+      flushPropsApplyButton(window.StudioControlListSelector.readControlListSelectorForm, 'applyControlListSelector');
     } else if (kind === 'recipeplus-selector') {
       const rpsHeight = document.getElementById('rpsHeight');
       const rpsWidth = document.getElementById('rpsWidth');
@@ -2493,7 +2609,7 @@ function defaultLineComponent(overrides = {}) {
     lineStyle: 'solid',
     backStyle: 'transparent',
     useForeColor: true,
-    foreColor: '#808080',
+    foreColor: '#000000',
     useBackColor: false,
     backColor: '#c0c0c0',
     lineWidth: 1,
@@ -3989,16 +4105,40 @@ function renderDisplayPickerTree(selectedId, query) {
   const tree = document.getElementById('displayPickerTree');
   if (!tree) return;
   const items = displayPickerItems.filter((item) => displayPickerMatches(item, query));
-  const rootLabel = displayPickerKind === 'parameter-files' ? 'Parameter Files' : 'Displays';
-  const rows = items.map((item) => {
+  const rootLabel = displayPickerKind === 'parameter-files'
+    ? 'Parameter Files'
+    : (displayPickerKind === 'information-messages' ? 'Information Messages' : 'Displays');
+
+  const renderItem = (item) => {
     const selected = item.id === selectedId ? ' is-selected' : '';
-    const label = item.title && item.title !== item.id ? `${item.title}` : item.id;
+    const label = displayPickerKind === 'displays' ? item.id : (item.title && item.title !== item.id ? item.title : item.id);
     return `<button type="button" class="component-browser-item${selected}" data-id="${escapeHtml(item.id)}" role="treeitem">${escapeHtml(label)}</button>`;
-  }).join('');
+  };
+
+  let groupsHtml = '';
+  if (displayPickerKind === 'displays') {
+    const groups = new Map();
+    for (const item of items) {
+      const folderId = folderForScreenId(item.id);
+      if (!groups.has(folderId)) groups.set(folderId, []);
+      groups.get(folderId).push(item);
+    }
+    groupsHtml = [...groups.entries()].map(([folderId, groupItems]) => `
+      <div class="component-browser-group">
+        <div class="component-browser-subfolder">${escapeHtml(folderId)}</div>
+        <div class="component-browser-children">
+          ${groupItems.map(renderItem).join('') || '<div class="component-browser-empty">No matches</div>'}
+        </div>
+      </div>
+    `).join('');
+  } else {
+    groupsHtml = `<div class="component-browser-children">${items.map(renderItem).join('') || '<div class="component-browser-empty">No matches</div>'}</div>`;
+  }
+
   tree.innerHTML = `
     <div class="component-browser-root" role="group">
       <div class="component-browser-folder">${escapeHtml(rootLabel)}</div>
-      <div class="component-browser-children">${rows || '<div class="component-browser-empty">No matches</div>'}</div>
+      ${groupsHtml}
     </div>`;
   displayPickerSelected = items.some((item) => item.id === selectedId) ? selectedId : (items[0]?.id || '');
   tree.querySelectorAll('.component-browser-item').forEach((btn) => {
@@ -4018,13 +4158,17 @@ async function showDisplayPickerDialog(selectedId = '', options = {}) {
     setStatus('Open a project first');
     return null;
   }
-  displayPickerKind = options.kind === 'parameter-files' ? 'parameter-files' : 'displays';
+  displayPickerKind = options.kind === 'parameter-files'
+    ? 'parameter-files'
+    : (options.kind === 'information-messages' ? 'information-messages' : 'displays');
   const hint = document.getElementById('displayPickerHint');
   if (hint) hint.textContent = 'Select a component';
   const search = document.getElementById('displayPickerSearch');
   if (search) search.value = '';
   try {
-    if (displayPickerKind === 'parameter-files') {
+    if (displayPickerKind === 'information-messages') {
+      displayPickerItems = Array.isArray(options.items) ? options.items.slice() : [];
+    } else if (displayPickerKind === 'parameter-files') {
       const res = await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/parameter-files`);
       const files = res.parameterFiles || state.projectConfig?.parameterFiles || {};
       displayPickerItems = Object.keys(files).sort((a, b) => a.localeCompare(b)).map((id) => ({ id, title: id }));
@@ -4630,7 +4774,7 @@ function updateLineStudioPreview(comp) {
     const dash = freehandPreviewDashAttr(lineStyle, lineW);
     parts.push(
       `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" fill="none"` +
-      ` stroke="${comp.foreColor || '#808080'}" stroke-width="${lineW}" stroke-linecap="round"${dash}/>`
+      ` stroke="${comp.foreColor || '#000000'}" stroke-width="${lineW}" stroke-linecap="butt"${dash}/>`
     );
   }
   freehandStrokePreview.innerHTML = parts.join('');
@@ -4983,6 +5127,8 @@ function startObjectPlacement(kind, defaults = {}) {
     setStatus('Drag on the display to draw the Password Button, then properties will open (Esc to cancel)');
   } else if (kind === 'change-user-properties') {
     setStatus('Drag on the display to draw the Change User Properties Button, then properties will open (Esc to cancel)');
+  } else if (kind === 'control-list') {
+    setStatus('Drag on the display to draw the Control List Selector, then properties will open (Esc to cancel)');
   } else if (kind === 'recipeplus-selector') {
     setStatus('Drag on the display to draw the RecipePlus Selector, then properties will open (Esc to cancel)');
   } else if (kind === 'recipeplus-table') {
@@ -5276,6 +5422,12 @@ async function completeObjectPlacement(rect) {
         return;
       }
       await window.StudioChangeUserPropertiesButton?.showChangeUserPropertiesButtonDialog(defaults);
+    } else if (kind === 'control-list') {
+      if (!displayIsOpen()) {
+        setStatus('Open a display or global object first');
+        return;
+      }
+      await window.StudioControlListSelector?.showControlListSelectorDialog(defaults);
     } else if (kind === 'recipeplus-selector') {
       if (!displayIsOpen()) {
         setStatus('Open a display or global object first');
@@ -5450,8 +5602,8 @@ function initObjectPlacement() {
       updateFreehandStrokePreview([start, current]);
       return;
     }
-    const minW = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'enter' || state.placement.kind === 'home' || state.placement.kind === 'move-left' || state.placement.kind === 'move-right' || state.placement.kind === 'move-up' || state.placement.kind === 'move-down' || state.placement.kind === 'page-down' || state.placement.kind === 'page-up' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'add-user-group' || state.placement.kind === 'delete-user-group' || state.placement.kind === 'modify-group-membership' || state.placement.kind === 'unlock-user' || state.placement.kind === 'enable-user' || state.placement.kind === 'disable-user' || state.placement.kind === 'change-password' || state.placement.kind === 'change-user-properties' || state.placement.kind === 'numeric') ? 40 : state.placement.kind === 'image' ? 32 : 24;
-    const minH = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'enter' || state.placement.kind === 'home' || state.placement.kind === 'move-left' || state.placement.kind === 'move-right' || state.placement.kind === 'move-up' || state.placement.kind === 'move-down' || state.placement.kind === 'page-down' || state.placement.kind === 'page-up' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'add-user-group' || state.placement.kind === 'delete-user-group' || state.placement.kind === 'modify-group-membership' || state.placement.kind === 'unlock-user' || state.placement.kind === 'enable-user' || state.placement.kind === 'disable-user' || state.placement.kind === 'change-password' || state.placement.kind === 'change-user-properties' || state.placement.kind === 'numeric') ? 24 : state.placement.kind === 'image' ? 32 : 16;
+    const minW = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'enter' || state.placement.kind === 'home' || state.placement.kind === 'move-left' || state.placement.kind === 'move-right' || state.placement.kind === 'move-up' || state.placement.kind === 'move-down' || state.placement.kind === 'page-down' || state.placement.kind === 'page-up' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'add-user-group' || state.placement.kind === 'delete-user-group' || state.placement.kind === 'modify-group-membership' || state.placement.kind === 'unlock-user' || state.placement.kind === 'enable-user' || state.placement.kind === 'disable-user' || state.placement.kind === 'change-password' || state.placement.kind === 'change-user-properties' || state.placement.kind === 'control-list' || state.placement.kind === 'numeric') ? 40 : state.placement.kind === 'image' ? 32 : 24;
+    const minH = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'enter' || state.placement.kind === 'home' || state.placement.kind === 'move-left' || state.placement.kind === 'move-right' || state.placement.kind === 'move-up' || state.placement.kind === 'move-down' || state.placement.kind === 'page-down' || state.placement.kind === 'page-up' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'add-user-group' || state.placement.kind === 'delete-user-group' || state.placement.kind === 'modify-group-membership' || state.placement.kind === 'unlock-user' || state.placement.kind === 'enable-user' || state.placement.kind === 'disable-user' || state.placement.kind === 'change-password' || state.placement.kind === 'change-user-properties' || state.placement.kind === 'control-list' || state.placement.kind === 'numeric') ? 24 : state.placement.kind === 'image' ? 32 : 16;
     updatePlacementRubberband(normalizePlacementRect(start.x, start.y, current.x, current.y, minW, minH));
   });
 
@@ -5472,8 +5624,8 @@ function initObjectPlacement() {
       completeLinePlacement(start, current).catch((err) => setStatus(`Error: ${err.message}`));
       return;
     }
-    const minW = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'enter' || state.placement.kind === 'home' || state.placement.kind === 'move-left' || state.placement.kind === 'move-right' || state.placement.kind === 'move-up' || state.placement.kind === 'move-down' || state.placement.kind === 'page-down' || state.placement.kind === 'page-up' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'add-user-group' || state.placement.kind === 'delete-user-group' || state.placement.kind === 'modify-group-membership' || state.placement.kind === 'unlock-user' || state.placement.kind === 'enable-user' || state.placement.kind === 'disable-user' || state.placement.kind === 'change-password' || state.placement.kind === 'change-user-properties' || state.placement.kind === 'numeric') ? 40 : state.placement.kind === 'image' ? 32 : 24;
-    const minH = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'enter' || state.placement.kind === 'home' || state.placement.kind === 'move-left' || state.placement.kind === 'move-right' || state.placement.kind === 'move-up' || state.placement.kind === 'move-down' || state.placement.kind === 'page-down' || state.placement.kind === 'page-up' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'add-user-group' || state.placement.kind === 'delete-user-group' || state.placement.kind === 'modify-group-membership' || state.placement.kind === 'unlock-user' || state.placement.kind === 'enable-user' || state.placement.kind === 'disable-user' || state.placement.kind === 'change-password' || state.placement.kind === 'change-user-properties' || state.placement.kind === 'numeric') ? 24 : state.placement.kind === 'image' ? 32 : 16;
+    const minW = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'enter' || state.placement.kind === 'home' || state.placement.kind === 'move-left' || state.placement.kind === 'move-right' || state.placement.kind === 'move-up' || state.placement.kind === 'move-down' || state.placement.kind === 'page-down' || state.placement.kind === 'page-up' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'add-user-group' || state.placement.kind === 'delete-user-group' || state.placement.kind === 'modify-group-membership' || state.placement.kind === 'unlock-user' || state.placement.kind === 'enable-user' || state.placement.kind === 'disable-user' || state.placement.kind === 'change-password' || state.placement.kind === 'change-user-properties' || state.placement.kind === 'control-list' || state.placement.kind === 'numeric') ? 40 : state.placement.kind === 'image' ? 32 : 24;
+    const minH = (state.placement.kind === 'momentary' || state.placement.kind === 'maintained' || state.placement.kind === 'latched' || state.placement.kind === 'multistate' || state.placement.kind === 'interlocked' || state.placement.kind === 'ramp' || state.placement.kind === 'numeric-input' || state.placement.kind === 'numeric-input-cursor' || state.placement.kind === 'string-display' || state.placement.kind === 'string-input' || state.placement.kind === 'goto' || state.placement.kind === 'return-to' || state.placement.kind === 'close-display' || state.placement.kind === 'display-list' || state.placement.kind === 'multistate-indicator' || state.placement.kind === 'symbol-indicator' || state.placement.kind === 'list-indicator' || state.placement.kind === 'bar-graph' || state.placement.kind === 'gauge' || state.placement.kind === 'scale' || state.placement.kind === 'pause-pen' || state.placement.kind === 'next-pen' || state.placement.kind === 'backspace' || state.placement.kind === 'end' || state.placement.kind === 'enter' || state.placement.kind === 'home' || state.placement.kind === 'move-left' || state.placement.kind === 'move-right' || state.placement.kind === 'move-up' || state.placement.kind === 'move-down' || state.placement.kind === 'page-down' || state.placement.kind === 'page-up' || state.placement.kind === 'trend' || state.placement.kind === 'recipeplus-button' || state.placement.kind === 'recipeplus-selector' || state.placement.kind === 'recipeplus-table' || state.placement.kind === 'add-user-group' || state.placement.kind === 'delete-user-group' || state.placement.kind === 'modify-group-membership' || state.placement.kind === 'unlock-user' || state.placement.kind === 'enable-user' || state.placement.kind === 'disable-user' || state.placement.kind === 'change-password' || state.placement.kind === 'change-user-properties' || state.placement.kind === 'control-list' || state.placement.kind === 'numeric') ? 24 : state.placement.kind === 'image' ? 32 : 16;
     const rect = normalizePlacementRect(start.x, start.y, current.x, current.y, minW, minH);
     completeObjectPlacement(rect).catch((err) => setStatus(`Error: ${err.message}`));
   });
@@ -5669,6 +5821,7 @@ async function renderCanvasEditHits(editComponents) {
       const hit = document.createElement('div');
       hit.className = 'canvas-graphic-hit';
       hit.dataset.index = String(index);
+      hit.style.zIndex = String(index);
       applyGraphicBoundsStyle(hit, comp);
       if (canvasSelectionIncludes(index)) hit.classList.add('selected');
 
@@ -6278,6 +6431,16 @@ async function openPropertiesForComponent(index) {
       window.StudioChangeUserPropertiesButton?.presentChangeUserPropertiesButtonDialog();
       window.StudioChangeUserPropertiesButton?.scheduleChangeUserPropertiesLivePreview();
       setTemplateEditStatus(comp.name, ref);
+    } else if (comp.type === 'ControlListSelector') {
+      flushDeferredDialogInits();
+      window.StudioControlListSelector?.initControlListSelectorDialog();
+      window.StudioControlListSelector?.fillControlListSelectorForm(comp);
+      resetPropsDialogState('control-list', window.StudioControlListSelector.readControlListSelectorForm, 'applyControlListSelector', index, entry.ref);
+      window.StudioControlListSelector?.switchControlListSelectorTab('general');
+      window.StudioControlListSelector?.wireControlListSelectorTools();
+      window.StudioControlListSelector?.presentControlListSelectorDialog();
+      window.StudioControlListSelector?.scheduleControlListSelectorLivePreview();
+      setTemplateEditStatus(comp.name, ref);
     } else if (comp.type === 'RecipePlusSelector') {
       flushDeferredDialogInits();
       window.StudioRecipePlusSelector?.initRecipePlusSelectorDialog();
@@ -6361,6 +6524,16 @@ function handleStudioCanvasKeydown(e) {
   if (e.ctrlKey && key === 'd' && hasSelection) {
     e.preventDefault();
     duplicateSelectedCanvasComponent().catch((err) => setStatus(`Error: ${err.message}`));
+    return;
+  }
+  if (e.ctrlKey && e.shiftKey && (e.key === ']' || e.key === '}')) {
+    e.preventDefault();
+    arrangeCanvasSelection('front').catch((err) => setStatus(`Error: ${err.message}`));
+    return;
+  }
+  if (e.ctrlKey && e.shiftKey && (e.key === '[' || e.key === '{')) {
+    e.preventDefault();
+    arrangeCanvasSelection('back').catch((err) => setStatus(`Error: ${err.message}`));
     return;
   }
   if ((key === 'delete' || key === 'backspace') && hasSelection && !state.placement) {
@@ -6910,6 +7083,10 @@ function handleObjectAction(id) {
     startObjectPlacement('change-user-properties', item.buttonDefaults || {});
     return;
   }
+  if (item.action === 'control-list-selector-properties') {
+    startObjectPlacement('control-list', item.selectorDefaults || {});
+    return;
+  }
   if (item.action === 'recipeplus-selector-properties') {
     startObjectPlacement('recipeplus-selector', item.selectorDefaults || {});
     return;
@@ -7241,7 +7418,7 @@ function handleViewAction(action, togglePath) {
       setStatus('Zoom reset to 100%');
       break;
     case 'animation':
-      setStatus('Animation editor — planned for visual editor phase');
+      window.StudioMenuCommands?.showAnimationDialog();
       break;
     default: break;
   }
@@ -7429,13 +7606,48 @@ function handleMenuAction(action) {
     case 'delete-project': deleteActiveProject(); break;
     case 'new-display': showAddDisplayDialog(); break;
     case 'new-parameter': openParametersPanel().catch((err) => setStatus(`Error: ${err.message}`)); break;
-    case 'new-local-message': openAlarmsPanel(); setStatus('Local Messages — Alarm definitions'); break;
-    case 'new-data-log': setStatus('Data Log — configure in project.json (historian planned)'); openSystemPanelById('diagnostics-setup'); break;
-    case 'new-macro': setStatus('Macros — planned for Phase 3'); break;
-    case 'new-library': setStatus('Library — faceplate library planned'); break;
-    case 'new-info-message': setStatus('Information Messages — planned'); break;
-    case 'new-recipe': loadScreenInWorkspace('500_Recipe'); setStatus('RecipePlus — Recipe management'); break;
-    case 'save': setStatus('Saved — project files auto-saved to disk'); break;
+    case 'new-local-message':
+      window.StudioLocalMessages?.showEditor({ untitled: true });
+      break;
+    case 'new-data-log':
+      window.StudioDataLog?.showEditor({ untitled: true });
+      break;
+    case 'new-macro':
+      window.StudioMacros?.showMacroEditor({ untitled: true });
+      break;
+    case 'new-library':
+      window.StudioMenuCommands?.showLibraryBrowser();
+      break;
+    case 'new-info-message':
+      window.StudioInformationSetup?.showInformationMessagesEditor({ untitled: true });
+      break;
+    case 'new-recipe':
+      window.StudioRecipePlusEditor?.showEditor({ untitled: true });
+      break;
+    case 'save':
+      Promise.resolve()
+        .then(() => window.StudioInformationSetup?.saveOpenEditor?.())
+        .then((infoSaved) => {
+          if (infoSaved) return true;
+          return window.StudioMacros?.saveOpenEditor?.();
+        })
+        .then((macroSaved) => {
+          if (macroSaved) return true;
+          return window.StudioDataLog?.saveOpenEditor?.();
+        })
+        .then((saved) => {
+          if (saved) return true;
+          return window.StudioLocalMessages?.saveOpenEditor?.();
+        })
+        .then((saved) => {
+          if (saved) return true;
+          return window.StudioRecipePlusEditor?.saveOpenEditor?.();
+        })
+        .then((saved) => {
+          if (!saved) setStatus('Saved — project files auto-saved to disk');
+        })
+        .catch((err) => setStatus(`Error: ${err.message}`));
+      break;
     case 'save-as':
       if (state.activeProject) showNewProjectDialog();
       else setStatus('No application open');
@@ -7454,8 +7666,7 @@ function handleMenuAction(action) {
       state.activeProject = null;
       state.projectConfig = null;
       state.openDisplays = [];
-      explorerTree.innerHTML = '';
-      explorerProject.textContent = '—';
+      clearExplorer();
       closeDisplayWorkspace();
       setStatus('Application closed');
       updateEditMenuState();
@@ -7688,11 +7899,35 @@ function updateEditClipboardUI() {
   document.querySelectorAll('[data-edit-action="cut"], [data-edit-action="copy"], [data-tb="cut"], [data-tb="copy"]').forEach((el) => {
     el.classList.toggle('disabled', !canCopy);
   });
-  document.querySelectorAll('[data-edit-action="paste"], [data-edit-action="duplicate"], [data-tb="paste"]').forEach((el) => {
+  document.querySelectorAll('[data-edit-action="delete"]').forEach((el) => {
+    el.classList.toggle('disabled', !canCopy);
+  });
+  document.querySelectorAll('[data-edit-action="paste"], [data-tb="paste"]').forEach((el) => {
+    el.classList.toggle('disabled', !canPaste);
+  });
+  document.querySelectorAll('[data-edit-action="paste-no-strings"]').forEach((el) => {
     el.classList.toggle('disabled', !canPaste);
   });
   document.querySelectorAll('[data-edit-action="duplicate"]').forEach((el) => {
     el.classList.toggle('disabled', !canCopy);
+  });
+  const displayOpen = displayIsOpen();
+  const hasAnySelection = getSelectedCanvasIndices().length > 0;
+  const hasTemplateSel = getSelectedCanvasIndices().some((idx) => state.canvasEditCache?.editComponents?.[idx]?.ref?.type === 'template-override');
+  document.querySelectorAll('[data-edit-action="copy-animation"], [data-edit-action="connections"], [data-edit-action="global-object-param-values"]').forEach((el) => {
+    el.classList.toggle('disabled', !hasAnySelection);
+  });
+  document.querySelectorAll('[data-edit-action="paste-animation"]').forEach((el) => {
+    el.classList.toggle('disabled', !state.animationClipboard || !hasAnySelection);
+  });
+  document.querySelectorAll('[data-edit-action="tag-substitution"], [data-edit-action="edit-base-object"]').forEach((el) => {
+    el.classList.toggle('disabled', !displayOpen);
+  });
+  document.querySelectorAll('[data-edit-action="break-link"]').forEach((el) => {
+    el.classList.toggle('disabled', !hasTemplateSel);
+  });
+  document.querySelectorAll('[data-edit-action="global-object-param-definitions"]').forEach((el) => {
+    el.classList.toggle('disabled', !isEditingGlobalObject());
   });
 }
 
@@ -7801,6 +8036,36 @@ function handleEditAction(action) {
     case 'duplicate':
       duplicateSelectedCanvasComponent().catch((err) => setStatus(`Error: ${err.message}`));
       break;
+    case 'delete':
+      deleteSelectedCanvasComponent().catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'paste-no-strings':
+      window.StudioMenuCommands?.pasteWithoutLocalizedStrings?.().catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'copy-animation':
+      window.StudioMenuCommands?.copyAnimation();
+      break;
+    case 'paste-animation':
+      window.StudioMenuCommands?.pasteAnimation?.().catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'tag-substitution':
+      window.StudioMenuCommands?.showTagSubstitutionDialog();
+      break;
+    case 'connections':
+      window.StudioMenuCommands?.showConnectionsDialog();
+      break;
+    case 'global-object-param-values':
+      window.StudioMenuCommands?.showGlobalParamValues();
+      break;
+    case 'global-object-param-definitions':
+      window.StudioMenuCommands?.showGlobalParamDefinitions();
+      break;
+    case 'edit-base-object':
+      window.StudioMenuCommands?.editBaseObject();
+      break;
+    case 'break-link':
+      window.StudioMenuCommands?.breakLink?.().catch((err) => setStatus(`Error: ${err.message}`));
+      break;
     case 'display-settings':
       showDisplaySettingsDialog().catch((err) => setStatus(`Error: ${err.message}`));
       break;
@@ -7826,6 +8091,18 @@ function handleEditAction(action) {
           .then(() => setStatus('Display cleared'))
           .catch((err) => setStatus(`Error: ${err.message}`));
       }
+      break;
+    case 'bring-to-front':
+      arrangeCanvasSelection('front').catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'send-to-back':
+      arrangeCanvasSelection('back').catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'bring-forward':
+      arrangeCanvasSelection('forward').catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'send-backward':
+      arrangeCanvasSelection('backward').catch((err) => setStatus(`Error: ${err.message}`));
       break;
     default: setStatus(`${action.replace(/-/g, ' ')} — available when visual editor is added`); break;
   }
@@ -7958,18 +8235,94 @@ function groupHmiTagExplorerTree(nodes) {
   }
 }
 
+function setExplorerCaption(projectName) {
+  if (!explorerTitle) return;
+  explorerTitle.textContent = projectName ? `Explorer - ${projectName}` : 'Explorer';
+}
+
+function clearExplorer() {
+  if (explorerTree) explorerTree.innerHTML = '';
+  if (explorerCommTree) explorerCommTree.innerHTML = '';
+  setExplorerCaption(null);
+  setExplorerView('application', { skipStatusRefresh: true });
+  const browseEl = document.getElementById('explorerCommBrowsing');
+  const modeEl = document.getElementById('explorerCommMode');
+  if (browseEl) browseEl.textContent = 'Browsing:';
+  if (modeEl) modeEl.textContent = 'Mode: Offline';
+}
+
+function setExplorerView(view, options = {}) {
+  const next = view === 'communications' ? 'communications' : 'application';
+  state.explorerView = next;
+  const isComm = next === 'communications';
+  explorerTree?.classList.toggle('hidden', isComm);
+  explorerCommTree?.classList.toggle('hidden', !isComm);
+  document.getElementById('explorerCommStatus')?.classList.toggle('hidden', !isComm);
+  document.getElementById('explorerTabApplication')?.classList.toggle('selected', !isComm);
+  document.getElementById('explorerTabCommunications')?.classList.toggle('selected', isComm);
+  if (isComm && !options.skipStatusRefresh) {
+    refreshCommunicationsStatus().catch(() => {});
+  }
+}
+
+function updateCommunicationsBrowsing(node) {
+  const browseEl = document.getElementById('explorerCommBrowsing');
+  const browse = node?.browseLabel || node?.label || '';
+  if (browseEl) browseEl.textContent = browse ? `Browsing: ${browse}` : 'Browsing:';
+}
+
+async function refreshCommunicationsStatus() {
+  const modeEl = document.getElementById('explorerCommMode');
+  let online = false;
+  try {
+    const comm = await fetchJson('/api/runtime/communication');
+    const status = comm.status || {};
+    online = (comm.driver || status.driver) === 'simulator'
+      || status.connected === true
+      || comm.connected === true;
+  } catch {
+    online = false;
+  }
+  if (modeEl) modeEl.textContent = `Mode: ${online ? 'Online' : 'Offline'}`;
+  const selected = explorerCommTree?.querySelector('.tree-row.selected');
+  if (!selected) {
+    const browseEl = document.getElementById('explorerCommBrowsing');
+    if (browseEl && !browseEl.textContent) browseEl.textContent = 'Browsing:';
+  }
+}
+
+function initExplorerViewTabs() {
+  document.querySelectorAll('[data-explorer-view]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setExplorerView(btn.dataset.explorerView);
+    });
+  });
+}
+
 async function loadExplorer(projectId) {
   const id = projectId || state.activeProject;
   if (!id) return;
   const data = await fetchJson(`/api/projects/${id}/explorer?_=${Date.now()}`);
   sanitizeExplorerTree(data.tree);
   groupHmiTagExplorerTree(data.tree);
-  explorerProject.textContent = `: ${data.projectName}`;
+  setExplorerCaption(data.projectName);
   explorerTree.innerHTML = '';
   for (const node of data.tree) {
     explorerTree.appendChild(renderTreeNode(node, 0));
   }
+  if (explorerCommTree) {
+    explorerCommTree.innerHTML = '';
+    const commTree = Array.isArray(data.communicationsTree) ? data.communicationsTree : [];
+    sanitizeExplorerTree(commTree);
+    for (const node of commTree) {
+      explorerCommTree.appendChild(renderTreeNode(node, 0));
+    }
+  }
   applyExplorerFilter();
+  setExplorerView(state.explorerView || 'application', { skipStatusRefresh: true });
+  if (state.explorerView === 'communications') {
+    refreshCommunicationsStatus().catch(() => {});
+  }
   setStatus(`Project loaded: ${data.projectName}`);
 }
 
@@ -8087,11 +8440,18 @@ function renderTreeNode(node, depth) {
     selectNode(row, node);
   });
 
+  row.addEventListener('dblclick', (e) => {
+    e.stopPropagation();
+    if (node.linxTopology && (node.action === 'communications' || node.commDevice)) {
+      window.StudioCommunicationsSetup?.showCommunicationsSetupDialog();
+    }
+  });
+
   row.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     e.stopPropagation();
     selectNode(row, node);
-    showExplorerContextMenu(e, node);
+    if (!node.linxTopology) showExplorerContextMenu(e, node);
   });
 
   el.appendChild(row);
@@ -8187,6 +8547,11 @@ function iconFor(node) {
     'recipeplus-setup': '🔧',
     'recipeplus-editor': '✎',
     linx: '🔗',
+    rslinx: '🖥',
+    backplane: '▦',
+    emulate: '⚙',
+    plc: '📦',
+    ethernet: '🌐',
     project: '📦',
     application: '📁',
     audit: '📋',
@@ -8221,8 +8586,13 @@ function handleExplorerAction(node) {
       openTagsPanel(node.tagFolder || node.label);
       break;
     case 'alarms':
-    case 'local-messages':
       openAlarmsPanel();
+      break;
+    case 'local-messages':
+      window.StudioLocalMessages?.showEditor({ untitled: true });
+      break;
+    case 'local-message-item':
+      window.StudioLocalMessages?.showEditor({ name: node.localMessageName });
       break;
     case 'user-groups':
       openGroupsPanel();
@@ -8233,12 +8603,23 @@ function handleExplorerAction(node) {
     case 'communications':
       window.StudioCommunicationsSetup?.showCommunicationsSetupDialog();
       break;
+    case 'linx-device':
+      setStatus(node.label || 'Communications');
+      break;
     case 'recipeplus-setup':
+      window.StudioRecipePlusSetup?.showDialog();
+      break;
     case 'recipeplus-editor':
-      openRecipePanel(action);
+      window.StudioRecipePlusEditor?.showEditor({ untitled: true });
+      break;
+    case 'recipeplus-item':
+      window.StudioRecipePlusEditor?.showEditor({ name: node.recipeName });
       break;
     case 'data-log':
-      openDataLogPanel();
+      window.StudioDataLog?.showEditor({ untitled: true });
+      break;
+    case 'data-log-item':
+      window.StudioDataLog?.showEditor({ name: node.dataLogName });
       break;
     case 'parameters':
     case 'parameters-add':
@@ -8249,11 +8630,22 @@ function handleExplorerAction(node) {
       break;
     case 'symbol-factory':
     case 'libraries':
+      window.StudioMenuCommands?.showLibraryBrowser();
+      break;
     case 'images':
-    case 'information-setup':
-    case 'information-messages':
-    case 'macros':
       openSystemPanel(node);
+      break;
+    case 'information-setup':
+      window.StudioInformationSetup?.showInformationSetupDialog();
+      break;
+    case 'information-messages':
+      window.StudioInformationSetup?.showInformationMessagesEditor();
+      break;
+    case 'macros':
+      window.StudioMacros?.showMacroEditor({ untitled: true });
+      break;
+    case 'macro-item':
+      window.StudioMacros?.showMacroEditor({ name: node.macroName });
       break;
     default:
       break;
@@ -8263,7 +8655,7 @@ function handleExplorerAction(node) {
 function openRecipePanel(mode) {
   hidePreviewStage();
   panelView.classList.remove('hidden');
-  const title = mode === 'recipeplus-editor' ? 'RecipePlus Editor' : 'RecipePlus Setup';
+  const title = 'RecipePlus Editor';
   panelView.innerHTML = `
     <div class="panel-content">
       <h2>${escapeHtml(title)}</h2>
@@ -8273,14 +8665,16 @@ function openRecipePanel(mode) {
   setStatus(title);
 }
 
-function openDataLogPanel() {
-  openSystemPanel({ label: 'Data Log Models', id: 'data-log-models' });
-}
-
 function selectNode(row, node) {
-  explorerTree.querySelectorAll('.tree-row').forEach((r) => r.classList.remove('selected'));
+  const tree = row.closest('.explorer-tree') || explorerTree;
+  tree.querySelectorAll('.tree-row').forEach((r) => r.classList.remove('selected'));
   row.classList.add('selected');
   state.selectedNode = node;
+
+  if (node.linxTopology || tree.id === 'explorerCommTree') {
+    updateCommunicationsBrowsing(node);
+    return;
+  }
 
   if (node.type === 'display') {
     state.selectedScreenId = node.id;
@@ -9957,6 +10351,10 @@ async function openTagsPanel(folderFilter = '', selectedTagName = '', options = 
 }
 
 async function openAlarmsPanel() {
+  if (window.StudioAlarmSetup?.showAlarmSetupDialog) {
+    await window.StudioAlarmSetup.showAlarmSetupDialog();
+    return;
+  }
   hidePreviewStage();
   panelView.classList.remove('hidden');
   await refreshProjectConfig();
@@ -10128,15 +10526,18 @@ async function importProjectAlarms(alarms) {
     byTag.set(a.tag, a);
   }
   const merged = [...byTag.values()].sort((x, y) => x.priority - y.priority || x.tag.localeCompare(y.tag));
-  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ alarms: merged })
-  });
-  await refreshProjectConfig();
+  if (window.StudioAlarmSetup?.mergeImportedAlarms) {
+    await window.StudioAlarmSetup.mergeImportedAlarms(alarms);
+  } else {
+    await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alarms: merged })
+    });
+    await refreshProjectConfig();
+  }
   setAlarmWizardStatus(`Imported ${alarms.length} alarm(s) — ${added} new, ${updated} updated`, 'ok');
   setStatus(`Imported ${alarms.length} alarms`);
-  await openAlarmsPanel();
 }
 
 async function removeAlarmAtIndex(index) {
@@ -10146,13 +10547,17 @@ async function removeAlarmAtIndex(index) {
   if (!alarm) return;
   if (!confirm(`Remove alarm "${alarm.message}" (${alarm.tag})?`)) return;
   alarms.splice(index, 1);
-  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ alarms })
-  });
-  await refreshProjectConfig();
-  await openAlarmsPanel();
+  if (window.StudioAlarmSetup?.adoptLegacyAlarms) {
+    await window.StudioAlarmSetup.adoptLegacyAlarms(alarms);
+  } else {
+    await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alarms })
+    });
+    await refreshProjectConfig();
+    await openAlarmsPanel();
+  }
   setStatus(`Removed alarm: ${alarm.tag}`);
 }
 
@@ -10162,13 +10567,17 @@ async function clearAllAlarmsFromProject() {
   const count = (state.projectConfig?.alarms || []).length;
   if (!count) return;
   if (!confirm(`Clear all ${count} alarm definition(s) from this project?`)) return;
-  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ alarms: [] })
-  });
-  await refreshProjectConfig();
-  await openAlarmsPanel();
+  if (window.StudioAlarmSetup?.clearSetup) {
+    await window.StudioAlarmSetup.clearSetup();
+  } else {
+    await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alarms: [] })
+    });
+    await refreshProjectConfig();
+    await openAlarmsPanel();
+  }
   setStatus(`Cleared ${count} alarm(s)`);
 }
 
@@ -10211,14 +10620,18 @@ async function saveAlarmEdit(e) {
     }
   }
   alarms.sort((a, b) => a.priority - b.priority || a.tag.localeCompare(b.tag));
-  await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ alarms })
-  });
+  if (window.StudioAlarmSetup?.adoptLegacyAlarms) {
+    await window.StudioAlarmSetup.adoptLegacyAlarms(alarms);
+  } else {
+    await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/config`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alarms })
+    });
+    await refreshProjectConfig();
+    await openAlarmsPanel();
+  }
   document.getElementById('alarmEditDialog').close();
-  await refreshProjectConfig();
-  await openAlarmsPanel();
   setStatus(`Saved alarm: ${entry.tag}`);
 }
 
@@ -10838,6 +11251,43 @@ async function getGraphicLayoutSize() {
   }
 }
 
+function showScalePromptDialog(message) {
+  return new Promise((resolve) => {
+    const dlg = document.getElementById('scalePromptDialog');
+    const msgEl = document.getElementById('scalePromptMessage');
+    const yesBtn = document.getElementById('scalePromptYes');
+    const noBtn = document.getElementById('scalePromptNo');
+    const cancelBtn = document.getElementById('scalePromptCancel');
+    if (!dlg || !msgEl || !yesBtn || !noBtn || !cancelBtn) {
+      // Dialog markup missing for some reason — fail safe to "cancel" rather
+      // than silently saving an unwanted size change.
+      resolve('cancel');
+      return;
+    }
+    msgEl.textContent = message;
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      yesBtn.removeEventListener('click', onYes);
+      noBtn.removeEventListener('click', onNo);
+      cancelBtn.removeEventListener('click', onCancel);
+      dlg.removeEventListener('cancel', onDialogCancel);
+      dlg.close();
+      resolve(result);
+    };
+    const onYes = () => finish('scale');
+    const onNo = () => finish('keep');
+    const onCancel = () => finish('cancel');
+    const onDialogCancel = (e) => { e.preventDefault(); finish('cancel'); };
+    yesBtn.addEventListener('click', onYes);
+    noBtn.addEventListener('click', onNo);
+    cancelBtn.addEventListener('click', onCancel);
+    dlg.addEventListener('cancel', onDialogCancel);
+    dlg.showModal();
+  });
+}
+
 async function saveProjectSettings(e) {
   e.preventDefault();
   if (!state.activeProject) return;
@@ -10854,11 +11304,15 @@ async function saveProjectSettings(e) {
   const sizeChanged = layout.width !== width || layout.height !== height;
   let scaleGraphics = false;
   if (sizeChanged) {
-    scaleGraphics = window.confirm(
+    const choice = await showScalePromptDialog(
       `The graphic layout is ${layout.width}×${layout.height}, but the project window size is ${width}×${height}.\n\n`
-      + 'Scale all displays and global objects so they fill the new size?\n\n'
-      + 'Choose OK to resize and reposition every object. Choose Cancel to keep objects at their current size (empty space will remain).'
+      + 'Scale all displays and global objects so they fill the new size?'
     );
+    if (choice === 'cancel') {
+      setStatus('Project settings not saved');
+      return;
+    }
+    scaleGraphics = choice === 'scale';
   }
 
   const patch = {
@@ -10963,6 +11417,12 @@ function handleToolbarAction(action) {
     case 'redo': handleEditAction('redo'); break;
     case 'zoom-in': handleViewAction('zoom-in'); break;
     case 'zoom-out': handleViewAction('zoom-out'); break;
+    case 'bring-to-front':
+    case 'send-to-back':
+    case 'bring-forward':
+    case 'send-backward':
+      handleEditAction(action);
+      break;
     case 'fit-window':
       setViewPref('zoom', 100);
       setStatus('Zoom fit — 100%');
@@ -11656,6 +12116,9 @@ function handleToolsAction(action) {
     case 'replace': showReplaceDialog(); break;
     case 'cross-ref': showCrossRefDialog(); break;
     case 'options': showOptionsDialog(); break;
+    case 'firmware': window.StudioMenuCommands?.showFirmwareWizard(); break;
+    case 'domain-cert': window.StudioMenuCommands?.showDomainCertificateDialog(); break;
+    case 'tamper-detect': window.StudioMenuCommands?.showTamperDialog(); break;
     default: setStatus(`${action} — planned`); break;
   }
 }
@@ -11894,8 +12357,7 @@ async function deleteProjectById(id) {
     closeDisplayWorkspace();
 
     if (!state.activeProject) {
-      explorerTree.innerHTML = '';
-      explorerProject.textContent = '—';
+      clearExplorer();
       state.projectConfig = null;
     } else {
       await loadExplorer(state.activeProject);
@@ -12043,9 +12505,9 @@ function getExplorerContextMenuItems(node) {
     ];
   }
 
-  if (node.id === 'information' || node.id === 'information-setup' || node.id === 'information-messages') {
+  if (node.id === 'local-messages' || node.action === 'local-messages') {
     return [
-      { action: 'new', label: 'New', disabled: true },
+      { action: 'new-local-message', label: 'New' },
       { action: 'add-component', label: 'Add Component into Project...', disabled: true },
       { action: 'new-folder', label: 'New Folder', disabled: true },
       { separator: true },
@@ -12057,9 +12519,18 @@ function getExplorerContextMenuItems(node) {
     ];
   }
 
-  if (node.id === 'recipeplus' || node.id === 'recipeplus-setup' || node.id === 'recipeplus-editor') {
+  if (node.action === 'local-message-item' || node.localMessageName) {
     return [
-      { action: 'new', label: 'New', disabled: true },
+      { action: 'open', label: 'Open' },
+      { separator: true },
+      { action: 'delete-local-message', label: 'Delete' },
+      { action: 'remove', label: 'Remove' }
+    ];
+  }
+
+  if (node.id === 'information' || node.id === 'information-setup' || node.id === 'information-messages') {
+    return [
+      { action: 'new-info-message', label: 'New' },
       { action: 'add-component', label: 'Add Component into Project...', disabled: true },
       { action: 'new-folder', label: 'New Folder', disabled: true },
       { separator: true },
@@ -12068,6 +12539,84 @@ function getExplorerContextMenuItems(node) {
       { separator: true },
       { action: 'import-export', label: 'Import and Export...', disabled: true },
       { action: 'filter', label: 'Filter...' }
+    ];
+  }
+
+  if (node.id === 'logic-control' || node.id === 'macros') {
+    return [
+      { action: 'new-macro', label: 'New' },
+      { action: 'add-component', label: 'Add Component into Project...', disabled: true },
+      { action: 'new-folder', label: 'New Folder', disabled: true },
+      { separator: true },
+      { action: 'delete', label: 'Delete', disabled: true },
+      { action: 'remove', label: 'Remove', disabled: true },
+      { separator: true },
+      { action: 'import-export', label: 'Import and Export...', disabled: true },
+      { action: 'filter', label: 'Filter...' }
+    ];
+  }
+
+  if (node.action === 'macro-item' || node.macroName) {
+    return [
+      { action: 'open', label: 'Open' },
+      { separator: true },
+      { action: 'delete-macro', label: 'Delete' },
+      { action: 'remove', label: 'Remove' }
+    ];
+  }
+
+  if (node.id === 'data-log' || node.id === 'data-log-models') {
+    return [
+      { action: 'new-data-log', label: 'New' },
+      { action: 'add-component', label: 'Add Component into Project...', disabled: true },
+      { action: 'new-folder', label: 'New Folder', disabled: true },
+      { separator: true },
+      { action: 'delete', label: 'Delete', disabled: true },
+      { action: 'remove', label: 'Remove', disabled: true },
+      { separator: true },
+      { action: 'import-export', label: 'Import and Export...', disabled: true },
+      { action: 'filter', label: 'Filter...' }
+    ];
+  }
+
+  if (node.action === 'data-log-item' || node.dataLogName) {
+    return [
+      { action: 'open', label: 'Open' },
+      { separator: true },
+      { action: 'delete-data-log', label: 'Delete' },
+      { action: 'remove', label: 'Remove' }
+    ];
+  }
+
+  if (node.id === 'recipeplus-setup') {
+    return [
+      { action: 'open', label: 'Open' },
+      { separator: true },
+      { action: 'delete', label: 'Delete', disabled: true },
+      { action: 'remove', label: 'Remove', disabled: true }
+    ];
+  }
+
+  if (node.id === 'recipeplus' || node.id === 'recipeplus-editor') {
+    return [
+      { action: 'new-recipe', label: 'New' },
+      { action: 'add-component', label: 'Add Component into Project...', disabled: true },
+      { action: 'new-folder', label: 'New Folder', disabled: true },
+      { separator: true },
+      { action: 'delete', label: 'Delete', disabled: true },
+      { action: 'remove', label: 'Remove', disabled: true },
+      { separator: true },
+      { action: 'import-export', label: 'Import and Export...', disabled: true },
+      { action: 'filter', label: 'Filter...' }
+    ];
+  }
+
+  if (node.action === 'recipeplus-item' || node.recipeName) {
+    return [
+      { action: 'open', label: 'Open' },
+      { separator: true },
+      { action: 'delete-recipe', label: 'Delete' },
+      { action: 'remove', label: 'Remove' }
     ];
   }
 
@@ -12146,13 +12695,18 @@ function getWorkspaceContextMenuItems() {
   if (hasSelection) {
     items.push({ action: 'object-properties', label: 'Properties...' });
     items.push({ separator: true });
+    items.push({ action: 'bring-to-front', label: 'Bring to Front' });
+    items.push({ action: 'send-to-back', label: 'Send to Back' });
+    items.push({ action: 'bring-forward', label: 'Bring Forward' });
+    items.push({ action: 'send-backward', label: 'Send Backward' });
+    items.push({ separator: true });
   }
   items.push(
     { action: 'display-settings', label: 'Display Settings...' },
     { action: 'key-assignments', label: 'Key Assignments' },
     { separator: true },
-    { action: 'paste', label: 'Paste', disabled: true },
-    { action: 'paste-no-strings', label: 'Paste without localized strings', disabled: true },
+    { action: 'paste', label: 'Paste', disabled: !state.clipboard?.components?.length },
+    { action: 'paste-no-strings', label: 'Paste without localized strings', disabled: !state.clipboard?.components?.length },
     { separator: true },
     { action: 'show-grid', label: 'Show Grid', checkable: true, checked: state.viewPrefs.showGrid },
     { action: 'snap-on', label: 'Snap To Grid', checkable: true, checked: state.viewPrefs.snapOn },
@@ -12241,11 +12795,23 @@ function runWorkspaceContextAction(action) {
           .catch((err) => setStatus(`Error: ${err.message}`));
       }
       break;
+    case 'bring-to-front':
+    case 'send-to-back':
+    case 'bring-forward':
+    case 'send-backward':
+      handleEditAction(action);
+      break;
     case 'display-settings':
       showDisplaySettingsDialog().catch((err) => setStatus(`Error: ${err.message}`));
       break;
     case 'key-assignments':
       showKeyAssignmentsDialog();
+      break;
+    case 'paste':
+      handleEditAction('paste');
+      break;
+    case 'paste-no-strings':
+      handleEditAction('paste-no-strings');
       break;
     case 'show-grid':
       handleViewAction('show-grid', 'showGrid');
@@ -12322,7 +12888,38 @@ function runExplorerContextAction(action, node) {
       clearAllTagsFromProject().catch((err) => setStatus(`Error: ${err.message}`));
       break;
     case 'new-alarm':
-      showAlarmEditDialog(-1);
+      if (window.StudioAlarmSetup?.showAlarmSetupDialog) {
+        window.StudioAlarmSetup.showAlarmSetupDialog({ tab: 'messages', newMessage: true });
+      } else {
+        showAlarmEditDialog(-1);
+      }
+      break;
+    case 'new-info-message':
+      window.StudioInformationSetup?.showInformationMessagesEditor({ untitled: true });
+      break;
+    case 'new-local-message':
+      window.StudioLocalMessages?.showEditor({ untitled: true });
+      break;
+    case 'delete-local-message':
+      window.StudioLocalMessages?.deleteFile(node.localMessageName).catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'new-macro':
+      window.StudioMacros?.showMacroEditor({ untitled: true });
+      break;
+    case 'delete-macro':
+      window.StudioMacros?.deleteMacro(node.macroName).catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'new-data-log':
+      window.StudioDataLog?.showEditor({ untitled: true });
+      break;
+    case 'delete-data-log':
+      window.StudioDataLog?.deleteModel(node.dataLogName).catch((err) => setStatus(`Error: ${err.message}`));
+      break;
+    case 'new-recipe':
+      window.StudioRecipePlusEditor?.showEditor({ untitled: true });
+      break;
+    case 'delete-recipe':
+      window.StudioRecipePlusEditor?.deleteRecipe(node.recipeName).catch((err) => setStatus(`Error: ${err.message}`));
       break;
     case 'new':
       break;
@@ -12330,6 +12927,15 @@ function runExplorerContextAction(action, node) {
     case 'remove':
       if (node.type === 'display') deleteSelectedDisplay();
       else if (node.type === 'image') deleteSelectedImage(node);
+      else if (node.macroName) {
+        window.StudioMacros?.deleteMacro(node.macroName).catch((err) => setStatus(`Error: ${err.message}`));
+      }       else if (node.dataLogName) {
+        window.StudioDataLog?.deleteModel(node.dataLogName).catch((err) => setStatus(`Error: ${err.message}`));
+      } else if (node.recipeName) {
+        window.StudioRecipePlusEditor?.deleteRecipe(node.recipeName).catch((err) => setStatus(`Error: ${err.message}`));
+      } else if (node.localMessageName) {
+        window.StudioLocalMessages?.deleteFile(node.localMessageName).catch((err) => setStatus(`Error: ${err.message}`));
+      }
       break;
     case 'import-export':
       if (node.id === 'hmi-tags' || node.id === 'hmi-tags-list') showTagWizardDialog();
@@ -12374,8 +12980,11 @@ function applyExplorerFilter() {
     return show;
   }
 
-  for (const nodeEl of explorerTree.children) {
-    visit(nodeEl);
+  for (const tree of [explorerTree, explorerCommTree]) {
+    if (!tree) continue;
+    for (const nodeEl of tree.children) {
+      visit(nodeEl);
+    }
   }
 }
 
@@ -12384,7 +12993,7 @@ function initExplorerContextMenu() {
     if (!e.target.closest('#explorerContextMenu')) hideExplorerContextMenu();
   });
   document.addEventListener('contextmenu', (e) => {
-    if (!e.target.closest('#explorerTree')) hideExplorerContextMenu();
+    if (!e.target.closest('#explorerTree, #explorerCommTree')) hideExplorerContextMenu();
     else hideWorkspaceContextMenu();
   });
   window.addEventListener('scroll', hideExplorerContextMenu, true);
@@ -12492,11 +13101,23 @@ document.getElementById('toolsMenuBtn')?.addEventListener('click', (e) => {
   toggleToolsMenu();
 });
 
+document.getElementById('recipeMenuBtn')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleRecipeMenu();
+});
+
 document.getElementById('fileMenu')?.addEventListener('click', (e) => e.stopPropagation());
 document.getElementById('editMenu')?.addEventListener('click', (e) => e.stopPropagation());
 document.getElementById('viewMenu')?.addEventListener('click', (e) => e.stopPropagation());
 document.getElementById('applicationMenu')?.addEventListener('click', (e) => e.stopPropagation());
 document.getElementById('toolsMenu')?.addEventListener('click', (e) => e.stopPropagation());
+document.getElementById('recipeMenu')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const btn = e.target.closest('[data-recipe-action]');
+  if (!btn) return;
+  closeAllMenus();
+  window.StudioRecipePlusEditor?.runMenuAction?.(btn.dataset.recipeAction);
+});
 document.getElementById('objectsMenu')?.addEventListener('mousedown', (e) => {
   e.stopPropagation();
 });
@@ -12799,6 +13420,10 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     showCrossRefDialog();
   }
+  if (e.ctrlKey && e.key.toLowerCase() === 'r') {
+    e.preventDefault();
+    window.StudioMenuCommands?.showTagSubstitutionDialog();
+  }
 });
 
 function runWhenIdle(fn, timeoutMs = 250) {
@@ -12816,6 +13441,7 @@ function runDeferredStudioInits() {
   initDraggableDialogs();
   initExplorerContextMenu();
   initExplorerResizer();
+  initExplorerViewTabs();
   initWorkspaceContextMenu();
   initCanvasEditOverlay();
   initObjectPlacement();
@@ -12876,7 +13502,11 @@ function runDeferredStudioInits() {
       () => window.StudioDisableUserButton?.initDisableUserButtonDialog(),
       () => window.StudioPasswordButton?.initPasswordButtonDialog(),
       () => window.StudioChangeUserPropertiesButton?.initChangeUserPropertiesButtonDialog(),
+      () => window.StudioControlListSelector?.initControlListSelectorDialog(),
       () => window.StudioCommunicationsSetup?.initCommunicationsSetupDialog(),
+      () => window.StudioAlarmSetup?.initAlarmSetupDialog(),
+      () => window.StudioInformationSetup?.initInformationSetupDialog(),
+      () => window.StudioMenuCommands?.initDialogs(),
       () => window.StudioShapeProperties?.initShapePropertiesDialog(),
       () => window.StudioFreehandProperties?.initFreehandPropertiesDialog(),
       () => window.StudioLineProperties?.initLinePropertiesDialog(),

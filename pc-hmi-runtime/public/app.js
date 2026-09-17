@@ -335,6 +335,17 @@ function createContext() {
       if (prev) loadScreen(prev, { skipHistory: true });
     },
     studioEdit: STUDIO_EDIT,
+    focusedObjectName: '',
+    focusObject: '',
+    root: null,
+
+    sendKeyPress(detail = {}) {
+      ComponentRegistry.sendKeyToInputTarget(this, {
+        sendPressTo: detail.sendPressTo,
+        linkedObject: detail.linkedObject,
+        audio: detail.audio
+      }, detail.key);
+    },
 
     getTagValue(tagName) {
       return state.tags[tagName]?.value;
@@ -345,7 +356,11 @@ function createContext() {
     },
 
     bindTag(tagName, callback) {
-      bindings.set(tagName, callback);
+      if (!tagName || typeof callback !== 'function') return;
+      const existing = bindings.get(tagName);
+      if (!existing) bindings.set(tagName, [callback]);
+      else if (Array.isArray(existing)) existing.push(callback);
+      else bindings.set(tagName, [existing, callback]);
       if (state.tags[tagName]) callback(state.tags[tagName].value);
     },
 
@@ -657,6 +672,7 @@ function collectTags(components) {
   const tags = [];
   for (const comp of components || []) {
     if (comp.tag) tags.push(comp.tag);
+    if (comp.visibleWhen?.tag) tags.push(comp.visibleWhen.tag);
     if (comp.rows) {
       if (Array.isArray(comp.rows[0])) {
         for (const row of comp.rows) {
@@ -699,9 +715,11 @@ function renderScreen(screen) {
     screenContent.style.height = '100%';
   }
   const ctx = createContext();
+  ctx.root = screenContent;
   state.activeContext = ctx;
   (screen.components || []).forEach((comp, index) => {
     try {
+      ctx.layerIndex = index;
       const el = ComponentRegistry.render(comp, ctx);
       el.dataset.componentIndex = String(index);
       if (comp._displayIndex != null) el.dataset.displayIndex = String(comp._displayIndex);
@@ -993,7 +1011,9 @@ function updateNav(activeGroup) {
 }
 
 function updateTagBindings(tagName, value) {
-  state.activeContext?._bindings?.get(tagName)?.(value);
+  const cb = state.activeContext?._bindings?.get(tagName);
+  if (typeof cb === 'function') cb(value);
+  else if (Array.isArray(cb)) cb.forEach((fn) => fn(value));
 }
 
 function syncTagBindings() {

@@ -53,7 +53,7 @@ Full Studio docs: **[pc-hmi-runtime/README.md](pc-hmi-runtime/README.md)**
 | Hard to version in Git | JSON diffs and merges in source control |
 | Manual tag/screen work | Scripts can generate JSON from master sheet |
 
-JSON is the **project format**. The **panel PC runs Plant HMI Runtime**, which reads those files and talks to the PLC via a communication driver (simulator today, OPC UA planned). JSON never goes to the PLC — only live tag values do.
+JSON is the **project format**. The **panel PC runs Plant HMI Runtime**, which reads those files and talks to the PLC via a communication driver (simulator, EtherNet/IP, or OPC UA). JSON never goes to the PLC — only live tag values do.
 
 ---
 

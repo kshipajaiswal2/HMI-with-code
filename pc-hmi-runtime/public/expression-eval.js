@@ -13,8 +13,9 @@
     if (!s) return false;
     if (s.startsWith(EXPR_PREFIX)) return true;
     if (/tags\.get\s*\(/i.test(s)) return true;
-    if (/\bif\b|\band\b|\bor\b|\bnot\b|\belse\b/i.test(s) && /[<>=!+\-*\/()]/.test(s)) return true;
+    if (/\bif\b|\band\b|\bor\b|\bnot\b|\belse\b/i.test(s) && /[<>=!+\-*\/()\{]/.test(s)) return true;
     if (/^\(.+\s+if\s+.+\s+else\s+.+\)$/i.test(s)) return true;
+    if (/\{[^}]+\}/.test(s) && /[<>=!+\-*\/()]|\band\b|\bor\b|\bif\b/i.test(s)) return true;
     return false;
   }
 
@@ -26,6 +27,10 @@
 
   function translatePythonLogicToJs(logic) {
     let expr = String(logic).trim();
+    expr = expr.replace(/\{([^}]+)\}/g, (_, raw) => {
+      const name = String(raw).replace(/^\[PLC\]/, '').replace(/\\/g, '.').trim();
+      return `(tags[${JSON.stringify(name)}] ?? 0)`;
+    });
     expr = expr.replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false');
     expr = expr.replace(/\band\b/gi, '&&').replace(/\bor\b/gi, '||').replace(/\bnot\b/gi, '!');
     expr = expr.replace(
@@ -62,6 +67,10 @@
     const re = /tags\.get\(\s*['"]([^'"]+)['"]/gi;
     let m;
     while ((m = re.exec(expr))) refs.add(m[1]);
+    const braceRe = /\{([^}]+)\}/g;
+    while ((m = braceRe.exec(expr))) {
+      refs.add(String(m[1]).replace(/^\[PLC\]/, '').replace(/\\/g, '.').trim());
+    }
     return [...refs];
   }
 
@@ -90,9 +99,10 @@
     if (!logic) return { ok: false, message: 'Expression is empty.' };
     try {
       const js = translatePythonLogicToJs(logic);
+      if (!js.trim()) return { ok: false, message: 'Expression is empty.' };
+      // Compile only — evaluating with empty tags falsely fails valid FactoryTalk grammar.
       // eslint-disable-next-line no-new
       new Function('tags', 'Math', `"use strict"; return (${js});`);
-      evaluate(logic, {});
       return { ok: true, message: 'Syntax OK.' };
     } catch (err) {
       return { ok: false, message: err.message || String(err) };

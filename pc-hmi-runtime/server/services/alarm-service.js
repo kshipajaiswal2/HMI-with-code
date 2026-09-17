@@ -10,13 +10,62 @@ class AlarmService extends EventEmitter {
     this.maxHistory = 500;
   }
 
-  loadDefinitions(definitions) {
-    this.definitions = definitions.map((def, index) => ({
+  loadDefinitions(definitions, options = {}) {
+    const maxHistory = Number(options.maxHistory);
+    if (Number.isFinite(maxHistory) && maxHistory > 0) {
+      this.maxHistory = Math.round(maxHistory);
+    }
+    this.definitions = (definitions || []).map((def, index) => ({
       id: `alarm-${index}`,
       tag: def.tag,
+      expression: def.expression || '',
+      triggerType: String(def.triggerType || 'value').toLowerCase(),
+      triggerValue: def.triggerValue,
       message: def.message,
-      priority: def.priority || 5
+      priority: def.priority || 5,
+      display: def.display !== false,
+      background: def.background,
+      foreground: def.foreground
     }));
+  }
+
+  resolveTag(def) {
+    const raw = String(def.tag || def.expression || '').trim();
+    if (!raw) return null;
+    const unbraced = raw.replace(/^\{|\}$/g, '');
+    const names = [raw, unbraced];
+    const plc = unbraced.match(/^\[PLC\](.+)$/i);
+    if (plc) {
+      names.push(plc[1]);
+      names.push(`PLC uploded Tags.${plc[1]}`);
+      names.push(`PLC uploaded Tags.${plc[1]}`);
+    }
+    for (const name of names) {
+      const tag = this.tagService.get(name);
+      if (tag) return tag;
+    }
+    return null;
+  }
+
+  isTriggerActive(def, tag) {
+    if (!tag) return false;
+    const type = def.triggerType || 'value';
+    const tv = def.triggerValue;
+    if (type === 'bit') {
+      const bit = Number(tv);
+      if (!Number.isFinite(bit) || bit < 0) return tag.value === true || tag.value === 1;
+      return ((Number(tag.value) >>> 0) & (1 << bit)) !== 0;
+    }
+    if (type === 'lsbit') {
+      const expected = tv === undefined || tv === null || tv === '' ? 1 : Number(tv);
+      return (Number(tag.value) & 1) === expected;
+    }
+    if (tv === undefined || tv === null || tv === '') {
+      return tag.value === true || tag.value === 1;
+    }
+    if (tag.value === true) return Number(tv) === 1;
+    if (tag.value === false) return Number(tv) === 0;
+    return Number(tag.value) === Number(tv);
   }
 
   evaluate() {
@@ -24,8 +73,9 @@ class AlarmService extends EventEmitter {
     const nowActive = [];
 
     for (const def of this.definitions) {
-      const tag = this.tagService.get(def.tag);
-      const isActive = tag && (tag.value === true || tag.value === 1);
+      if (def.display === false) continue;
+      const tag = this.resolveTag(def);
+      const isActive = this.isTriggerActive(def, tag);
       if (isActive) {
         const existing = this.active.find((a) => a.id === def.id);
         if (existing) {

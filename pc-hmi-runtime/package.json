@@ -2,8 +2,9 @@
   "name": "plant-hmi",
   "version": "0.2.0",
   "private": true,
+  "author": "Kshipa",
   "description": "Windows PC-based HMI platform — Studio + Runtime, Rockwell-equivalent features",
-  "main": "server/index.js",
+  "main": "electron/main.js",
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
@@ -11,7 +12,8 @@
     "desktop:runtime": "electron electron/main.js --runtime",
     "desktop:kiosk": "electron electron/main.js --runtime --kiosk",
     "test": "node --test test/**/*.test.js",
-    "build:panel": "node scripts/build-panel-package.js"
+    "build:panel": "node scripts/build-panel-package.js",
+    "dist": "electron-builder --win --x64"
   },
   "dependencies": {
     "express": "^4.19.2",
@@ -19,6 +21,50 @@
     "st-ethernet-ip": "^2.7.5"
   },
   "devDependencies": {
-    "electron": "^34.0.0"
+    "electron": "^34.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.planthmi.app",
+    "productName": "Plant HMI",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "asar": false,
+    "files": [
+      "electron/**/*",
+      "server/**/*",
+      "public/**/*",
+      "shared/**/*",
+      "schemas/**/*",
+      "config/**/*",
+      "screens/**/*",
+      "projects/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "forceCodeSigning": false,
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "signDlls": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": false,
+      "include": "build/installer.nsh",
+      "artifactName": "PlantHMI-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "PlantHMI-Portable-${version}.${ext}"
+    }
   }
 }

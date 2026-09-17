@@ -437,8 +437,12 @@ body.studio-edit-mode .ft-polyline.studio-selected {
   text-overflow: ellipsis;
 }
 .ft-alarm-ticker {
-  border-top: 1px solid #cc0000;
-  border-bottom: 1px solid #cc0000;
+  border-top: 1px solid transparent;
+  border-bottom: 1px solid transparent;
+}
+.ft-alarm-ticker.has-message {
+  border-top-color: #cc0000;
+  border-bottom-color: #cc0000;
 }
 .ft-string-display {
   box-sizing: border-box;
@@ -628,6 +632,24 @@ body.studio-edit-mode .ft-polyline.studio-selected {
   white-space: nowrap;
   word-break: break-all;
   overflow: hidden;
+}
+.ft-control-list-selector {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 0;
+  outline: none;
+}
+.ft-control-list-selector .ft-display-list-row.is-committed {
+  box-shadow: inset 0 0 0 1px #7aa3c9;
+}
+.ft-control-list-selector.ft-cls-waiting {
+  cursor: wait;
+  opacity: 0.85;
+}
+.ft-control-list-selector.ft-cls-error {
+  box-shadow: inset 0 0 0 2px #ff3b30;
 }
 .ft-btn-caption {
   pointer-events: none;

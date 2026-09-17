@@ -168,6 +168,67 @@
     exprPickTarget = null;
   }
 
+  function setExprStatus(message, kind) {
+    const status = $('exprEditorStatus');
+    if (!status) return;
+    status.textContent = message || '';
+    status.className = kind ? `expr-editor-status ${kind}` : 'expr-editor-status';
+  }
+
+  function runCheckSyntax() {
+    const ta = $('exprEditorText');
+    if (!ta) return;
+    if (!window.ExpressionEval || typeof ExpressionEval.checkSyntax !== 'function') {
+      setExprStatus('Expression checker failed to load.', 'error');
+      return;
+    }
+    const check = ExpressionEval.checkSyntax(ta.value);
+    setExprStatus(check.message, check.ok ? 'ok' : 'error');
+  }
+
+  function closeExprMenus(exceptId) {
+    document.querySelectorAll('#expressionEditorDialog .expr-split-menu').forEach((menu) => {
+      if (exceptId && menu.id === exceptId) return;
+      menu.classList.add('hidden');
+    });
+  }
+
+  function toggleExprMenu(menuId) {
+    const menu = $(menuId);
+    if (!menu) return;
+    const willOpen = menu.classList.contains('hidden');
+    closeExprMenus();
+    menu.classList.toggle('hidden', !willOpen);
+  }
+
+  function wireExprMenus() {
+    const map = {
+      exprEditorFunctions: 'exprEditorFunctionsMenu',
+      exprEditorLogicalAnd: 'exprEditorLogicalMenu',
+      exprEditorRelEq: 'exprEditorRelMenu',
+      exprEditorArithAdd: 'exprEditorArithMenu'
+    };
+    Object.entries(map).forEach(([btnId, menuId]) => {
+      $(btnId)?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleExprMenu(menuId);
+      });
+    });
+    document.querySelectorAll('#expressionEditorDialog [data-expr-insert]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const ta = $('exprEditorText');
+        const text = btn.getAttribute('data-expr-insert') || '';
+        if (ta && text) insertAtCursor(ta, text);
+        closeExprMenus();
+      });
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest?.('#expressionEditorDialog .expr-split')) closeExprMenus();
+    });
+  }
+
   function wirePickButtons() {
     document.querySelectorAll('[data-tag-pick]').forEach((btn) => {
       if (btn.dataset.tagPickWired === '1') return;
@@ -205,44 +266,18 @@
       exprPickTarget = null;
       $('expressionEditorDialog')?.close();
     });
-    $('exprEditorCheck')?.addEventListener('click', () => {
-      const ta = $('exprEditorText');
-      if (!ta || !window.ExpressionEval) return;
-      const check = ExpressionEval.checkSyntax(ta.value);
-      $('exprEditorStatus').textContent = check.message;
-      $('exprEditorStatus').className = `expr-editor-status ${check.ok ? 'ok' : 'error'}`;
-    });
+    $('exprEditorCheck')?.addEventListener('click', runCheckSyntax);
     $('exprEditorTags')?.addEventListener('click', async () => {
       const ta = $('exprEditorText');
       await openTagBrowser(null, (sel) => {
         if (ta) insertAtCursor(ta, `tags.get('${sel}', False)`);
       });
     });
-
-    const inserts = {
-      exprEditorIf: "1 if tags.get('TagName', False) else 0",
-      exprEditorLogicalAnd: ' and ',
-      exprEditorLogicalOr: ' or ',
-      exprEditorLogicalNot: 'not ',
-      exprEditorRelEq: ' == ',
-      exprEditorRelNe: ' != ',
-      exprEditorRelLt: ' < ',
-      exprEditorRelGt: ' > ',
-      exprEditorArithAdd: ' + ',
-      exprEditorArithSub: ' - ',
-      exprEditorArithMul: ' * ',
-      exprEditorArithDiv: ' / '
-    };
-    Object.entries(inserts).forEach(([id, text]) => {
-      $(id)?.addEventListener('click', () => {
-        const ta = $('exprEditorText');
-        if (ta) insertAtCursor(ta, text);
-      });
-    });
-    $('exprEditorFunctions')?.addEventListener('click', () => {
+    $('exprEditorIf')?.addEventListener('click', () => {
       const ta = $('exprEditorText');
-      if (ta) insertAtCursor(ta, "tags.get('TagName', False)");
+      if (ta) insertAtCursor(ta, "1 if tags.get('TagName', False) else 0");
     });
+    wireExprMenus();
 
     const ta = $('exprEditorText');
     ta?.addEventListener('keyup', () => updateExprCursorPos(ta));

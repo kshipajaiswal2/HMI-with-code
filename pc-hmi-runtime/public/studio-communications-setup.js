@@ -110,6 +110,9 @@
       body: JSON.stringify({ communication })
     });
     await window.refreshProjectConfig?.();
+    if (typeof window.loadExplorer === 'function' && window.state.activeProject) {
+      await window.loadExplorer(window.state.activeProject);
+    }
     const ipNote = communication.driver === 'simulator'
       ? 'Simulator (offline)'
       : communication.plcIpAddress;

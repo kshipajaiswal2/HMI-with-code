@@ -284,9 +284,11 @@ function tagCsvLines(tags) {
 }
 
 class ProjectService {
-  constructor(rootDir) {
+  constructor(rootDir, options = {}) {
     this.rootDir = rootDir;
-    this.projectsDir = path.join(rootDir, 'projects');
+    this.projectsDir = options.projectsDir
+      || process.env.PLANTHMI_PROJECTS
+      || path.join(rootDir, 'projects');
     this.templateDir = path.join(this.projectsDir, '_template');
     this.standardScreensPath = path.join(rootDir, 'config', 'standard-screens.json');
     this.activeFile = path.join(this.projectsDir, '.active.json');
@@ -1701,7 +1703,24 @@ class ProjectService {
               ]
             };
           })(),
-          { type: 'item', id: 'local-messages', label: 'Local Messages', icon: 'local-messages', action: 'local-messages' }
+          {
+            type: 'folder',
+            id: 'local-messages',
+            label: 'Local Messages',
+            icon: 'local-messages',
+            action: 'local-messages',
+            children: Object.keys(config.localMessages && typeof config.localMessages === 'object' ? config.localMessages : {})
+              .filter((name) => name && name !== 'Untitled')
+              .sort((a, b) => a.localeCompare(b))
+              .map((name) => ({
+                type: 'item',
+                id: `local-msg-${String(name).replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+                label: name,
+                icon: 'local-messages',
+                action: 'local-message-item',
+                localMessageName: name
+              }))
+          }
         ]
       },
       {
@@ -1729,7 +1748,24 @@ class ProjectService {
         label: 'Logic and Control',
         icon: 'logic',
         children: [
-          { type: 'item', id: 'macros', label: 'Macros', icon: 'macros', action: 'macros' }
+          {
+            type: 'folder',
+            id: 'macros',
+            label: 'Macros',
+            icon: 'macros',
+            action: 'macros',
+            children: Object.keys(config.macros && typeof config.macros === 'object' ? config.macros : {})
+              .filter((name) => name && name !== 'Untitled')
+              .sort((a, b) => a.localeCompare(b))
+              .map((name) => ({
+                type: 'item',
+                id: `macro-${String(name).replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+                label: name,
+                icon: 'macros',
+                action: 'macro-item',
+                macroName: name
+              }))
+          }
         ]
       },
       {
@@ -1738,7 +1774,24 @@ class ProjectService {
         label: 'Data Log',
         icon: 'data-log',
         children: [
-          { type: 'item', id: 'data-log-models', label: 'Data Log Models', icon: 'data-log-models', action: 'data-log' }
+          {
+            type: 'folder',
+            id: 'data-log-models',
+            label: 'Data Log Models',
+            icon: 'data-log-models',
+            action: 'data-log',
+            children: Object.keys(config.dataLogModels && typeof config.dataLogModels === 'object' ? config.dataLogModels : {})
+              .filter((name) => name && name !== 'Untitled')
+              .sort((a, b) => a.localeCompare(b))
+              .map((name) => ({
+                type: 'item',
+                id: `data-log-${String(name).replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+                label: name,
+                icon: 'data-log-models',
+                action: 'data-log-item',
+                dataLogName: name
+              }))
+          }
         ]
       },
       {
@@ -1748,7 +1801,24 @@ class ProjectService {
         icon: 'recipeplus',
         children: [
           { type: 'item', id: 'recipeplus-setup', label: 'RecipePlus Setup', icon: 'recipeplus-setup', action: 'recipeplus-setup' },
-          { type: 'item', id: 'recipeplus-editor', label: 'RecipePlus Editor', icon: 'recipeplus-editor', action: 'recipeplus-editor' }
+          {
+            type: 'folder',
+            id: 'recipeplus-editor',
+            label: 'RecipePlus Editor',
+            icon: 'recipeplus-editor',
+            action: 'recipeplus-editor',
+            children: Object.keys(config.recipePlusFiles && typeof config.recipePlusFiles === 'object' ? config.recipePlusFiles : {})
+              .filter((name) => name && name !== 'Untitled')
+              .sort((a, b) => a.localeCompare(b))
+              .map((name) => ({
+                type: 'item',
+                id: `recipe-${String(name).replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+                label: name,
+                icon: 'recipeplus-editor',
+                action: 'recipeplus-item',
+                recipeName: name
+              }))
+          }
         ]
       },
       {
@@ -1785,8 +1855,127 @@ class ProjectService {
       projectId,
       projectName: config.name || projectId,
       host,
-      tree
+      tree,
+      communicationsTree: this.buildCommunicationsTree(config, host)
     };
+  }
+
+  buildCommunicationsTree(config, host) {
+    const comm = config.communication && typeof config.communication === 'object'
+      ? config.communication
+      : {};
+    const driver = comm.driver || 'simulator';
+    const parsedSlot = Number.parseInt(String(comm.path ?? ''), 10);
+    const requestedSlot = Number.isFinite(parsedSlot) && parsedSlot >= 0 ? parsedSlot : 2;
+    const deviceSlot = requestedSlot === 0 || requestedSlot === 1 ? 2 : requestedSlot;
+    const { isPlcDeviceTag } = require('../../shared/tag-connections');
+    const plcTagChildren = (config.tags || [])
+      .filter(isPlcDeviceTag)
+      .slice(0, 200)
+      .map((tag) => ({
+        type: 'item',
+        id: `linx-browse-tag-${String(tag.name).replace(/[^a-zA-Z0-9._:-]/g, '_')}`,
+        label: tag.name,
+        tagName: tag.name,
+        icon: 'tag',
+        browseLabel: tag.name,
+        linxTopology: true,
+        action: 'linx-device'
+      }));
+
+    const deviceNode = (id, label, icon, browseLabel, extra = {}) => {
+      const children = extra.children && extra.children.length ? extra.children : undefined;
+      return {
+        type: children ? 'folder' : 'item',
+        id,
+        label,
+        icon,
+        browseLabel,
+        linxTopology: true,
+        action: extra.action || 'linx-device',
+        commDevice: Boolean(extra.commDevice),
+        children
+      };
+    };
+
+    let plcDevice;
+    if (driver === 'ethernet-ip') {
+      const ip = String(comm.plcIpAddress || '').trim() || 'EtherNet/IP';
+      plcDevice = deviceNode(
+        'linx-slot-plc',
+        `${deviceSlot}, CompactLogix / ControlLogix, ${ip}`,
+        'plc',
+        ip,
+        { action: 'communications', commDevice: true, children: plcTagChildren }
+      );
+    } else if (driver === 'opcua') {
+      const endpoint = comm.opcua?.endpoint
+        || (comm.plcIpAddress ? `opc.tcp://${comm.plcIpAddress}:${comm.opcua?.port || 4840}` : 'OPC UA');
+      plcDevice = deviceNode(
+        'linx-slot-plc',
+        `${deviceSlot}, OPC UA Server, ${endpoint}`,
+        'plc',
+        endpoint,
+        { action: 'communications', commDevice: true, children: plcTagChildren }
+      );
+    } else {
+      plcDevice = deviceNode(
+        'linx-slot-plc',
+        `${deviceSlot}, Studio 5000 Logix Emulate, Simulator`,
+        'emulate',
+        'Studio 5000 Logix Emulate',
+        { action: 'communications', commDevice: true, children: plcTagChildren }
+      );
+    }
+
+    const networks = [
+      {
+        type: 'folder',
+        id: 'linx-backplane',
+        label: '1789-A17, Backplane',
+        icon: 'backplane',
+        browseLabel: '1789-A17, Backplane',
+        linxTopology: true,
+        children: [
+          deviceNode('linx-slot-0', '0, RSLinx, RSLinx Server', 'rslinx', 'RSLinx Server'),
+          deviceNode('linx-slot-1', `1, FactoryTalk Linx - Desktop, ${host}`, 'linx', `FactoryTalk Linx - Desktop, ${host}`),
+          plcDevice
+        ]
+      }
+    ];
+
+    if (driver === 'ethernet-ip' && String(comm.plcIpAddress || '').trim()) {
+      const ip = String(comm.plcIpAddress).trim();
+      networks.push({
+        type: 'folder',
+        id: 'linx-ethernet',
+        label: 'AB_ETH-1, EtherNet/IP Driver',
+        icon: 'ethernet',
+        browseLabel: 'EtherNet/IP Driver',
+        linxTopology: true,
+        children: [
+          deviceNode(
+            'linx-eth-plc',
+            `${ip}, CompactLogix / ControlLogix`,
+            'plc',
+            ip,
+            { action: 'communications', commDevice: true, children: plcTagChildren }
+          )
+        ]
+      });
+    }
+
+    return [
+      {
+        type: 'folder',
+        id: 'linx-desktop',
+        label: `FactoryTalk Linx - Desktop, ${host}`,
+        icon: 'linx',
+        browseLabel: `FactoryTalk Linx - Desktop, ${host}`,
+        linxTopology: true,
+        children: networks
+      }
+    ];
   }
 
   copyDir(src, dest) {

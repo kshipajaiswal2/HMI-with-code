@@ -18,7 +18,7 @@
       "backColor": "#E8E8E8",
       "useBackColor": true,
       "foreColor": "#000000",
-      "lineWidth": 1
+      "lineWidth": 2
     },
     {
       "type": "Text",

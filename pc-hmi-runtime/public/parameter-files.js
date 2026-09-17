@@ -79,7 +79,7 @@
   }
 
   function applySubNavHighlight(comp, parameterFile) {
-    if (comp.type !== 'GotoButton' || !comp.name?.startsWith('PlcIoSubNav_')) return;
+    if (comp.type !== 'GotoButton' || !String(comp.name || '').startsWith('PlcIoSubNav')) return;
     const pf = String(comp.parameterFile || '').trim();
     const active = pf && pf === parameterFile;
     comp.useBorderColor = true;

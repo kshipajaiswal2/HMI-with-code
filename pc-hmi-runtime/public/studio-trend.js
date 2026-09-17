@@ -449,6 +449,21 @@
     scheduleTrendLivePreview();
   }
 
+  function fillDataLogModelSelect(selected) {
+    const sel = document.getElementById('trDataLogModel');
+    if (!sel) return;
+    const names = (window.StudioDataLog?.listNames?.()
+      || Object.keys(window.state?.projectConfig?.dataLogModels || {}))
+      .filter((n) => n && n !== 'Untitled')
+      .sort((a, b) => a.localeCompare(b));
+    const cur = selected || '';
+    sel.innerHTML = `<option value="">&lt;None&gt;</option>${names.map((n) => {
+      const safe = String(n).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+      return `<option value="${safe}">${safe}</option>`;
+    }).join('')}`;
+    sel.value = names.includes(cur) ? cur : '';
+  }
+
   function fillTrendForm(comp) {
     if (window.state) window.state.propsFormFill = true;
     try {
@@ -520,6 +535,7 @@
       });
       document.getElementById('trScalePen').value = String(comp.scalePen || 1);
       document.getElementById('trScalePercent').checked = Boolean(comp.scaleAsPercent);
+      fillDataLogModelSelect(comp.dataLogModel || '');
       document.getElementById('trDataLogModel').value = comp.dataLogModel || '';
       document.getElementById('trHeight').value = comp.height ?? 180;
       document.getElementById('trWidth').value = comp.width ?? 240;

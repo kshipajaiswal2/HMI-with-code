@@ -1,0 +1,14 @@
+Plant HMI 0.2.1 — install on another PC
+======================================
+
+1. If you downloaded this zip, right-click it → Properties → tick Unblock → OK.
+2. Unzip. Run PlantHMI-Setup-0.2.1.exe (not the old 0.2.0 file).
+3. If Windows says "Windows protected your PC":
+     More info  →  Run anyway
+   This warning appears because the installer is not digitally signed.
+   It is Plant HMI from this project, not a virus.
+4. Teams / Outlook block .exe attachments. Send this zip, a USB copy, or a
+   shared-folder link — do not attach the .exe itself.
+
+After install, Start Menu → Plant HMI Studio (or Plant HMI Runtime).
+Projects are stored in: %APPDATA%\Plant HMI\projects

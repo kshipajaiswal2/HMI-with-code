@@ -70,7 +70,7 @@ JSON is the **project format**. The **panel PC runs Plant HMI Runtime**, which r
 
 Studio’s **Tools → Transfer Utility** can also create a ZIP or folder deployment.
 
-To send the **Windows installer** to another PC, do not attach `PlantHMI-Setup-*.exe` in Teams or Outlook (those block `.exe` files). Copy it on USB, share a folder link, or zip it first (`pc-hmi-runtime\dist\PlantHMI-Setup-0.2.0.zip`). Latest source is on GitHub: https://github.com/kshipajaiswal2/HMI-with-code
+To send the **Windows installer** to another PC, do not attach `PlantHMI-Setup-*.exe` in Teams or Outlook (those block `.exe` files). Copy it on USB, share a folder link, or zip it first (`pc-hmi-runtime\dist\PlantHMI-Setup-0.2.1.zip`). Latest source is on GitHub: https://github.com/kshipajaiswal2/HMI-with-code
 
 ---
 

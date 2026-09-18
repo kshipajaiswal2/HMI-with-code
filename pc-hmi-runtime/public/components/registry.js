@@ -9768,21 +9768,12 @@ const ComponentRegistry = {
     textEl.className = 'ft-alarm-ticker-text';
     el.appendChild(timeEl);
     el.appendChild(textEl);
-    const fallback = (comp.caption != null && comp.caption !== '')
-      ? String(comp.caption)
-      : 'ABCDE FGHIJK LMNOPQ RSTUV WXYZ ABCDE FGHIJK LMNOPQ RSTUV WXYZ';
     const isPlaceholderMessage = (text) => {
       const value = String(text || '').replace(/\s+/g, ' ').trim();
       return !value || /ABCDE\s+FGHIJK/i.test(value);
     };
     const applyMessage = (message) => {
       const text = message == null ? '' : String(message);
-      if (studioEdit) {
-        timeEl.textContent = ComponentRegistry.formatFtShortDateTime();
-        textEl.textContent = text.trim() ? text : fallback;
-        el.classList.add('has-message');
-        return;
-      }
       if (isPlaceholderMessage(text)) {
         timeEl.textContent = '';
         textEl.textContent = '';
@@ -9794,7 +9785,7 @@ const ComponentRegistry = {
       el.classList.add('has-message');
     };
     const tickTime = () => {
-      if (!studioEdit && !textEl.textContent) return;
+      if (!textEl.textContent) return;
       timeEl.textContent = ComponentRegistry.formatFtShortDateTime();
     };
     if (studioEdit) tickTime();

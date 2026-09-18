@@ -1,6 +1,6 @@
 {
   "name": "plant-hmi",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "author": "Kshipa",
   "description": "Windows PC-based HMI platform — Studio + Runtime, Rockwell-equivalent features",

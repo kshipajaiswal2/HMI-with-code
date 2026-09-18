@@ -50,7 +50,7 @@ This produces two files in `dist\`:
 Copy either file to the target PC with **USB, a shared folder, or OneDrive**. Do **not** attach the `.exe` to Teams or Outlook — those block executable attachments (`file type that is not permitted`). Zip it first if you must send it by chat:
 
 ```powershell
-Compress-Archive -Path "dist\PlantHMI-Setup-0.2.0.exe" -DestinationPath "dist\PlantHMI-Setup-0.2.0.zip" -Force
+Compress-Archive -Path "dist\PlantHMI-Setup-0.2.1.exe" -DestinationPath "dist\PlantHMI-Setup-0.2.1.zip" -Force
 ```
 
 Then send `PlantHMI-Setup-0.2.0.zip`. The other PC unzips and runs the setup file. No Node.js or npm is required there.
@@ -75,8 +75,10 @@ reinstalling the app does not wipe your work:
 
 `%APPDATA%\Plant HMI\projects`
 
-Windows may show a SmartScreen prompt on first run because the installer is
-unsigned. Choose **More info → Run anyway** if you built it yourself.
+Windows may show **Windows protected your PC** (SmartScreen) on first run because
+the installer is unsigned. That is normal. Choose **More info → Run anyway**.
+If the file was downloaded, right-click it first → **Properties** → tick
+**Unblock** → OK, then run setup.
 
 The first launch copies the bundled starter projects there. After that, all
 edits stay in that folder. Dev checkouts (`npm run desktop`) still use

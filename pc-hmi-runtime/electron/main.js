@@ -115,13 +115,44 @@ function resolveProjectsDir() {
   return path.join(app.getPath('userData'), 'projects');
 }
 
+function packagedAppVersion() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version || '0';
+  } catch {
+    return '0';
+  }
+}
+
+function refreshBundledOverview(src, dest) {
+  let entries = [];
+  try {
+    entries = fs.readdirSync(src, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const from = path.join(src, entry.name, 'Gfx', '100_Overview.json');
+    const toDir = path.join(dest, entry.name, 'Gfx');
+    const to = path.join(toDir, '100_Overview.json');
+    if (!fs.existsSync(from)) continue;
+    fs.mkdirSync(toDir, { recursive: true });
+    fs.copyFileSync(from, to);
+  }
+}
+
 function seedPackagedProjects(src, dest) {
   if (!fs.existsSync(src)) return;
-  const marker = path.join(dest, '.seeded');
-  if (fs.existsSync(marker)) return;
   fs.mkdirSync(dest, { recursive: true });
-  fs.cpSync(src, dest, { recursive: true, force: false });
-  fs.writeFileSync(marker, new Date().toISOString(), 'utf8');
+  const version = packagedAppVersion();
+  const marker = path.join(dest, '.seeded');
+  const previous = fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8').trim() : '';
+  const firstSeed = !previous;
+  fs.cpSync(src, dest, { recursive: true, force: firstSeed });
+  if (!firstSeed && previous !== version) {
+    refreshBundledOverview(src, dest);
+  }
+  fs.writeFileSync(marker, version, 'utf8');
 }
 
 function probePlantHmi(port) {

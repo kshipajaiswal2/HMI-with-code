@@ -790,7 +790,6 @@ body.embed-body {
   border: 1px solid var(--border); border-radius: 4px; font-family: var(--font); font-size: 13px;
 }
 .login-actions { display: flex; gap: 8px; margin-top: 12px; }
-.login-hint { margin-top: 10px; font-size: 11px; color: var(--text-muted); }
 
 /* Alarm banner */
 .alarm-banner {

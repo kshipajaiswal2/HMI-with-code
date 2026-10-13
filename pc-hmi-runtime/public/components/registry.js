@@ -3083,7 +3083,6 @@ const ComponentRegistry = {
         <button type="submit" class="action-btn primary">Login</button>
         <button type="button" class="action-btn" data-action="logout">Logout</button>
       </div>
-      <p class="login-hint">operator/operator · engineer/engineer · admin/admin</p>
     `;
     const refresh = () => {
       const user = ctx.getCurrentUser();

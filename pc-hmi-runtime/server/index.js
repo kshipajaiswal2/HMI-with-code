@@ -632,7 +632,7 @@ app.get('/api/runtime/status', (req, res) => {
   const communication = getEffectiveCommunication();
   res.json({
     platform: 'Plant HMI Studio',
-    version: '0.2.0',
+    version: require('../package.json').version,
     projectId: pid,
     communication: {
       ...(driver?.getStatus?.() ?? { connected: false, driver: 'none', quality: 'bad' }),

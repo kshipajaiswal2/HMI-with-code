@@ -11,9 +11,6 @@
     {
       "type": "LoginPanel",
       "id": "login-panel"
-    },
-    {
-      "type": "LoginPanel"
     }
   ],
   "displaySettings": {

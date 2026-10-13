@@ -40,7 +40,7 @@ for (const projectId of PROJECTS) {
   project.parameterFiles = synced.parameterFiles;
   project.tags = synced.tags;
   fs.writeFileSync(projectPath, `${JSON.stringify(project, null, 2)}\n`);
-  ParameterFileService.writeProjectParameterParFiles(root, projectId, synced.parameterFiles);
+  ParameterFileService.writeProjectParameterParFiles(path.join(root, 'projects', projectId), synced.parameterFiles);
 
   const tagDir = path.join(root, 'projects', projectId, 'Tag');
   fs.mkdirSync(tagDir, { recursive: true });

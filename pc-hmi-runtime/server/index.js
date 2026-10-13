@@ -384,7 +384,7 @@ app.patch('/api/projects/:id/config', (req, res) => {
     }
     const config = projectService.updateProjectConfig(req.params.id, patch);
     if (patch.parameterFiles) {
-      ParameterFileService.writeProjectParameterParFiles(ROOT, req.params.id, config.parameterFiles);
+      ParameterFileService.writeProjectParameterParFiles(projectService.projectPath(req.params.id), config.parameterFiles);
     }
     if (req.params.id === projectService.getActiveId() || req.params.id === loadedRuntimeProjectId) {
       loadProjectRuntime(req.params.id);
@@ -417,11 +417,7 @@ app.post('/api/projects/:id/parameter-files', (req, res) => {
       parameterFiles: result.parameterFiles,
       tags: result.tags
     });
-    ParameterFileService.writeProjectParameterParFiles(ROOT, req.params.id, result.parameterFiles);
-    fs.writeFileSync(
-      path.join(ROOT, 'config', 'io-list-tag-values.json'),
-      `${JSON.stringify(result.listValues, null, 2)}\n`
-    );
+    ParameterFileService.writeProjectParameterParFiles(projectService.projectPath(req.params.id), result.parameterFiles);
     if (req.params.id === projectService.getActiveId() || req.params.id === loadedRuntimeProjectId) {
       loadProjectRuntime(req.params.id);
     }
@@ -431,6 +427,29 @@ app.post('/api/projects/:id/parameter-files', (req, res) => {
       listNum: result.listNum,
       parameterFiles: next.parameterFiles
     });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Called after PLC tags are imported: sorts their IO points into Safety/PLC DI/DO lists (one set
+// per zone when the export has several) and creates the parameter files those lists need.
+app.post('/api/projects/:id/io-lists/from-plc-tags', (req, res) => {
+  try {
+    const config = projectService.readProjectConfig(req.params.id);
+    const result = ParameterFileService.syncIoListsFromPlcTags(config);
+    if (!result.summary.length) {
+      return res.json({ success: true, summary: [], message: 'No SDI/DI/SDO/DO points found in the project tags' });
+    }
+    const next = projectService.updateProjectConfig(req.params.id, {
+      parameterFiles: result.parameterFiles,
+      tags: result.tags
+    });
+    ParameterFileService.writeProjectParameterParFiles(projectService.projectPath(req.params.id), result.parameterFiles);
+    if (req.params.id === projectService.getActiveId() || req.params.id === loadedRuntimeProjectId) {
+      loadProjectRuntime(req.params.id);
+    }
+    res.json({ success: true, summary: result.summary, parameterFiles: Object.keys(next.parameterFiles || {}) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -448,7 +467,7 @@ app.put('/api/projects/:id/parameter-files/:name', (req, res) => {
     }
     files[name] = { ...files[name], replacements };
     const next = projectService.updateProjectConfig(req.params.id, { parameterFiles: files });
-    ParameterFileService.writeProjectParameterParFiles(ROOT, req.params.id, files);
+    ParameterFileService.writeProjectParameterParFiles(projectService.projectPath(req.params.id), files);
     if (req.params.id === projectService.getActiveId() || req.params.id === loadedRuntimeProjectId) {
       loadProjectRuntime(req.params.id);
     }
@@ -468,11 +487,7 @@ app.delete('/api/projects/:id/parameter-files/:name', (req, res) => {
       parameterFiles: result.parameterFiles,
       tags: result.tags
     });
-    ParameterFileService.writeProjectParameterParFiles(ROOT, req.params.id, result.parameterFiles);
-    fs.writeFileSync(
-      path.join(ROOT, 'config', 'io-list-tag-values.json'),
-      `${JSON.stringify(result.listValues, null, 2)}\n`
-    );
+    ParameterFileService.writeProjectParameterParFiles(projectService.projectPath(req.params.id), result.parameterFiles);
     if (req.params.id === projectService.getActiveId() || req.params.id === loadedRuntimeProjectId) {
       loadProjectRuntime(req.params.id);
     }

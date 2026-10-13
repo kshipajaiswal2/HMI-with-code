@@ -8971,7 +8971,8 @@ function shouldAssignPlcUploadedFolder(raw, folder, format) {
   return Boolean(plc || raw.dataSource === 'device') && !folder;
 }
 
-const IO_SYSTEM_FOLDER_RE = /^(PLC_(DI|DO)|Safety_(DI|DO))_(Discr|No|Tags)$/;
+// Optional zone prefix (RIO01_PLC_DI_Discr) when a PLC export holds several zones.
+const IO_SYSTEM_FOLDER_RE = /^(?:[A-Za-z0-9]+_)?(PLC_(DI|DO)|Safety_(DI|DO))_(Discr|No|Tags)$/;
 
 const tagsPanelState = { folder: '', selected: '', mode: 'edit', detailAbort: null, ctx: null, collapsedGroups: new Set() };
 
@@ -11705,6 +11706,12 @@ async function mergeTagsIntoProject(imported, sourceLabel, options = {}) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tags })
   });
+  // Sort the imported IO points into Safety/PLC DI/DO lists and create their parameter files.
+  const ioSync = await fetchJson(`/api/projects/${encodeURIComponent(state.activeProject)}/io-lists/from-plc-tags`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}'
+  }).catch((err) => ({ error: err.message, summary: [] }));
   await refreshProjectConfig();
   await loadExplorer(state.activeProject);
   const openFolder = usesPlcFolder ? PLC_UPLOADED_TAGS_FOLDER : tagsPanelState.folder;
@@ -11716,6 +11723,13 @@ async function mergeTagsIntoProject(imported, sourceLabel, options = {}) {
   let msg = `Imported ${added + updated} tag${added + updated === 1 ? '' : 's'} from ${sourceLabel} (${added} new, ${updated} updated) — ${tags.length} total`;
   if (usesPlcFolder) msg += ` → folder "${PLC_UPLOADED_TAGS_FOLDER}"`;
   if (skippedIo) msg += ` — ${skippedIo} IO list tag(s) skipped`;
+  if (ioSync?.summary?.length) {
+    const kindLabel = { di: 'PLC DI', do: 'PLC DO', safetyDi: 'Safety DI', safetyDo: 'Safety DO' };
+    const parts = ioSync.summary.map((s) => `${s.zone ? `${s.zone} ` : ''}${kindLabel[s.kind]} ${s.points} pts (${s.lists} list${s.lists === 1 ? '' : 's'})`);
+    msg += ` — IO lists: ${parts.join(', ')}`;
+  } else if (ioSync?.error) {
+    msg += ` — IO lists not updated: ${ioSync.error}`;
+  }
   setTagWizardStatus(msg, 'ok');
   setStatus(msg);
   return { added, updated, total: tags.length, skippedIo };
@@ -11750,7 +11764,9 @@ function normalizeImportedTag(raw, options = {}) {
   }
 
   const plc = String(raw.plcAddress || raw.PLCReference || raw.connection || '').trim();
-  const shortName = name.includes('.') ? name.split('.').pop() : name;
+  // The PLC tag is the name without its folder, not the part after the last dot: bit tags such
+  // as RIO03_Z3:10:I.0 would otherwise get the PLC address "0".
+  const shortName = folder && name.startsWith(`${folder}.`) ? name.slice(folder.length + 1) : name;
   return normalizeTagEntry({
     ...raw,
     name,

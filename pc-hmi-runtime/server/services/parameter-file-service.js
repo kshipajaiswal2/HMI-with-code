@@ -8,9 +8,10 @@ function mergeIoTags(existingTags, ioTags) {
   const existingByName = Object.fromEntries((existingTags || []).map((t) => [t.name, t]));
   const ioNames = new Set(ioTags.map((t) => t.name));
   const kept = (existingTags || []).filter((t) => !ioNames.has(t.name));
-  const mergedIo = ioTags.map((tag) => {
+  const mergedIo = ioTags.map(({ fromPlc, ...tag }) => {
     const prev = existingByName[tag.name];
-    if (!prev) return tag;
+    // Values read from the PLC tag export replace whatever placeholder text was there before.
+    if (!prev || fromPlc) return tag;
     return {
       ...tag,
       description: prev.description || tag.description,
@@ -21,8 +22,10 @@ function mergeIoTags(existingTags, ioTags) {
   return [...kept, ...mergedIo];
 }
 
-function writeProjectParameterParFiles(projectRoot, projectId, parameterFiles) {
-  const parDir = path.join(projectRoot, 'projects', projectId, 'Parameters');
+// projectDir is the project's own folder (projects/<id>, or %APPDATA%\Plant HMI\projects\<id> in
+// the installed app); the program folder itself is read-only there.
+function writeProjectParameterParFiles(projectDir, parameterFiles) {
+  const parDir = path.join(projectDir, 'Parameters');
   fs.mkdirSync(parDir, { recursive: true });
   for (const [name, def] of Object.entries(parameterFiles || {})) {
     const safeName = name.replace(/[<>:"/\\|?*]/g, '_');
@@ -41,6 +44,18 @@ function syncParameterInfrastructure(projectConfig, options = {}) {
     listValues,
     writeParFiles: options.writeParFiles !== false
   };
+}
+
+/**
+ * Build the IO lists from uploaded PLC tags: classify their IO points (SDI/DI/SDO/DO, per zone),
+ * add the parameter files needed to hold them, and fill the list tags with their descriptions
+ * and PLC connections. Existing parameter files are kept.
+ */
+function syncIoListsFromPlcTags(projectConfig) {
+  const current = Builder.mergeProjectParameterFiles(projectConfig.parameterFiles);
+  const { parameterFiles, summary } = IoListTags.planIoListsFromPlcTags(projectConfig.tags, current);
+  const synced = syncParameterInfrastructure({ ...projectConfig, parameterFiles });
+  return { ...synced, summary };
 }
 
 function addProjectParameterFile(projectConfig, kind) {
@@ -62,6 +77,7 @@ module.exports = {
   mergeIoTags,
   writeProjectParameterParFiles,
   syncParameterInfrastructure,
+  syncIoListsFromPlcTags,
   addProjectParameterFile,
   removeProjectParameterFile
 };

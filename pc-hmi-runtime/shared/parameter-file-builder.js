@@ -44,8 +44,25 @@
     return String(n).padStart(2, '0');
   }
 
-  function parameterFileName(kind, listNum) {
-    const cfg = IO_LIST_KINDS[kind];
+  /**
+   * Folder/label names for an IO list kind. Projects with one zone use the plain names
+   * (PLC_DI_Discr, "PLC DI List 01"); with several zones each zone gets its own prefixed set
+   * (RIO01_PLC_DI_Discr, "RIO01 PLC DI List 01").
+   */
+  function kindConfig(kind, zone = '') {
+    const base = IO_LIST_KINDS[kind];
+    if (!base || !zone) return base;
+    return {
+      ...base,
+      label: `${zone} ${base.label}`,
+      discrPrefix: `${zone}_${base.discrPrefix}`,
+      noPrefix: `${zone}_${base.noPrefix}`,
+      tagsPrefix: `${zone}_${base.tagsPrefix}`
+    };
+  }
+
+  function parameterFileName(kind, listNum, zone = '') {
+    const cfg = kindConfig(kind, zone);
     return `${cfg.label} List ${pad2(listNum)}`;
   }
 
@@ -59,8 +76,8 @@
     return String(tag || '').trim().replace(/\\/g, '.');
   }
 
-  function buildReplacements(kind, listNum) {
-    const cfg = IO_LIST_KINDS[kind];
+  function buildReplacements(kind, listNum, zone = '') {
+    const cfg = kindConfig(kind, zone);
     if (!cfg) return {};
     const listName = cfg.listName(listNum);
     const replacements = {
@@ -76,38 +93,46 @@
     return replacements;
   }
 
-  function buildParameterFile(kind, listNum) {
-    const name = parameterFileName(kind, listNum);
-    return {
-      [name]: {
-        description: `${IO_LIST_KINDS[kind].label} list ${pad2(listNum)}`,
-        kind,
-        listNum,
-        replacements: buildReplacements(kind, listNum)
-      }
+  function buildParameterFile(kind, listNum, zone = '') {
+    const name = parameterFileName(kind, listNum, zone);
+    const def = {
+      description: `${kindConfig(kind, zone).label} list ${pad2(listNum)}`,
+      kind,
+      listNum,
+      replacements: buildReplacements(kind, listNum, zone)
     };
+    if (zone) def.zone = zone;
+    return { [name]: def };
   }
 
-  function listParameterFiles(parameterFiles, kind) {
+  function listParameterFiles(parameterFiles, kind, zone = '') {
     return Object.entries(parameterFiles || {})
-      .filter(([, def]) => def?.kind === kind)
+      .filter(([, def]) => def?.kind === kind && (def.zone || '') === zone)
       .map(([, def]) => def.listNum)
       .sort((a, b) => a - b);
   }
 
-  function nextListNum(parameterFiles, kind) {
-    const nums = listParameterFiles(parameterFiles, kind);
+  function listZones(parameterFiles) {
+    const zones = new Set(['']);
+    for (const def of Object.values(parameterFiles || {})) {
+      if (def?.kind && def.zone) zones.add(def.zone);
+    }
+    return [...zones];
+  }
+
+  function nextListNum(parameterFiles, kind, zone = '') {
+    const nums = listParameterFiles(parameterFiles, kind, zone);
     if (!nums.length) return 1;
     return Math.max(...nums) + 1;
   }
 
-  function maxListNum(parameterFiles, kind) {
-    const nums = listParameterFiles(parameterFiles, kind);
+  function maxListNum(parameterFiles, kind, zone = '') {
+    const nums = listParameterFiles(parameterFiles, kind, zone);
     return nums.length ? Math.max(...nums) : 0;
   }
 
-  function dataSlotCount(parameterFiles, kind) {
-    const max = maxListNum(parameterFiles, kind);
+  function dataSlotCount(parameterFiles, kind, zone = '') {
+    const max = maxListNum(parameterFiles, kind, zone);
     return max > 0 ? max * ROWS_PER_LIST : 0;
   }
 
@@ -171,6 +196,8 @@
   return {
     ROWS_PER_LIST,
     IO_LIST_KINDS,
+    kindConfig,
+    listZones,
     normalizeFtTag,
     dataIndexForListRow,
     parameterFileName,

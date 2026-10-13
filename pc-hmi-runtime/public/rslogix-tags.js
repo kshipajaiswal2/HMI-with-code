@@ -59,8 +59,10 @@
     return type === 'ALIAS' || type === 'RCOMMENT' || type === 'REMARK';
   }
 
+  // IO point comments sit on a bit (RIO03_Z3:10:I.0) or on a BOOL array element that the logic
+  // maps the IO into (RIO01_SDI[1]); both are single points.
   function isBitSpecifier(specifier) {
-    return /\.(\d+)$/.test(cellStr(specifier));
+    return /\.(\d+)$|\[\d+\]$/.test(cellStr(specifier));
   }
 
   function normalizeDescription(raw) {

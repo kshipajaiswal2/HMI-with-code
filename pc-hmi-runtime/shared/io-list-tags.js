@@ -91,20 +91,102 @@ function buildTagDef(name, type, folder, description, initialValue, options = {}
 
 function pickPlcSourceTags(existingTags, kind) {
   const isInput = kind === 'di' || kind === 'safetyDi';
+  const isSafety = kind === 'safetyDi' || kind === 'safetyDo';
   const filtered = (existingTags || []).filter((tag) => {
     if (tag.folder || tag.dataSource === 'memory') return false;
     if (tag.type !== 'bool') return false;
     const text = `${tag.name} ${tag.description || ''}`;
+    // Safety points (SDI/SDO) must not land in the standard lists, nor the other way round.
+    if (/S(DI|DO)\d/i.test(text) !== isSafety) return false;
     if (isInput) return /DI\d|:I\.|\.I\./i.test(text);
     return /DO\d|:O\.|\.O\./i.test(text);
   });
   return filtered.map((tag) => tag.name);
 }
 
-function buildFolderTagDefs(kind, parameterFiles, plcSources = []) {
-  const cfg = Builder.IO_LIST_KINDS[kind];
-  const maxList = Builder.maxListNum(parameterFiles, kind) || 1;
-  const slotCount = Builder.dataSlotCount(parameterFiles, kind) || Builder.ROWS_PER_LIST;
+const IO_KIND_BY_CODE = { DI: 'di', DO: 'do', SDI: 'safetyDi', SDO: 'safetyDo' };
+const IO_FOLDER_RE = /^(?:[A-Za-z0-9]+_)?(PLC_(DI|DO)|Safety_(DI|DO))_(Discr|No|Tags)$/;
+
+function isIoListFolder(folder) {
+  const f = String(folder || '').trim();
+  return IO_FOLDER_RE.test(f) || f === 'Temp_Tags';
+}
+
+/** Zone key from a PLC tag name: RIO01_SDI[3] -> RIO01, RIO03_Z3:10:I.0 -> RIO03, Start_PB -> ''. */
+function zoneKeyFromTagName(name) {
+  const text = String(name || '');
+  const arrayMatch = text.match(/^([A-Za-z0-9]+?)_S?D[IO]\[\d+\]$/i);
+  if (arrayMatch) return arrayMatch[1].toUpperCase();
+  const moduleMatch = text.match(/^([A-Za-z]+\d+)[_:]/);
+  if (!moduleMatch || /^S?D[IO]\d+$/i.test(moduleMatch[1])) return '';
+  return moduleMatch[1].toUpperCase();
+}
+
+/**
+ * IO points described in uploaded PLC tags ("SDI1_Chopper HMI E-Stop 1/1", "DI57_Tilting ..."),
+ * grouped by zone and kind: Map(zone -> { di|do|safetyDi|safetyDo: Map(pointNo -> point) }).
+ * Array elements (RIO01_DI[5]) win over raw module bits (RIO03_Z3:10:I.0) for the same point.
+ * With a single zone the key is '' so the standard (unprefixed) lists are used.
+ */
+function classifyPlcIoPoints(tags) {
+  const zones = new Map();
+  for (const tag of tags || []) {
+    if (isIoListFolder(tag?.folder)) continue;
+    // Imported tags are saved as "<folder>.<tag>"; the PLC's own tag name is in plcAddress.
+    const plcTag = String(tag?.plcAddress || tag?.connection || tag?.name || '').trim();
+    const description = String(tag?.description || '').trim();
+    // Logic tags such as DI41_ONS have no real description (importers fill in the tag name).
+    if (!plcTag || description === plcTag || description === String(tag?.name || '').trim()) continue;
+    const match = description.match(/^(SDI|SDO|DI|DO)0*(\d{1,4})(?:[\s_:-]+(.*))?$/i);
+    if (!match) continue;
+    const code = match[1].toUpperCase();
+    const num = Number(match[2]);
+    if (!num) continue;
+    const zone = zoneKeyFromTagName(plcTag);
+    if (!zones.has(zone)) zones.set(zone, { di: new Map(), do: new Map(), safetyDi: new Map(), safetyDo: new Map() });
+    const byNum = zones.get(zone)[IO_KIND_BY_CODE[code]];
+    const prev = byNum.get(num);
+    if (prev && prev.connection.includes('[') && !plcTag.includes('[')) continue;
+    const text = String(match[3] || '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+    byNum.set(num, {
+      connection: plcTag,
+      label: `${code}${pad2(num)}${text ? ` ${text}` : ''}`
+    });
+  }
+  if (zones.size === 1) {
+    const [only] = zones.values();
+    return new Map([['', only]]);
+  }
+  return zones;
+}
+
+/** Make sure every zone/kind that has PLC points has enough parameter files (8 points each). */
+function planIoListsFromPlcTags(tags, parameterFiles) {
+  const files = { ...(parameterFiles || {}) };
+  const zones = classifyPlcIoPoints(tags);
+  const summary = [];
+  for (const [zone, kinds] of zones) {
+    for (const kind of ['di', 'do', 'safetyDi', 'safetyDo']) {
+      const points = kinds[kind];
+      if (!points.size) continue;
+      const needed = Math.ceil(Math.max(...points.keys()) / Builder.ROWS_PER_LIST);
+      for (let listNum = 1; listNum <= needed; listNum++) {
+        const name = Builder.parameterFileName(kind, listNum, zone);
+        if (!files[name]) Object.assign(files, Builder.buildParameterFile(kind, listNum, zone));
+      }
+      summary.push({ zone, kind, points: points.size, lists: needed });
+    }
+  }
+  return { parameterFiles: files, summary };
+}
+
+function buildFolderTagDefs(kind, parameterFiles, plcSources = [], zone = '', points = null) {
+  const cfg = Builder.kindConfig(kind, zone);
+  const maxList = Builder.maxListNum(parameterFiles, kind, zone) || 1;
+  const slotCount = Builder.dataSlotCount(parameterFiles, kind, zone) || Builder.ROWS_PER_LIST;
+  const codePrefix = kind === 'di' ? 'DI' : kind === 'do' ? 'DO' : kind === 'safetyDi' ? 'SDI' : 'SDO';
+  const pointAt = (slot) => points?.get(slot + 1) || null;
+  const spareText = (slot) => `${codePrefix}${pad2(slot + 1)} Spare ${codePrefix.startsWith('S') ? 'Safety ' : ''}${codePrefix.includes('DI') ? 'DI' : 'DO'}`;
   const defs = [];
 
   for (let listNum = 1; listNum <= maxList; listNum++) {
@@ -122,14 +204,18 @@ function buildFolderTagDefs(kind, parameterFiles, plcSources = []) {
     const dataIdx = pad2(slot);
     const listNum = Math.floor(slot / Builder.ROWS_PER_LIST) + 1;
     const rowInList = slot % Builder.ROWS_PER_LIST;
-    const text = buildDiscrValues(kind, listNum)[rowInList];
-    defs.push(buildTagDef(
+    const text = points
+      ? (pointAt(slot)?.label || spareText(slot))
+      : buildDiscrValues(kind, listNum)[rowInList];
+    const def = buildTagDef(
       `${cfg.discrPrefix}.Data_${dataIdx}`,
       'string',
       cfg.discrPrefix,
       text,
       text
-    ));
+    );
+    if (points) def.fromPlc = true;
+    defs.push(def);
   }
 
   for (let slot = 0; slot < slotCount; slot++) {
@@ -148,19 +234,20 @@ function buildFolderTagDefs(kind, parameterFiles, plcSources = []) {
 
   for (let slot = 0; slot < slotCount; slot++) {
     const dataIdx = pad2(slot);
-    const connection = plcSources[slot] || '';
+    const connection = points ? (pointAt(slot)?.connection || '') : (plcSources[slot] || '');
     const listNum = Math.floor(slot / Builder.ROWS_PER_LIST) + 1;
     const rowInList = slot % Builder.ROWS_PER_LIST;
     const ioNum = (listNum - 1) * Builder.ROWS_PER_LIST + rowInList + 1;
-    const prefix = kind === 'di' ? 'DI' : kind === 'do' ? 'DO' : kind === 'safetyDi' ? 'SDI' : 'SDO';
-    defs.push(buildTagDef(
+    const def = buildTagDef(
       `${cfg.tagsPrefix}.Data_${dataIdx}`,
       'bool',
       cfg.tagsPrefix,
-      connection || `${prefix}${pad2(ioNum)} value`,
+      connection || `${codePrefix}${pad2(ioNum)} value`,
       false,
       { connection }
-    ));
+    );
+    if (points) def.fromPlc = true;
+    defs.push(def);
   }
 
   return defs;
@@ -174,16 +261,24 @@ function buildTempTagDefs() {
 
 function buildAllIoListTagDefs(existingTags = [], parameterFiles = null) {
   const files = Builder.mergeProjectParameterFiles(parameterFiles);
+  const zonePoints = classifyPlcIoPoints(existingTags);
   const defs = [...buildTempTagDefs()];
-  for (const kind of ['di', 'do', 'safetyDi', 'safetyDo']) {
-    const plcSources = pickPlcSourceTags(existingTags, kind);
-    defs.push(...buildFolderTagDefs(kind, files, plcSources));
+  for (const zone of Builder.listZones(files)) {
+    const kinds = zonePoints.get(zone);
+    for (const kind of ['di', 'do', 'safetyDi', 'safetyDo']) {
+      if (zone && !Builder.maxListNum(files, kind, zone)) continue;
+      // Points read from the PLC tag export are the source of truth; projects without them
+      // keep the older behaviour (template text + unclassified PLC tags in order).
+      const points = kinds && kinds[kind].size ? kinds[kind] : null;
+      const plcSources = points ? [] : pickPlcSourceTags(existingTags, kind);
+      defs.push(...buildFolderTagDefs(kind, files, plcSources, zone, points));
+    }
   }
   return defs;
 }
 
-function buildListRuntimeValues(kind, listNum, tagByName = {}) {
-  const cfg = Builder.IO_LIST_KINDS[kind];
+function buildListRuntimeValues(kind, listNum, tagByName = {}, zone = '') {
+  const cfg = Builder.kindConfig(kind, zone);
   const listName = cfg.listName(listNum);
   const descriptions = buildDiscrValues(kind, listNum);
   const values = {};
@@ -209,7 +304,7 @@ function buildAllListRuntimeValues(parameterFiles = null, existingTags = null) {
   const byParameterFile = {};
   for (const [name, def] of Object.entries(files)) {
     if (!def?.kind || !def?.listNum) continue;
-    byParameterFile[name] = buildListRuntimeValues(def.kind, def.listNum, tagByName);
+    byParameterFile[name] = buildListRuntimeValues(def.kind, def.listNum, tagByName, def.zone || '');
   }
   return byParameterFile;
 }
@@ -262,5 +357,8 @@ module.exports = {
   getHmiTagExplorerGroups,
   getDefaultHmiTagFolderOrder,
   getIoListTagFolders,
-  pickPlcSourceTags
+  pickPlcSourceTags,
+  classifyPlcIoPoints,
+  planIoListsFromPlcTags,
+  isIoListFolder
 };

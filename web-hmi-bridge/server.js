@@ -70,6 +70,25 @@ for (const dir of [FTIO_DIR, FACTORYTALK_EXPORT_DIR, REIMPORT_DIR, PACKAGE_DIR, 
 }
 
 app.use(express.json({ limit: '50mb' }));
+
+// Other machines on the LAN may view displays and run the read-only conversions, but saving,
+// uploading, packaging and deleting change files on this PC (including the FactoryTalk export
+// folder), so by default only a browser on this PC may do them.
+const ALLOW_REMOTE_WRITES = process.env.BRIDGE_ALLOW_REMOTE_WRITES === '1';
+const REMOTE_SAFE_POSTS = new Set(['/api/convert-io-list-xlsx', '/api/export-zone-tags-csv']);
+
+function isLocalRequest(req) {
+  const addr = req.socket.remoteAddress || '';
+  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
+
+app.use('/api', (req, res, next) => {
+  const readOnly = req.method === 'GET' || req.method === 'HEAD'
+    || (req.method === 'POST' && REMOTE_SAFE_POSTS.has(req.baseUrl + req.path));
+  if (readOnly || ALLOW_REMOTE_WRITES || isLocalRequest(req)) return next();
+  res.status(403).json({ error: 'Changes can only be made on the PC running web-hmi-bridge' });
+});
+
 app.get('/vendor/xlsx.full.min.js', (_req, res) => {
   res.sendFile(path.join(ROOT, 'node_modules', 'xlsx', 'dist', 'xlsx.full.min.js'));
 });
@@ -1501,6 +1520,9 @@ server.listen(PORT, HOST, () => {
   }
   if (HOST === '0.0.0.0') {
     console.log('  Share a Network URL above with others on the same LAN.');
+    console.log(ALLOW_REMOTE_WRITES
+      ? '  Other computers can save and delete files (BRIDGE_ALLOW_REMOTE_WRITES=1).'
+      : '  Other computers can view only; saving and deleting work on this PC.');
   }
   console.log(`Reading FactoryTalk display exports from: ${FACTORYTALK_EXPORT_DIR}`);
   console.log(`Writing edited files and import packages to: ${REIMPORT_DIR}`);

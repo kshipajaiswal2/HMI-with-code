@@ -92,6 +92,7 @@ Open **http://localhost:5050**
 | `FT_EXPORT_DIR` | `..\Export import` | FactoryTalk export folder |
 | `FT_IMAGE_DIR` | `..\hmi\MyPlantHMI\Images` | Preview image library |
 | `FT_HMI_DIR` | `..\hmi` | HMI project root |
+| `BRIDGE_ALLOW_REMOTE_WRITES` | off | Set to `1` to let other computers save, upload and delete files. By default they can view displays and run conversions only. |
 
 ### Typical bridge workflow
 

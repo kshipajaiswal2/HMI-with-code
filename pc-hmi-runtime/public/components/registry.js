@@ -2695,7 +2695,7 @@ const ComponentRegistry = {
     const table = document.createElement('table');
     table.className = 'data-table';
     const thead = document.createElement('thead');
-    thead.innerHTML = `<tr>${comp.columns.map((c) => `<th>${c}</th>`).join('')}</tr>`;
+    thead.innerHTML = `<tr>${comp.columns.map((c) => `<th>${escapeHtml(String(c))}</th>`).join('')}</tr>`;
     table.appendChild(thead);
     const tbody = document.createElement('tbody');
     for (const row of comp.rows || []) {
@@ -4650,7 +4650,7 @@ const ComponentRegistry = {
         const lowest = [...groups].sort((a, b) => a.level - b.level)[0];
         ComponentRegistry.renderGroupChecklist(groupsEl, groups, lowest ? [lowest.id] : []);
       } catch (err) {
-        groupsEl.innerHTML = `<p class="dialog-hint">Could not load groups: ${err.message}</p>`;
+        groupsEl.innerHTML = `<p class="dialog-hint">Could not load groups: ${escapeHtml(err.message)}</p>`;
       }
       submitBtn.onclick = async () => {
         const username = nameEl.value.trim();
@@ -4742,7 +4742,7 @@ const ComponentRegistry = {
         const lowest = [...loadedGroups].sort((a, b) => a.level - b.level)[0];
         ComponentRegistry.renderGroupChecklist(groupsEl, loadedGroups, lowest ? [lowest.id] : []);
       } catch (err) {
-        groupsEl.innerHTML = `<p class="dialog-hint">Could not load groups: ${err.message}</p>`;
+        groupsEl.innerHTML = `<p class="dialog-hint">Could not load groups: ${escapeHtml(err.message)}</p>`;
       }
       // Re-check the boxes to match the TARGET user's actual current groups as soon as a real
       // username is entered — this is a full-replace action (whatever's checked at submit time
@@ -4930,7 +4930,7 @@ const ComponentRegistry = {
         const lowest = [...loadedGroups].sort((a, b) => a.level - b.level)[0];
         ComponentRegistry.renderGroupChecklist(groupsEl, loadedGroups, lowest ? [lowest.id] : []);
       } catch (err) {
-        groupsEl.innerHTML = `<p class="dialog-hint">Could not load groups: ${err.message}</p>`;
+        groupsEl.innerHTML = `<p class="dialog-hint">Could not load groups: ${escapeHtml(err.message)}</p>`;
       }
       // Same reasoning as Modify Group Membership: this is a full-replace action for both the
       // group list AND the enabled flag, so pre-populate both from the TARGET user's real

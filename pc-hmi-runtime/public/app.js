@@ -535,7 +535,7 @@ function buildNavBar() {
     btn.dataset.screen = item.screen;
     btn.dataset.group = item.group;
     const icons = { home: '⌂', settings: '⚙', manual: '☞', alarms: '🔔', recipe: '📋', legends: 'ℹ', user: '👤' };
-    btn.innerHTML = `<span class="nav-icon">${icons[item.icon] || '•'}</span><span>${item.label}</span>`;
+    btn.innerHTML = `<span class="nav-icon">${icons[item.icon] || '•'}</span><span>${escapeHtml(item.label || '')}</span>`;
     navBar.appendChild(btn);
   }
   const spacer = document.createElement('div');
@@ -1043,15 +1043,15 @@ function renderAccessDenied(screen) {
   screenContent.innerHTML = `
     <div class="access-denied">
       <h2>Access Denied</h2>
-      <p><strong>${screen.title}</strong> requires security level ${screen.securityLevel}.</p>
-      <p>Current level: ${state.currentUser?.level ?? 0} (${state.currentUser?.username || 'Guest'})</p>
+      <p><strong>${escapeHtml(screen.title || '')}</strong> requires security level ${escapeHtml(String(screen.securityLevel))}.</p>
+      <p>Current level: ${state.currentUser?.level ?? 0} (${escapeHtml(state.currentUser?.username || 'Guest')})</p>
       <button type="button" class="action-btn" onclick="goBackScreen()">Back</button>
       <button type="button" class="action-btn primary" onclick="loadScreen('700_User_Management')">Login</button>
     </div>`;
 }
 
 function renderPlaceholder(screenId) {
-  screenContent.innerHTML = `<div class="placeholder-screen"><h2>${screenId.replace(/^\d+_/, '').replace(/_/g, ' ')}</h2><p>Screen not configured.</p>
+  screenContent.innerHTML = `<div class="placeholder-screen"><h2>${escapeHtml(screenId.replace(/^\d+_/, '').replace(/_/g, ' '))}</h2><p>Screen not configured.</p>
     <button type="button" class="action-btn" onclick="goBackScreen()">Back</button></div>`;
 }
 

@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { Server } = require('socket.io');
 
 const { TagService } = require('./services/tag-service');
@@ -179,10 +180,54 @@ loadProjectRuntime().catch((err) => console.error('Initial runtime load failed:'
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+// Browsers only. A page on another website must not be able to drive this server: its own
+// domain pointed at 127.0.0.1 (DNS rebinding) fails the Host check, and its cross-site POSTs
+// or websocket connections fail the Origin check.
+function allowedHostnames() {
+  const names = new Set(['localhost', '127.0.0.1', '::1', os.hostname().toLowerCase()]);
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const item of list || []) names.add(String(item.address).toLowerCase());
+  }
+  for (const extra of String(process.env.PLANTHMI_ALLOWED_HOSTS || '').split(',')) {
+    if (extra.trim()) names.add(extra.trim().toLowerCase());
+  }
+  return names;
+}
+
+function isAllowedHost(hostHeader) {
+  if (!hostHeader) return false;
+  try {
+    const hostname = new URL(`http://${hostHeader}`).hostname.replace(/^\[|\]$/g, '').toLowerCase();
+    return allowedHostnames().has(hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isSameOrigin(headers) {
+  if (!headers.origin) return true;
+  try {
+    return new URL(headers.origin).host === headers.host;
+  } catch {
+    return false;
+  }
+}
+
+const io = new Server(server, {
+  allowRequest: (req, callback) => callback(null, isAllowedHost(req.headers.host) && isSameOrigin(req.headers))
+});
 
 projectService.migrateAllProjects();
 
+app.use((req, res, next) => {
+  if (!isAllowedHost(req.headers.host)) {
+    return res.status(403).json({ error: 'Unknown host name. Add it to PLANTHMI_ALLOWED_HOSTS to allow it.' });
+  }
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !isSameOrigin(req.headers)) {
+    return res.status(403).json({ error: 'Cross-site request refused' });
+  }
+  next();
+});
 app.use(express.json({ limit: '30mb' }));
 
 // Each request runs as its own client's login (X-HMI-Session header, see UserService).
@@ -1265,6 +1310,16 @@ tagService.on('change', (update) => {
 
 alarmService.on('change', (state) => {
   io.emit('alarm-update', state);
+});
+
+// A failed promise somewhere (e.g. a PLC call) must not take the HMI down; log it and carry on.
+// A thrown exception leaves unknown state, so log and exit and let the desktop app restart us.
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled promise rejection:', err?.stack || err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception, exiting:', err?.stack || err);
+  process.exit(1);
 });
 
 server.on('error', (err) => {

@@ -118,3 +118,41 @@ test('login responses never include the password', () => {
   const result = users.login('admin', 'admin');
   assert.equal('password' in result.user, false);
 });
+
+const { TagLogicService } = require('../server/services/tag-logic-service');
+
+function logicService(rules) {
+  const service = new TagLogicService({ tags: new Map() });
+  service.loadRules(rules);
+  return service;
+}
+
+test('tag logic fallback evaluates real rules', () => {
+  const chain = JSON.stringify(['A', 'B']);
+  const service = logicService([
+    { name: 'All', logic: `all(tags.get(n, False) for n in ${chain})` },
+    { name: 'One', logic: "tags.get('A', False)" },
+    { name: 'Num', type: 'int', logic: "tags['N'] * 2 + 1" }
+  ]);
+  const out = service.runJsFallback({ A: true, B: false, N: 5 });
+  assert.deepEqual([out.All, out.One, out.Num], [false, true, 11]);
+});
+
+test('tag logic fallback refuses code that escapes the expression', () => {
+  const attacks = [
+    "process.exit(1)",
+    "require('child_process')",
+    "tags['A']['constructor']['constructor']('return process')()",
+    "tags.constructor",
+    "(x = 1)",
+    "`${1}`",
+    "Math.max.call.apply",
+    "globalThis",
+    "(() => { return 1; })()"
+  ];
+  const service = logicService(attacks.map((logic, i) => ({ name: `R${i}`, logic })));
+  const out = service.runJsFallback({ A: true });
+  for (let i = 0; i < attacks.length; i++) {
+    assert.ok(out[`R${i}`]?.error, `should reject: ${attacks[i]}`);
+  }
+});

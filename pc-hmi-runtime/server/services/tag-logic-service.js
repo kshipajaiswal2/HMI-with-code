@@ -110,13 +110,28 @@ class TagLogicService {
     return expr;
   }
 
+  // Rules come from project files and are compiled with new Function below, so only the small
+  // vocabulary the translated tag logic uses is accepted: no other identifiers (process,
+  // require, eval, constructor...), no statements or template strings, and no string keys that
+  // could reach a constructor (e.g. tags['A']['constructor']['constructor']('code')).
+  static assertSafeJsLogic(expr) {
+    const strings = expr.match(/'[^'\\]*'|"[^"\\]*"/g) || [];
+    if (strings.some((s) => /constructor|prototype|__/.test(s))) throw new Error('Disallowed string in tag logic');
+    const code = expr.replace(/'[^'\\]*'|"[^"\\]*"/g, '""');
+    if (/[`;{}\\]|=(?!=|>)/.test(code.replace(/[=!]==?|[<>]=/g, ''))) throw new Error('Disallowed syntax in tag logic');
+    for (const word of code.match(/[A-Za-z_$][\w$]*/g) || []) {
+      if (!TagLogicService.JS_LOGIC_WORDS.has(word)) throw new Error(`"${word}" is not allowed in tag logic`);
+    }
+  }
+
   runJsFallback(tags) {
-    const ctx = { ...tags };
+    const ctx = Object.assign(Object.create(null), tags);
     const results = {};
 
     for (const rule of this.rules) {
       try {
         const expr = this.translatePythonLogicToJs(rule.logic);
+        TagLogicService.assertSafeJsLogic(expr);
         const fn = new Function('tags', 'Math', `"use strict"; return (${expr});`);
         let value = fn(ctx, Math);
         if (rule.type === 'bool') value = Boolean(value);
@@ -189,5 +204,9 @@ class TagLogicService {
 }
 
 TagLogicService.ESTOP_CHAIN = ESTOP_CHAIN;
+TagLogicService.JS_LOGIC_WORDS = new Set([
+  'tags', 'n', 'true', 'false', 'null', 'undefined', 'every', 'some', 'Boolean', 'Number',
+  'Math', 'min', 'max', 'abs', 'round', 'floor', 'ceil'
+]);
 
 module.exports = { TagLogicService };

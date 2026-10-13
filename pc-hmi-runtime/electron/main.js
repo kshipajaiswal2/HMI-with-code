@@ -14,6 +14,8 @@ let serverProcess = null;
 let ownsServer = false;
 let listenPort = Number(process.env.PORT) || 8080;
 let serverReady = false;
+let quitting = false;
+let restartDelayMs = 2000;
 const windows = { studio: null, runtime: null };
 const pendingLaunches = [];
 
@@ -137,6 +139,12 @@ function refreshBundledOverview(src, dest) {
     const to = path.join(toDir, '100_Overview.json');
     if (!fs.existsSync(from)) continue;
     fs.mkdirSync(toDir, { recursive: true });
+    // Keep the user's edited Overview instead of silently replacing it (.bak is not loaded as a screen).
+    if (fs.existsSync(to) && !fs.readFileSync(to).equals(fs.readFileSync(from))) {
+      const backup = `${to}.before-${packagedAppVersion()}.bak`;
+      fs.copyFileSync(to, backup);
+      logLine(`backed up customised overview to ${backup}`);
+    }
     fs.copyFileSync(from, to);
   }
 }
@@ -208,28 +216,67 @@ function startServer({ port, projectsDir }) {
       windowsHide: true
     });
 
-    serverProcess.stdout.pipe(out);
-    serverProcess.stderr.pipe(out);
-    serverProcess.on('error', reject);
-    serverProcess.on('exit', (code) => {
-      if (code !== 0 && code !== null && !serverReady) {
-        reject(new Error(`Server exited early with code ${code}`));
-      }
+    const child = serverProcess;
+    let started = false;
+    let settled = false;
+    const fail = (err) => {
+      if (settled) return;
+      settled = true;
+      try { child.kill(); } catch { /* already gone */ }
+      reject(err);
+    };
+
+    child.stdout.pipe(out);
+    child.stderr.pipe(out);
+    child.on('error', fail);
+    child.on('exit', (code) => {
+      if (!started) fail(new Error(`Server exited early with code ${code}`));
+      else if (!quitting) restartServer({ port, projectsDir }, code);
     });
 
     let attempts = 0;
     const check = () => {
+      if (settled) return;
       http.get(`http://127.0.0.1:${port}/api/runtime/status`, (res) => {
-        if (res.statusCode === 200) resolve();
-        else retry();
+        res.resume();
+        if (res.statusCode === 200 && !settled) {
+          started = true;
+          settled = true;
+          resolve();
+        } else retry();
       }).on('error', retry);
     };
     const retry = () => {
-      if (++attempts > 40) reject(new Error(`Server failed to start (timed out waiting on port ${port})`));
+      if (settled) return;
+      if (++attempts > 40) fail(new Error(`Server failed to start (timed out waiting on port ${port})`));
       else setTimeout(check, 500);
     };
     setTimeout(check, 800);
   });
+}
+
+// An HMI must keep running unattended: if the server dies after start-up, start it again on
+// the same port and reload the open windows, backing off while it keeps failing.
+function restartServer(options, exitCode) {
+  logLine(`server exited (code ${exitCode}); restarting in ${restartDelayMs} ms`);
+  setTimeout(() => {
+    if (quitting) return;
+    const startedAt = Date.now();
+    startServer(options)
+      .then(() => {
+        logLine('server restarted');
+        for (const win of Object.values(windows)) {
+          if (win && !win.isDestroyed()) win.webContents.reload();
+        }
+        // Reset the back-off once a restart has stayed up for a minute.
+        setTimeout(() => { if (Date.now() - startedAt >= 60000) restartDelayMs = 2000; }, 60000);
+      })
+      .catch((err) => {
+        logLine(`server restart failed: ${err.message}`);
+        restartDelayMs = Math.min(restartDelayMs * 2, 30000);
+        restartServer(options, 'restart-failed');
+      });
+  }, restartDelayMs);
 }
 
 function focusWindow(win) {
@@ -345,11 +392,13 @@ if (gotLock) {
 
   app.on('window-all-closed', () => {
     if (hasOpenWindows()) return;
+    quitting = true;
     if (ownsServer && serverProcess) serverProcess.kill();
     if (process.platform !== 'darwin') app.quit();
   });
 
   app.on('before-quit', () => {
+    quitting = true;
     if (ownsServer && serverProcess) serverProcess.kill();
   });
 }

@@ -10,7 +10,9 @@ const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  allowRequest: (req, callback) => callback(null, isAllowedHost(req.headers.host) && isSameOrigin(req.headers))
+});
 
 const PORT = Number(process.env.PORT) || 5050;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -76,6 +78,43 @@ app.use(express.json({ limit: '50mb' }));
 // folder), so by default only a browser on this PC may do them.
 const ALLOW_REMOTE_WRITES = process.env.BRIDGE_ALLOW_REMOTE_WRITES === '1';
 const REMOTE_SAFE_POSTS = new Set(['/api/convert-io-list-xlsx', '/api/export-zone-tags-csv']);
+
+// A page on another website must not drive the bridge: its own domain pointed at 127.0.0.1
+// (DNS rebinding) fails the Host check, and its cross-site POST/DELETE fails the Origin check.
+function isAllowedHost(hostHeader) {
+  if (!hostHeader) return false;
+  const names = new Set(['localhost', '127.0.0.1', '::1', os.hostname().toLowerCase()]);
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const item of list || []) names.add(String(item.address).toLowerCase());
+  }
+  for (const extra of String(process.env.BRIDGE_ALLOWED_HOSTS || '').split(',')) {
+    if (extra.trim()) names.add(extra.trim().toLowerCase());
+  }
+  try {
+    return names.has(new URL(`http://${hostHeader}`).hostname.replace(/^\[|\]$/g, '').toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function isSameOrigin(headers) {
+  if (!headers.origin) return true;
+  try {
+    return new URL(headers.origin).host === headers.host;
+  } catch {
+    return false;
+  }
+}
+
+app.use((req, res, next) => {
+  if (!isAllowedHost(req.headers.host)) {
+    return res.status(403).json({ error: 'Unknown host name. Add it to BRIDGE_ALLOWED_HOSTS to allow it.' });
+  }
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !isSameOrigin(req.headers)) {
+    return res.status(403).json({ error: 'Cross-site request refused' });
+  }
+  next();
+});
 
 function isLocalRequest(req) {
   const addr = req.socket.remoteAddress || '';

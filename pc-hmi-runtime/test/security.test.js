@@ -88,6 +88,31 @@ test('session level follows group edits live', () => {
   assert.equal(users.userForToken(token).level, 3);
 });
 
+test('passwords are stored hashed and still verify', () => {
+  const users = makeUsers();
+  users.addUser({ username: 'newbie', password: 'secret1' });
+  const stored = users.findUser('newbie').password;
+  assert.match(stored, /^scrypt\$[0-9a-f]{32}\$[0-9a-f]{64}$/);
+  assert.equal(users.login('newbie', 'secret1').success, true);
+  assert.equal(users.login('newbie', 'wrong').success, false);
+
+  users.changePassword({ username: 'newbie', password: 'secret2' });
+  assert.notEqual(users.findUser('newbie').password, stored);
+  assert.equal(users.login('newbie', 'secret1').success, false);
+  assert.equal(users.login('newbie', 'secret2').success, true);
+});
+
+test('plain-text passwords from older projects log in and migrate to hashes', () => {
+  const users = makeUsers();
+  assert.equal(users.login('admin', 'admin').success, true);
+  const result = UserService.migratePasswords(users.users);
+  assert.equal(result.changed, true);
+  for (const user of users.users) assert.match(user.password, /^scrypt\$/);
+  assert.equal(users.login('admin', 'admin').success, true);
+  assert.equal(users.login('admin', 'nope').success, false);
+  assert.equal(UserService.migratePasswords(users.users).changed, false, 'already hashed');
+});
+
 test('login responses never include the password', () => {
   const users = makeUsers();
   const result = users.login('admin', 'admin');

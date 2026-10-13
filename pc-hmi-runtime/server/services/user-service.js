@@ -14,6 +14,27 @@ const { AsyncLocalStorage } = require('node:async_hooks');
 const sessionContext = new AsyncLocalStorage();
 const sessions = new Map(); // token -> username
 
+// Passwords are stored as salted scrypt hashes: "scrypt$<salt hex>$<hash hex>". Plain-text
+// passwords from older projects still log in, and migratePasswords() replaces them on load.
+const HASH_PREFIX = 'scrypt$';
+
+function hashPassword(plain) {
+  const salt = crypto.randomBytes(16);
+  const hash = crypto.scryptSync(String(plain), salt, 32);
+  return `${HASH_PREFIX}${salt.toString('hex')}$${hash.toString('hex')}`;
+}
+
+function verifyPassword(stored, plain) {
+  const saved = String(stored ?? '');
+  const given = String(plain ?? '');
+  if (!saved.startsWith(HASH_PREFIX)) return saved === given;
+  const [saltHex, hashHex] = saved.slice(HASH_PREFIX.length).split('$');
+  const expected = Buffer.from(hashHex || '', 'hex');
+  if (!expected.length) return false;
+  const actual = crypto.scryptSync(given, Buffer.from(saltHex || '', 'hex'), expected.length);
+  return crypto.timingSafeEqual(expected, actual);
+}
+
 class UserService {
   constructor(users = [], groupService) {
     this.users = users;
@@ -93,6 +114,18 @@ class UserService {
     return { users, changed };
   }
 
+  // Replaces any plain-text passwords with hashes, in place. Returns { users, changed } like
+  // migrateLegacyUsers so the caller can persist the result straight away.
+  static migratePasswords(users) {
+    let changed = false;
+    for (const user of users) {
+      if (user.password == null || String(user.password).startsWith(HASH_PREFIX)) continue;
+      user.password = hashPassword(user.password);
+      changed = true;
+    }
+    return { users, changed };
+  }
+
   findUser(username) {
     const name = String(username || '').trim();
     if (!name) return null;
@@ -123,7 +156,7 @@ class UserService {
     if (user.enabled === false) {
       return { success: false, error: 'This account is disabled. Ask an administrator to enable it.' };
     }
-    if (user.password !== password) {
+    if (!verifyPassword(user.password, password)) {
       user.failedAttempts = (user.failedAttempts || 0) + 1;
       if (user.failedAttempts >= UserService.MAX_FAILED_ATTEMPTS) {
         user.locked = true;
@@ -173,7 +206,7 @@ class UserService {
     if (!resolved.success) return resolved;
     const user = {
       username: name,
-      password: pass,
+      password: hashPassword(pass),
       groups: resolved.groupIds,
       enabled: true,
       locked: false,
@@ -270,7 +303,7 @@ class UserService {
     if (!pass) return { success: false, error: 'New password is required' };
     const user = this.findUser(name);
     if (!user) return { success: false, error: `No user found with the username "${name}"` };
-    user.password = pass;
+    user.password = hashPassword(pass);
     return { success: true, user: this.summarize(user) };
   }
 
@@ -315,4 +348,4 @@ UserService.LEGACY_ROLE_TO_GROUP_NAME = {
 };
 UserService.MAX_FAILED_ATTEMPTS = 5;
 
-module.exports = { UserService };
+module.exports = { UserService, hashPassword, verifyPassword };

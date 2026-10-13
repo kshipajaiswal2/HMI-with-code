@@ -108,6 +108,7 @@ function loadProjectRuntimeInner(projectId) {
   groupService = new GroupService(projectConfig.groups || []);
   const projectUsers = projectConfig.users || [];
   const migration = UserService.migrateLegacyUsers(projectUsers, groupService);
+  const passwordMigration = UserService.migratePasswords(projectUsers);
   userService = new UserService(projectUsers, groupService);
   // Persist the migration/default-groups seeding to project.json IMMEDIATELY, not whenever the
   // next unrelated user-management route happens to save `users`/`groups` again. Studio reads
@@ -116,7 +117,8 @@ function loadProjectRuntimeInner(projectId) {
   // project's users stayed in the old `{role,level}` shape on disk, Studio would see zero
   // members for every built-in group and could let one be deleted while real (not-yet-migrated
   // on disk) users still depend on it, silently demoting them on the next load.
-  if (groupsWereMissing || migration.changed) {
+  // Plain-text passwords are hashed and saved the same way, so they don't linger on disk.
+  if (groupsWereMissing || migration.changed || passwordMigration.changed) {
     try {
       projectConfig = projectService.updateProjectConfig(id, { groups: groupService.groups, users: projectUsers });
     } catch (err) {

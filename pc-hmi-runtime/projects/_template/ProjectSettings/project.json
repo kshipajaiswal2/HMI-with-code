@@ -27,19 +27,19 @@
   "users": [
     {
       "username": "operator",
-      "password": "operator",
+      "password": "scrypt$12734460d0929a953e526f9488a36ab2$a8e06899cf0ed164538c798da75b03651a94a99fae69467debf42a444099e8b9",
       "role": "operator",
       "level": 1
     },
     {
       "username": "engineer",
-      "password": "engineer",
+      "password": "scrypt$0f33788ceccb7630e5ae3722e4b5a2c9$86abdd616e27293f0de100756729ba29383867db6c259a32f7d6006a919b1408",
       "role": "engineer",
       "level": 5
     },
     {
       "username": "admin",
-      "password": "admin",
+      "password": "scrypt$f051f1c79955baf8881d7baf40468cc5$a2babadb12ed045e240bc5826259d4bc368a9914ec93a7632095093d19cfb647",
       "role": "admin",
       "level": 10
     }

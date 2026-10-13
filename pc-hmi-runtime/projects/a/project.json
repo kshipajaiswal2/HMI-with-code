@@ -30,21 +30,21 @@
   "users": [
     {
       "username": "operator",
-      "password": "operator",
+      "password": "scrypt$760bec2afaebfde9c5349e401353f171$83774f13e75f7e1eed18219d087875abb75da1ff5417147203a0b02757596dc6",
       "groups": [
         "operators"
       ]
     },
     {
       "username": "engineer",
-      "password": "engineer",
+      "password": "scrypt$a8acaec1a05b7dc577d0a55dbd09fd3b$0e60bb6d52d4e8d9965ae9f34e7a1ba4aef175afd20420259ec09cd88817c053",
       "groups": [
         "engineers"
       ]
     },
     {
       "username": "admin",
-      "password": "admin",
+      "password": "scrypt$de99d8daf72a8ce5c22f911c29dbe9ac$26a16f6e8ac286507e9fdaa6057ae3373099817200801e9b5465a47cf5a949b7",
       "groups": [
         "administrators"
       ]

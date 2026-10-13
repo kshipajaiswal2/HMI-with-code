@@ -182,6 +182,54 @@ const io = new Server(server, { cors: { origin: '*' } });
 projectService.migrateAllProjects();
 
 app.use(express.json({ limit: '30mb' }));
+
+// Each request runs as its own client's login (X-HMI-Session header, see UserService).
+app.use((req, _res, next) => UserService.runWithSession(req.get('X-HMI-Session'), next));
+
+const ALLOW_REMOTE_STUDIO = process.env.PLANTHMI_ALLOW_REMOTE_STUDIO === '1';
+
+function isLocalRequest(req) {
+  const addr = req.socket.remoteAddress || '';
+  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
+
+// Studio, project and filesystem routes can rewrite or delete files on this PC, so by default
+// only a browser on the PC itself may use them; other machines get the operator runtime only.
+app.get(['/', '/index.html', '/studio.html'], (req, res, next) => {
+  if (ALLOW_REMOTE_STUDIO || isLocalRequest(req)) return next();
+  res.redirect('/runtime.html');
+});
+app.use(['/api/studio', '/api/projects'], (req, res, next) => {
+  if (ALLOW_REMOTE_STUDIO || isLocalRequest(req)) return next();
+  res.status(403).json({ error: 'Studio is only available on the HMI PC itself' });
+});
+
+// Actions that write to the PLC or change runtime state: allowed from the HMI PC itself,
+// but another machine has to be logged in first.
+function requireLocalOrLogin(req, res) {
+  if (isLocalRequest(req) || userService.getCurrentUser()) return true;
+  res.status(403).json({ success: false, error: 'Log in to do this from another computer' });
+  return false;
+}
+
+// project.json keeps login passwords; never send them to a browser.
+function publicConfig(config) {
+  if (!Array.isArray(config?.users)) return config;
+  return { ...config, users: config.users.map(({ password, failedAttempts, ...user }) => user) };
+}
+
+function publicActiveProject() {
+  const active = projectService.getActiveProject();
+  return active ? { ...active, config: publicConfig(active.config) } : active;
+}
+
+// Tells each connected client who is logged in for its own session.
+function emitSessionUsers() {
+  for (const socket of io.sockets.sockets.values()) {
+    socket.emit('user-changed', userService.userForToken(socket.data.sessionToken));
+  }
+}
+
 app.use((req, res, next) => {
   if (/\.(html|js|css)$/.test(req.path) && !req.path.includes('node_modules')) {
     res.set('Cache-Control', 'no-store');
@@ -191,7 +239,8 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(ROOT, 'public')));
 app.use('/shared', express.static(path.join(ROOT, 'shared')));
 app.use('/config', express.static(path.join(ROOT, 'config')));
-app.use('/projects', express.static(PROJECTS_DIR));
+// The browser only ever needs project images; project.json (with passwords) stays private.
+app.use('/projects', (req, res, next) => (/^\/[^/]+\/Images\//.test(req.path) ? next() : res.status(404).end()), express.static(PROJECTS_DIR));
 
 app.get('/', (_req, res) => {
   res.sendFile(path.join(ROOT, 'public', 'studio.html'));
@@ -293,7 +342,7 @@ app.patch('/api/projects/:id/config', (req, res) => {
     if (req.params.id === projectService.getActiveId() || req.params.id === loadedRuntimeProjectId) {
       loadProjectRuntime(req.params.id);
     }
-    res.json({ success: true, config });
+    res.json({ success: true, config: publicConfig(config) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -462,7 +511,7 @@ app.get('/api/projects', (_req, res) => {
 
 app.get('/api/projects/active', (_req, res) => {
   try {
-    res.json(projectService.getActiveProject());
+    res.json(publicActiveProject());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -482,8 +531,8 @@ app.post('/api/projects', (req, res) => {
   try {
     const created = projectService.createProject(name.trim(), { subtitle, language, windowProfile });
     loadProjectRuntime(created.id);
-    io.emit('project-changed', projectService.getActiveProject());
-    res.json({ success: true, project: created, active: projectService.getActiveProject() });
+    io.emit('project-changed', publicActiveProject());
+    res.json({ success: true, project: created, active: publicActiveProject() });
   } catch (err) {
     res.status(err.statusCode || 500).json({ error: err.message });
   }
@@ -493,8 +542,8 @@ app.delete('/api/projects/:id', (req, res) => {
   try {
     const result = projectService.deleteProject(req.params.id);
     if (result.activeId) loadProjectRuntime(result.activeId);
-    io.emit('project-changed', projectService.getActiveProject());
-    res.json({ success: true, ...result, active: projectService.getActiveProject() });
+    io.emit('project-changed', publicActiveProject());
+    res.json({ success: true, ...result, active: publicActiveProject() });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -504,8 +553,8 @@ app.post('/api/projects/:id/open', (req, res) => {
   try {
     const active = projectService.openProject(req.params.id);
     loadProjectRuntime(active.id);
-    io.emit('project-changed', projectService.getActiveProject());
-    res.json({ success: true, active });
+    io.emit('project-changed', publicActiveProject());
+    res.json({ success: true, active: publicActiveProject() });
   } catch (err) {
     res.status(404).json({ error: err.message });
   }
@@ -657,6 +706,7 @@ app.get('/api/runtime/alarms', (_req, res) => {
 
 app.post('/api/runtime/macros/run', async (req, res) => {
   await ensureRuntimeLoaded(req);
+  if (!requireLocalOrLogin(req, res)) return;
   const name = String(req.body?.name || req.body?.macro || '').trim();
   if (!name) return res.status(400).json({ error: 'Macro name required' });
   const result = macroService.run(name);
@@ -689,6 +739,7 @@ app.get('/api/runtime/data-log/:name', async (req, res) => {
 });
 
 app.post('/api/runtime/alarms/acknowledge', (req, res) => {
+  if (!requireLocalOrLogin(req, res)) return;
   const { alarmId, all } = req.body || {};
   if (all) {
     const count = alarmService.acknowledgeAll(userService.getCurrentUser()?.username);
@@ -699,13 +750,15 @@ app.post('/api/runtime/alarms/acknowledge', (req, res) => {
   res.json({ success: ok });
 });
 
-app.post('/api/runtime/alarms/clear-history', (_req, res) => {
+app.post('/api/runtime/alarms/clear-history', (req, res) => {
+  if (!requireLocalOrLogin(req, res)) return;
   alarmService.clearHistory();
   res.json({ success: true });
 });
 
 app.post('/api/runtime/parameter-file/apply', async (req, res) => {
   await ensureRuntimeLoaded(req);
+  if (!requireLocalOrLogin(req, res)) return;
   const { parameterFile } = req.body || {};
   if (!parameterFile) return res.status(400).json({ error: 'parameterFile required' });
   const pid = resolveProjectId(req);
@@ -724,6 +777,7 @@ app.post('/api/runtime/parameter-file/apply', async (req, res) => {
 });
 
 app.post('/api/runtime/tags/write', async (req, res) => {
+  if (!requireLocalOrLogin(req, res)) return;
   const { tag, value } = req.body || {};
   if (!tag) return res.status(400).json({ error: 'tag required' });
   if (tagLogicService.isComputed(tag)) {
@@ -751,7 +805,8 @@ app.get('/api/runtime/tags/logic', (_req, res) => {
   });
 });
 
-app.post('/api/runtime/tags/logic/evaluate', (_req, res) => {
+app.post('/api/runtime/tags/logic/evaluate', (req, res) => {
+  if (!requireLocalOrLogin(req, res)) return;
   const result = tagLogicService.evaluate();
   res.json({ success: true, ...result, tags: tagService.getAll() });
 });
@@ -766,6 +821,9 @@ app.get('/api/runtime/communication', (_req, res) => {
 
 app.post('/api/runtime/communication/mode', async (req, res) => {
   ensureRuntimeLoaded();
+  if (!ALLOW_REMOTE_STUDIO && !isLocalRequest(req)) {
+    return res.status(403).json({ error: 'Communication settings can only be changed on the HMI PC itself' });
+  }
   const { driver: driverName, persist, plcIpAddress, path, pollIntervalMs } = req.body || {};
   if (!driverName || !['simulator', 'ethernet-ip'].includes(driverName)) {
     return res.status(400).json({ error: 'driver must be simulator or ethernet-ip' });
@@ -803,6 +861,9 @@ app.post('/api/runtime/communication/mode', async (req, res) => {
 
 app.post('/api/runtime/communication/test', async (req, res) => {
   ensureRuntimeLoaded();
+  if (!ALLOW_REMOTE_STUDIO && !isLocalRequest(req)) {
+    return res.status(403).json({ error: 'Communication settings can only be changed on the HMI PC itself' });
+  }
   const { driver: driverName, plcIpAddress, path } = req.body || {};
   if (driverName === 'simulator') {
     return res.json({ ok: true, message: 'Simulator does not require a live PLC' });
@@ -836,21 +897,20 @@ app.post('/api/runtime/communication/test', async (req, res) => {
 
 app.post('/api/runtime/login', (req, res) => {
   const { username, password } = req.body || {};
-  const result = userService.login(username, password);
-  if (result.success) io.emit('user-changed', result.user);
-  res.json(result);
+  // The client keeps the returned token and sends it on later requests and its socket.
+  res.json(userService.login(username, password));
 });
 
 app.post('/api/runtime/logout', (_req, res) => {
   userService.logout();
-  io.emit('user-changed', null);
+  emitSessionUsers();
   res.json({ success: true });
 });
 
 // Every user-management mutation below (add/delete/unlock/enable/disable/modify-group/
 // change-password/change-user-properties, and now group create/edit/delete) is an
-// administrative action, so it requires the CURRENT runtime session
-// (userService.currentUser, the same singleton /login sets) to already be logged in at
+// administrative action, so it requires the requesting client's own session
+// (userService.getCurrentUser(), from the token /login returned) to already be logged in at
 // GroupService.ADMIN_LEVEL (3) or higher — a fixed threshold, not a lookup of whatever the
 // "Administrators" group happens to be named right now, so renaming that built-in group can
 // never accidentally lock every admin action. Login/Logout themselves stay open — this only
@@ -919,7 +979,7 @@ app.post('/api/runtime/delete-user', async (req, res) => {
       res.status(500).json({ success: false, error: 'User deleted but the project could not be saved' });
       return;
     }
-    if (result.loggedOutSelf) io.emit('user-changed', null);
+    emitSessionUsers();
     io.emit('user-list-changed', { users: userService.users.map((u) => userService.summarize(u)) });
     res.json(result);
   } catch (err) {
@@ -946,7 +1006,7 @@ function respondUserMutation(req, res, result) {
     res.status(500).json({ success: false, error: 'Change applied but the project could not be saved' });
     return;
   }
-  if (result.loggedOutSelf) io.emit('user-changed', null);
+  emitSessionUsers();
   io.emit('user-list-changed', { users: userService.users.map((u) => userService.summarize(u)) });
   res.json(result);
 }
@@ -1126,13 +1186,8 @@ app.post('/api/runtime/edit-group', async (req, res) => {
     }
     io.emit('groups-changed', { groups: groupService.listGroups() });
     io.emit('user-list-changed', { users: userService.users.map((u) => userService.summarize(u)) });
-    // A level/name edit can change what the CURRENTLY logged-in session displays and is
-    // allowed to do (canAccess itself is already computed live — see UserService.canAccess —
-    // but the cached currentUser the client mirrors from `user-changed` is not, so refresh and
-    // re-broadcast it here or that session's UI would keep showing its pre-edit level until it
-    // happens to log out and back in).
-    const refreshedCurrentUser = userService.refreshCurrentUser();
-    if (refreshedCurrentUser) io.emit('user-changed', refreshedCurrentUser);
+    // A level/name edit changes what logged-in sessions of that group display, so refresh them.
+    emitSessionUsers();
     res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -1167,17 +1222,18 @@ app.post('/api/runtime/delete-group', async (req, res) => {
 
 io.on('connection', (socket) => {
   const communication = getEffectiveCommunication();
+  socket.data.sessionToken = String(socket.handshake.auth?.token || '');
   socket.emit('init', {
     tags: tagService.getAll(),
     alarms: alarmService.getState(),
-    user: userService.getCurrentUser(),
+    user: userService.userForToken(socket.data.sessionToken),
     communication: {
       ...(driver?.getStatus?.() ?? { connected: false, driver: 'none', quality: 'bad' }),
       effectiveDriver: communication.driver || 'simulator',
       plcIpAddress: communication.plcIpAddress || null,
       path: communication.path || '0'
     },
-    project: projectService.getActiveProject()
+    project: publicActiveProject()
   });
 
   socket.on('subscribe', (tagNames) => {
@@ -1185,6 +1241,19 @@ io.on('connection', (socket) => {
     if (driver?.onSubscriptionsChanged) driver.onSubscriptionsChanged();
     socket.emit('tags', tagService.getSubscribedSnapshot());
   });
+
+  // Sent by the client after it logs in or out, so user-changed pushes match its own session.
+  socket.on('session', (token) => {
+    socket.data.sessionToken = token ? String(token) : '';
+    socket.emit('user-changed', userService.userForToken(socket.data.sessionToken));
+  });
+});
+
+// Last in the chain: report errors (such as a malformed JSON body) as JSON, without the
+// stack trace and file paths Express would otherwise send back.
+app.use((err, _req, res, _next) => {
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({ error: err.type === 'entity.parse.failed' ? 'Invalid JSON body' : (status < 500 ? err.message : 'Server error') });
 });
 
 tagService.on('change', (update) => {

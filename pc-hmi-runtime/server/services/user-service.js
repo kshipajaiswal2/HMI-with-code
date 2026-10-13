@@ -4,11 +4,49 @@
 // effective security level is always computed live from GroupService.getLevel(groups) rather
 // than stored — so editing a group's level instantly changes what every member of that group
 // can do, without touching a single user record.
+const crypto = require('node:crypto');
+const { AsyncLocalStorage } = require('node:async_hooks');
+
+// Logins are per client: each successful login gets a random token (sent back by the browser
+// in the X-HMI-Session header), and server/index.js runs every request inside
+// runWithSession(token) so getCurrentUser()/canAccess() see only that client's login.
+// Module-level so sessions survive the UserService being rebuilt on a project reload.
+const sessionContext = new AsyncLocalStorage();
+const sessions = new Map(); // token -> username
+
 class UserService {
   constructor(users = [], groupService) {
     this.users = users;
     this.groupService = groupService;
-    this.currentUser = null;
+  }
+
+  static runWithSession(token, fn) {
+    return sessionContext.run({ token: token ? String(token) : '' }, fn);
+  }
+
+  static currentToken() {
+    return sessionContext.getStore()?.token || '';
+  }
+
+  // Live summary for a session token, or null if the token is unknown or its account has since
+  // been deleted, disabled or locked.
+  userForToken(token) {
+    const username = token ? sessions.get(token) : null;
+    const user = username ? this.findUser(username) : null;
+    if (!user || user.enabled === false || user.locked) return null;
+    return this.summarize(user);
+  }
+
+  isCurrentUser(username) {
+    const current = this.getCurrentUser();
+    return Boolean(current) && current.username.toLowerCase() === String(username).trim().toLowerCase();
+  }
+
+  endSessionsFor(username) {
+    const name = String(username).trim().toLowerCase();
+    for (const [token, owner] of sessions) {
+      if (owner.toLowerCase() === name) sessions.delete(token);
+    }
   }
 
   // One-time migration for users saved before groups existed (a lone `role`/`level` string,
@@ -94,66 +132,32 @@ class UserService {
       return { success: false, error: 'Invalid credentials' };
     }
     user.failedAttempts = 0;
-    this.currentUser = this.summarize(user);
-    return { success: true, user: this.currentUser };
+    const token = crypto.randomBytes(24).toString('hex');
+    sessions.set(token, user.username);
+    return { success: true, user: this.summarize(user), token };
   }
 
   logout() {
-    this.currentUser = null;
+    sessions.delete(UserService.currentToken());
   }
 
   getCurrentUser() {
-    return this.currentUser;
+    return this.userForToken(UserService.currentToken());
   }
 
-  // Computed LIVE from the current group levels every call — not from the level cached on
-  // `currentUser` at login/last-refresh. A group's level can be edited by an Administrator at
-  // any time via GroupService.editGroup, and that change must take effect immediately for
-  // every already-logged-in session of that group (most importantly: demoting a group must
-  // immediately revoke access it used to grant, not leave it live until the session happens to
-  // log out and back in). `currentUser.groups` itself only changes via an explicit membership
-  // edit (modifyGroup/addUserToGroup/removeUserFromGroup/changeUserProperties), all of which
-  // already call refreshCurrentUserIfSelf, so it's always the right list of group ids to
-  // re-resolve against whatever GroupService currently says those groups are worth.
+  // Computed live from the session's user record and current group levels, so a group or
+  // membership edit takes effect immediately for every logged-in session.
   canAccess(requiredLevel) {
     if (!requiredLevel) return true;
-    if (!this.currentUser) return requiredLevel === 0;
-    return this.groupService.getLevel(this.currentUser.groups) >= requiredLevel;
+    const current = this.getCurrentUser();
+    if (!current) return false;
+    return this.groupService.getLevel(current.groups) >= requiredLevel;
   }
 
   // Generic alias for canAccess, matching the standard "CheckAccess" HMI command name — same
   // behavior, just the name a protected button/screen check reads more naturally as.
   checkAccess(requiredLevel) {
     return this.canAccess(requiredLevel);
-  }
-
-  // Keeps `currentUser` in sync with the underlying user record after any mutation that could
-  // change what it reports (a group edited elsewhere doesn't need this — level is computed
-  // live — but a change to WHICH groups this exact user belongs to does).
-  refreshCurrentUserIfSelf(username, user) {
-    if (this.currentUser && this.currentUser.username.toLowerCase() === String(username).trim().toLowerCase()) {
-      this.currentUser = this.summarize(user);
-    }
-  }
-
-  // Re-summarizes the currently-logged-in session against the live user record and group
-  // levels, WITHOUT knowing which username changed — used after a group-level/name edit
-  // (GroupService.editGroup), since that can affect the current session's displayed
-  // level/role even though no user record itself was touched. `canAccess`/`checkAccess`
-  // already compute live and don't need this to stay secure; this exists so the CACHED
-  // display fields (`currentUser.level`/`.role`, and whatever the client mirrors from the
-  // `user-changed` broadcast) don't go stale and mislead the person looking at the screen.
-  // Returns the refreshed summary (or null if no one is logged in / their account vanished),
-  // for the caller to re-broadcast.
-  refreshCurrentUser() {
-    if (!this.currentUser) return null;
-    const user = this.findUser(this.currentUser.username);
-    if (!user) {
-      this.currentUser = null;
-      return null;
-    }
-    this.currentUser = this.summarize(user);
-    return this.currentUser;
   }
 
   addUser({ username, password, groups } = {}) {
@@ -184,12 +188,9 @@ class UserService {
     if (!name) return { success: false, error: 'Username is required' };
     const idx = this.users.findIndex((u) => u.username.toLowerCase() === name.toLowerCase());
     if (idx === -1) return { success: false, error: `No user found with the username "${name}"` };
+    const loggedOutSelf = this.isCurrentUser(name);
     const [removed] = this.users.splice(idx, 1);
-    let loggedOutSelf = false;
-    if (this.currentUser && this.currentUser.username.toLowerCase() === name.toLowerCase()) {
-      this.currentUser = null;
-      loggedOutSelf = true;
-    }
+    this.endSessionsFor(name);
     return { success: true, user: this.summarize(removed), loggedOutSelf };
   }
 
@@ -214,14 +215,9 @@ class UserService {
     if (currentlyEnabled === nextEnabled) {
       return { success: false, error: `User "${user.username}" is already ${nextEnabled ? 'enabled' : 'disabled'}` };
     }
+    const loggedOutSelf = !nextEnabled && this.isCurrentUser(name);
     user.enabled = nextEnabled;
-    let loggedOutSelf = false;
-    if (!nextEnabled && this.currentUser && this.currentUser.username.toLowerCase() === name.toLowerCase()) {
-      this.currentUser = null;
-      loggedOutSelf = true;
-    } else {
-      this.refreshCurrentUserIfSelf(name, user);
-    }
+    if (!nextEnabled) this.endSessionsFor(name);
     return { success: true, user: this.summarize(user), loggedOutSelf };
   }
 
@@ -236,7 +232,6 @@ class UserService {
     const resolved = this.groupService.resolveGroupIds(groups);
     if (!resolved.success) return resolved;
     user.groups = resolved.groupIds;
-    this.refreshCurrentUserIfSelf(name, user);
     return { success: true, user: this.summarize(user) };
   }
 
@@ -252,7 +247,6 @@ class UserService {
       return { success: false, error: `User "${user.username}" is already in "${g.name}"` };
     }
     user.groups.push(g.id);
-    this.refreshCurrentUserIfSelf(name, user);
     return { success: true, user: this.summarize(user) };
   }
 
@@ -266,7 +260,6 @@ class UserService {
     const idx = (user.groups || []).indexOf(g.id);
     if (idx === -1) return { success: false, error: `User "${user.username}" is not in "${g.name}"` };
     user.groups.splice(idx, 1);
-    this.refreshCurrentUserIfSelf(name, user);
     return { success: true, user: this.summarize(user) };
   }
 
@@ -295,13 +288,10 @@ class UserService {
     let loggedOutSelf = false;
     if (enabled !== undefined) {
       const nextEnabled = Boolean(enabled);
+      loggedOutSelf = !nextEnabled && this.isCurrentUser(name);
       user.enabled = nextEnabled;
-      if (!nextEnabled && this.currentUser && this.currentUser.username.toLowerCase() === name.toLowerCase()) {
-        this.currentUser = null;
-        loggedOutSelf = true;
-      }
+      if (!nextEnabled) this.endSessionsFor(name);
     }
-    if (!loggedOutSelf) this.refreshCurrentUserIfSelf(name, user);
     return { success: true, user: this.summarize(user), loggedOutSelf };
   }
 

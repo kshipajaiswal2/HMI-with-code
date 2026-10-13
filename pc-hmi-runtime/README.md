@@ -102,6 +102,12 @@ Default port: **8080** (override with `PORT` env variable).
 
 Default users: `operator/operator` · `engineer/engineer` · `admin/admin`
 
+### Access from other computers
+
+- **Studio** (and its project, file, deploy and communication APIs) only answers on the HMI PC itself. A browser on another machine is sent to the Runtime instead. To allow remote Studio on a trusted network, set `PLANTHMI_ALLOW_REMOTE_STUDIO=1`.
+- **Runtime** can be opened from other machines, but tag writes, macros, parameter files and alarm actions from another machine need a login first.
+- Each browser tab has its own login, so logging in on one panel or tab never logs in any other.
+
 ---
 
 ## New project workflow

@@ -3481,7 +3481,8 @@ const ComponentRegistry = {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
-      await ctx.login(fd.get('username'), fd.get('password'));
+      const result = await ctx.login(fd.get('username'), fd.get('password'));
+      if (!result?.success) status.textContent = result?.error || 'Login failed';
     });
     form.querySelector('[data-action="logout"]').addEventListener('click', () => ctx.logout());
     panel.appendChild(status);

@@ -215,6 +215,19 @@ const PROJECT_FOLDERS = [
   IoListTags.PLC_UPLOADED_TAGS_FOLDER
 ];
 
+// Project, screen and global-object ids come straight from request URLs and become one path
+// segment on disk, so anything that could step outside its folder ("..", separators, drive
+// letters) is rejected.
+function isSafePathSegment(name) {
+  const s = String(name ?? '');
+  return Boolean(s) && s !== '.' && s !== '..' && !/[\\/:*?"<>|\x00-\x1f]/.test(s);
+}
+
+function assertSafePathSegment(name, label) {
+  if (!isSafePathSegment(name)) throw new Error(`Invalid ${label}: ${name}`);
+  return String(name);
+}
+
 function pauseMs(ms) {
   const end = Date.now() + ms;
   while (Date.now() < end) { /* spin */ }
@@ -765,7 +778,7 @@ class ProjectService {
   }
 
   globalObjectFilePath(projectId, objectId) {
-    return path.join(this.globalObjectsDir(projectId), `${objectId}.json`);
+    return path.join(this.globalObjectsDir(projectId), `${assertSafePathSegment(objectId, 'global object id')}.json`);
   }
 
   ensureDefaultGlobalObjects(projectId) {
@@ -833,6 +846,7 @@ class ProjectService {
   }
 
   getGlobalObject(projectId, objectId) {
+    if (!isSafePathSegment(objectId)) return null;
     const file = this.globalObjectFilePath(projectId, objectId);
     if (!fs.existsSync(file)) return null;
     return JSON.parse(readFileWithRetry(file));
@@ -894,7 +908,7 @@ class ProjectService {
   }
 
   screenFilePath(projectId, screenId) {
-    return path.join(this.gfxDir(projectId), `${screenId}.json`);
+    return path.join(this.gfxDir(projectId), `${assertSafePathSegment(screenId, 'screen id')}.json`);
   }
 
   /** Export tag CSV + settings snapshot (like FactoryTalk *-Tags.CSV) */
@@ -1051,7 +1065,7 @@ class ProjectService {
   }
 
   projectPath(id) {
-    return path.join(this.projectsDir, id);
+    return path.join(this.projectsDir, assertSafePathSegment(id, 'project id'));
   }
 
   plcUploadedTagsDir(projectId) {
@@ -1117,7 +1131,7 @@ class ProjectService {
   }
 
   projectExists(id) {
-    return id && id !== '_template' && fs.existsSync(this.projectPath(id));
+    return isSafePathSegment(id) && id !== '_template' && fs.existsSync(this.projectPath(id));
   }
 
   listProjects() {
@@ -1181,6 +1195,7 @@ class ProjectService {
   }
 
   getScreen(projectId, screenId, options = {}) {
+    if (!isSafePathSegment(screenId)) return null;
     this.ensureProjectLayout(projectId);
     this.ensureStandardScreens(projectId);
     const file = this.screenFilePath(projectId, screenId);

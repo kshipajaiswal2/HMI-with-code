@@ -17,9 +17,37 @@ const navUser = document.getElementById('navUser');
 const headerIndicators = document.getElementById('headerIndicators');
 const navBar = document.getElementById('navBar');
 
+// Logins are per browser tab: the server hands back a session token, which every /api call
+// sends as X-HMI-Session so this tab's login never affects another panel or browser.
+const SESSION_KEY = 'planthmi.session';
+let sessionToken = '';
+try { sessionToken = sessionStorage.getItem(SESSION_KEY) || ''; } catch { /* storage unavailable */ }
+
+function setSessionToken(token) {
+  sessionToken = token || '';
+  try {
+    if (sessionToken) sessionStorage.setItem(SESSION_KEY, sessionToken);
+    else sessionStorage.removeItem(SESSION_KEY);
+  } catch { /* storage unavailable: login lasts until reload */ }
+  socket?.emit('session', sessionToken);
+}
+
+const nativeFetch = window.fetch.bind(window);
+window.fetch = (input, init = {}) => {
+  const url = new URL(typeof input === 'string' ? input : input.url, window.location.href);
+  if (!sessionToken || url.origin !== window.location.origin || !url.pathname.startsWith('/api/')) {
+    return nativeFetch(input, init);
+  }
+  const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+  headers.set('X-HMI-Session', sessionToken);
+  return nativeFetch(input, { ...init, headers });
+};
+
 let socket = null;
 try {
-  if (typeof io === 'function') socket = io({ transports: ['websocket', 'polling'] });
+  if (typeof io === 'function') {
+    socket = io({ transports: ['websocket', 'polling'], auth: (cb) => cb({ token: sessionToken }) });
+  }
 } catch (err) {
   console.warn('Socket.IO unavailable:', err);
 }
@@ -397,11 +425,20 @@ function createContext() {
 
     async login(username, password) {
       const res = await apiPost('/api/runtime/login', { username, password });
-      return res.json();
+      const result = await res.json();
+      if (result.success) {
+        setSessionToken(result.token);
+        state.currentUser = result.user;
+        updateUserUI();
+      }
+      return result;
     },
 
     async logout() {
       await apiPost('/api/runtime/logout', {});
+      setSessionToken('');
+      state.currentUser = null;
+      updateUserUI();
     },
 
     async addUserGroup({ username, password, groups }) {
@@ -592,6 +629,18 @@ async function loadScreen(screenId, options = {}) {
     // because no one happens to be logged in on the actual runtime session right now.
     const studioEditParam = STUDIO_EDIT ? '&studioEdit=1' : '';
     const res = await fetchWithTimeout(apiUrl(`/api/runtime/screens/${encodeURIComponent(screenId)}?_=${Date.now()}${studioEditParam}`));
+    // The server backstop answers 403 before the client check below ever sees the screen,
+    // so show the real Access Denied page instead of falling through to "not configured".
+    if (res.status === 403) {
+      const denied = await res.json().catch(() => ({}));
+      const title = screenId.replace(/^\d+_/, '').replace(/_/g, ' ');
+      renderAccessDenied({ title, securityLevel: denied.securityLevel ?? '?' });
+      state.currentScreen = screenId;
+      state.activeParameterFile = null;
+      updateNav(null);
+      screenTitle.textContent = title;
+      return;
+    }
     if (!res.ok) throw new Error('not found');
     let screen = await res.json();
 
@@ -996,12 +1045,20 @@ function renderAccessDenied(screen) {
       <h2>Access Denied</h2>
       <p><strong>${screen.title}</strong> requires security level ${screen.securityLevel}.</p>
       <p>Current level: ${state.currentUser?.level ?? 0} (${state.currentUser?.username || 'Guest'})</p>
+      <button type="button" class="action-btn" onclick="goBackScreen()">Back</button>
       <button type="button" class="action-btn primary" onclick="loadScreen('700_User_Management')">Login</button>
     </div>`;
 }
 
 function renderPlaceholder(screenId) {
-  screenContent.innerHTML = `<div class="placeholder-screen"><h2>${screenId.replace(/^\d+_/, '').replace(/_/g, ' ')}</h2><p>Screen not configured.</p></div>`;
+  screenContent.innerHTML = `<div class="placeholder-screen"><h2>${screenId.replace(/^\d+_/, '').replace(/_/g, ' ')}</h2><p>Screen not configured.</p>
+    <button type="button" class="action-btn" onclick="goBackScreen()">Back</button></div>`;
+}
+
+// These pages replace the composed screen (and its nav bar), so they need their own way out.
+function goBackScreen() {
+  const prev = state.screenHistory.pop();
+  loadScreen(prev || '100_Overview', { skipHistory: true });
 }
 
 function updateNav(activeGroup) {

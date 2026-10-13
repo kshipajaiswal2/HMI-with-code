@@ -346,10 +346,6 @@ function isEditableSource(file) {
   return source === 'edited' || source === 'uploaded';
 }
 
-function isDefaultMode() {
-  return sidebarMode === SIDEBAR_MODE_DEFAULTS;
-}
-
 function createProjectKey(projectId, folderName, screenName) {
   return [projectId, folderName, screenName].map((part) => String(part || '')).join('::');
 }
@@ -2440,10 +2436,6 @@ function getIoListZoneSheet(project, zone) {
   return sheets.find((sheet) => displayKey(sheet.zone) === displayKey(target)) || sheets[0] || null;
 }
 
-function getIoListSheetPlcDiItems(sheet) {
-  return (sheet?.diInputs || []).filter((item) => item.ioKind === 'DI' || (!item.ioKind && !item.isSafety));
-}
-
 function getIoListSheetItemsByKind(sheet, kind) {
   const key = String(kind || '').toUpperCase();
   if (key === 'SDI' || key === 'DI') {
@@ -2515,10 +2507,6 @@ function appendIoListEditorRowsTable(section, config) {
   section.appendChild(table);
 }
 
-function getIoListSheetPageCount(sheet) {
-  return Math.max(1, Math.ceil(getIoListSheetPlcDiItems(sheet).length / 8));
-}
-
 function resolveIoListEditorZone(project, zones, fallbackZone = '') {
   const list = normalizeIoListZoneNames(zones);
   let zone = String(project?.ioListPreviewZone || fallbackZone || '').trim();
@@ -2556,10 +2544,6 @@ function mergeVisibleIoListSheetEdits(project) {
     sheet.doOutputs[doIndex].description = String(rowEl.querySelector('[data-io-field="description"]')?.value || '').trim();
     sheet.doOutputs[doIndex].plcTag = String(rowEl.querySelector('[data-io-field="plcTag"]')?.value || '').trim();
   }
-}
-
-function collectIoListSheetEditsFromTable() {
-  return null;
 }
 
 function getIoListEditableRows(project, file) {
@@ -4026,13 +4010,6 @@ function moveProjectScreen(fromProjectId, fromFolderName, screenName, toProjectI
   return true;
 }
 
-function findProjectScreenByLocation(projectId, folderName, screenName) {
-  const project = getProjectById(projectId);
-  const folder = findProjectFolder(project, folderName);
-  const screen = folder ? findProjectScreen(project, folder.name, screenName) : null;
-  return { project, folder, screen };
-}
-
 function getProjectScreenByKey(projectKey) {
   for (const project of projectList) {
     for (const folder of project.folders || []) {
@@ -4158,32 +4135,6 @@ function resolveDisplayFolderName(fileName, autoFolderMap) {
   return autoFolderMap.get(bucket) || UNGROUPED_FOLDER_NAME;
 }
 
-async function loadDisplayFolders() {
-  const res = await fetch('/api/display-folders');
-  if (!res.ok) {
-    throw new Error('Failed to load display folders');
-  }
-
-  const data = await res.json();
-  const nextFolders = Array.isArray(data.folders)
-    ? data.folders.map((name) => normalizeFolderName(name)).filter(Boolean)
-    : [];
-  const rawAssignments = data.assignments && typeof data.assignments === 'object'
-    ? data.assignments
-    : {};
-  const nextAssignments = {};
-  for (const [name, folder] of Object.entries(rawAssignments)) {
-    const fileKey = displayKey(name);
-    const folderName = normalizeFolderName(folder);
-    if (fileKey && folderName) {
-      nextAssignments[fileKey] = folderName;
-    }
-  }
-
-  folderNames = [...new Set(nextFolders)];
-  folderAssignments = nextAssignments;
-}
-
 async function saveDisplayFolders() {
   const res = await fetch('/api/display-folders/save', {
     method: 'POST',
@@ -4194,23 +4145,6 @@ async function saveDisplayFolders() {
   const data = await readApiJson(res);
   if (!res.ok) {
     throw new Error(data.error || 'Failed to save display folders');
-  }
-}
-
-function setSidebarMode(mode) {
-  sidebarMode = mode === SIDEBAR_MODE_DEFAULTS ? SIDEBAR_MODE_DEFAULTS : SIDEBAR_MODE_DISPLAYS;
-  localStorage.setItem(SIDEBAR_MODE_STORAGE_KEY, sidebarMode);
-
-  if (exportsCard) {
-    exportsCard.classList.toggle('default-mode', isDefaultMode());
-  }
-
-  if (sidebarTitle) {
-    sidebarTitle.textContent = 'Projects';
-  }
-
-  if (importFolderBtn) {
-    importFolderBtn.classList.toggle('hidden', isDefaultMode());
   }
 }
 
@@ -7418,29 +7352,6 @@ function parsePopupTemplateObject(rawXml) {
   return wrapper.querySelector('wrapper > *');
 }
 
-function normalizePopupTemplateXml(rawXml) {
-  const node = parsePopupTemplateObject(rawXml);
-  if (!node) {
-    return '';
-  }
-
-  const clone = node.cloneNode(true);
-  if (!clone.hasAttribute('left')) {
-    clone.setAttribute('left', '0');
-  }
-  if (!clone.hasAttribute('top')) {
-    clone.setAttribute('top', '0');
-  }
-  if (!clone.hasAttribute('width')) {
-    clone.setAttribute('width', '220');
-  }
-  if (!clone.hasAttribute('height')) {
-    clone.setAttribute('height', '160');
-  }
-
-  return new XMLSerializer().serializeToString(clone);
-}
-
 function getGeneratedPopupDraftById(draftId) {
   const key = String(draftId || '');
   return generatedPopupDrafts.find((draft) => draft.id === key) || null;
@@ -7623,47 +7534,6 @@ function removeGeneratedPopupHistoryForGroup(project, popupGroupName, targetScre
   return project.popupGeneratedRows.length !== beforeCount;
 }
 
-function resolvePopupTemplateById(project, templateId) {
-  const key = String(templateId || '');
-  if (!key) {
-    return null;
-  }
-
-  if (key === 'preset:conveyor:vfd') {
-    return {
-      id: 'preset:conveyor:vfd',
-      name: '800_popup (Conveyor VFD)',
-      xml: CONVEYOR_VFD_TEMPLATE_XML
-    };
-  }
-
-  if (key === 'preset:conveyor:generic') {
-    return {
-      id: 'preset:conveyor:generic',
-      name: 'Conveyor Popup',
-      xml: CONVEYOR_VFD_TEMPLATE_XML
-    };
-  }
-
-  if (key === 'preset:conveyor:speed') {
-    return {
-      id: 'preset:conveyor:speed',
-      name: 'Conveyor Speed Popup',
-      xml: CONVEYOR_SPEED_TEMPLATE_XML
-    };
-  }
-
-  if (key === 'preset:pneumatic:forward_reverse') {
-    return {
-      id: 'preset:pneumatic:forward_reverse',
-      name: 'Pneumatic Forward/Reverse Popup',
-      xml: PNEUMATIC_FORWARD_REVERSE_TEMPLATE_XML
-    };
-  }
-
-  return project?.popupTemplates?.find((template) => String(template.id) === key) || null;
-}
-
 function clearGeneratedRowsFromPlannerTable() {
   if (!popupPlanBody) {
     return;
@@ -7682,18 +7552,6 @@ function renderPopupTargetScreenOptions(project) {
   plannerTargetScreenKey = activeProjectKey && String(activeProjectKey).startsWith(`${project.id}::`)
     ? activeProjectKey
     : '';
-}
-
-function copyPopupDraftToClipboardBuffer(draft) {
-  if (!draft) {
-    return;
-  }
-
-  copiedObjectXml = String(draft.xml || '');
-  copiedObjectName = formatPopupLabel(draft.popupName || 'Popup', draft.sequence || 1, draft.totalForName || 1);
-  copiedObjectGroupId = '';
-  copiedPasteCount = 0;
-  packageResult.textContent = `Copied popup template: ${draft.label}. Use Ctrl+V to paste into the active screen.`;
 }
 
 function formatPopupLabel(popupName, sequence, totalForName = 1) {
@@ -8536,46 +8394,6 @@ function sanitizeXmlForFactoryTalk(xml) {
   }
 }
 
-async function loadDisplayXml(name) {
-  if (activeProjectKey) {
-    const record = getProjectScreenByKey(activeProjectKey);
-    if (record) {
-      return {
-        name: record.screen.name,
-        xml: record.screen.xml,
-        projectId: record.project.id,
-        folderName: record.folder.name
-      };
-    }
-  }
-
-  const res = await fetch(`/api/displays/${encodeURIComponent(name)}`);
-  const data = await readApiJson(res);
-  if (!res.ok) {
-    throw new Error(data.error || `Failed to load ${name}`);
-  }
-
-  return data;
-}
-
-async function deleteDisplayXml(name, source) {
-  const normalizedSource = source === 'uploaded' ? 'edited' : source;
-  const query = normalizedSource ? `?source=${encodeURIComponent(normalizedSource)}` : '';
-  const res = await fetch(`/api/displays/${encodeURIComponent(name)}${query}`, {
-    method: 'DELETE'
-  });
-
-  const data = await readApiJson(res);
-  if (res.status === 404) {
-    return { ok: true, removed: name, alreadyMissing: true };
-  }
-  if (!res.ok) {
-    throw new Error(data.error || `Failed to remove ${name}`);
-  }
-
-  return data;
-}
-
 async function saveDefaultTemplateXml(name, xml) {
   const res = await fetch(`/api/default-pages/${encodeURIComponent(name)}/save`, {
     method: 'POST',
@@ -8596,37 +8414,6 @@ async function loadDefaultTemplateXml(name) {
   const data = await readApiJson(res);
   if (!res.ok) {
     throw new Error(data.error || `Failed to load default template ${name}`);
-  }
-
-  return data;
-}
-
-async function deleteDefaultTemplateXml(name) {
-  const res = await fetch(`/api/default-pages/${encodeURIComponent(name)}`, {
-    method: 'DELETE'
-  });
-
-  const data = await readApiJson(res);
-  if (res.status === 404) {
-    return { ok: true, removed: name, alreadyMissing: true };
-  }
-  if (!res.ok) {
-    throw new Error(data.error || `Failed to remove default template ${name}`);
-  }
-
-  return data;
-}
-
-async function seedDefaultTemplates(files) {
-  const res = await fetch('/api/default-pages/seed', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ files: Array.isArray(files) ? files : [] })
-  });
-
-  const data = await readApiJson(res);
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to copy default templates to project');
   }
 
   return data;
@@ -8657,60 +8444,6 @@ function upsertCurrentDisplayRow(row) {
   currentDisplayRows = [...currentDisplayRows, { ...row }];
 }
 
-function moveDisplayRow(sourceKey, targetKey) {
-  if (!sourceKey || !targetKey || sourceKey === targetKey) {
-    return;
-  }
-
-  const nextRows = [...currentDisplayRows];
-  const sourceIndex = nextRows.findIndex((file) => displayKey(file.name) === sourceKey);
-  const targetIndex = nextRows.findIndex((file) => displayKey(file.name) === targetKey);
-  if (sourceIndex < 0 || targetIndex < 0) {
-    return;
-  }
-
-  const [moved] = nextRows.splice(sourceIndex, 1);
-  nextRows.splice(targetIndex, 0, moved);
-  renderDisplays(nextRows);
-}
-
-async function createDisplayFromTemplate() {
-  const rawName = window.prompt('New page name', 'New Page');
-  if (rawName === null) {
-    return;
-  }
-
-  const trimmed = rawName.trim();
-  if (!trimmed) {
-    alert('Enter a page name.');
-    return;
-  }
-
-  const normalized = `${trimmed.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim()}.xml`;
-  const pageName = normalized.replace(/\.xml\.xml$/i, '.xml');
-  const existing = currentDisplayRows.find((file) => displayKey(file.name) === displayKey(pageName));
-  if (existing && !window.confirm(`${pageName} already exists. Replace it?`)) {
-    return;
-  }
-
-  const template = await loadDisplayXml(TEMPLATE_DISPLAY_NAME);
-  await saveDisplayXml(pageName, template.xml);
-
-  const meta = readSizeFromXml(template.xml);
-  upsertCurrentDisplayRow({
-    name: pageName,
-    source: 'edited',
-    sizeBytes: new Blob([template.xml]).size,
-    lastModified: new Date().toISOString(),
-    width: meta.width,
-    height: meta.height
-  });
-
-  usingUploadedList = false;
-  renderDisplays(currentDisplayRows);
-  await loadDisplay(pageName);
-}
-
 function setBridgeCard(status) {
   const dot = bridgeStatus.querySelector('.dot');
   dot.style.background = status.connected ? '#27ae60' : '#e74c3c';
@@ -8732,58 +8465,6 @@ function clearSelectedDisplay() {
   clearObjectPanel();
   updatePackageSelection(currentDisplayRows);
   renderPreview();
-}
-
-async function removeDisplayByName(name) {
-  const key = displayKey(name);
-  const file = currentDisplayRows.find((rowFile) => displayKey(rowFile.name) === key);
-  if (!file) {
-    return;
-  }
-
-  const confirmed = confirm(`Remove ${file.name} from the list?`);
-  if (!confirmed) {
-    return;
-  }
-
-  await deleteDisplayXml(file.name, file.source);
-  if (folderAssignments[key]) {
-    delete folderAssignments[key];
-    try {
-      await saveDisplayFolders();
-    } catch (_err) {
-      // Ignore folder save failure during delete flow.
-    }
-  }
-
-  if (displayKey(selectedDisplay) === key) {
-    clearSelectedDisplay();
-  }
-
-  const nextFiles = currentDisplayRows.filter((rowFile) => displayKey(rowFile.name) !== key);
-  renderDisplays(nextFiles);
-}
-
-async function removeDefaultTemplateByName(name) {
-  const key = displayKey(name);
-  const file = currentDefaultRows.find((rowFile) => displayKey(rowFile.name) === key);
-  if (!file) {
-    return;
-  }
-
-  const confirmed = confirm(`Remove default template ${file.name}?`);
-  if (!confirmed) {
-    return;
-  }
-
-  await deleteDefaultTemplateXml(file.name);
-
-  if (displayKey(selectedDefaultTemplate) === key) {
-    clearSelectedDisplay();
-  }
-
-  const nextFiles = currentDefaultRows.filter((rowFile) => displayKey(rowFile.name) !== key);
-  renderDefaultTemplates(nextFiles);
 }
 
 function renderDisplays(files) {
@@ -11300,28 +10981,6 @@ function removePopupGroupFromCurrentXml(popupGroupName) {
   renderPreview();
   persistCurrentXmlState();
   return true;
-}
-
-function shiftPositionedNodesInTree(rootNode, deltaX, deltaY, displayWidth, displayHeight) {
-  const allNodes = [rootNode, ...Array.from(rootNode.querySelectorAll('*'))];
-  for (const node of allNodes) {
-    if (!node || !node.hasAttribute || !node.hasAttribute('left') || !node.hasAttribute('top')) {
-      continue;
-    }
-
-    const currentLeft = Number(node.getAttribute('left'));
-    const currentTop = Number(node.getAttribute('top'));
-    const nodeWidth = Math.max(1, Number(node.getAttribute('width') || 1));
-    const nodeHeight = Math.max(1, Number(node.getAttribute('height') || 1));
-    if (!Number.isFinite(currentLeft) || !Number.isFinite(currentTop)) {
-      continue;
-    }
-
-    const nextLeft = clamp(currentLeft + deltaX, 0, Math.max(0, displayWidth - nodeWidth));
-    const nextTop = clamp(currentTop + deltaY, 0, Math.max(0, displayHeight - nodeHeight));
-    node.setAttribute('left', String(Math.round(nextLeft)));
-    node.setAttribute('top', String(Math.round(nextTop)));
-  }
 }
 
 function appendGroupPreviewChildren(groupNode, container, groupWidth, groupHeight) {

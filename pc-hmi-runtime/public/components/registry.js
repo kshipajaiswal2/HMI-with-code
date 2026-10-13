@@ -13,6 +13,11 @@ const NAV_IMAGES = {
   user: 'userorange_2.bmp'
 };
 
+// Overrides for the Error state of the Maintained/Latched/Multistate button defaults.
+const BUTTON_ERROR_STATE = {
+  caption: 'Error', blink: true, useCaptionColor: true, backColor: 'navy', borderColor: 'navy'
+};
+
 const ComponentRegistry = {
   _alarmListControllers: new Map(),
   SectionHeader(comp) {
@@ -265,10 +270,14 @@ const ComponentRegistry = {
     return btn;
   },
 
-  MaintainedButton(comp, ctx) {
+  // Shared renderer for the Maintained, Latched, Multistate and Interlocked buttons: the
+  // caption/image/appearance of the current state plus the Studio click hooks. `setup(states)`
+  // supplies what differs — the tag that drives the displayed state, how a tag value maps to a
+  // state, the state shown when unbound, and `wire(btn, renderState)` for the runtime press.
+  renderStateButton(comp, ctx, { type, cssClass, defaultStates, setup }) {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'ft-maintained-btn ft-graphic';
+    btn.className = `${cssClass} ft-graphic`;
     if (comp.name) btn.dataset.name = comp.name;
     if (comp.visible === false) {
       btn.style.display = 'none';
@@ -277,9 +286,7 @@ const ComponentRegistry = {
 
     ComponentRegistry.applyGraphicsObject(btn, comp);
     const studioEdit = Boolean(ctx.studioEdit);
-    const states = comp.states?.length
-      ? comp.states
-      : ComponentRegistry.defaultMaintainedButtonStates(comp.caption ?? comp.label);
+    const states = comp.states?.length ? comp.states : defaultStates();
     const caption = document.createElement('span');
     caption.className = 'ft-btn-caption';
     caption.style.pointerEvents = 'none';
@@ -292,11 +299,7 @@ const ComponentRegistry = {
     btn.appendChild(caption);
     let imgEl = null;
 
-    const indicatorTag = comp.indicatorTag || comp.tag;
-    const state0 = states.find((s) => s.id === 'State0') || states[0];
-    const state1 = states.find((s) => s.id === 'State1') || states[1];
-    const state0Val = state0?.value ?? 0;
-    const state1Val = state1?.value ?? 1;
+    const { indicatorTag, stateForValue, defaultState, wire } = setup(states);
 
     const renderState = (stateDef) => {
       if (!stateDef) return;
@@ -316,7 +319,7 @@ const ComponentRegistry = {
       }
       if (stateDef.image) {
         imgEl = document.createElement('img');
-        imgEl.className = 'ft-maintained-btn-icon';
+        imgEl.className = `${cssClass}-icon`;
         imgEl.src = ComponentRegistry.imageUrl(stateDef.image, ctx);
         imgEl.alt = '';
         imgEl.draggable = false;
@@ -357,10 +360,9 @@ const ComponentRegistry = {
     };
 
     const showTagState = (val) => {
-      renderState(ComponentRegistry.resolveMultistateState(states, val));
+      renderState(stateForValue(val));
     };
 
-    const defaultState = ComponentRegistry.resolveMultistateState(states, state0Val);
     const previewState = (studioEdit && comp.previewStateId)
       ? (states.find((s) => s.id === comp.previewStateId) || defaultState)
       : defaultState;
@@ -378,7 +380,7 @@ const ComponentRegistry = {
         window.parent.postMessage({
           type: 'planthmi-embed-graphic-dblclick',
           name: comp.name || '',
-          componentType: 'MaintainedButton',
+          componentType: type,
           source: comp._source || ''
         }, '*');
       });
@@ -387,371 +389,176 @@ const ComponentRegistry = {
         window.parent.postMessage({
           type: 'planthmi-embed-graphic-click',
           name: comp.name || '',
-          componentType: 'MaintainedButton',
+          componentType: type,
           source: comp._source || ''
         }, '*');
       });
       return btn;
     }
 
-    const isState1 = (val) => {
-      const resolved = ComponentRegistry.resolveMultistateState(states, val);
-      return resolved?.id === 'State1' || resolved?.value === state1Val;
-    };
-
-    const toggle = () => {
-      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
-      if (!writeTag) return;
-      const basedOnValue = (comp.nextStateBasedOn || 'currentState') === 'valueControl';
-      const current = basedOnValue
-        ? ctx.getTagValue(comp.tag)
-        : (indicatorTag
-          ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
-          : ctx.getTagValue(comp.tag));
-      const nextVal = isState1(current) ? state0Val : state1Val;
-      ctx.writeTag(writeTag, nextVal);
-    };
-
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      toggle();
-    });
-
+    wire(btn, renderState);
     return btn;
+  },
+
+  // Value of the tag that decides the next state (Maintained/Multistate "next state based on").
+  stateButtonCurrentValue(comp, ctx, indicatorTag) {
+    const basedOnValue = (comp.nextStateBasedOn || 'currentState') === 'valueControl';
+    return basedOnValue
+      ? ctx.getTagValue(comp.tag)
+      : (indicatorTag
+        ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
+        : ctx.getTagValue(comp.tag));
+  },
+
+  MaintainedButton(comp, ctx) {
+    return ComponentRegistry.renderStateButton(comp, ctx, {
+      type: 'MaintainedButton',
+      cssClass: 'ft-maintained-btn',
+      defaultStates: () => ComponentRegistry.defaultMaintainedButtonStates(comp.caption ?? comp.label),
+      setup: (states) => {
+        const indicatorTag = comp.indicatorTag || comp.tag;
+        const state0 = states.find((s) => s.id === 'State0') || states[0];
+        const state1 = states.find((s) => s.id === 'State1') || states[1];
+        const state0Val = state0?.value ?? 0;
+        const state1Val = state1?.value ?? 1;
+
+        const isState1 = (val) => {
+          const resolved = ComponentRegistry.resolveMultistateState(states, val);
+          return resolved?.id === 'State1' || resolved?.value === state1Val;
+        };
+
+        const toggle = () => {
+          const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+          if (!writeTag) return;
+          const current = ComponentRegistry.stateButtonCurrentValue(comp, ctx, indicatorTag);
+          const nextVal = isState1(current) ? state0Val : state1Val;
+          ctx.writeTag(writeTag, nextVal);
+        };
+
+        return {
+          indicatorTag,
+          stateForValue: (val) => ComponentRegistry.resolveMultistateState(states, val),
+          defaultState: ComponentRegistry.resolveMultistateState(states, state0Val),
+          wire: (btn) => {
+            btn.addEventListener('click', (e) => {
+              e.preventDefault();
+              toggle();
+            });
+          }
+        };
+      }
+    });
   },
 
   LatchedButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-latched-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
+    return ComponentRegistry.renderStateButton(comp, ctx, {
+      type: 'LatchedButton',
+      cssClass: 'ft-latched-btn',
+      defaultStates: () => ComponentRegistry.defaultLatchedButtonStates(comp.caption ?? comp.label),
+      setup: (states) => {
+        const indicatorTag = comp.indicatorTag || comp.tag;
+        const handshakeTag = comp.handshakeTag || '';
+        const state0 = states.find((s) => s.id === 'State0') || states[0];
+        const state1 = states.find((s) => s.id === 'State1') || states[1];
+        const state0Val = state0?.value ?? 0;
+        const latchVal = comp.latchValue ?? state1?.value ?? 1;
 
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    const states = comp.states?.length
-      ? comp.states
-      : ComponentRegistry.defaultLatchedButtonStates(comp.caption ?? comp.label);
-    const caption = document.createElement('span');
-    caption.className = 'ft-btn-caption';
-    caption.style.pointerEvents = 'none';
-    btn.style.display = 'flex';
-    btn.style.flexDirection = 'column';
-    btn.style.alignItems = 'center';
-    btn.style.justifyContent = 'center';
-    btn.style.padding = '0 4px';
-    btn.style.overflow = 'hidden';
-    btn.appendChild(caption);
-    let imgEl = null;
+        const isLatched = (val) => {
+          const n = Number(val);
+          if (comp.latchResetType === 'zeroValue') return n !== 0;
+          return n !== 0 && n !== state0Val;
+        };
 
-    const indicatorTag = comp.indicatorTag || comp.tag;
-    const handshakeTag = comp.handshakeTag || '';
-    const state0 = states.find((s) => s.id === 'State0') || states[0];
-    const state1 = states.find((s) => s.id === 'State1') || states[1];
-    const state0Val = state0?.value ?? 0;
-    const latchVal = comp.latchValue ?? state1?.value ?? 1;
-
-    const renderState = (stateDef) => {
-      if (!stateDef) return;
-      if (imgEl) {
-        imgEl.remove();
-        imgEl = null;
-      }
-      const merged = ComponentRegistry.mergeMomentaryState(comp, stateDef);
-      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit, useHighlightColor: false });
-      ComponentRegistry.applyShapePattern(btn, merged);
-      if (comp.useHighlightColor && comp.highlightColor) {
-        btn.classList.add('ft-highlight-on-focus');
-        btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-      } else {
-        btn.classList.remove('ft-highlight-on-focus');
-        btn.style.removeProperty('--ft-highlight-color');
-      }
-      if (stateDef.image) {
-        imgEl = document.createElement('img');
-        imgEl.className = 'ft-latched-btn-icon';
-        imgEl.src = ComponentRegistry.imageUrl(stateDef.image, ctx);
-        imgEl.alt = '';
-        imgEl.draggable = false;
-        imgEl.style.pointerEvents = 'none';
-        const scaled = Boolean(stateDef.imageScaled);
-        imgEl.style.maxWidth = scaled ? '100%' : '88%';
-        imgEl.style.maxHeight = scaled ? '100%' : '88%';
-        imgEl.style.objectFit = scaled ? 'fill' : 'contain';
-        imgEl.style.width = scaled ? '100%' : '';
-        imgEl.style.height = scaled ? '100%' : '';
-        imgEl.classList.toggle('ft-blink', Boolean(stateDef.imageBlink));
-        btn.insertBefore(imgEl, caption);
-      }
-      caption.textContent = stateDef.caption ?? comp.caption ?? comp.label ?? '';
-      caption.style.display = caption.textContent ? '' : 'none';
-      const alignId = stateDef.alignment || comp.alignment || 'middleCenter';
-      const align = ComponentRegistry.textAlignment(alignId);
-      btn.style.justifyContent = align.justify;
-      btn.style.alignItems = align.align;
-      ComponentRegistry.applyCaptionStyle(caption, {
-        fontFamily: comp.fontFamily,
-        fontSize: comp.fontSize,
-        bold: comp.bold,
-        italic: comp.italic,
-        underline: comp.underline,
-        foreColor: stateDef.captionColor || stateDef.foreColor || comp.foreColor,
-        useForeColor: stateDef.useCaptionColor !== false && comp.useForeColor !== false,
-        wordWrap: stateDef.wordWrap !== undefined ? stateDef.wordWrap : comp.wordWrap,
-        alignment: alignId
-      });
-      if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid') {
-        caption.style.backgroundColor = stateDef.captionBackColor || '#001C38';
-      } else {
-        caption.style.backgroundColor = 'transparent';
-      }
-      caption.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
-      btn.classList.toggle('ft-blink', Boolean(stateDef.blink));
-    };
-
-    const showTagState = (val) => {
-      renderState(ComponentRegistry.resolveMultistateState(states, val));
-    };
-
-    const defaultState = ComponentRegistry.resolveMultistateState(states, state0Val);
-    const previewState = (studioEdit && comp.previewStateId)
-      ? (states.find((s) => s.id === comp.previewStateId) || defaultState)
-      : defaultState;
-
-    if (indicatorTag && !studioEdit) {
-      ComponentRegistry.bindIndicatorRef(indicatorTag, showTagState, ctx);
-    } else {
-      renderState(previewState);
-    }
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'LatchedButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'LatchedButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      return btn;
-    }
-
-    const isLatched = (val) => {
-      const n = Number(val);
-      if (comp.latchResetType === 'zeroValue') return n !== 0;
-      return n !== 0 && n !== state0Val;
-    };
-
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
-      if (!writeTag) return;
-      const resetVal = handshakeTag
-        ? ComponentRegistry.readIndicatorRef(handshakeTag, ctx)
-        : (indicatorTag
-          ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
-          : ctx.getTagValue(comp.tag));
-      if (!isLatched(resetVal)) {
-        ctx.writeTag(writeTag, latchVal);
+        return {
+          indicatorTag,
+          stateForValue: (val) => ComponentRegistry.resolveMultistateState(states, val),
+          defaultState: ComponentRegistry.resolveMultistateState(states, state0Val),
+          wire: (btn) => {
+            btn.addEventListener('click', (e) => {
+              e.preventDefault();
+              const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+              if (!writeTag) return;
+              const resetVal = handshakeTag
+                ? ComponentRegistry.readIndicatorRef(handshakeTag, ctx)
+                : (indicatorTag
+                  ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
+                  : ctx.getTagValue(comp.tag));
+              if (!isLatched(resetVal)) {
+                ctx.writeTag(writeTag, latchVal);
+              }
+            });
+          }
+        };
       }
     });
-
-    return btn;
   },
 
   MultistateButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-multistate-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
+    return ComponentRegistry.renderStateButton(comp, ctx, {
+      type: 'MultistateButton',
+      cssClass: 'ft-multistate-btn',
+      defaultStates: () => {
+        const userStateCount = comp.numberOfStates ?? (comp.states?.filter((s) => s.id !== 'Error').length || 2);
+        return ComponentRegistry.defaultMultistateButtonStates(userStateCount, comp.caption ?? comp.label);
+      },
+      setup: (states) => {
+        const indicatorTag = comp.indicatorTag || comp.tag;
+        const userStates = states.filter((s) => s.id !== 'Error');
 
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    const userStateCount = comp.numberOfStates ?? (comp.states?.filter((s) => s.id !== 'Error').length || 2);
-    const states = comp.states?.length
-      ? comp.states
-      : ComponentRegistry.defaultMultistateButtonStates(userStateCount, comp.caption ?? comp.label);
-    const caption = document.createElement('span');
-    caption.className = 'ft-btn-caption';
-    caption.style.pointerEvents = 'none';
-    btn.style.display = 'flex';
-    btn.style.flexDirection = 'column';
-    btn.style.alignItems = 'center';
-    btn.style.justifyContent = 'center';
-    btn.style.padding = '0 4px';
-    btn.style.overflow = 'hidden';
-    btn.appendChild(caption);
-    let imgEl = null;
+        const advance = () => {
+          const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+          if (!writeTag) return;
+          const current = ComponentRegistry.stateButtonCurrentValue(comp, ctx, indicatorTag);
+          const resolved = ComponentRegistry.resolveMultistateState(states, current);
+          const idx = userStates.findIndex((s) => s.id === resolved?.id);
+          const nextIdx = idx < 0 ? 0 : (idx + 1) % userStates.length;
+          ctx.writeTag(writeTag, userStates[nextIdx]?.value ?? nextIdx);
+        };
 
-    const indicatorTag = comp.indicatorTag || comp.tag;
-    const userStates = states.filter((s) => s.id !== 'Error');
+        return {
+          indicatorTag,
+          stateForValue: (val) => ComponentRegistry.resolveMultistateState(states, val),
+          defaultState: ComponentRegistry.resolveMultistateState(states, userStates[0]?.value ?? 0),
+          wire: (btn) => {
+            let repeatTimer = null;
+            let repeatDelayTimer = null;
+            const rate = Number(comp.autoRepeatRate ?? 0);
+            const delay = comp.autoRepeatDelay ?? 400;
+            const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
 
-    const renderState = (stateDef) => {
-      if (!stateDef) return;
-      if (imgEl) {
-        imgEl.remove();
-        imgEl = null;
+            const stopRepeat = () => {
+              if (repeatDelayTimer) clearTimeout(repeatDelayTimer);
+              if (repeatTimer) clearInterval(repeatTimer);
+              repeatDelayTimer = null;
+              repeatTimer = null;
+            };
+
+            const startRepeat = () => {
+              advance();
+              if (intervalMs <= 0) return;
+              repeatDelayTimer = setTimeout(() => {
+                repeatTimer = setInterval(advance, intervalMs);
+              }, delay);
+            };
+
+            btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
+            btn.addEventListener('mouseup', stopRepeat);
+            btn.addEventListener('mouseleave', stopRepeat);
+            btn.addEventListener('click', (e) => e.preventDefault());
+            if (comp.touch !== false) {
+              btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
+              btn.addEventListener('touchend', stopRepeat);
+              btn.addEventListener('touchcancel', stopRepeat);
+            }
+          }
+        };
       }
-      const merged = ComponentRegistry.mergeMomentaryState(comp, stateDef);
-      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit, useHighlightColor: false });
-      ComponentRegistry.applyShapePattern(btn, merged);
-      if (comp.useHighlightColor && comp.highlightColor) {
-        btn.classList.add('ft-highlight-on-focus');
-        btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-      } else {
-        btn.classList.remove('ft-highlight-on-focus');
-        btn.style.removeProperty('--ft-highlight-color');
-      }
-      if (stateDef.image) {
-        imgEl = document.createElement('img');
-        imgEl.className = 'ft-multistate-btn-icon';
-        imgEl.src = ComponentRegistry.imageUrl(stateDef.image, ctx);
-        imgEl.alt = '';
-        imgEl.draggable = false;
-        imgEl.style.pointerEvents = 'none';
-        const scaled = Boolean(stateDef.imageScaled);
-        imgEl.style.maxWidth = scaled ? '100%' : '88%';
-        imgEl.style.maxHeight = scaled ? '100%' : '88%';
-        imgEl.style.objectFit = scaled ? 'fill' : 'contain';
-        imgEl.style.width = scaled ? '100%' : '';
-        imgEl.style.height = scaled ? '100%' : '';
-        imgEl.classList.toggle('ft-blink', Boolean(stateDef.imageBlink));
-        btn.insertBefore(imgEl, caption);
-      }
-      caption.textContent = stateDef.caption ?? comp.caption ?? comp.label ?? '';
-      caption.style.display = caption.textContent ? '' : 'none';
-      const alignId = stateDef.alignment || comp.alignment || 'middleCenter';
-      const align = ComponentRegistry.textAlignment(alignId);
-      btn.style.justifyContent = align.justify;
-      btn.style.alignItems = align.align;
-      ComponentRegistry.applyCaptionStyle(caption, {
-        fontFamily: comp.fontFamily,
-        fontSize: comp.fontSize,
-        bold: comp.bold,
-        italic: comp.italic,
-        underline: comp.underline,
-        foreColor: stateDef.captionColor || stateDef.foreColor || comp.foreColor,
-        useForeColor: stateDef.useCaptionColor !== false && comp.useForeColor !== false,
-        wordWrap: stateDef.wordWrap !== undefined ? stateDef.wordWrap : comp.wordWrap,
-        alignment: alignId
-      });
-      if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid') {
-        caption.style.backgroundColor = stateDef.captionBackColor || '#001C38';
-      } else {
-        caption.style.backgroundColor = 'transparent';
-      }
-      caption.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
-      btn.classList.toggle('ft-blink', Boolean(stateDef.blink));
-    };
-
-    const showTagState = (val) => {
-      renderState(ComponentRegistry.resolveMultistateState(states, val));
-    };
-
-    const defaultState = ComponentRegistry.resolveMultistateState(states, userStates[0]?.value ?? 0);
-    const previewState = (studioEdit && comp.previewStateId)
-      ? (states.find((s) => s.id === comp.previewStateId) || defaultState)
-      : defaultState;
-
-    if (indicatorTag && !studioEdit) {
-      ComponentRegistry.bindIndicatorRef(indicatorTag, showTagState, ctx);
-    } else {
-      renderState(previewState);
-    }
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'MultistateButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'MultistateButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      return btn;
-    }
-
-    const advance = () => {
-      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
-      if (!writeTag) return;
-      const basedOnValue = (comp.nextStateBasedOn || 'currentState') === 'valueControl';
-      const current = basedOnValue
-        ? ctx.getTagValue(comp.tag)
-        : (indicatorTag
-          ? ComponentRegistry.readIndicatorRef(indicatorTag, ctx)
-          : ctx.getTagValue(comp.tag));
-      const resolved = ComponentRegistry.resolveMultistateState(states, current);
-      const idx = userStates.findIndex((s) => s.id === resolved?.id);
-      const nextIdx = idx < 0 ? 0 : (idx + 1) % userStates.length;
-      ctx.writeTag(writeTag, userStates[nextIdx]?.value ?? nextIdx);
-    };
-
-    let repeatTimer = null;
-    let repeatDelayTimer = null;
-    const rate = Number(comp.autoRepeatRate ?? 0);
-    const delay = comp.autoRepeatDelay ?? 400;
-    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
-
-    const stopRepeat = () => {
-      if (repeatDelayTimer) clearTimeout(repeatDelayTimer);
-      if (repeatTimer) clearInterval(repeatTimer);
-      repeatDelayTimer = null;
-      repeatTimer = null;
-    };
-
-    const startRepeat = () => {
-      advance();
-      if (intervalMs <= 0) return;
-      repeatDelayTimer = setTimeout(() => {
-        repeatTimer = setInterval(advance, intervalMs);
-      }, delay);
-    };
-
-    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
-    btn.addEventListener('mouseup', stopRepeat);
-    btn.addEventListener('mouseleave', stopRepeat);
-    btn.addEventListener('click', (e) => e.preventDefault());
-    if (comp.touch !== false) {
-      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
-      btn.addEventListener('touchend', stopRepeat);
-      btn.addEventListener('touchcancel', stopRepeat);
-    }
-
-    return btn;
+    });
   },
 
-  defaultMultistateButtonStates(count = 2, caption = '') {
-    const n = Math.max(2, Number(count) || 2);
-    const state = (id, extra = {}) => ({
+  // One state of a Maintained/Latched/Interlocked/Multistate button with the shared defaults.
+  buttonStateDef(id, ...overrides) {
+    return Object.assign({
       id,
       backColor: '#001C38',
       borderColor: '#001C38',
@@ -761,7 +568,7 @@ const ComponentRegistry = {
       captionColor: '#ffffff',
       useCaptionColor: false,
       captionBackColor: '#001C38',
-      useCaptionBackColor: true,
+      useCaptionBackColor: false,
       captionBlink: false,
       captionBackStyle: 'transparent',
       patternStyle: 'none',
@@ -778,165 +585,58 @@ const ComponentRegistry = {
       useImageBackColor: false,
       imageBackColor: '#001C38',
       imageBlink: false,
-      imageScaled: false,
-      ...extra
-    });
+      imageScaled: false
+    }, ...overrides);
+  },
+
+  defaultMultistateButtonStates(count = 2, caption = '') {
+    const n = Math.max(2, Number(count) || 2);
+    const state = (id, extra) => ComponentRegistry.buttonStateDef(id, { useCaptionBackColor: true }, extra);
     const states = [];
     for (let i = 0; i < n; i++) {
       states.push(state(`State${i}`, { value: i, caption: i === 0 ? caption : '' }));
     }
-    states.push(state('Error', { caption: 'Error', blink: true, useCaptionColor: true, backColor: 'navy', borderColor: 'navy' }));
+    states.push(state('Error', BUTTON_ERROR_STATE));
     return states;
   },
 
   InterlockedButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-interlocked-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
+    return ComponentRegistry.renderStateButton(comp, ctx, {
+      type: 'InterlockedButton',
+      cssClass: 'ft-interlocked-btn',
+      defaultStates: () => ComponentRegistry.defaultInterlockedButtonStates(comp.caption ?? comp.label),
+      setup: (states) => {
+        const rawBv = Number(comp.buttonValue);
+        const buttonValue = Number.isFinite(rawBv) ? rawBv : 0;
+        const state0 = states.find((s) => s.id === 'State0') || states[0];
+        const state1 = states.find((s) => s.id === 'State1') || states[1];
 
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    const states = comp.states?.length
-      ? comp.states
-      : ComponentRegistry.defaultInterlockedButtonStates(comp.caption ?? comp.label);
-    const caption = document.createElement('span');
-    caption.className = 'ft-btn-caption';
-    caption.style.pointerEvents = 'none';
-    btn.style.display = 'flex';
-    btn.style.flexDirection = 'column';
-    btn.style.alignItems = 'center';
-    btn.style.justifyContent = 'center';
-    btn.style.padding = '0 4px';
-    btn.style.overflow = 'hidden';
-    btn.appendChild(caption);
-    let imgEl = null;
+        return {
+          indicatorTag: comp.tag,
+          stateForValue: (val) => {
+            const n = Number(val);
+            return (Number.isFinite(n) && n === buttonValue) ? (state1 || state0) : state0;
+          },
+          defaultState: state0,
+          wire: (btn, renderState) => {
+            const press = () => {
+              renderState(state1 || state0);
+              const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
+              if (writeTag) ctx.writeTag(writeTag, buttonValue);
+              const pf = String(comp.parameterFile || '').trim();
+              if (pf && ctx.navigate) {
+                ctx.navigate(comp.target || ctx.currentScreen, { parameterFile: pf });
+              }
+            };
 
-    const rawBv = Number(comp.buttonValue);
-    const buttonValue = Number.isFinite(rawBv) ? rawBv : 0;
-    const state0 = states.find((s) => s.id === 'State0') || states[0];
-    const state1 = states.find((s) => s.id === 'State1') || states[1];
-
-    const renderState = (stateDef) => {
-      if (!stateDef) return;
-      if (imgEl) {
-        imgEl.remove();
-        imgEl = null;
+            btn.addEventListener('mousedown', (e) => { e.preventDefault(); press(); });
+            if (comp.touch !== false) {
+              btn.addEventListener('touchstart', (e) => { e.preventDefault(); press(); }, { passive: false });
+            }
+          }
+        };
       }
-      const merged = ComponentRegistry.mergeMomentaryState(comp, stateDef);
-      ComponentRegistry.applyButtonAppearance(btn, { ...merged, studioEdit, useHighlightColor: false });
-      ComponentRegistry.applyShapePattern(btn, merged);
-      if (comp.useHighlightColor && comp.highlightColor) {
-        btn.classList.add('ft-highlight-on-focus');
-        btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-      } else {
-        btn.classList.remove('ft-highlight-on-focus');
-        btn.style.removeProperty('--ft-highlight-color');
-      }
-      if (stateDef.image) {
-        imgEl = document.createElement('img');
-        imgEl.className = 'ft-interlocked-btn-icon';
-        imgEl.src = ComponentRegistry.imageUrl(stateDef.image, ctx);
-        imgEl.alt = '';
-        imgEl.draggable = false;
-        imgEl.style.pointerEvents = 'none';
-        const scaled = Boolean(stateDef.imageScaled);
-        imgEl.style.maxWidth = scaled ? '100%' : '88%';
-        imgEl.style.maxHeight = scaled ? '100%' : '88%';
-        imgEl.style.objectFit = scaled ? 'fill' : 'contain';
-        imgEl.style.width = scaled ? '100%' : '';
-        imgEl.style.height = scaled ? '100%' : '';
-        imgEl.classList.toggle('ft-blink', Boolean(stateDef.imageBlink));
-        btn.insertBefore(imgEl, caption);
-      }
-      caption.textContent = stateDef.caption ?? comp.caption ?? comp.label ?? '';
-      caption.style.display = caption.textContent ? '' : 'none';
-      const alignId = stateDef.alignment || comp.alignment || 'middleCenter';
-      const align = ComponentRegistry.textAlignment(alignId);
-      btn.style.justifyContent = align.justify;
-      btn.style.alignItems = align.align;
-      ComponentRegistry.applyCaptionStyle(caption, {
-        fontFamily: comp.fontFamily,
-        fontSize: comp.fontSize,
-        bold: comp.bold,
-        italic: comp.italic,
-        underline: comp.underline,
-        foreColor: stateDef.captionColor || stateDef.foreColor || comp.foreColor,
-        useForeColor: stateDef.useCaptionColor !== false && comp.useForeColor !== false,
-        wordWrap: stateDef.wordWrap !== undefined ? stateDef.wordWrap : comp.wordWrap,
-        alignment: alignId
-      });
-      if (stateDef.useCaptionBackColor && stateDef.captionBackStyle === 'solid') {
-        caption.style.backgroundColor = stateDef.captionBackColor || '#001C38';
-      } else {
-        caption.style.backgroundColor = 'transparent';
-      }
-      caption.classList.toggle('ft-blink', Boolean(stateDef.captionBlink));
-      btn.classList.toggle('ft-blink', Boolean(stateDef.blink));
-    };
-
-    const stateForValue = (val) => {
-      const n = Number(val);
-      return (Number.isFinite(n) && n === buttonValue) ? (state1 || state0) : state0;
-    };
-
-    const showTagState = (val) => {
-      renderState(stateForValue(val));
-    };
-
-    const previewState = (studioEdit && comp.previewStateId)
-      ? (states.find((s) => s.id === comp.previewStateId) || state0)
-      : state0;
-
-    if (comp.tag && !studioEdit) {
-      ComponentRegistry.bindIndicatorRef(comp.tag, showTagState, ctx);
-    } else {
-      renderState(previewState);
-    }
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'InterlockedButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'InterlockedButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      return btn;
-    }
-
-    const press = () => {
-      renderState(state1 || state0);
-      const writeTag = ComponentRegistry.resolveWriteTagName(comp.tag);
-      if (writeTag) ctx.writeTag(writeTag, buttonValue);
-      const pf = String(comp.parameterFile || '').trim();
-      if (pf && ctx.navigate) {
-        ctx.navigate(comp.target || ctx.currentScreen, { parameterFile: pf });
-      }
-    };
-
-    btn.addEventListener('mousedown', (e) => { e.preventDefault(); press(); });
-    if (comp.touch !== false) {
-      btn.addEventListener('touchstart', (e) => { e.preventDefault(); press(); }, { passive: false });
-    }
-
-    return btn;
+    });
   },
 
   RampButton(comp, ctx) {
@@ -1113,115 +813,30 @@ const ComponentRegistry = {
   },
 
   defaultInterlockedButtonStates(caption = '') {
-    const state = (id, extra = {}) => ({
-      id,
-      backColor: '#001C38',
-      borderColor: '#001C38',
-      useBackColor: true,
-      useBorderColor: true,
-      caption,
-      captionColor: '#ffffff',
-      useCaptionColor: false,
-      captionBackColor: '#001C38',
-      useCaptionBackColor: false,
-      captionBlink: false,
-      captionBackStyle: 'transparent',
-      patternStyle: 'none',
-      usePatternColor: false,
-      patternColor: '#ffffff',
-      wordWrap: true,
-      alignment: 'middleCenter',
-      blink: false,
-      image: '',
-      imageBackStyle: 'transparent',
-      imageAlignment: 'middleCenter',
-      useImageColor: false,
-      imageColor: '#ffffff',
-      useImageBackColor: false,
-      imageBackColor: '#001C38',
-      imageBlink: false,
-      imageScaled: false,
-      ...extra
-    });
+    const base = { caption, imageColor: '#ffffff' };
     return [
-      state('State0'),
-      state('State1')
+      ComponentRegistry.buttonStateDef('State0', base),
+      ComponentRegistry.buttonStateDef('State1', base)
     ];
   },
 
   defaultMaintainedButtonStates(caption = '') {
-    const state = (id, extra = {}) => ({
-      id,
-      backColor: '#001C38',
-      borderColor: '#001C38',
-      useBackColor: true,
-      useBorderColor: true,
-      caption,
-      captionColor: '#ffffff',
-      useCaptionColor: false,
-      captionBackColor: '#001C38',
-      useCaptionBackColor: false,
-      captionBlink: false,
-      captionBackStyle: 'transparent',
-      patternStyle: 'none',
-      usePatternColor: false,
-      patternColor: '#ffffff',
-      wordWrap: true,
-      alignment: 'middleRight',
-      blink: false,
-      image: '',
-      imageBackStyle: 'transparent',
-      imageAlignment: 'middleCenter',
-      useImageColor: false,
-      imageColor: '#001C38',
-      useImageBackColor: false,
-      imageBackColor: '#001C38',
-      imageBlink: false,
-      imageScaled: false,
-      ...extra
-    });
+    const state = (id, extra) => ComponentRegistry.buttonStateDef(id, { caption, alignment: 'middleRight' }, extra);
     return [
       state('State0', { value: 0 }),
       state('State1', { value: 1 }),
-      state('Error', { caption: 'Error', blink: true, useCaptionColor: true, backColor: 'navy', borderColor: 'navy' })
+      state('Error', BUTTON_ERROR_STATE)
     ];
   },
 
   defaultLatchedButtonStates(caption = '') {
-    const state = (id, extra = {}) => ({
-      id,
-      backColor: '#001C38',
-      borderColor: '#001C38',
-      useBackColor: true,
-      useBorderColor: true,
-      caption,
-      captionColor: '#ffffff',
-      useCaptionColor: false,
-      captionBackColor: '#001C38',
-      useCaptionBackColor: true,
-      captionBlink: false,
-      captionBackStyle: 'transparent',
-      patternStyle: 'none',
-      usePatternColor: false,
-      patternColor: '#ffffff',
-      wordWrap: true,
-      alignment: 'middleCenter',
-      blink: false,
-      image: '',
-      imageBackStyle: 'transparent',
-      imageAlignment: 'middleCenter',
-      useImageColor: false,
-      imageColor: '#001C38',
-      useImageBackColor: true,
-      imageBackColor: '#001C38',
-      imageBlink: false,
-      imageScaled: false,
-      ...extra
-    });
+    const state = (id, extra) => ComponentRegistry.buttonStateDef(id, {
+      caption, useCaptionBackColor: true, useImageBackColor: true
+    }, extra);
     return [
       state('State0', { value: 0 }),
       state('State1', { value: 1 }),
-      state('Error', { caption: 'Error', blink: true, useCaptionColor: true, backColor: 'navy', borderColor: 'navy' })
+      state('Error', BUTTON_ERROR_STATE)
     ];
   },
 
@@ -4898,7 +4513,9 @@ const ComponentRegistry = {
     return btn;
   },
 
-  AddUserGroupButton(comp, ctx) {
+  // Shared look and Studio click hooks of the user-management buttons; `openDialog` runs on a
+  // runtime click.
+  renderUserButton(comp, ctx, type, openDialog) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
@@ -4980,6 +4597,33 @@ const ComponentRegistry = {
     btn.appendChild(cap);
     btn.classList.toggle('ft-blink', Boolean(comp.blink));
 
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: type,
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: type,
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', openDialog);
+    }
+    return btn;
+  },
+
+  AddUserGroupButton(comp, ctx) {
     const openAddUserDialog = async () => {
       const dlg = ComponentRegistry.ensureRuntimeAddUserDialog();
       const status = dlg.querySelector('#runtimeAddUserStatus');
@@ -5061,273 +4705,20 @@ const ComponentRegistry = {
       };
     };
 
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'AddUserGroupButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'AddUserGroupButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      btn.addEventListener('click', openAddUserDialog);
-    }
-    return btn;
+    return ComponentRegistry.renderUserButton(comp, ctx, 'AddUserGroupButton', openAddUserDialog);
   },
 
   DeleteUserGroupButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: comp.borderUsesBackColor !== false,
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderUsernamePromptButton(comp, ctx, {
+      type: 'DeleteUserGroupButton',
+      prompt: ComponentRegistry.USERNAME_PROMPTS.deleteUserGroup,
+      action: 'deleteUserGroup',
+      doneVerb: 'deleted',
+      failMessage: 'Could not delete user'
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    if (comp.image) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) {
-        imgEl.classList.add('ft-goto-btn-icon-scaled');
-      }
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    const openDeleteUserDialog = () => {
-      const dlg = ComponentRegistry.ensureRuntimeDeleteUserDialog();
-      const status = dlg.querySelector('#runtimeDeleteUserStatus');
-      const nameEl = dlg.querySelector('#runtimeDeleteUserName');
-      const submitBtn = dlg.querySelector('#runtimeDeleteUserSubmit');
-      nameEl.value = '';
-      status.textContent = '';
-      status.className = 'runtime-comm-status';
-      submitBtn.disabled = false;
-      submitBtn.onclick = async () => {
-        const username = nameEl.value.trim();
-        if (!username) {
-          status.textContent = 'Username is required';
-          status.className = 'runtime-comm-status error';
-          nameEl.focus();
-          return;
-        }
-        submitBtn.disabled = true;
-        status.textContent = 'Checking username...';
-        status.className = 'runtime-comm-status';
-        try {
-          const result = await ctx.deleteUserGroup({ username });
-          if (result?.success) {
-            status.textContent = `User "${username}" deleted.`;
-            status.className = 'runtime-comm-status ok';
-            setTimeout(() => {
-              try { dlg.close(); } catch (_) { /* ignore */ }
-            }, 900);
-          } else {
-            // "except check the name" — surface the not-found/validation error clearly and
-            // leave the dialog open so the operator can correct the username and retry.
-            status.textContent = result?.error || `No user found with the username "${username}"`;
-            status.className = 'runtime-comm-status error';
-            submitBtn.disabled = false;
-            nameEl.focus();
-            nameEl.select();
-          }
-        } catch (err) {
-          status.textContent = err.message || 'Could not delete user';
-          status.className = 'runtime-comm-status error';
-          submitBtn.disabled = false;
-        }
-      };
-      try {
-        dlg.showModal();
-      } catch (err) {
-        dlg.setAttribute('open', '');
-      }
-      nameEl.focus();
-    };
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'DeleteUserGroupButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'DeleteUserGroupButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      btn.addEventListener('click', openDeleteUserDialog);
-    }
-    return btn;
   },
 
   ModifyGroupMembershipButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: comp.borderUsesBackColor !== false,
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
-    });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    if (comp.image) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) {
-        imgEl.classList.add('ft-goto-btn-icon-scaled');
-      }
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
     const openRuntimeDialog = async () => {
       const dlg = ComponentRegistry.ensureModifyGroupDialog();
       const status = dlg.querySelector('#runtimeModifyGroupStatus');
@@ -5409,585 +4800,40 @@ const ComponentRegistry = {
       };
     };
 
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'ModifyGroupMembershipButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'ModifyGroupMembershipButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      btn.addEventListener('click', openRuntimeDialog);
-    }
-    return btn;
+    return ComponentRegistry.renderUserButton(comp, ctx, 'ModifyGroupMembershipButton', openRuntimeDialog);
   },
 
   UnlockUserButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: comp.borderUsesBackColor !== false,
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderUsernamePromptButton(comp, ctx, {
+      type: 'UnlockUserButton',
+      prompt: ComponentRegistry.USERNAME_PROMPTS.unlockUser,
+      action: 'unlockUser',
+      doneVerb: 'unlocked',
+      failMessage: 'Could not complete the request'
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    if (comp.image) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) {
-        imgEl.classList.add('ft-goto-btn-icon-scaled');
-      }
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    const openRuntimeDialog = () => {
-      const dlg = ComponentRegistry.ensureUnlockUserDialog();
-      const status = dlg.querySelector('#runtimeUnlockUserStatus');
-      const nameEl = dlg.querySelector('#runtimeUnlockUserName');
-      const submitBtn = dlg.querySelector('#runtimeUnlockUserSubmit');
-      nameEl.value = '';
-      status.textContent = '';
-      status.className = 'runtime-comm-status';
-      submitBtn.disabled = false;
-      submitBtn.onclick = async () => {
-        const username = nameEl.value.trim();
-        if (!username) {
-          status.textContent = 'Username is required';
-          status.className = 'runtime-comm-status error';
-          nameEl.focus();
-          return;
-        }
-        submitBtn.disabled = true;
-        status.textContent = 'Checking username...';
-        status.className = 'runtime-comm-status';
-        try {
-          const result = await ctx.unlockUser({ username: username });
-          if (result?.success) {
-            status.textContent = `User "${username}" unlocked.`;
-            status.className = 'runtime-comm-status ok';
-            setTimeout(() => {
-              try { dlg.close(); } catch (_) { /* ignore */ }
-            }, 900);
-          } else {
-            status.textContent = result?.error || `No user found with the username "${username}"`;
-            status.className = 'runtime-comm-status error';
-            submitBtn.disabled = false;
-            nameEl.focus();
-            nameEl.select();
-          }
-        } catch (err) {
-          status.textContent = err.message || 'Could not complete the request';
-          status.className = 'runtime-comm-status error';
-          submitBtn.disabled = false;
-        }
-      };
-      try {
-        dlg.showModal();
-      } catch (err) {
-        dlg.setAttribute('open', '');
-      }
-      nameEl.focus();
-    };
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'UnlockUserButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'UnlockUserButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      btn.addEventListener('click', openRuntimeDialog);
-    }
-    return btn;
   },
 
   EnableUserButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: comp.borderUsesBackColor !== false,
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderUsernamePromptButton(comp, ctx, {
+      type: 'EnableUserButton',
+      prompt: ComponentRegistry.USERNAME_PROMPTS.enableUser,
+      action: 'enableUser',
+      doneVerb: 'enabled',
+      failMessage: 'Could not complete the request'
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    if (comp.image) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) {
-        imgEl.classList.add('ft-goto-btn-icon-scaled');
-      }
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    const openRuntimeDialog = () => {
-      const dlg = ComponentRegistry.ensureEnableUserDialog();
-      const status = dlg.querySelector('#runtimeEnableUserStatus');
-      const nameEl = dlg.querySelector('#runtimeEnableUserName');
-      const submitBtn = dlg.querySelector('#runtimeEnableUserSubmit');
-      nameEl.value = '';
-      status.textContent = '';
-      status.className = 'runtime-comm-status';
-      submitBtn.disabled = false;
-      submitBtn.onclick = async () => {
-        const username = nameEl.value.trim();
-        if (!username) {
-          status.textContent = 'Username is required';
-          status.className = 'runtime-comm-status error';
-          nameEl.focus();
-          return;
-        }
-        submitBtn.disabled = true;
-        status.textContent = 'Checking username...';
-        status.className = 'runtime-comm-status';
-        try {
-          const result = await ctx.enableUser({ username: username });
-          if (result?.success) {
-            status.textContent = `User "${username}" enabled.`;
-            status.className = 'runtime-comm-status ok';
-            setTimeout(() => {
-              try { dlg.close(); } catch (_) { /* ignore */ }
-            }, 900);
-          } else {
-            status.textContent = result?.error || `No user found with the username "${username}"`;
-            status.className = 'runtime-comm-status error';
-            submitBtn.disabled = false;
-            nameEl.focus();
-            nameEl.select();
-          }
-        } catch (err) {
-          status.textContent = err.message || 'Could not complete the request';
-          status.className = 'runtime-comm-status error';
-          submitBtn.disabled = false;
-        }
-      };
-      try {
-        dlg.showModal();
-      } catch (err) {
-        dlg.setAttribute('open', '');
-      }
-      nameEl.focus();
-    };
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'EnableUserButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'EnableUserButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      btn.addEventListener('click', openRuntimeDialog);
-    }
-    return btn;
   },
 
   DisableUserButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: comp.borderUsesBackColor !== false,
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderUsernamePromptButton(comp, ctx, {
+      type: 'DisableUserButton',
+      prompt: ComponentRegistry.USERNAME_PROMPTS.disableUser,
+      action: 'disableUser',
+      doneVerb: 'disabled',
+      failMessage: 'Could not complete the request'
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    if (comp.image) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) {
-        imgEl.classList.add('ft-goto-btn-icon-scaled');
-      }
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    const openRuntimeDialog = () => {
-      const dlg = ComponentRegistry.ensureDisableUserDialog();
-      const status = dlg.querySelector('#runtimeDisableUserStatus');
-      const nameEl = dlg.querySelector('#runtimeDisableUserName');
-      const submitBtn = dlg.querySelector('#runtimeDisableUserSubmit');
-      nameEl.value = '';
-      status.textContent = '';
-      status.className = 'runtime-comm-status';
-      submitBtn.disabled = false;
-      submitBtn.onclick = async () => {
-        const username = nameEl.value.trim();
-        if (!username) {
-          status.textContent = 'Username is required';
-          status.className = 'runtime-comm-status error';
-          nameEl.focus();
-          return;
-        }
-        submitBtn.disabled = true;
-        status.textContent = 'Checking username...';
-        status.className = 'runtime-comm-status';
-        try {
-          const result = await ctx.disableUser({ username: username });
-          if (result?.success) {
-            status.textContent = `User "${username}" disabled.`;
-            status.className = 'runtime-comm-status ok';
-            setTimeout(() => {
-              try { dlg.close(); } catch (_) { /* ignore */ }
-            }, 900);
-          } else {
-            status.textContent = result?.error || `No user found with the username "${username}"`;
-            status.className = 'runtime-comm-status error';
-            submitBtn.disabled = false;
-            nameEl.focus();
-            nameEl.select();
-          }
-        } catch (err) {
-          status.textContent = err.message || 'Could not complete the request';
-          status.className = 'runtime-comm-status error';
-          submitBtn.disabled = false;
-        }
-      };
-      try {
-        dlg.showModal();
-      } catch (err) {
-        dlg.setAttribute('open', '');
-      }
-      nameEl.focus();
-    };
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'DisableUserButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'DisableUserButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      btn.addEventListener('click', openRuntimeDialog);
-    }
-    return btn;
   },
 
   PasswordButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: comp.borderUsesBackColor !== false,
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
-    });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    if (comp.image) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) {
-        imgEl.classList.add('ft-goto-btn-icon-scaled');
-      }
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
     const openRuntimeDialog = () => {
       const dlg = ComponentRegistry.ensureChangePasswordDialog();
       const status = dlg.querySelector('#runtimeChangePasswordStatus');
@@ -6055,114 +4901,10 @@ const ComponentRegistry = {
       nameEl.focus();
     };
 
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'PasswordButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'PasswordButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      btn.addEventListener('click', openRuntimeDialog);
-    }
-    return btn;
+    return ComponentRegistry.renderUserButton(comp, ctx, 'PasswordButton', openRuntimeDialog);
   },
 
   ChangeUserPropertiesButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-recipeplus-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: comp.borderUsesBackColor !== false,
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
-    });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    if (comp.image) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) {
-        imgEl.classList.add('ft-goto-btn-icon-scaled');
-      }
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
     const openRuntimeDialog = async () => {
       const dlg = ComponentRegistry.ensureChangePropertiesDialog();
       const status = dlg.querySelector('#runtimeChangePropertiesStatus');
@@ -6247,30 +4989,7 @@ const ComponentRegistry = {
       };
     };
 
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'ChangeUserPropertiesButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'ChangeUserPropertiesButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      btn.addEventListener('click', openRuntimeDialog);
-    }
-    return btn;
+    return ComponentRegistry.renderUserButton(comp, ctx, 'ChangeUserPropertiesButton', openRuntimeDialog);
   },
 
   RecipePlusSelector(comp, ctx) {
@@ -6781,247 +5500,15 @@ const ComponentRegistry = {
   },
 
   PausePenButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-pause-pen-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: comp.borderUsesBackColor !== false,
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderPenButton(comp, ctx, {
+      type: 'PausePenButton', className: 'ft-pause-pen-btn', method: 'pauseTrendPen', eventName: 'planthmi-pause-pen'
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    if (comp.image) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) {
-        imgEl.classList.add('ft-goto-btn-icon-scaled');
-      }
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'PausePenButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'PausePenButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      btn.addEventListener('click', () => {
-        const sendPressTo = comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus';
-        const linkedObject = (comp.linkedObject || '').trim();
-        const target = sendPressTo === 'linkedObject'
-          ? linkedObject
-          : (ctx.focusedObjectName || ctx.focusObject || '');
-        if (typeof ctx.pauseTrendPen === 'function') {
-          ctx.pauseTrendPen({ sendPressTo, linkedObject, target, audio: comp.audio !== false });
-        } else {
-          btn.dispatchEvent(new CustomEvent('planthmi-pause-pen', {
-            bubbles: true,
-            detail: { sendPressTo, linkedObject, target, audio: comp.audio !== false }
-          }));
-        }
-      });
-    }
-    return btn;
   },
 
   NextPenButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-next-pen-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: comp.borderUsesBackColor !== false,
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderPenButton(comp, ctx, {
+      type: 'NextPenButton', className: 'ft-next-pen-btn', method: 'nextTrendPen', eventName: 'planthmi-next-pen'
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    if (comp.image) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) {
-        imgEl.classList.add('ft-goto-btn-icon-scaled');
-      }
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'NextPenButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'NextPenButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      btn.addEventListener('click', () => {
-        const sendPressTo = comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus';
-        const linkedObject = (comp.linkedObject || '').trim();
-        const target = sendPressTo === 'linkedObject'
-          ? linkedObject
-          : (ctx.focusedObjectName || ctx.focusObject || '');
-        if (typeof ctx.nextTrendPen === 'function') {
-          ctx.nextTrendPen({ sendPressTo, linkedObject, target, audio: comp.audio !== false });
-        } else {
-          btn.dispatchEvent(new CustomEvent('planthmi-next-pen', {
-            bubbles: true,
-            detail: { sendPressTo, linkedObject, target, audio: comp.audio !== false }
-          }));
-        }
-      });
-    }
-    return btn;
   },
 
   resolveGraphicImageFile(fileName) {
@@ -7058,6 +5545,349 @@ const ComponentRegistry = {
         ComponentRegistry.sendKeyToInputTarget(ctx, comp, key);
       }
     });
+  },
+
+  // Shared renderer for the Backspace/End/Enter/Home and Move/Page key buttons. Move/Page
+  // buttons auto-repeat while held; the others send one key press per click.
+  // Shared renderer for the Next Pen / Pause Pen buttons: each press goes to the linked or
+  // focused Trend through ctx[method], or bubbles up as `eventName` when there is no handler.
+  renderPenButton(comp, ctx, { type, className, method, eventName }) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `${className} ft-goto-btn ft-graphic`;
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: comp.borderUsesBackColor !== false,
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    if (comp.image) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(comp.image, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) {
+        imgEl.classList.add('ft-goto-btn-icon-scaled');
+      }
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: type,
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: type,
+          source: comp._source || ''
+        }, '*');
+      });
+    } else {
+      btn.addEventListener('click', () => {
+        const sendPressTo = comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus';
+        const linkedObject = (comp.linkedObject || '').trim();
+        const target = sendPressTo === 'linkedObject'
+          ? linkedObject
+          : (ctx.focusedObjectName || ctx.focusObject || '');
+        if (typeof ctx[method] === 'function') {
+          ctx[method]({ sendPressTo, linkedObject, target, audio: comp.audio !== false });
+        } else {
+          btn.dispatchEvent(new CustomEvent(eventName, {
+            bubbles: true,
+            detail: { sendPressTo, linkedObject, target, audio: comp.audio !== false }
+          }));
+        }
+      });
+    }
+    return btn;
+  },
+
+  // Shared renderer for the Unlock/Enable/Disable/Delete user buttons: each opens a runtime
+  // prompt for a username and calls ctx[action]({ username }), keeping the prompt open on errors.
+  renderUsernamePromptButton(comp, ctx, { type, prompt, action, doneVerb, failMessage }) {
+    const openRuntimeDialog = () => {
+      const dlg = ComponentRegistry.ensureUsernamePromptDialog(prompt);
+      const status = dlg.querySelector(`#${prompt.idBase}Status`);
+      const nameEl = dlg.querySelector(`#${prompt.idBase}Name`);
+      const submitBtn = dlg.querySelector(`#${prompt.idBase}Submit`);
+      nameEl.value = '';
+      status.textContent = '';
+      status.className = 'runtime-comm-status';
+      submitBtn.disabled = false;
+      submitBtn.onclick = async () => {
+        const username = nameEl.value.trim();
+        if (!username) {
+          status.textContent = 'Username is required';
+          status.className = 'runtime-comm-status error';
+          nameEl.focus();
+          return;
+        }
+        submitBtn.disabled = true;
+        status.textContent = 'Checking username...';
+        status.className = 'runtime-comm-status';
+        try {
+          const result = await ctx[action]({ username });
+          if (result?.success) {
+            status.textContent = `User "${username}" ${doneVerb}.`;
+            status.className = 'runtime-comm-status ok';
+            setTimeout(() => {
+              try { dlg.close(); } catch (_) { /* ignore */ }
+            }, 900);
+          } else {
+            status.textContent = result?.error || `No user found with the username "${username}"`;
+            status.className = 'runtime-comm-status error';
+            submitBtn.disabled = false;
+            nameEl.focus();
+            nameEl.select();
+          }
+        } catch (err) {
+          status.textContent = err.message || failMessage;
+          status.className = 'runtime-comm-status error';
+          submitBtn.disabled = false;
+        }
+      };
+      try {
+        dlg.showModal();
+      } catch (err) {
+        dlg.setAttribute('open', '');
+      }
+      nameEl.focus();
+    };
+
+    return ComponentRegistry.renderUserButton(comp, ctx, type, openRuntimeDialog);
+  },
+
+  renderKeyButton(comp, ctx, { type, className, image, key, autoRepeat }) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `${className} ft-goto-btn ft-graphic`;
+    if (comp.name) btn.dataset.name = comp.name;
+    if (comp.visible === false) {
+      btn.style.display = 'none';
+      return btn;
+    }
+    ComponentRegistry.applyGraphicsObject(btn, comp);
+    const studioEdit = Boolean(ctx.studioEdit);
+    ComponentRegistry.applyButtonAppearance(btn, {
+      ...comp,
+      borderStyle: comp.borderStyle || 'line',
+      borderWidth: comp.borderWidth ?? 1,
+      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
+      backStyle: comp.backStyle || 'solid',
+      backColor: comp.backColor || '#001C38',
+      useBackColor: comp.useBackColor !== false,
+      shape: comp.shape || 'rectangle',
+      studioEdit,
+      useHighlightColor: false
+    });
+    ComponentRegistry.applyShapePattern(btn, {
+      ...comp,
+      usePatternColor: comp.usePatternColor !== false,
+      patternColor: comp.patternColor || '#ffffff'
+    });
+    if (comp.useHighlightColor !== false && comp.highlightColor) {
+      btn.classList.add('ft-highlight-on-focus');
+      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
+    } else {
+      btn.classList.remove('ft-highlight-on-focus');
+      btn.style.removeProperty('--ft-highlight-color');
+    }
+    let imgEl = null;
+    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || image);
+    if (imageName) {
+      imgEl = document.createElement('img');
+      imgEl.className = 'ft-goto-btn-icon';
+      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
+      imgEl.alt = '';
+      imgEl.draggable = false;
+      imgEl.style.pointerEvents = 'none';
+      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
+      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
+        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
+      }
+      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
+      const missing = document.createElement('span');
+      missing.className = 'ft-goto-btn-missing hidden';
+      missing.setAttribute('aria-hidden', 'true');
+      imgEl.addEventListener('error', () => {
+        imgEl.style.display = 'none';
+        missing.classList.remove('hidden');
+      });
+      btn.appendChild(missing);
+    }
+
+    const cap = document.createElement('span');
+    cap.className = 'ft-goto-btn-caption';
+    const captionText = comp.label || comp.caption || '';
+    cap.textContent = captionText;
+    cap.style.display = captionText ? '' : 'none';
+    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
+    ComponentRegistry.applyCaptionStyle(cap, {
+      fontFamily: comp.fontFamily || 'Arial Unicode MS',
+      fontSize: comp.fontSize ?? 10,
+      bold: comp.bold ?? false,
+      italic: comp.italic,
+      underline: comp.underline,
+      foreColor: comp.captionColor || comp.foreColor || '#000000',
+      useForeColor: useCaptionColor,
+      wordWrap: comp.wordWrap !== false,
+      alignment: comp.alignment || 'middleCenter'
+    });
+    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
+      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
+    }
+    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
+    cap.style.width = '100%';
+    cap.style.lineHeight = '1.15';
+    cap.style.pointerEvents = 'none';
+
+    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
+    if (imgEl) btn.appendChild(imgEl);
+    btn.appendChild(cap);
+    btn.classList.toggle('ft-blink', Boolean(comp.blink));
+
+    if (studioEdit) {
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-dblclick',
+          name: comp.name || '',
+          componentType: type,
+          source: comp._source || ''
+        }, '*');
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({
+          type: 'planthmi-embed-graphic-click',
+          name: comp.name || '',
+          componentType: type,
+          source: comp._source || ''
+        }, '*');
+      });
+      return btn;
+    }
+
+    if (!autoRepeat) {
+      ComponentRegistry.bindRuntimeKeyPress(btn, ctx, comp, key);
+      return btn;
+    }
+
+    const doPress = () => {
+      if (typeof ctx.sendKeyPress === 'function') {
+        ctx.sendKeyPress({
+          key,
+          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
+          linkedObject: (comp.linkedObject || '').trim(),
+          audio: comp.audio !== false
+        });
+      } else {
+        ComponentRegistry.sendKeyToInputTarget(ctx, comp, key);
+      }
+    };
+    const rate = Number(comp.autoRepeatRate) || 0;
+    const delay = comp.autoRepeatDelay ?? 400;
+    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
+    let repeatTimer = null;
+    let delayTimer = null;
+
+    const stopRepeat = () => {
+      if (delayTimer) clearTimeout(delayTimer);
+      if (repeatTimer) clearInterval(repeatTimer);
+      delayTimer = null;
+      repeatTimer = null;
+    };
+
+    const startRepeat = () => {
+      doPress();
+      if (intervalMs <= 0) return;
+      delayTimer = setTimeout(() => {
+        repeatTimer = setInterval(doPress, intervalMs);
+      }, delay);
+    };
+
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
+    btn.addEventListener('mouseup', stopRepeat);
+    btn.addEventListener('mouseleave', stopRepeat);
+    btn.addEventListener('click', (e) => e.preventDefault());
+    if (comp.touch !== false) {
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
+      btn.addEventListener('touchend', stopRepeat);
+      btn.addEventListener('touchcancel', stopRepeat);
+    }
+    return btn;
   },
 
   sendKeyToInputTarget(ctx, comp, key) {
@@ -7147,1405 +5977,63 @@ const ComponentRegistry = {
   },
 
   BackspaceButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-backspace-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderKeyButton(comp, ctx, {
+      type: 'BackspaceButton', className: 'ft-backspace-btn', image: 'Backspace', key: 'Backspace', autoRepeat: false
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Backspace');
-    if (imageName) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      const missing = document.createElement('span');
-      missing.className = 'ft-goto-btn-missing hidden';
-      missing.setAttribute('aria-hidden', 'true');
-      imgEl.addEventListener('error', () => {
-        imgEl.style.display = 'none';
-        missing.classList.remove('hidden');
-      });
-      btn.appendChild(missing);
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'BackspaceButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'BackspaceButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      ComponentRegistry.bindRuntimeKeyPress(btn, ctx, comp, 'Backspace');
-    }
-    return btn;
   },
 
   EndButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-end-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderKeyButton(comp, ctx, {
+      type: 'EndButton', className: 'ft-end-btn', image: 'End', key: 'End', autoRepeat: false
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'End');
-    if (imageName) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      const missing = document.createElement('span');
-      missing.className = 'ft-goto-btn-missing hidden';
-      missing.setAttribute('aria-hidden', 'true');
-      imgEl.addEventListener('error', () => {
-        imgEl.style.display = 'none';
-        missing.classList.remove('hidden');
-      });
-      btn.appendChild(missing);
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'EndButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'EndButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      ComponentRegistry.bindRuntimeKeyPress(btn, ctx, comp, 'End');
-    }
-    return btn;
   },
 
   EnterButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-enter-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderKeyButton(comp, ctx, {
+      type: 'EnterButton', className: 'ft-enter-btn', image: 'Enter', key: 'Enter', autoRepeat: false
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Enter');
-    if (imageName) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      const missing = document.createElement('span');
-      missing.className = 'ft-goto-btn-missing hidden';
-      missing.setAttribute('aria-hidden', 'true');
-      imgEl.addEventListener('error', () => {
-        imgEl.style.display = 'none';
-        missing.classList.remove('hidden');
-      });
-      btn.appendChild(missing);
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'EnterButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'EnterButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      ComponentRegistry.bindRuntimeKeyPress(btn, ctx, comp, 'Enter');
-    }
-    return btn;
   },
 
   HomeButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-home-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderKeyButton(comp, ctx, {
+      type: 'HomeButton', className: 'ft-home-btn', image: 'Home', key: 'Home', autoRepeat: false
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Home');
-    if (imageName) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      const missing = document.createElement('span');
-      missing.className = 'ft-goto-btn-missing hidden';
-      missing.setAttribute('aria-hidden', 'true');
-      imgEl.addEventListener('error', () => {
-        imgEl.style.display = 'none';
-        missing.classList.remove('hidden');
-      });
-      btn.appendChild(missing);
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'HomeButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'HomeButton',
-          source: comp._source || ''
-        }, '*');
-      });
-    } else {
-      ComponentRegistry.bindRuntimeKeyPress(btn, ctx, comp, 'Home');
-    }
-    return btn;
   },
 
   MoveLeftButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-move-left-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderKeyButton(comp, ctx, {
+      type: 'MoveLeftButton', className: 'ft-move-left-btn', image: 'Arrow Left', key: 'ArrowLeft', autoRepeat: true
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Arrow Left');
-    if (imageName) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      const missing = document.createElement('span');
-      missing.className = 'ft-goto-btn-missing hidden';
-      missing.setAttribute('aria-hidden', 'true');
-      imgEl.addEventListener('error', () => {
-        imgEl.style.display = 'none';
-        missing.classList.remove('hidden');
-      });
-      btn.appendChild(missing);
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'MoveLeftButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'MoveLeftButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      return btn;
-    }
-
-    const doPress = () => {
-      if (typeof ctx.sendKeyPress === 'function') {
-        ctx.sendKeyPress({
-          key: 'ArrowLeft',
-          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
-          linkedObject: (comp.linkedObject || '').trim(),
-          audio: comp.audio !== false
-        });
-      } else {
-        ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'ArrowLeft');
-      }
-    };
-    const rate = Number(comp.autoRepeatRate) || 0;
-    const delay = comp.autoRepeatDelay ?? 400;
-    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
-    let repeatTimer = null;
-    let delayTimer = null;
-
-    const stopRepeat = () => {
-      if (delayTimer) clearTimeout(delayTimer);
-      if (repeatTimer) clearInterval(repeatTimer);
-      delayTimer = null;
-      repeatTimer = null;
-    };
-
-    const startRepeat = () => {
-      doPress();
-      if (intervalMs <= 0) return;
-      delayTimer = setTimeout(() => {
-        repeatTimer = setInterval(doPress, intervalMs);
-      }, delay);
-    };
-
-    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
-    btn.addEventListener('mouseup', stopRepeat);
-    btn.addEventListener('mouseleave', stopRepeat);
-    btn.addEventListener('click', (e) => e.preventDefault());
-    if (comp.touch !== false) {
-      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
-      btn.addEventListener('touchend', stopRepeat);
-      btn.addEventListener('touchcancel', stopRepeat);
-    }
-    return btn;
   },
 
   MoveRightButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-move-right-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderKeyButton(comp, ctx, {
+      type: 'MoveRightButton', className: 'ft-move-right-btn', image: 'Arrow Right', key: 'ArrowRight', autoRepeat: true
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Arrow Right');
-    if (imageName) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      const missing = document.createElement('span');
-      missing.className = 'ft-goto-btn-missing hidden';
-      missing.setAttribute('aria-hidden', 'true');
-      imgEl.addEventListener('error', () => {
-        imgEl.style.display = 'none';
-        missing.classList.remove('hidden');
-      });
-      btn.appendChild(missing);
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'MoveRightButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'MoveRightButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      return btn;
-    }
-
-    const doPress = () => {
-      if (typeof ctx.sendKeyPress === 'function') {
-        ctx.sendKeyPress({
-          key: 'ArrowRight',
-          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
-          linkedObject: (comp.linkedObject || '').trim(),
-          audio: comp.audio !== false
-        });
-      } else {
-        ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'ArrowRight');
-      }
-    };
-    const rate = Number(comp.autoRepeatRate) || 0;
-    const delay = comp.autoRepeatDelay ?? 400;
-    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
-    let repeatTimer = null;
-    let delayTimer = null;
-
-    const stopRepeat = () => {
-      if (delayTimer) clearTimeout(delayTimer);
-      if (repeatTimer) clearInterval(repeatTimer);
-      delayTimer = null;
-      repeatTimer = null;
-    };
-
-    const startRepeat = () => {
-      doPress();
-      if (intervalMs <= 0) return;
-      delayTimer = setTimeout(() => {
-        repeatTimer = setInterval(doPress, intervalMs);
-      }, delay);
-    };
-
-    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
-    btn.addEventListener('mouseup', stopRepeat);
-    btn.addEventListener('mouseleave', stopRepeat);
-    btn.addEventListener('click', (e) => e.preventDefault());
-    if (comp.touch !== false) {
-      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
-      btn.addEventListener('touchend', stopRepeat);
-      btn.addEventListener('touchcancel', stopRepeat);
-    }
-    return btn;
   },
 
   MoveUpButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-move-up-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderKeyButton(comp, ctx, {
+      type: 'MoveUpButton', className: 'ft-move-up-btn', image: 'Arrow Up', key: 'ArrowUp', autoRepeat: true
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Arrow Up');
-    if (imageName) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      const missing = document.createElement('span');
-      missing.className = 'ft-goto-btn-missing hidden';
-      missing.setAttribute('aria-hidden', 'true');
-      imgEl.addEventListener('error', () => {
-        imgEl.style.display = 'none';
-        missing.classList.remove('hidden');
-      });
-      btn.appendChild(missing);
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'MoveUpButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'MoveUpButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      return btn;
-    }
-
-    const doPress = () => {
-      if (typeof ctx.sendKeyPress === 'function') {
-        ctx.sendKeyPress({
-          key: 'ArrowUp',
-          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
-          linkedObject: (comp.linkedObject || '').trim(),
-          audio: comp.audio !== false
-        });
-      } else {
-        ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'ArrowUp');
-      }
-    };
-    const rate = Number(comp.autoRepeatRate) || 0;
-    const delay = comp.autoRepeatDelay ?? 400;
-    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
-    let repeatTimer = null;
-    let delayTimer = null;
-
-    const stopRepeat = () => {
-      if (delayTimer) clearTimeout(delayTimer);
-      if (repeatTimer) clearInterval(repeatTimer);
-      delayTimer = null;
-      repeatTimer = null;
-    };
-
-    const startRepeat = () => {
-      doPress();
-      if (intervalMs <= 0) return;
-      delayTimer = setTimeout(() => {
-        repeatTimer = setInterval(doPress, intervalMs);
-      }, delay);
-    };
-
-    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
-    btn.addEventListener('mouseup', stopRepeat);
-    btn.addEventListener('mouseleave', stopRepeat);
-    btn.addEventListener('click', (e) => e.preventDefault());
-    if (comp.touch !== false) {
-      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
-      btn.addEventListener('touchend', stopRepeat);
-      btn.addEventListener('touchcancel', stopRepeat);
-    }
-    return btn;
   },
 
   MoveDownButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-move-down-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderKeyButton(comp, ctx, {
+      type: 'MoveDownButton', className: 'ft-move-down-btn', image: 'Arrow Down', key: 'ArrowDown', autoRepeat: true
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Arrow Down');
-    if (imageName) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      const missing = document.createElement('span');
-      missing.className = 'ft-goto-btn-missing hidden';
-      missing.setAttribute('aria-hidden', 'true');
-      imgEl.addEventListener('error', () => {
-        imgEl.style.display = 'none';
-        missing.classList.remove('hidden');
-      });
-      btn.appendChild(missing);
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'MoveDownButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'MoveDownButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      return btn;
-    }
-
-    const doPress = () => {
-      if (typeof ctx.sendKeyPress === 'function') {
-        ctx.sendKeyPress({
-          key: 'ArrowDown',
-          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
-          linkedObject: (comp.linkedObject || '').trim(),
-          audio: comp.audio !== false
-        });
-      } else {
-        ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'ArrowDown');
-      }
-    };
-    const rate = Number(comp.autoRepeatRate) || 0;
-    const delay = comp.autoRepeatDelay ?? 400;
-    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
-    let repeatTimer = null;
-    let delayTimer = null;
-
-    const stopRepeat = () => {
-      if (delayTimer) clearTimeout(delayTimer);
-      if (repeatTimer) clearInterval(repeatTimer);
-      delayTimer = null;
-      repeatTimer = null;
-    };
-
-    const startRepeat = () => {
-      doPress();
-      if (intervalMs <= 0) return;
-      delayTimer = setTimeout(() => {
-        repeatTimer = setInterval(doPress, intervalMs);
-      }, delay);
-    };
-
-    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
-    btn.addEventListener('mouseup', stopRepeat);
-    btn.addEventListener('mouseleave', stopRepeat);
-    btn.addEventListener('click', (e) => e.preventDefault());
-    if (comp.touch !== false) {
-      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
-      btn.addEventListener('touchend', stopRepeat);
-      btn.addEventListener('touchcancel', stopRepeat);
-    }
-    return btn;
   },
 
   PageDownButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-page-down-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderKeyButton(comp, ctx, {
+      type: 'PageDownButton', className: 'ft-page-down-btn', image: 'Page Down', key: 'PageDown', autoRepeat: true
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Page Down');
-    if (imageName) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      const missing = document.createElement('span');
-      missing.className = 'ft-goto-btn-missing hidden';
-      missing.setAttribute('aria-hidden', 'true');
-      imgEl.addEventListener('error', () => {
-        imgEl.style.display = 'none';
-        missing.classList.remove('hidden');
-      });
-      btn.appendChild(missing);
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'PageDownButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'PageDownButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      return btn;
-    }
-
-    const doPress = () => {
-      if (typeof ctx.sendKeyPress === 'function') {
-        ctx.sendKeyPress({
-          key: 'PageDown',
-          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
-          linkedObject: (comp.linkedObject || '').trim(),
-          audio: comp.audio !== false
-        });
-      } else {
-        ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'PageDown');
-      }
-    };
-    const rate = Number(comp.autoRepeatRate) || 0;
-    const delay = comp.autoRepeatDelay ?? 400;
-    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
-    let repeatTimer = null;
-    let delayTimer = null;
-
-    const stopRepeat = () => {
-      if (delayTimer) clearTimeout(delayTimer);
-      if (repeatTimer) clearInterval(repeatTimer);
-      delayTimer = null;
-      repeatTimer = null;
-    };
-
-    const startRepeat = () => {
-      doPress();
-      if (intervalMs <= 0) return;
-      delayTimer = setTimeout(() => {
-        repeatTimer = setInterval(doPress, intervalMs);
-      }, delay);
-    };
-
-    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
-    btn.addEventListener('mouseup', stopRepeat);
-    btn.addEventListener('mouseleave', stopRepeat);
-    btn.addEventListener('click', (e) => e.preventDefault());
-    if (comp.touch !== false) {
-      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
-      btn.addEventListener('touchend', stopRepeat);
-      btn.addEventListener('touchcancel', stopRepeat);
-    }
-    return btn;
   },
 
   PageUpButton(comp, ctx) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ft-page-up-btn ft-goto-btn ft-graphic';
-    if (comp.name) btn.dataset.name = comp.name;
-    if (comp.visible === false) {
-      btn.style.display = 'none';
-      return btn;
-    }
-    ComponentRegistry.applyGraphicsObject(btn, comp);
-    const studioEdit = Boolean(ctx.studioEdit);
-    ComponentRegistry.applyButtonAppearance(btn, {
-      ...comp,
-      borderStyle: comp.borderStyle || 'line',
-      borderWidth: comp.borderWidth ?? 1,
-      borderUsesBackColor: Boolean(comp.borderUsesBackColor),
-      backStyle: comp.backStyle || 'solid',
-      backColor: comp.backColor || '#001C38',
-      useBackColor: comp.useBackColor !== false,
-      shape: comp.shape || 'rectangle',
-      studioEdit,
-      useHighlightColor: false
+    return ComponentRegistry.renderKeyButton(comp, ctx, {
+      type: 'PageUpButton', className: 'ft-page-up-btn', image: 'Page Up', key: 'PageUp', autoRepeat: true
     });
-    ComponentRegistry.applyShapePattern(btn, {
-      ...comp,
-      usePatternColor: comp.usePatternColor !== false,
-      patternColor: comp.patternColor || '#ffffff'
-    });
-    if (comp.useHighlightColor !== false && comp.highlightColor) {
-      btn.classList.add('ft-highlight-on-focus');
-      btn.style.setProperty('--ft-highlight-color', comp.highlightColor);
-    } else {
-      btn.classList.remove('ft-highlight-on-focus');
-      btn.style.removeProperty('--ft-highlight-color');
-    }
-    let imgEl = null;
-    const imageName = ComponentRegistry.resolveGraphicImageFile(comp.image || 'Page Up');
-    if (imageName) {
-      imgEl = document.createElement('img');
-      imgEl.className = 'ft-goto-btn-icon';
-      imgEl.src = ComponentRegistry.imageUrl(imageName, ctx);
-      imgEl.alt = '';
-      imgEl.draggable = false;
-      imgEl.style.pointerEvents = 'none';
-      if (comp.imageScaled) imgEl.classList.add('ft-goto-btn-icon-scaled');
-      if (comp.useImageBackColor && comp.imageBackStyle === 'solid') {
-        imgEl.style.backgroundColor = comp.imageBackColor || '#001C38';
-      }
-      imgEl.classList.toggle('ft-blink', Boolean(comp.imageBlink));
-      const missing = document.createElement('span');
-      missing.className = 'ft-goto-btn-missing hidden';
-      missing.setAttribute('aria-hidden', 'true');
-      imgEl.addEventListener('error', () => {
-        imgEl.style.display = 'none';
-        missing.classList.remove('hidden');
-      });
-      btn.appendChild(missing);
-    }
-
-    const cap = document.createElement('span');
-    cap.className = 'ft-goto-btn-caption';
-    const captionText = comp.label || comp.caption || '';
-    cap.textContent = captionText;
-    cap.style.display = captionText ? '' : 'none';
-    const useCaptionColor = comp.useCaptionColor !== undefined ? comp.useCaptionColor : (comp.useForeColor !== false);
-    ComponentRegistry.applyCaptionStyle(cap, {
-      fontFamily: comp.fontFamily || 'Arial Unicode MS',
-      fontSize: comp.fontSize ?? 10,
-      bold: comp.bold ?? false,
-      italic: comp.italic,
-      underline: comp.underline,
-      foreColor: comp.captionColor || comp.foreColor || '#000000',
-      useForeColor: useCaptionColor,
-      wordWrap: comp.wordWrap !== false,
-      alignment: comp.alignment || 'middleCenter'
-    });
-    if (comp.useCaptionBackColor && comp.captionBackStyle === 'solid') {
-      cap.style.backgroundColor = comp.captionBackColor || '#001C38';
-    }
-    cap.classList.toggle('ft-blink', Boolean(comp.captionBlink));
-    cap.style.width = '100%';
-    cap.style.lineHeight = '1.15';
-    cap.style.pointerEvents = 'none';
-
-    ComponentRegistry.applyGotoButtonLayout(btn, imgEl, cap, comp);
-    if (imgEl) btn.appendChild(imgEl);
-    btn.appendChild(cap);
-    btn.classList.toggle('ft-blink', Boolean(comp.blink));
-
-    if (studioEdit) {
-      btn.addEventListener('dblclick', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-dblclick',
-          name: comp.name || '',
-          componentType: 'PageUpButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({
-          type: 'planthmi-embed-graphic-click',
-          name: comp.name || '',
-          componentType: 'PageUpButton',
-          source: comp._source || ''
-        }, '*');
-      });
-      return btn;
-    }
-
-    const doPress = () => {
-      if (typeof ctx.sendKeyPress === 'function') {
-        ctx.sendKeyPress({
-          key: 'PageUp',
-          sendPressTo: comp.sendPressTo === 'linkedObject' ? 'linkedObject' : 'objectWithFocus',
-          linkedObject: (comp.linkedObject || '').trim(),
-          audio: comp.audio !== false
-        });
-      } else {
-        ComponentRegistry.sendKeyToInputTarget(ctx, comp, 'PageUp');
-      }
-    };
-    const rate = Number(comp.autoRepeatRate) || 0;
-    const delay = comp.autoRepeatDelay ?? 400;
-    const intervalMs = rate <= 0 ? 0 : (rate <= 20 ? Math.max(50, Math.round(1000 / rate)) : rate);
-    let repeatTimer = null;
-    let delayTimer = null;
-
-    const stopRepeat = () => {
-      if (delayTimer) clearTimeout(delayTimer);
-      if (repeatTimer) clearInterval(repeatTimer);
-      delayTimer = null;
-      repeatTimer = null;
-    };
-
-    const startRepeat = () => {
-      doPress();
-      if (intervalMs <= 0) return;
-      delayTimer = setTimeout(() => {
-        repeatTimer = setInterval(doPress, intervalMs);
-      }, delay);
-    };
-
-    btn.addEventListener('mousedown', (e) => { e.preventDefault(); startRepeat(); });
-    btn.addEventListener('mouseup', stopRepeat);
-    btn.addEventListener('mouseleave', stopRepeat);
-    btn.addEventListener('click', (e) => e.preventDefault());
-    if (comp.touch !== false) {
-      btn.addEventListener('touchstart', (e) => { e.preventDefault(); startRepeat(); }, { passive: false });
-      btn.addEventListener('touchend', stopRepeat);
-      btn.addEventListener('touchcancel', stopRepeat);
-    }
-    return btn;
   },
 
   Trend(comp, ctx) {
@@ -10217,223 +7705,100 @@ const ComponentRegistry = {
   },
 
   ensureRuntimeAddUserDialog() {
-    let dlg = document.getElementById('runtimeAddUserDialog');
-    if (dlg) return dlg;
-    dlg = document.createElement('dialog');
-    dlg.id = 'runtimeAddUserDialog';
-    dlg.className = 'dialog runtime-adduser-dialog';
-    dlg.innerHTML = `
-      <form method="dialog" onsubmit="return false">
-        <h3>Add User/Group</h3>
-        <p class="dialog-hint">Create a new user account and assign it to a role/group.</p>
-        <label class="dialog-field">
-          <span>Username</span>
-          <input type="text" id="runtimeAddUserName" autocomplete="off" />
+    const id = 'runtimeAddUser';
+    return ComponentRegistry.ensureUsernamePromptDialog({
+      idBase: id,
+      title: 'Add User/Group',
+      hint: 'Create a new user account and assign it to a role/group.',
+      submitLabel: 'Add User',
+      fields: ComponentRegistry.userDialogPasswordFields(id, 'Password', 'Confirm password')
+        + ComponentRegistry.userDialogGroupsField(id)
+    });
+  },
+
+  ensureModifyGroupDialog() {
+    const id = 'runtimeModifyGroup';
+    return ComponentRegistry.ensureUsernamePromptDialog({
+      idBase: id,
+      title: 'Modify Group Membership',
+      hint: 'Enter the username and check the group(s) it should belong to — this REPLACES the user\'s full group membership. The username is checked before anything changes.',
+      submitLabel: 'Modify',
+      fields: ComponentRegistry.userDialogGroupsField(id)
+    });
+  },
+
+  // Runtime username prompts used by renderUsernamePromptButton, keyed by ctx action.
+  USERNAME_PROMPTS: {
+    unlockUser: {
+      idBase: 'runtimeUnlockUser',
+      title: 'Unlock User',
+      hint: 'Enter the username to unlock. The username is checked before anything changes.',
+      submitLabel: 'Unlock'
+    },
+    enableUser: {
+      idBase: 'runtimeEnableUser',
+      title: 'Enable User',
+      hint: 'Enter the username to enable. The username is checked before anything changes.',
+      submitLabel: 'Enable'
+    },
+    disableUser: {
+      idBase: 'runtimeDisableUser',
+      title: 'Disable User',
+      hint: 'Enter the username to disable. The username is checked before anything changes.',
+      submitLabel: 'Disable'
+    },
+    deleteUserGroup: {
+      idBase: 'runtimeDeleteUser',
+      title: 'Delete User/Group',
+      hint: 'Enter the username to remove. The username is checked before anything is deleted.',
+      submitLabel: 'Delete User'
+    }
+  },
+
+  // Extra fields for the runtime user dialogs, placed between the username and the status line.
+  userDialogPasswordFields(idBase, label, confirmLabel) {
+    return [['Password', label], ['Confirm', confirmLabel]].map(([suffix, text]) => `        <label class="dialog-field">
+          <span>${text}</span>
+          <input type="password" id="${idBase}${suffix}" autocomplete="new-password" />
         </label>
-        <label class="dialog-field">
-          <span>Password</span>
-          <input type="password" id="runtimeAddUserPassword" autocomplete="new-password" />
-        </label>
-        <label class="dialog-field">
-          <span>Confirm password</span>
-          <input type="password" id="runtimeAddUserConfirm" autocomplete="new-password" />
-        </label>
-        <div class="dialog-field">
+`).join('');
+  },
+
+  userDialogGroupsField(idBase) {
+    return `        <div class="dialog-field">
           <span>Groups</span>
-          <div id="runtimeAddUserGroups" class="dialog-group-checklist">Loading groups…</div>
+          <div id="${idBase}Groups" class="dialog-group-checklist">Loading groups…</div>
         </div>
-        <div id="runtimeAddUserStatus" class="runtime-comm-status"></div>
-        <div class="dialog-actions">
-          <button type="button" id="runtimeAddUserCancel">Cancel</button>
-          <button type="button" id="runtimeAddUserSubmit" class="primary">Add User</button>
-        </div>
-      </form>
-    `;
-    document.body.appendChild(dlg);
-    dlg.querySelector('#runtimeAddUserCancel').addEventListener('click', () => {
-      try { dlg.close(); } catch (_) { /* ignore */ }
-    });
-    dlg.addEventListener('cancel', () => {
-      const status = dlg.querySelector('#runtimeAddUserStatus');
-      if (status) {
-        status.textContent = '';
-        status.className = 'runtime-comm-status';
-      }
-    });
-    return dlg;
+`;
   },
 
-  ensureRuntimeDeleteUserDialog() {
-    let dlg = document.getElementById('runtimeDeleteUserDialog');
+  ensureUsernamePromptDialog({ idBase, title, hint, submitLabel, fields = '' }) {
+    let dlg = document.getElementById(`${idBase}Dialog`);
     if (dlg) return dlg;
     dlg = document.createElement('dialog');
-    dlg.id = 'runtimeDeleteUserDialog';
+    dlg.id = `${idBase}Dialog`;
     dlg.className = 'dialog runtime-adduser-dialog';
     dlg.innerHTML = `
       <form method="dialog" onsubmit="return false">
-        <h3>Delete User/Group</h3>
-        <p class="dialog-hint">Enter the username to remove. The username is checked before anything is deleted.</p>
+        <h3>${title}</h3>
+        <p class="dialog-hint">${hint}</p>
         <label class="dialog-field">
           <span>Username</span>
-          <input type="text" id="runtimeDeleteUserName" autocomplete="off" />
+          <input type="text" id="${idBase}Name" autocomplete="off" />
         </label>
-        <div id="runtimeDeleteUserStatus" class="runtime-comm-status"></div>
+${fields}        <div id="${idBase}Status" class="runtime-comm-status"></div>
         <div class="dialog-actions">
-          <button type="button" id="runtimeDeleteUserCancel">Cancel</button>
-          <button type="button" id="runtimeDeleteUserSubmit" class="primary">Delete User</button>
+          <button type="button" id="${idBase}Cancel">Cancel</button>
+          <button type="button" id="${idBase}Submit" class="primary">${submitLabel}</button>
         </div>
       </form>
     `;
     document.body.appendChild(dlg);
-    dlg.querySelector('#runtimeDeleteUserCancel').addEventListener('click', () => {
+    dlg.querySelector(`#${idBase}Cancel`).addEventListener('click', () => {
       try { dlg.close(); } catch (_) { /* ignore */ }
     });
     dlg.addEventListener('cancel', () => {
-      const status = dlg.querySelector('#runtimeDeleteUserStatus');
-      if (status) {
-        status.textContent = '';
-        status.className = 'runtime-comm-status';
-      }
-    });
-    return dlg;
-  },
-
-ensureModifyGroupDialog() {
-    let dlg = document.getElementById('runtimeModifyGroupDialog');
-    if (dlg) return dlg;
-    dlg = document.createElement('dialog');
-    dlg.id = 'runtimeModifyGroupDialog';
-    dlg.className = 'dialog runtime-adduser-dialog';
-    dlg.innerHTML = `
-      <form method="dialog" onsubmit="return false">
-        <h3>Modify Group Membership</h3>
-        <p class="dialog-hint">Enter the username and check the group(s) it should belong to — this REPLACES the user's full group membership. The username is checked before anything changes.</p>
-        <label class="dialog-field">
-          <span>Username</span>
-          <input type="text" id="runtimeModifyGroupName" autocomplete="off" />
-        </label>
-        <div class="dialog-field">
-          <span>Groups</span>
-          <div id="runtimeModifyGroupGroups" class="dialog-group-checklist">Loading groups…</div>
-        </div>
-        <div id="runtimeModifyGroupStatus" class="runtime-comm-status"></div>
-        <div class="dialog-actions">
-          <button type="button" id="runtimeModifyGroupCancel">Cancel</button>
-          <button type="button" id="runtimeModifyGroupSubmit" class="primary">Modify</button>
-        </div>
-      </form>
-    `;
-    document.body.appendChild(dlg);
-    dlg.querySelector('#runtimeModifyGroupCancel').addEventListener('click', () => {
-      try { dlg.close(); } catch (_) { /* ignore */ }
-    });
-    dlg.addEventListener('cancel', () => {
-      const status = dlg.querySelector('#runtimeModifyGroupStatus');
-      if (status) {
-        status.textContent = '';
-        status.className = 'runtime-comm-status';
-      }
-    });
-    return dlg;
-  },
-
-  ensureUnlockUserDialog() {
-    let dlg = document.getElementById('runtimeUnlockUserDialog');
-    if (dlg) return dlg;
-    dlg = document.createElement('dialog');
-    dlg.id = 'runtimeUnlockUserDialog';
-    dlg.className = 'dialog runtime-adduser-dialog';
-    dlg.innerHTML = `
-      <form method="dialog" onsubmit="return false">
-        <h3>Unlock User</h3>
-        <p class="dialog-hint">Enter the username to unlock. The username is checked before anything changes.</p>
-        <label class="dialog-field">
-          <span>Username</span>
-          <input type="text" id="runtimeUnlockUserName" autocomplete="off" />
-        </label>
-        <div id="runtimeUnlockUserStatus" class="runtime-comm-status"></div>
-        <div class="dialog-actions">
-          <button type="button" id="runtimeUnlockUserCancel">Cancel</button>
-          <button type="button" id="runtimeUnlockUserSubmit" class="primary">Unlock</button>
-        </div>
-      </form>
-    `;
-    document.body.appendChild(dlg);
-    dlg.querySelector('#runtimeUnlockUserCancel').addEventListener('click', () => {
-      try { dlg.close(); } catch (_) { /* ignore */ }
-    });
-    dlg.addEventListener('cancel', () => {
-      const status = dlg.querySelector('#runtimeUnlockUserStatus');
-      if (status) {
-        status.textContent = '';
-        status.className = 'runtime-comm-status';
-      }
-    });
-    return dlg;
-  },
-
-  ensureEnableUserDialog() {
-    let dlg = document.getElementById('runtimeEnableUserDialog');
-    if (dlg) return dlg;
-    dlg = document.createElement('dialog');
-    dlg.id = 'runtimeEnableUserDialog';
-    dlg.className = 'dialog runtime-adduser-dialog';
-    dlg.innerHTML = `
-      <form method="dialog" onsubmit="return false">
-        <h3>Enable User</h3>
-        <p class="dialog-hint">Enter the username to enable. The username is checked before anything changes.</p>
-        <label class="dialog-field">
-          <span>Username</span>
-          <input type="text" id="runtimeEnableUserName" autocomplete="off" />
-        </label>
-        <div id="runtimeEnableUserStatus" class="runtime-comm-status"></div>
-        <div class="dialog-actions">
-          <button type="button" id="runtimeEnableUserCancel">Cancel</button>
-          <button type="button" id="runtimeEnableUserSubmit" class="primary">Enable</button>
-        </div>
-      </form>
-    `;
-    document.body.appendChild(dlg);
-    dlg.querySelector('#runtimeEnableUserCancel').addEventListener('click', () => {
-      try { dlg.close(); } catch (_) { /* ignore */ }
-    });
-    dlg.addEventListener('cancel', () => {
-      const status = dlg.querySelector('#runtimeEnableUserStatus');
-      if (status) {
-        status.textContent = '';
-        status.className = 'runtime-comm-status';
-      }
-    });
-    return dlg;
-  },
-
-  ensureDisableUserDialog() {
-    let dlg = document.getElementById('runtimeDisableUserDialog');
-    if (dlg) return dlg;
-    dlg = document.createElement('dialog');
-    dlg.id = 'runtimeDisableUserDialog';
-    dlg.className = 'dialog runtime-adduser-dialog';
-    dlg.innerHTML = `
-      <form method="dialog" onsubmit="return false">
-        <h3>Disable User</h3>
-        <p class="dialog-hint">Enter the username to disable. The username is checked before anything changes.</p>
-        <label class="dialog-field">
-          <span>Username</span>
-          <input type="text" id="runtimeDisableUserName" autocomplete="off" />
-        </label>
-        <div id="runtimeDisableUserStatus" class="runtime-comm-status"></div>
-        <div class="dialog-actions">
-          <button type="button" id="runtimeDisableUserCancel">Cancel</button>
-          <button type="button" id="runtimeDisableUserSubmit" class="primary">Disable</button>
-        </div>
-      </form>
-    `;
-    document.body.appendChild(dlg);
-    dlg.querySelector('#runtimeDisableUserCancel').addEventListener('click', () => {
-      try { dlg.close(); } catch (_) { /* ignore */ }
-    });
-    dlg.addEventListener('cancel', () => {
-      const status = dlg.querySelector('#runtimeDisableUserStatus');
+      const status = dlg.querySelector(`#${idBase}Status`);
       if (status) {
         status.textContent = '';
         status.className = 'runtime-comm-status';
@@ -10443,89 +7808,29 @@ ensureModifyGroupDialog() {
   },
 
   ensureChangePasswordDialog() {
-    let dlg = document.getElementById('runtimeChangePasswordDialog');
-    if (dlg) return dlg;
-    dlg = document.createElement('dialog');
-    dlg.id = 'runtimeChangePasswordDialog';
-    dlg.className = 'dialog runtime-adduser-dialog';
-    dlg.innerHTML = `
-      <form method="dialog" onsubmit="return false">
-        <h3>Change Password</h3>
-        <p class="dialog-hint">Enter the username and its new password. The username is checked before anything changes.</p>
-        <label class="dialog-field">
-          <span>Username</span>
-          <input type="text" id="runtimeChangePasswordName" autocomplete="off" />
-        </label>
-        <label class="dialog-field">
-          <span>New password</span>
-          <input type="password" id="runtimeChangePasswordPassword" autocomplete="new-password" />
-        </label>
-        <label class="dialog-field">
-          <span>Confirm new password</span>
-          <input type="password" id="runtimeChangePasswordConfirm" autocomplete="new-password" />
-        </label>
-        <div id="runtimeChangePasswordStatus" class="runtime-comm-status"></div>
-        <div class="dialog-actions">
-          <button type="button" id="runtimeChangePasswordCancel">Cancel</button>
-          <button type="button" id="runtimeChangePasswordSubmit" class="primary">Save</button>
-        </div>
-      </form>
-    `;
-    document.body.appendChild(dlg);
-    dlg.querySelector('#runtimeChangePasswordCancel').addEventListener('click', () => {
-      try { dlg.close(); } catch (_) { /* ignore */ }
+    const id = 'runtimeChangePassword';
+    return ComponentRegistry.ensureUsernamePromptDialog({
+      idBase: id,
+      title: 'Change Password',
+      hint: 'Enter the username and its new password. The username is checked before anything changes.',
+      submitLabel: 'Save',
+      fields: ComponentRegistry.userDialogPasswordFields(id, 'New password', 'Confirm new password')
     });
-    dlg.addEventListener('cancel', () => {
-      const status = dlg.querySelector('#runtimeChangePasswordStatus');
-      if (status) {
-        status.textContent = '';
-        status.className = 'runtime-comm-status';
-      }
-    });
-    return dlg;
   },
 
   ensureChangePropertiesDialog() {
-    let dlg = document.getElementById('runtimeChangePropertiesDialog');
-    if (dlg) return dlg;
-    dlg = document.createElement('dialog');
-    dlg.id = 'runtimeChangePropertiesDialog';
-    dlg.className = 'dialog runtime-adduser-dialog';
-    dlg.innerHTML = `
-      <form method="dialog" onsubmit="return false">
-        <h3>Change User Properties</h3>
-        <p class="dialog-hint">Enter the username, then update its group membership and enabled state. The username is checked before anything changes.</p>
-        <label class="dialog-field">
-          <span>Username</span>
-          <input type="text" id="runtimeChangePropertiesName" autocomplete="off" />
-        </label>
-        <div class="dialog-field">
-          <span>Groups</span>
-          <div id="runtimeChangePropertiesGroups" class="dialog-group-checklist">Loading groups…</div>
-        </div>
-        <label class="dialog-field dialog-check">
-          <input type="checkbox" id="runtimeChangePropertiesEnabled" checked />
+    const id = 'runtimeChangeProperties';
+    return ComponentRegistry.ensureUsernamePromptDialog({
+      idBase: id,
+      title: 'Change User Properties',
+      hint: 'Enter the username, then update its group membership and enabled state. The username is checked before anything changes.',
+      submitLabel: 'Save',
+      fields: `${ComponentRegistry.userDialogGroupsField(id)}        <label class="dialog-field dialog-check">
+          <input type="checkbox" id="${id}Enabled" checked />
           <span>Enabled</span>
         </label>
-        <div id="runtimeChangePropertiesStatus" class="runtime-comm-status"></div>
-        <div class="dialog-actions">
-          <button type="button" id="runtimeChangePropertiesCancel">Cancel</button>
-          <button type="button" id="runtimeChangePropertiesSubmit" class="primary">Save</button>
-        </div>
-      </form>
-    `;
-    document.body.appendChild(dlg);
-    dlg.querySelector('#runtimeChangePropertiesCancel').addEventListener('click', () => {
-      try { dlg.close(); } catch (_) { /* ignore */ }
+`
     });
-    dlg.addEventListener('cancel', () => {
-      const status = dlg.querySelector('#runtimeChangePropertiesStatus');
-      if (status) {
-        status.textContent = '';
-        status.className = 'runtime-comm-status';
-      }
-    });
-    return dlg;
   },
 
   formatValue(val, comp) {

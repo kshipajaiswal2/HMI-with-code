@@ -2055,23 +2055,6 @@
     return bindings;
   }
 
-  function buildDoParameterBindings(page = 1) {
-    const pageNum = Math.max(1, Number(page) || 1);
-    const pageSuffix = String(pageNum).padStart(2, '0');
-    const bindings = new Map();
-    bindings.set(100, `PLC_DO_Discr\\List_${pageSuffix}`);
-
-    const base = (pageNum - 1) * 8;
-    for (let i = 0; i < 8; i += 1) {
-      const dataIdx = String(base + i).padStart(2, '0');
-      bindings.set(101 + i, `PLC_DO_Discr\\Data_${dataIdx}`);
-      bindings.set(201 + i, `PLC_DO_No\\Data_${dataIdx}`);
-      bindings.set(301 + i, `PLC_DO_Tags\\Data_${dataIdx}`);
-    }
-
-    return bindings;
-  }
-
   function buildDefaultParameterFile(options = {}) {
     const page = Math.max(1, Number(options.page) || 1);
     const pageSuffix = String(page).padStart(2, '0');

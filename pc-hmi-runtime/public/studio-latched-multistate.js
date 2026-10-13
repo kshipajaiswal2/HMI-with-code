@@ -30,13 +30,6 @@
     return (states || []).filter((s) => s.id !== 'Error').length;
   }
 
-  function wirePushButtonTools(dialogId, syncFn) {
-    const dialog = document.getElementById(dialogId);
-    if (window.StudioTagTools) StudioTagTools.wirePickButtons();
-    if (window.FtColorPicker) window.FtColorPicker.initAll(dialog);
-    syncFn?.();
-  }
-
   function switchTab(dialogId, tabAttr, panelAttr, tabId) {
     document.querySelectorAll(`#${dialogId} .dialog-tab`).forEach((el) => {
       el.classList.toggle('active', el.dataset[tabAttr] === tabId);

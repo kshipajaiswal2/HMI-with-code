@@ -540,26 +540,6 @@ function writeDisplayFolderConfig(config) {
   return nextConfig;
 }
 
-function resolveFolderedImportPath(name, folderMap, assignments = {}) {
-  const assigned = sanitizeFolderName(assignments[String(name || '').toLowerCase()] || '');
-  if (assigned) {
-    return `${assigned}/${name}`;
-  }
-
-  const number = parseDisplayNumber(name);
-  if (!Number.isFinite(number)) {
-    return name;
-  }
-
-  const bucket = Math.floor(number / 100) * 100;
-  const folderName = folderMap.get(bucket);
-  if (!folderName) {
-    return name;
-  }
-
-  return `${folderName}/${name}`;
-}
-
 function resolveDisplayGroupName(name, folderMap, assignments = {}) {
   const assigned = sanitizeFolderName(assignments[String(name || '').toLowerCase()] || '');
   if (assigned) {
@@ -988,58 +968,6 @@ function getLatestPackageFolder() {
     folderName,
     folderPath: path.join(PACKAGE_DIR, folderName)
   };
-}
-
-function toArchiveInfo(filePath) {
-  const ext = path.extname(String(filePath || '')).toLowerCase();
-  if (ext === '.apa') {
-    return {
-      archivePath: filePath,
-      archiveType: 'apa',
-      restoreMenuLabel: 'Restore Application'
-    };
-  }
-
-  if (ext === '.mer') {
-    return {
-      archivePath: filePath,
-      archiveType: 'mer',
-      restoreMenuLabel: 'Restore Runtime Application'
-    };
-  }
-
-  return null;
-}
-
-function findProjectArchiveInfo() {
-  const configured = String(FACTORYTALK_PROJECT_ARCHIVE_PATH || '').trim();
-  if (configured && fs.existsSync(configured)) {
-    const configuredInfo = toArchiveInfo(configured);
-    if (configuredInfo) {
-      return configuredInfo;
-    }
-  }
-
-  if (!fs.existsSync(FACTORYTALK_HMI_DIR)) {
-    return null;
-  }
-
-  const archiveFiles = fs.readdirSync(FACTORYTALK_HMI_DIR)
-    .filter((name) => /\.(apa|mer)$/i.test(name))
-    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-
-  if (!archiveFiles.length) {
-    return null;
-  }
-
-  const preferredApa = archiveFiles.find((name) => /\.apa$/i.test(name));
-  const fallbackMer = archiveFiles.find((name) => /\.mer$/i.test(name));
-  const chosen = preferredApa || fallbackMer;
-  if (!chosen) {
-    return null;
-  }
-
-  return toArchiveInfo(path.join(FACTORYTALK_HMI_DIR, chosen));
 }
 
 function buildDisplayBatchFiles(targetDir, copied, notesIntroLines = []) {

@@ -1764,14 +1764,6 @@ function markCanvasEditOverlayStale() {
   state.canvasEditOverlayStale = true;
 }
 
-function isUiWorkSuspended() {
-  return Boolean(
-    state.propsFormFill ||
-    state.canvasEditDrag ||
-    document.querySelector('dialog.dialog[open]')
-  );
-}
-
 function isCanvasOverlayRefreshBlocked() {
   if (state.propsFormFill || state.canvasEditDrag) return true;
   const dlg = document.querySelector('dialog.dialog[open]');
@@ -4069,24 +4061,12 @@ function defaultGotoButtonComponent(overrides = {}) {
   return window.StudioGotoButton?.defaultGotoButtonComponent?.(overrides) || { type: 'GotoButton', ...overrides };
 }
 
-function wireGotoButtonDialogTools() {
-  window.StudioGotoButton?.wireGotoButtonTools();
-}
-
-function syncGotoButtonLabelFields() {
-  /* handled in studio-goto-button.js */
-}
-
 async function showGotoButtonDialog(overrides = {}) {
   return window.StudioGotoButton?.showGotoButtonDialog(overrides);
 }
 
 function switchGotoButtonTab(tabId) {
   window.StudioGotoButton?.switchGotoButtonTab(tabId);
-}
-
-function syncGotoButtonGeneralFields() {
-  /* handled in studio-goto-button.js */
 }
 
 let displayPickerResolve = null;
@@ -5649,14 +5629,6 @@ function initObjectPlacement() {
 
 function isCanvasGraphicComponent(comp) {
   return CANVAS_GRAPHIC_TYPES.has(comp?.type) && comp.left != null && comp.top != null;
-}
-
-function listCanvasGraphicIndices(components) {
-  const indices = [];
-  (components || []).forEach((comp, index) => {
-    if (isCanvasGraphicComponent(comp)) indices.push(index);
-  });
-  return indices;
 }
 
 function previewSetSelection(name) {
@@ -8652,19 +8624,6 @@ function handleExplorerAction(node) {
   }
 }
 
-function openRecipePanel(mode) {
-  hidePreviewStage();
-  panelView.classList.remove('hidden');
-  const title = 'RecipePlus Editor';
-  panelView.innerHTML = `
-    <div class="panel-content">
-      <h2>${escapeHtml(title)}</h2>
-      <p>Configure recipes for project <strong>${escapeHtml(state.activeProject)}</strong>.</p>
-      <p class="hint">Recipe screens are under <strong>Graphics → Displays → 500 Recipe</strong>.</p>
-    </div>`;
-  setStatus(title);
-}
-
 function selectNode(row, node) {
   const tree = row.closest('.explorer-tree') || explorerTree;
   tree.querySelectorAll('.tree-row').forEach((r) => r.classList.remove('selected'));
@@ -9973,42 +9932,6 @@ function normalizeTagEntry(raw) {
     if (Number.isFinite(len) && len > 0) entry.stringLength = len;
   }
   return entry;
-}
-
-function showTagEditDialog(existingName, defaultFolder = '') {
-  if (!state.activeProject) {
-    setStatus('Open an application first');
-    return;
-  }
-  refreshProjectConfig().then(() => {
-    const tags = state.projectConfig?.tags || [];
-    const existing = existingName ? tags.find((t) => t.name === existingName) : null;
-    tagEditOriginalName = existing?.name || null;
-    document.getElementById('tagEditTitle').textContent = existing ? 'Edit HMI Tag' : 'New HMI Tag';
-    const nameEl = document.getElementById('tagEditName');
-    const folder = existing?.folder || defaultFolder || 'Temp_Tags';
-    nameEl.value = existing ? formatFtTagName(existing) : (folder ? `${folder}\\` : '');
-    nameEl.readOnly = Boolean(existing && isIoSystemFolder(existing.folder));
-    document.getElementById('tagEditType').value = coerceInternalEditorType(existing?.type || 'bool');
-    document.getElementById('tagEditDescription').value = existing?.description || '';
-    document.getElementById('tagEditFolder').value = folder;
-    const dataSource = existing?.dataSource || 'memory';
-    document.querySelectorAll('input[name="tagEditSourceKind"]').forEach((el) => {
-      el.checked = el.value === dataSource;
-    });
-    const address = dataSource === 'device'
-      ? (existing?.plcAddress || existing?.connection || '')
-      : (existing?.connection || '');
-    document.getElementById('tagEditConnection').value = address;
-    document.getElementById('tagEditDataSource').value = dataSource;
-    document.getElementById('tagEditPlcAddress').value = existing?.plcAddress || '';
-    const computed = Boolean(existing?.computed);
-    document.getElementById('tagEditComputed').checked = computed;
-    document.getElementById('tagEditLogic').value = existing?.logic || '';
-    document.getElementById('tagEditLogicWrap').classList.toggle('hidden', !computed);
-    document.getElementById('tagEditDialog').showModal();
-    nameEl.focus();
-  });
 }
 
 async function saveTagEdit(e) {

@@ -107,6 +107,7 @@ Default users: `operator/operator` · `engineer/engineer` · `admin/admin`
 - **Studio** (and its project, file, deploy and communication APIs) only answers on the HMI PC itself. A browser on another machine is sent to the Runtime instead. To allow remote Studio on a trusted network, set `PLANTHMI_ALLOW_REMOTE_STUDIO=1`.
 - **Runtime** can be opened from other machines, but tag writes, macros, parameter files and alarm actions from another machine need a login first.
 - Each browser tab has its own login, so logging in on one panel or tab never logs in any other.
+- The server only answers to its own names: `localhost`, this PC's IP addresses and its computer name. If panels reach it through another DNS name, list it in `PLANTHMI_ALLOWED_HOSTS` (comma-separated, e.g. `hmi-line1.plant.local`). This blocks other websites from reaching the HMI through the browser.
 
 ---
 

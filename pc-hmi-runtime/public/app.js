@@ -316,7 +316,25 @@ function applyDisplayCanvasSize(width, height, backgroundColor) {
   }
 
   screenContent.style.background = bg;
+  fitDisplayToWindow();
 }
+
+// Displays are designed at a fixed size (e.g. 800x600); scale that to fill the window and
+// centre it, as a panel PC would, instead of leaving it in the top-left corner. Studio's
+// live preview (studioEdit) keeps the real pixel size.
+function fitDisplayToWindow() {
+  const app = document.getElementById('app');
+  if (!app || EMBED_MODE || STUDIO_EDIT) return;
+  const { width: w, height: h } = state.displaySize;
+  const scale = Math.min(window.innerWidth / w, window.innerHeight / h) || 1;
+  app.style.position = 'absolute';
+  app.style.transformOrigin = 'top left';
+  app.style.transform = `scale(${scale})`;
+  app.style.left = `${Math.max(0, (window.innerWidth - w * scale) / 2)}px`;
+  app.style.top = `${Math.max(0, (window.innerHeight - h * scale) / 2)}px`;
+}
+
+window.addEventListener('resize', fitDisplayToWindow);
 
 function resolveScreenSize(screen) {
   const rt = state.projectRuntime || {};

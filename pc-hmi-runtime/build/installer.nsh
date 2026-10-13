@@ -20,6 +20,9 @@
   CreateShortCut "$SMPROGRAMS\Plant HMI\Plant HMI Kiosk.lnk" \
     "$INSTDIR\Plant HMI.exe" "--runtime --kiosk" "$INSTDIR\Plant HMI.exe" 0
 
+  CreateShortCut "$SMPROGRAMS\Plant HMI\Uninstall Plant HMI.lnk" \
+    "$INSTDIR\Uninstall Plant HMI.exe" "" "$INSTDIR\Uninstall Plant HMI.exe" 0
+
   CreateShortCut "$DESKTOP\Plant HMI Studio.lnk" \
     "$INSTDIR\Plant HMI.exe" "" "$INSTDIR\Plant HMI.exe" 0
 
@@ -31,6 +34,7 @@
   Delete "$SMPROGRAMS\Plant HMI\Plant HMI Studio.lnk"
   Delete "$SMPROGRAMS\Plant HMI\Plant HMI Runtime.lnk"
   Delete "$SMPROGRAMS\Plant HMI\Plant HMI Kiosk.lnk"
+  Delete "$SMPROGRAMS\Plant HMI\Uninstall Plant HMI.lnk"
   RMDir "$SMPROGRAMS\Plant HMI"
   Delete "$DESKTOP\Plant HMI Studio.lnk"
   Delete "$DESKTOP\Plant HMI Runtime.lnk"

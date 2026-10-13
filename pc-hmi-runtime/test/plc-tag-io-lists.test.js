@@ -71,6 +71,13 @@ test('a multi-zone export gets one set of parameter files per zone', () => {
   assert.equal(values['RIO02 PLC DO List 01']['RIO02_PLC_DO_Discr.Data_00'], 'DO01 Dryer Tower Lamp Red');
 });
 
+test('user memory tags whose description starts with a code are not PLC points', () => {
+  const userTag = { name: 'Line.Speed', type: 'float', folder: 'Line', dataSource: 'memory', description: 'DI99 belt speed' };
+  assert.equal(IoListTags.classifyPlcIoPoints([userTag]).size, 0);
+  const zones = IoListTags.classifyPlcIoPoints([...importedTags(), userTag]);
+  assert.deepEqual([...zones.keys()].sort(), ['RIO01', 'RIO02', 'RIO03']);
+});
+
 test('projects without PLC IO points keep their existing lists unchanged', () => {
   const files = Builder.mergeProjectParameterFiles(null);
   const before = IoListTags.buildAllIoListTagDefs([], files);

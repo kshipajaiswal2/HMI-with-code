@@ -132,6 +132,8 @@ function classifyPlcIoPoints(tags) {
   const zones = new Map();
   for (const tag of tags || []) {
     if (isIoListFolder(tag?.folder)) continue;
+    // Only tags that come from the PLC; a user's own memory tag described "DI99 ..." is not a point.
+    if (!tag?.plcAddress && tag?.folder !== PLC_UPLOADED_TAGS_FOLDER) continue;
     // Imported tags are saved as "<folder>.<tag>"; the PLC's own tag name is in plcAddress.
     const plcTag = String(tag?.plcAddress || tag?.connection || tag?.name || '').trim();
     const description = String(tag?.description || '').trim();

@@ -9255,8 +9255,26 @@ function getTagFolderList(allDefs) {
   return [...ordered, ...rest];
 }
 
+// Per-zone IO list folders (RIO01_PLC_DI_Discr...) get the same Discr/No/Tags grouping as the
+// standard ones, one group per zone and kind ("RIO01 PLC_DI").
+function zoneTagFolderGroups(folders) {
+  const order = { Discr: 0, No: 1, Tags: 2 };
+  const groups = new Map();
+  for (const folder of folders) {
+    const m = String(folder).match(/^([A-Za-z0-9]+)_(PLC_DI|PLC_DO|Safety_DI|Safety_DO)_(Discr|No|Tags)$/);
+    if (!m) continue;
+    const id = `${m[1]} ${m[2]}`;
+    if (!groups.has(id)) groups.set(id, { id, folders: [] });
+    groups.get(id).folders.push(folder);
+  }
+  return [...groups.values()]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((g) => ({ ...g, folders: g.folders.sort((x, y) => order[x.split('_').pop()] - order[y.split('_').pop()]) }));
+}
+
 function buildTagEditorFolderTreeHtml(folders, allDefs, activeFolder) {
-  const groupedNames = new Set(HMI_TAG_EXPLORER_GROUPS.flatMap((group) => group.folders));
+  const folderGroups = [...HMI_TAG_EXPLORER_GROUPS, ...zoneTagFolderGroups(folders)];
+  const groupedNames = new Set(folderGroups.flatMap((group) => group.folders));
   const countOf = (folder) => allDefs.filter((def) => def.folder === folder).length;
   const collapsed = tagsPanelState.collapsedGroups || new Set();
   const leafBtn = (folder, label) => {
@@ -9268,7 +9286,7 @@ function buildTagEditorFolderTreeHtml(folders, allDefs, activeFolder) {
     return leafBtn(PLC_UPLOADED_TAGS_FOLDER, 'PLC uploaded Tags')
       .replace('class="tag-folder-btn', 'class="tag-folder-btn tag-folder-btn-root');
   }
-  const groupsHtml = HMI_TAG_EXPLORER_GROUPS.map((group) => {
+  const groupsHtml = folderGroups.map((group) => {
     const isCollapsed = collapsed.has(group.id);
     return `<div class="tag-folder-group${isCollapsed ? ' collapsed' : ''}" data-group="${escapeHtml(group.id)}">
       <button type="button" class="tag-folder-group-toggle" data-group-toggle="${escapeHtml(group.id)}" aria-expanded="${isCollapsed ? 'false' : 'true'}">

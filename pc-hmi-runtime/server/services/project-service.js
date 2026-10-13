@@ -1594,8 +1594,10 @@ class ProjectService {
     }
 
     const plcUploadedName = IoListTags.PLC_UPLOADED_TAGS_FOLDER;
+    // Per-zone IO list folders are grouped in the tag editor, like the standard ones above.
+    const isZoneIoFolder = (name) => name !== 'Temp_Tags' && IoListTags.isIoListFolder(name);
     const extraFolderNodes = orderedFolders
-      .filter((folderName) => !groupedNames.has(folderName) && folderName !== plcUploadedName)
+      .filter((folderName) => !groupedNames.has(folderName) && folderName !== plcUploadedName && !isZoneIoFolder(folderName))
       .map((folderName) => ({
         type: 'folder',
         id: `tag-folder-${folderName}`,

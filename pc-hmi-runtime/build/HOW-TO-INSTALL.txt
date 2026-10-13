@@ -12,7 +12,8 @@ Plant HMI 0.2.1 — install on another PC
 
 After install, Start Menu → Plant HMI Studio (or Plant HMI Runtime).
 
-To uninstall: Start Menu → Plant HMI → Uninstall Plant HMI
-  (or Windows Settings → Apps → Installed apps → Plant HMI → Uninstall).
+To uninstall: double-click "Uninstall Plant HMI.cmd" in this zip,
+  or Start Menu → Plant HMI → Uninstall Plant HMI,
+  or Windows Settings → Apps → Installed apps → Plant HMI → Uninstall.
 Your projects in %APPDATA%\Plant HMI\projects are kept.
 Projects are stored in: %APPDATA%\Plant HMI\projects

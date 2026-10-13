@@ -384,8 +384,11 @@
     return String(value).trim();
   }
 
+  // "Packing IO List", "IO list V04", and also short names such as "Frame-1 IO" or "IO Rack 2".
+  // Sheets that turn out to hold no IO rows are dropped after parsing.
   function isIoListSheetName(name) {
-    return /io\s*list/i.test(cellStr(name));
+    const text = cellStr(name);
+    return /io\s*list/i.test(text) || /(^|[\s_-])IO$/i.test(text) || /^IO([\s_-]|$)/i.test(text);
   }
 
   function ioListZoneFromSheetName(sheetName) {
@@ -413,6 +416,11 @@
       if (zone) {
         return zone;
       }
+    }
+
+    const shortSuffixMatch = name.match(/^(.*?)[\s_-]+IO$/i);
+    if (shortSuffixMatch && cellStr(shortSuffixMatch[1])) {
+      return cellStr(shortSuffixMatch[1]);
     }
 
     if (isIoListSheetName(name)) {
@@ -903,6 +911,76 @@
       }
     }
 
+    return inferMasterIoListSections(rows)[0] || null;
+  }
+
+  // Some master sheets leave the IO type column unlabelled ("Sl No | <SDI01...> | Address |
+  // Input Description ..."). Find the header row by its Sl No / Address / Description labels,
+  // split it into the input and output halves at the second Sl No, and on each half pick the
+  // column whose rows hold SDI/DI (input) or SDO/DO (output) codes.
+  function plainHeaderLabels(row) {
+    const labels = (Array.isArray(row) ? row : []).map(cellStr).map(normalizeHeaderLabel);
+    const isSlNo = (label) => label === 'sl no' || label === 'sno' || label === 'slno' || label.startsWith('sl no')
+      || label === 'sr no' || label.startsWith('sr no') || label === 'srno';
+    const indicesOf = (test) => labels.map((label, idx) => (test(label) ? idx : -1)).filter((idx) => idx >= 0);
+    const slNos = indicesOf(isSlNo);
+    const descriptions = indicesOf((label) => label.includes('description'));
+    const addresses = indicesOf((label) => label === 'address');
+    if (!slNos.length || !descriptions.length || !addresses.length) return null;
+    return { slNos, descriptions, addresses, tags: indicesOf((label) => label === 'tag' || label === 'full description') };
+  }
+
+  // A sheet can hold several tables (rack IO, analog, field modules), each under its own header
+  // row; the columns are worked out separately for each table.
+  function inferMasterIoListSections(rows) {
+    const starts = [];
+    (rows || []).forEach((row, idx) => { if (plainHeaderLabels(row)) starts.push(idx); });
+    return starts
+      .map((start, i) => inferMasterIoListHeaderFromData(rows, start, starts[i + 1] ?? rows.length))
+      .filter(Boolean);
+  }
+
+  function inferMasterIoListHeaderFromData(rows, from = 0, to = (rows || []).length) {
+    for (let rowIndex = from; rowIndex < Math.min(to, (rows || []).length); rowIndex += 1) {
+      const found = plainHeaderLabels(rows[rowIndex]);
+      if (!found) continue;
+      const { slNos, descriptions, addresses, tags } = found;
+      let end = to;
+      for (let next = rowIndex + 1; next < to; next += 1) {
+        if (plainHeaderLabels(rows[next])) { end = next; break; }
+      }
+
+      const splitAt = slNos.length > 1 ? slNos[1] : Infinity;
+      const hits = { input: new Map(), output: new Map() };
+      for (const row of rows.slice(rowIndex + 1, end)) {
+        (Array.isArray(row) ? row : []).forEach((cell, idx) => {
+          const parsed = parseIoPointType(cell);
+          const side = idx < splitAt ? 'input' : 'output';
+          if (!parsed?.num || parsed.direction !== side) return;
+          hits[side].set(idx, (hits[side].get(idx) || 0) + 1);
+        });
+      }
+      const best = (map) => [...map.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? -1;
+      const inputType = best(hits.input);
+      const outputType = best(hits.output);
+      if (inputType < 0 && outputType < 0) continue;
+
+      const inSide = (list) => list.find((idx) => idx < splitAt);
+      const outSide = (list) => list.find((idx) => idx >= splitAt);
+      return {
+        rowIndex,
+        endRow: end,
+        inferred: true,
+        inputType,
+        inputAddress: inputType >= 0 ? (inSide(addresses) ?? inputType + 2) : -1,
+        inputDescription: inputType >= 0 ? (inSide(descriptions) ?? inputType + 4) : -1,
+        inputTag: inputType >= 0 ? (inSide(tags) ?? inputType + 7) : -1,
+        outputType,
+        outputAddress: outputType >= 0 ? (outSide(addresses) ?? outputType + 2) : -1,
+        outputDescription: outputType >= 0 ? (outSide(descriptions) ?? outputType + 3) : -1,
+        outputTag: outputType >= 0 ? (outSide(tags) ?? outputType + 6) : -1
+      };
+    }
     return null;
   }
 
@@ -975,8 +1053,22 @@
     if (!match?.parsed) {
       return;
     }
+    // Unlabelled sheets: only real point codes (SDI01, DO12...) count, not any text that merely
+    // contains "DI"/"DO" such as a "Spare DO SOV" description.
+    if (header.inferred && !match.parsed.num) {
+      return;
+    }
 
     const values = pickIoSideValues(cells, header, side, match.index);
+    if (header.inferred) {
+      // Field-module tables put the module (RM01, VB02...) just before a module-relative code
+      // (DI01...) and have no address of their own; keep the module in the description.
+      const module = cellStr(cells[match.index - 1]);
+      if (/^[A-Z]{1,4}\d{1,3}$/i.test(module) && !parseIoPointType(module)) {
+        values.description = `${module} ${cellStr(values.description)}`.trim();
+      }
+      if (cellStr(values.address) === cellStr(values.typeValue)) values.address = '';
+    }
     const record = {
       type: match.parsed.code || cellStr(values.typeValue).toUpperCase(),
       ioKind: match.parsed.ioKind,
@@ -1278,12 +1370,14 @@
       doOutputs: []
     };
 
-    const header = findMasterIoListHeader(rows);
-    if (!header) {
+    const firstHeader = findMasterIoListHeader(rows);
+    if (!firstHeader) {
       return parsed;
     }
 
-    for (const rawRow of (rows || []).slice(header.rowIndex + 1)) {
+    // Labelled sheets use one header for the whole sheet; unlabelled ones are read table by table.
+    const sections = firstHeader.inferred ? inferMasterIoListSections(rows) : [firstHeader];
+    for (const header of sections) for (const rawRow of (rows || []).slice(header.rowIndex + 1, header.endRow ?? rows.length)) {
       const cells = (Array.isArray(rawRow) ? rawRow : []).map(cellStr);
       if (!cells.some(Boolean)) {
         continue;
